@@ -429,7 +429,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
             }
           ],
           temperature: 0.4, // Lower temperature for structured output
-          max_tokens: 2000
+          max_tokens: 4000
         })
       });
 
@@ -710,15 +710,97 @@ Maintain a supportive, motivational tone while being honest about adherence patt
   // Helper methods for plan generation
   private parsePlanResponse(response: string): any {
     try {
+      // Log raw response details
+      console.log('🔍 AI Response Analysis:');
+      console.log('- Raw response length:', response.length);
+      console.log('- Raw response preview (first 200 chars):', response.substring(0, 200));
+      console.log('- Raw response preview (last 200 chars):', response.substring(response.length - 200));
+      
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        console.log('❌ No JSON found in response - checking for markdown wrapping');
+        console.log('- Contains markdown code blocks:', response.includes('```'));
+        console.log('- Contains "json":', response.includes('json'));
         throw new Error('No JSON found in AI response');
       }
-      return JSON.parse(jsonMatch[0]);
+      
+      let extractedJson = jsonMatch[0];
+      console.log('✅ JSON extracted with regex');
+      console.log('- Extracted JSON length:', extractedJson.length);
+      console.log('- JSON starts with:', extractedJson.substring(0, 100));
+      console.log('- JSON ends with:', extractedJson.substring(extractedJson.length - 100));
+      
+      // Check for common JSON issues around position 8500
+      if (extractedJson.length > 8500) {
+        const errorContext = extractedJson.substring(8450, 8550);
+        console.log('🎯 Context around error position 8500:', errorContext);
+        
+        // Check for trailing commas
+        const trailingCommaMatches = extractedJson.match(/,\s*[}\]]/g);
+        if (trailingCommaMatches) {
+          console.log('⚠️ Found trailing commas in JSON:', trailingCommaMatches.length, 'instances');
+        }
+        
+        // Check for incomplete arrays/objects
+        const openBraces = (extractedJson.match(/\{/g) || []).length;
+        const closeBraces = (extractedJson.match(/\}/g) || []).length;
+        const openBrackets = (extractedJson.match(/\[/g) || []).length;
+        const closeBrackets = (extractedJson.match(/\]/g) || []).length;
+        
+        console.log('📊 Brace/Bracket balance:');
+        console.log('- Open braces {:', openBraces, 'Close braces }:', closeBraces);
+        console.log('- Open brackets [:', openBrackets, 'Close brackets ]:', closeBrackets);
+        
+        if (openBraces !== closeBraces || openBrackets !== closeBrackets) {
+          console.log('❌ Unbalanced braces/brackets - attempting JSON repair...');
+          extractedJson = this.repairIncompleteJSON(extractedJson, openBraces, closeBraces, openBrackets, closeBrackets);
+          console.log('🔧 JSON repaired, new length:', extractedJson.length);
+        }
+      }
+      
+      const parsed = JSON.parse(extractedJson);
+      console.log('✅ JSON parsed successfully');
+      return parsed;
     } catch (error) {
-      console.error('Failed to parse plan response:', error);
+      console.error('❌ Failed to parse plan response:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      } else {
+        console.error('Non-Error thrown:', error);
+      }
       throw new Error('Invalid plan format from AI');
     }
+  }
+
+  private repairIncompleteJSON(json: string, openBraces: number, closeBraces: number, openBrackets: number, closeBrackets: number): string {
+    let repaired = json;
+    
+    // Remove trailing commas that might be causing the issue
+    repaired = repaired.replace(/,\s*([}\]])/g, '$1');
+    
+    // Add missing closing brackets and braces
+    const missingBraces = openBraces - closeBraces;
+    const missingBrackets = openBrackets - closeBrackets;
+    
+    // Add missing closing brackets first (inner structures)
+    for (let i = 0; i < missingBrackets; i++) {
+      repaired += ']';
+    }
+    
+    // Add missing closing braces (outer structures)
+    for (let i = 0; i < missingBraces; i++) {
+      repaired += '}';
+    }
+    
+    console.log('🔧 JSON repair applied:');
+    console.log('- Added', missingBrackets, 'closing brackets');
+    console.log('- Added', missingBraces, 'closing braces');
+    
+    return repaired;
   }
 
   private parsePlanModificationResponse(response: string): any {
