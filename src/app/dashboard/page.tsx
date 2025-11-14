@@ -6,10 +6,13 @@ import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
+
+// Chart type options
+type ChartType = 'line' | 'bar' | 'area';
 
 interface TimeRangeOption {
   value: TimeRange;
@@ -32,6 +35,7 @@ interface ChartConfig {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
+  fillOpacity?: number;
   formatter: (value: number) => string;
   yAxisFormatter: (value: number) => string;
   unit: string;
@@ -42,7 +46,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     metric: 'distance',
     label: 'Distance',
     icon: TrendingUp,
-    color: 'hsl(var(--primary))',
+    color: '#3b82f6', // Blue-500
+    fillOpacity: 0.3,
     formatter: (value: number) => `${value}m`,
     yAxisFormatter: (value: number) => `${value}m`,
     unit: 'meters'
@@ -51,7 +56,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     metric: 'pace',
     label: 'Average Pace',
     icon: Target,
-    color: 'hsl(var(--chart-2))',
+    color: '#10b981', // Emerald-500
+    fillOpacity: 0.3,
     formatter: (value: number) => formatPace(value),
     yAxisFormatter: (value: number) => formatPace(value),
     unit: 'time per 500m'
@@ -60,7 +66,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     metric: 'power',
     label: 'Average Power',
     icon: Zap,
-    color: 'hsl(var(--chart-3))',
+    color: '#f59e0b', // Amber-500
+    fillOpacity: 0.3,
     formatter: (value: number) => `${Math.round(value)}W`,
     yAxisFormatter: (value: number) => `${Math.round(value)}W`,
     unit: 'watts'
@@ -69,7 +76,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     metric: 'strokeRate',
     label: 'Stroke Rate',
     icon: Activity,
-    color: 'hsl(var(--chart-4))',
+    color: '#8b5cf6', // Violet-500
+    fillOpacity: 0.3,
     formatter: (value: number) => `${Math.round(value)} SPM`,
     yAxisFormatter: (value: number) => `${Math.round(value)}`,
     unit: 'strokes per minute'
@@ -78,7 +86,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     metric: 'energy',
     label: 'Energy',
     icon: Flame,
-    color: 'hsl(var(--chart-5))',
+    color: '#ef4444', // Red-500
+    fillOpacity: 0.3,
     formatter: (value: number) => `${Math.round(value)} kCal`,
     yAxisFormatter: (value: number) => `${Math.round(value)}`,
     unit: 'kilocalories'
@@ -87,7 +96,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     metric: 'duration',
     label: 'Duration',
     icon: Clock,
-    color: 'hsl(var(--chart-6))',
+    color: '#06b6d4', // Cyan-500
+    fillOpacity: 0.3,
     formatter: (value: number) => formatDuration(value),
     yAxisFormatter: (value: number) => `${Math.round(value / 60)}m`,
     unit: 'minutes'
@@ -157,6 +167,7 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
   const [enabledCharts, setEnabledCharts] = useState<ChartMetric[]>(['distance', 'power', 'pace']);
+  const [chartType, setChartType] = useState<ChartType>('line');
 
   useEffect(() => {
     setMounted(true);
@@ -233,6 +244,85 @@ export default function DashboardPage() {
     acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
     return acc;
   }, {} as Record<ChartMetric, any[]>);
+
+  // Render chart based on selected type
+  const renderChart = (metric: ChartMetric, chartData: any[], config: ChartConfig) => {
+    const commonProps = {
+      width: '100%' as const,
+      height: 300,
+      data: chartData,
+      margin: { top: 5, right: 30, left: 20, bottom: 5 }
+    };
+
+    const commonChartElements = (
+      <>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <XAxis 
+          dataKey="date" 
+          className="text-xs"
+          stroke="#6b7280"
+          tick={{ fill: '#6b7280' }}
+        />
+        <YAxis 
+          className="text-xs"
+          stroke="#6b7280"
+          tick={{ fill: '#6b7280' }}
+          tickFormatter={config.yAxisFormatter}
+        />
+        <Tooltip 
+          contentStyle={{
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            color: '#111827'
+          }}
+          formatter={(value: number) => [config.formatter(value), config.label]}
+        />
+      </>
+    );
+
+    switch (chartType) {
+      case 'bar':
+        return (
+          <BarChart {...commonProps}>
+            {commonChartElements}
+            <Bar 
+              dataKey={metric} 
+              fill={config.color}
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        );
+      case 'area':
+        return (
+          <AreaChart {...commonProps}>
+            {commonChartElements}
+            <Area 
+              type="monotone" 
+              dataKey={metric} 
+              stroke={config.color}
+              fill={config.color}
+              fillOpacity={config.fillOpacity}
+              strokeWidth={2}
+            />
+          </AreaChart>
+        );
+      default: // line
+        return (
+          <LineChart {...commonProps}>
+            {commonChartElements}
+            <Line 
+              type="monotone" 
+              dataKey={metric} 
+              stroke={config.color}
+              strokeWidth={2}
+              dot={{ fill: config.color, strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -440,13 +530,46 @@ export default function DashboardPage() {
               {/* Chart Selector */}
               <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Gauge className="h-5 w-5 text-primary" />
-                    Select Charts to Display
-                  </CardTitle>
-                  <CardDescription>
-                    Choose which metrics to track over time
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Gauge className="h-5 w-5 text-primary" />
+                        Select Charts to Display
+                      </CardTitle>
+                      <CardDescription>
+                        Choose which metrics to track over time
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground mr-2">Chart Type:</span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant={chartType === 'line' ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setChartType('line')}
+                          className="text-xs"
+                        >
+                          Line
+                        </Button>
+                        <Button
+                          variant={chartType === 'bar' ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setChartType('bar')}
+                          className="text-xs"
+                        >
+                          Bar
+                        </Button>
+                        <Button
+                          variant={chartType === 'area' ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setChartType('area')}
+                          className="text-xs"
+                        >
+                          Area
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -471,7 +594,7 @@ export default function DashboardPage() {
                   <div className="mt-4 text-sm text-muted-foreground">
                     {enabledCharts.length === 0 
                       ? "No charts selected. Select at least one metric to visualize."
-                      : `Showing ${enabledCharts.length} chart${enabledCharts.length > 1 ? 's' : ''}`
+                      : `Showing ${enabledCharts.length} chart${enabledCharts.length > 1 ? 's' : ''} as ${chartType} visualization${chartType !== 'line' ? 's' : ''}`
                     }
                   </div>
                 </CardContent>
@@ -505,37 +628,11 @@ export default function DashboardPage() {
                       </CardHeader>
                       <CardContent>
                         {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                              <XAxis 
-                                dataKey="date" 
-                                className="text-xs"
-                                stroke="hsl(var(--muted-foreground))"
-                              />
-                              <YAxis 
-                                className="text-xs"
-                                stroke="hsl(var(--muted-foreground))"
-                                tickFormatter={config.yAxisFormatter}
-                              />
-                              <Tooltip 
-                                contentStyle={{
-                                  backgroundColor: 'hsl(var(--background))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '6px'
-                                }}
-                                formatter={(value: number) => [config.formatter(value), config.label]}
-                              />
-                              <Line 
-                                type="monotone" 
-                                dataKey={metric} 
-                                stroke={config.color}
-                                strokeWidth={2}
-                                dot={{ fill: config.color, strokeWidth: 2, r: 4 }}
-                                activeDot={{ r: 6 }}
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
+                          <div className="w-full">
+                            <ResponsiveContainer width="100%" height={300}>
+                              {renderChart(metric, chartData, config)}
+                            </ResponsiveContainer>
+                          </div>
                         ) : (
                           <div className="text-center text-muted-foreground py-8">
                             <p>No data available for {config.label.toLowerCase()} chart.</p>
