@@ -7,6 +7,23 @@ interface OpenAIConfig {
   baseUrl: string;
 }
 
+// Chat message types
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  sessionId: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Insight types from cloud AI
 export interface CloudInsight {
   id: string;
@@ -55,6 +72,151 @@ export class CloudAIService {
   // Check if service is configured
   isConfigured(): boolean {
     return this.config !== null;
+  }
+
+  // Send chat message to AI trainer
+  async sendChatMessage(
+    message: string, 
+    conversationHistory: ChatMessage[] = [],
+    userSessions?: Session[]
+  ): Promise<string> {
+    if (!this.config) {
+      throw new Error('Cloud AI service not configured');
+    }
+
+    try {
+      const messages = this.buildChatMessages(message, conversationHistory, userSessions);
+      
+      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages,
+          temperature: 0.7, // Higher temperature for more conversational responses
+          max_tokens: 1000
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Chat AI failed:', error);
+      throw error;
+    }
+  }
+
+  // Build chat message array with system prompt and conversation context
+  private buildChatMessages(
+    userMessage: string, 
+    history: ChatMessage[], 
+    sessions?: Session[]
+  ): any[] {
+    const systemPrompt = this.getChatSystemPrompt(sessions);
+    
+    // Start with system prompt
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt
+      }
+    ];
+
+    // Add conversation history (last 10 messages to maintain context)
+    const recentHistory = history.slice(-10);
+    recentHistory.forEach(msg => {
+      messages.push({
+        role: msg.role,
+        content: msg.content
+      });
+    });
+
+    // Add current user message
+    messages.push({
+      role: 'user',
+      content: userMessage
+    });
+
+    return messages;
+  }
+
+  // Get system prompt for chat AI trainer
+  private getChatSystemPrompt(sessions?: Session[]): string {
+    const sessionContext = sessions ? this.getSessionContext(sessions) : '';
+    
+    return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
+
+YOUR EXPERTISE:
+- Rowing technique and form improvement
+- Training program design and periodization
+- Performance analysis and goal setting
+- Recovery and injury prevention
+- Nutrition and lifestyle guidance for rowers
+- Mental preparation and race strategy
+
+YOUR PERSONALITY:
+- Encouraging and motivational
+- Knowledgeable but approachable
+- Data-driven when relevant, but focused on practical advice
+- Asks clarifying questions to provide better guidance
+- Celebrates progress and provides constructive feedback
+
+${sessionContext}
+
+COMMUNICATION STYLE:
+- Use conversational, encouraging language
+- Provide specific, actionable advice
+- Ask about the rower's goals, experience level, and constraints
+- Reference their actual data when available to personalize recommendations
+- Keep responses focused and practical
+
+Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.`;
+  }
+
+  // Get user's session context for personalized coaching
+  private getSessionContext(sessions: Session[]): string {
+    if (!sessions || sessions.length === 0) {
+      return 'USER DATA: No training sessions available yet.';
+    }
+
+    const recentSessions = sessions.slice(-5);
+    const totalSessions = sessions.length;
+    const totalDistance = sessions.reduce((sum, s) => sum + s.distance, 0);
+    const avgPace = sessions
+      .map(s => s.avgSplit)
+      .filter(p => p > 0)
+      .reduce((sum, p, _, arr) => sum + p / arr.length, 0);
+    const avgPower = sessions
+      .map(s => s.avgPower)
+      .filter(p => p > 0)
+      .reduce((sum, p, _, arr) => sum + p / arr.length, 0);
+
+    return `USER DATA:
+- Total Sessions: ${totalSessions}
+- Total Distance: ${(totalDistance / 1000).toFixed(1)}km
+- Average Pace: ${avgPace > 0 ? this.formatPace(avgPace) : 'N/A'}/500m
+- Average Power: ${avgPower > 0 ? Math.round(avgPower) + 'W' : 'N/A'}
+- Recent Activity: Last ${recentSessions.length} sessions in the past ${this.getDaysSpan(recentSessions)} days
+
+Use this data to provide personalized coaching and reference their actual performance when relevant.`;
+  }
+
+  // Calculate time span of sessions
+  private getDaysSpan(sessions: Session[]): number {
+    if (sessions.length < 2) return 0;
+    
+    const dates = sessions.map(s => new Date(s.timestamp));
+    const oldest = new Date(Math.min(...dates.map(d => d.getTime())));
+    const newest = new Date(Math.max(...dates.map(d => d.getTime())));
+    
+    return Math.ceil((newest.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24));
   }
 
   // Anonymize session data for privacy
