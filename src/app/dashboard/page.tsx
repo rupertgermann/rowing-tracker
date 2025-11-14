@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -177,6 +178,7 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 
 export default function DashboardPage() {
   const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
+  const router = useRouter();
   const sessions = getSessions();
   const stats = getStats();
   const chartSettings = getChartSettings();
@@ -227,7 +229,8 @@ export default function DashboardPage() {
     return sessions.map(session => ({
       date: formatDate(new Date(session.timestamp)),
       [metric]: getMetricValue(session, metric),
-      fullDate: session.timestamp
+      fullDate: session.timestamp,
+      sessionId: session.id
     }));
   };
 
@@ -260,6 +263,26 @@ export default function DashboardPage() {
     return acc;
   }, {} as Record<ChartMetric, any[]>);
 
+  // Handle chart data point click
+  const handleChartClick = (data: any) => {
+    console.log('Chart clicked:', data); // Debug: Log what Recharts passes
+    if (data && data.sessionId) {
+      console.log('Navigating to session:', data.sessionId); // Debug: Log navigation
+      router.push(`/sessions/${data.sessionId}`);
+    } else if (data && data.activePayload && data.activePayload.length > 0) {
+      // For Bar/Area charts, extract from activePayload
+      const sessionId = data.activePayload[0].payload.sessionId;
+      if (sessionId) {
+        console.log('Navigating to session from payload:', sessionId); // Debug: Log navigation
+        router.push(`/sessions/${sessionId}`);
+      } else {
+        console.log('No sessionId found in activePayload'); // Debug: Log missing ID
+      }
+    } else {
+      console.log('No sessionId found in clicked data'); // Debug: Log missing ID
+    }
+  };
+
   // Render chart based on selected type
   const renderChart = (metric: ChartMetric, chartData: any[], config: ChartConfig) => {
     const commonProps = {
@@ -267,6 +290,12 @@ export default function DashboardPage() {
       height: 300,
       data: chartData,
       margin: { top: 5, right: 30, left: 20, bottom: 5 }
+    };
+
+    // Props for Bar/Area charts (need container onClick)
+    const barAreaProps = {
+      ...commonProps,
+      onClick: handleChartClick
     };
 
     const commonChartElements = (
@@ -291,18 +320,19 @@ export default function DashboardPage() {
     switch (chartSettings.chartType) {
       case 'bar':
         return (
-          <BarChart {...commonProps}>
+          <BarChart {...barAreaProps}>
             {commonChartElements}
             <Bar 
               dataKey={metric} 
               fill={config.color}
               radius={[4, 4, 0, 0]}
+              cursor="pointer"
             />
           </BarChart>
         );
       case 'area':
         return (
-          <AreaChart {...commonProps}>
+          <AreaChart {...barAreaProps}>
             {commonChartElements}
             <Area 
               type="monotone" 
@@ -311,6 +341,7 @@ export default function DashboardPage() {
               fill={config.color}
               fillOpacity={config.fillOpacity}
               strokeWidth={2}
+              cursor="pointer"
             />
           </AreaChart>
         );
@@ -323,8 +354,12 @@ export default function DashboardPage() {
               dataKey={metric} 
               stroke={config.color}
               strokeWidth={2}
-              dot={{ fill: config.color, strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6 }}
+              dot={{ fill: config.color, strokeWidth: 2, r: 4, cursor: 'pointer' }}
+              activeDot={{ 
+                r: 6, 
+                cursor: 'pointer',
+                onClick: (e: any, payload: any) => handleChartClick(payload)
+              }}
             />
           </LineChart>
         );
