@@ -159,6 +159,10 @@ Build a stunning web app to visualize SmartRow CSV exports with beautiful analyt
   - `LineChart` or `BarChart` for distance/duration ✅
   - Built-in `Tooltip` component for hover values ✅
   - Filter data based on selected time range ✅
+- [x] Chart data point navigation ✅
+  - Click on chart points to view session details ✅
+  - Works with Line, Bar, and Area charts ✅
+  - Visual feedback with cursor pointer ✅
 - [x] Time range selector with shadcn buttons ✅
   - Buttons for: 7 days, 30 days, 90 days, All time
   - Use React state for selection (no persistence needed for MVP)
@@ -190,7 +194,7 @@ Build a stunning web app to visualize SmartRow CSV exports with beautiful analyt
   - Date picker for start/end dates
   - Quick filters: Last week, Last month, Last 3 months
 - [x] Distance filter ✅
-  - Dropdown or slider: 500m, 1000m, 2000m+, All
+  - Dropdown or slider: 100m, 500m, 1000m, 2000m, 5000m+, All
 - [x] Clear filters button ✅
 
 ### Sorting
@@ -235,34 +239,35 @@ Build a stunning web app to visualize SmartRow CSV exports with beautiful analyt
 
 ---
 
-## Phase 6: Personal Records (Day 8)
+## Phase 6: Personal Records (Day 8) ✅ COMPLETED
 
 ### PR Calculations
-- [ ] Implement PR calculation logic
-  - Best (fastest) time for 500m
-  - Best time for 1000m
-  - Best time for 2000m
-  - Best time for 5000m
-  - Track date of each PR
-- [ ] Calculate best average power
-- [ ] Calculate best stroke rate
+- [x] Implement PR calculation logic ✅
+  - Best (fastest) time for 100m ✅
+  - Best (fastest) time for 500m ✅
+  - Best time for 1000m ✅
+  - Best time for 2000m ✅
+  - Best time for 5000m ✅
+  - Track date of each PR ✅
+- [x] Calculate best average power ✅
+- [x] Calculate best stroke rate ✅
 
 ### PR Display
-- [ ] Create PRs page
-- [ ] Build PR cards
-  - Distance category
-  - Best time
-  - Date achieved
-  - Average pace
-  - Average power
-  - Visual styling (gold/trophy theme)
-- [ ] Show "No PR yet" for uncompleted distances
+- [x] Create PRs page ✅
+- [x] Build PR cards ✅
+  - Distance category ✅
+  - Best time ✅
+  - Date achieved ✅
+  - Average pace ✅
+  - Average power ✅
+  - Visual styling (gold/trophy theme) ✅
+- [x] Show "No PR yet" for uncompleted distances ✅
 
 ### PR Badges
-- [ ] Add PR badges to sessions list
-  - Small icon/badge for sessions with PRs
-  - Tooltip showing which PR was achieved
-- [ ] Highlight PR sessions in table
+- [x] Add PR badges to sessions list ✅
+  - Small icon/badge for sessions with PRs ✅
+  - Tooltip showing which PR was achieved ✅
+- [x] Highlight PR sessions in table ✅
 
 ---
 
@@ -305,10 +310,13 @@ Build a stunning web app to visualize SmartRow CSV exports with beautiful analyt
 - [ ] Focus states
 
 ### Performance
-- [ ] Use React.useMemo for expensive calculations (PR calculations, aggregations)
-- [ ] Recharts automatically optimizes with ResponsiveContainer
-- [ ] Next.js App Router handles code splitting automatically
-- [ ] Zustand is already optimized (no re-renders on unrelated state changes)
+- [x] Use React.useMemo for expensive calculations ✅
+  - Memoized session filtering with time range ✅
+  - Memoized stats aggregations ✅
+  - Memoized chart data preparation ✅
+- [x] Recharts automatically optimizes with ResponsiveContainer ✅
+- [x] Next.js App Router handles code splitting automatically ✅
+- [x] Zustand is already optimized (no re-renders on unrelated state changes) ✅
 
 ---
 
