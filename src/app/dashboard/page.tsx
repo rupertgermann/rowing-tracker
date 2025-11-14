@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,11 @@ export default function DashboardPage() {
   const { getSessions, getStats } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check if user has data
   const hasData = sessions.length > 0;
@@ -68,7 +73,18 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        {!hasData ? (
+        {!mounted ? (
+          // Loading placeholder to match server/client
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-64 mb-4"></div>
+            <div className="h-4 bg-muted rounded w-96 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-32 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        ) : !hasData ? (
           // Empty state
           <div className="text-center py-16">
             <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,11 @@ function formatDate(date: Date): string {
 export default function SessionsPage() {
   const { getSessions } = useRowingStore();
   const sessions = getSessions();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sort sessions by date (newest first)
   const sortedSessions = [...sessions].sort((a, b) => 
@@ -65,23 +71,14 @@ export default function SessionsPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Sessions</h1>
-            <p className="text-muted-foreground">
-              Browse and analyze your workout history
-            </p>
+        {!mounted ? (
+          // Loading placeholder to match server/client
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-32 mb-4"></div>
+            <div className="h-4 bg-muted rounded w-64 mb-8"></div>
+            <div className="h-96 bg-muted rounded"></div>
           </div>
-          {hasData && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>{sessions.length} sessions</span>
-            </div>
-          )}
-        </div>
-
-        {!hasData ? (
+        ) : !hasData ? (
           // Empty state
           <div className="text-center py-16">
             <div className="bg-muted rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
