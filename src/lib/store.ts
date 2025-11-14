@@ -2,11 +2,21 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 
+// Chart configuration types
+type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration';
+type ChartType = 'line' | 'bar' | 'area';
+
+interface ChartSettings {
+  enabledCharts: ChartMetric[];
+  chartType: ChartType;
+}
+
 interface RowingStore {
   // State
   sessions: Session[];
   personalRecords: PersonalRecord[];
   filters: SessionFilters;
+  chartSettings: ChartSettings;
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -14,6 +24,8 @@ interface RowingStore {
   updateFilters: (filters: Partial<SessionFilters>) => void;
   resetFilters: () => void;
   deleteSession: (sessionId: string) => void;
+  updateChartSettings: (settings: Partial<ChartSettings>) => void;
+  resetChartSettings: () => void;
   
   // Computed getters
   getSessions: () => Session[];
@@ -21,11 +33,17 @@ interface RowingStore {
   getStats: () => SessionStats;
   getPersonalRecords: () => PersonalRecord[];
   getSessionById: (id: string) => Session | undefined;
+  getChartSettings: () => ChartSettings;
 }
 
 const defaultFilters: SessionFilters = {
   sortBy: 'date',
   sortOrder: 'desc'
+};
+
+const defaultChartSettings: ChartSettings = {
+  enabledCharts: ['distance', 'power', 'pace'],
+  chartType: 'line'
 };
 
 // Calculate personal records from sessions
@@ -217,6 +235,7 @@ export const useRowingStore = create<RowingStore>()(
       sessions: [],
       personalRecords: [],
       filters: defaultFilters,
+      chartSettings: defaultChartSettings,
 
       // Actions
       addSessions: (newSessions) => {
@@ -263,6 +282,16 @@ export const useRowingStore = create<RowingStore>()(
         });
       },
 
+      updateChartSettings: (newSettings) => {
+        set((state) => ({
+          chartSettings: { ...state.chartSettings, ...newSettings }
+        }));
+      },
+
+      resetChartSettings: () => {
+        set({ chartSettings: defaultChartSettings });
+      },
+
       // Computed getters
       getSessions: () => get().sessions,
       
@@ -281,6 +310,10 @@ export const useRowingStore = create<RowingStore>()(
 
       getSessionById: (id) => {
         return get().sessions.find(session => session.id === id);
+      },
+
+      getChartSettings: () => {
+        return get().chartSettings;
       }
     }),
     {
@@ -289,7 +322,8 @@ export const useRowingStore = create<RowingStore>()(
       // Only persist essential data, not computed values
       partialize: (state) => ({
         sessions: state.sessions,
-        filters: state.filters
+        filters: state.filters,
+        chartSettings: state.chartSettings
       }),
       // Convert string timestamps back to Date objects on rehydrate
       onRehydrateStorage: () => (state) => {

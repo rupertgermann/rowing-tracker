@@ -161,13 +161,12 @@ function prepareChartData(sessions: any[]) {
 }
 
 export default function DashboardPage() {
-  const { getSessions, getStats } = useRowingStore();
+  const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
+  const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
-  const [enabledCharts, setEnabledCharts] = useState<ChartMetric[]>(['distance', 'power', 'pace']);
-  const [chartType, setChartType] = useState<ChartType>('line');
 
   useEffect(() => {
     setMounted(true);
@@ -232,15 +231,16 @@ export default function DashboardPage() {
 
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
-    setEnabledCharts(prev => 
-      prev.includes(metric) 
-        ? prev.filter(m => m !== metric)
-        : [...prev, metric]
-    );
+    const currentCharts = chartSettings.enabledCharts;
+    const updatedCharts = currentCharts.includes(metric) 
+      ? currentCharts.filter(m => m !== metric)
+      : [...currentCharts, metric];
+    
+    updateChartSettings({ enabledCharts: updatedCharts });
   };
 
   // Prepare chart data for each enabled metric
-  const chartDataMap = enabledCharts.reduce((acc, metric) => {
+  const chartDataMap = chartSettings.enabledCharts.reduce((acc, metric) => {
     acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
     return acc;
   }, {} as Record<ChartMetric, any[]>);
@@ -281,7 +281,7 @@ export default function DashboardPage() {
       </>
     );
 
-    switch (chartType) {
+    switch (chartSettings.chartType) {
       case 'bar':
         return (
           <BarChart {...commonProps}>
@@ -544,25 +544,25 @@ export default function DashboardPage() {
                       <span className="text-sm text-muted-foreground mr-2">Chart Type:</span>
                       <div className="flex gap-1">
                         <Button
-                          variant={chartType === 'line' ? "default" : "outline"}
+                          variant={chartSettings.chartType === 'line' ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setChartType('line')}
+                          onClick={() => updateChartSettings({ chartType: 'line' })}
                           className="text-xs"
                         >
                           Line
                         </Button>
                         <Button
-                          variant={chartType === 'bar' ? "default" : "outline"}
+                          variant={chartSettings.chartType === 'bar' ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setChartType('bar')}
+                          onClick={() => updateChartSettings({ chartType: 'bar' })}
                           className="text-xs"
                         >
                           Bar
                         </Button>
                         <Button
-                          variant={chartType === 'area' ? "default" : "outline"}
+                          variant={chartSettings.chartType === 'area' ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setChartType('area')}
+                          onClick={() => updateChartSettings({ chartType: 'area' })}
                           className="text-xs"
                         >
                           Area
@@ -575,7 +575,7 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     {Object.entries(chartConfigs).map(([metric, config]) => {
                       const Icon = config.icon;
-                      const isEnabled = enabledCharts.includes(metric as ChartMetric);
+                      const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
                       
                       return (
                         <Button
@@ -592,9 +592,9 @@ export default function DashboardPage() {
                     })}
                   </div>
                   <div className="mt-4 text-sm text-muted-foreground">
-                    {enabledCharts.length === 0 
+                    {chartSettings.enabledCharts.length === 0 
                       ? "No charts selected. Select at least one metric to visualize."
-                      : `Showing ${enabledCharts.length} chart${enabledCharts.length > 1 ? 's' : ''} as ${chartType} visualization${chartType !== 'line' ? 's' : ''}`
+                      : `Showing ${chartSettings.enabledCharts.length} chart${chartSettings.enabledCharts.length > 1 ? 's' : ''} as ${chartSettings.chartType} visualization${chartSettings.chartType !== 'line' ? 's' : ''}`
                     }
                   </div>
                 </CardContent>
@@ -602,9 +602,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Configurable Charts */}
-            {enabledCharts.length > 0 && (
+            {chartSettings.enabledCharts.length > 0 && (
               <div className="space-y-6">
-                {enabledCharts.map(metric => {
+                {chartSettings.enabledCharts.map(metric => {
                   const config = chartConfigs[metric];
                   const Icon = config.icon;
                   const chartData = chartDataMap[metric];
@@ -647,7 +647,7 @@ export default function DashboardPage() {
             )}
 
             {/* Empty State for Charts */}
-            {enabledCharts.length === 0 && (
+            {chartSettings.enabledCharts.length === 0 && (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center py-8">
