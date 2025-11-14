@@ -498,7 +498,7 @@ export default function PlansPage() {
                       <div
                         key={session.id}
                         className={`p-3 border rounded-lg flex items-center justify-between ${
-                          session.completed ? 'bg-green-50 border-green-200' : 'bg-white'
+                          session.completed ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-card dark:bg-card'
                         }`}
                       >
                         <div className="flex items-center gap-3">
