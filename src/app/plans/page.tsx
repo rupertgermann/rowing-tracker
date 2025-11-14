@@ -152,8 +152,9 @@ export default function PlansPage() {
           status: 'active',
           startDate: new Date()
         });
-        setActivePlan(updatedPlan);
-        setPlans(plans.map(p => p.id === planId ? updatedPlan : p));
+        
+        // Reload plans from localStorage to ensure state synchronization
+        loadPlans();
       }
     } catch (err) {
       setError('Failed to activate plan');
