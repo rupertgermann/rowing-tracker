@@ -19,7 +19,7 @@ import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDo
 // Filter options
 interface FilterConfig {
   dateRange: 'all' | '7days' | '30days' | '90days';
-  distanceRange: 'all' | '500' | '1000' | '2000' | '5000+';
+  distanceRange: 'all' | '100' | '500' | '1000' | '2000' | '5000+';
 }
 
 const dateRangeOptions = [
@@ -31,6 +31,7 @@ const dateRangeOptions = [
 
 const distanceRangeOptions = [
   { value: 'all', label: 'All Distances' },
+  { value: '100', label: '100m' },
   { value: '500', label: '500m' },
   { value: '1000', label: '1000m' },
   { value: '2000', label: '2000m' },
