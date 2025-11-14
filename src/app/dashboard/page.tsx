@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Time range options
@@ -23,6 +23,76 @@ const timeRangeOptions: TimeRangeOption[] = [
   { value: '90days', label: '90 Days', days: 90 },
   { value: 'all', label: 'All Time' }
 ];
+
+// Chart configuration options
+type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration';
+
+interface ChartConfig {
+  metric: ChartMetric;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  formatter: (value: number) => string;
+  yAxisFormatter: (value: number) => string;
+  unit: string;
+}
+
+const chartConfigs: Record<ChartMetric, ChartConfig> = {
+  distance: {
+    metric: 'distance',
+    label: 'Distance',
+    icon: TrendingUp,
+    color: 'hsl(var(--primary))',
+    formatter: (value: number) => `${value}m`,
+    yAxisFormatter: (value: number) => `${value}m`,
+    unit: 'meters'
+  },
+  pace: {
+    metric: 'pace',
+    label: 'Average Pace',
+    icon: Target,
+    color: 'hsl(var(--chart-2))',
+    formatter: (value: number) => formatPace(value),
+    yAxisFormatter: (value: number) => formatPace(value),
+    unit: 'time per 500m'
+  },
+  power: {
+    metric: 'power',
+    label: 'Average Power',
+    icon: Zap,
+    color: 'hsl(var(--chart-3))',
+    formatter: (value: number) => `${Math.round(value)}W`,
+    yAxisFormatter: (value: number) => `${Math.round(value)}W`,
+    unit: 'watts'
+  },
+  strokeRate: {
+    metric: 'strokeRate',
+    label: 'Stroke Rate',
+    icon: Activity,
+    color: 'hsl(var(--chart-4))',
+    formatter: (value: number) => `${Math.round(value)} SPM`,
+    yAxisFormatter: (value: number) => `${Math.round(value)}`,
+    unit: 'strokes per minute'
+  },
+  energy: {
+    metric: 'energy',
+    label: 'Energy',
+    icon: Flame,
+    color: 'hsl(var(--chart-5))',
+    formatter: (value: number) => `${Math.round(value)} kCal`,
+    yAxisFormatter: (value: number) => `${Math.round(value)}`,
+    unit: 'kilocalories'
+  },
+  duration: {
+    metric: 'duration',
+    label: 'Duration',
+    icon: Clock,
+    color: 'hsl(var(--chart-6))',
+    formatter: (value: number) => formatDuration(value),
+    yAxisFormatter: (value: number) => `${Math.round(value / 60)}m`,
+    unit: 'minutes'
+  }
+};
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -55,6 +125,16 @@ function formatPower(watts: number): string {
   return `${Math.round(watts)}W`;
 }
 
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 // Prepare chart data for distance over time
 function prepareChartData(sessions: any[]) {
   return sessions
@@ -76,6 +156,7 @@ export default function DashboardPage() {
   const stats = getStats();
   const [mounted, setMounted] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [enabledCharts, setEnabledCharts] = useState<ChartMetric[]>(['distance', 'power', 'pace']);
 
   useEffect(() => {
     setMounted(true);
@@ -116,8 +197,42 @@ export default function DashboardPage() {
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
   
-  // Prepare chart data with filtered sessions
-  const chartData = hasFilteredData ? prepareChartData(filteredSessions) : [];
+  // Prepare chart data for different metrics
+  const prepareChartData = (sessions: any[], metric: ChartMetric) => {
+    return sessions.map(session => ({
+      date: formatDate(new Date(session.timestamp)),
+      [metric]: getMetricValue(session, metric),
+      fullDate: session.timestamp
+    }));
+  };
+
+  // Get metric value from session based on metric type
+  const getMetricValue = (session: any, metric: ChartMetric): number => {
+    switch (metric) {
+      case 'distance': return session.distance;
+      case 'pace': return session.avgSplit;
+      case 'power': return session.avgPower;
+      case 'strokeRate': return session.avgStrokeRate;
+      case 'energy': return session.energy;
+      case 'duration': return session.duration;
+      default: return 0;
+    }
+  };
+
+  // Toggle chart visibility
+  const toggleChart = (metric: ChartMetric) => {
+    setEnabledCharts(prev => 
+      prev.includes(metric) 
+        ? prev.filter(m => m !== metric)
+        : [...prev, metric]
+    );
+  };
+
+  // Prepare chart data for each enabled metric
+  const chartDataMap = enabledCharts.reduce((acc, metric) => {
+    acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
+    return acc;
+  }, {} as Record<ChartMetric, any[]>);
 
   return (
     <div className="min-h-screen bg-background">
@@ -304,63 +419,154 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            {/* Distance Over Time Chart */}
+            {/* Chart Configuration */}
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Distance Over Time
-                {timeRange !== 'all' && (
-                  <span className="text-lg font-normal text-muted-foreground ml-2">
-                    ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
-                  </span>
-                )}
-              </h2>
-              {hasFilteredData ? (
-                <Card>
-                  <CardContent className="pt-6">
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis 
-                          dataKey="date" 
-                          className="text-xs"
-                          stroke="hsl(var(--muted-foreground))"
-                        />
-                        <YAxis 
-                          className="text-xs"
-                          stroke="hsl(var(--muted-foreground))"
-                          tickFormatter={(value) => `${value}m`}
-                        />
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '6px'
-                          }}
-                          formatter={(value: number) => [`${value}m`, 'Distance']}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="distance" 
-                          stroke="hsl(var(--primary))" 
-                          strokeWidth={2}
-                          dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-center text-muted-foreground py-8">
-                      <p>No sessions found in the selected time range.</p>
-                      <p className="text-sm">Try selecting a different time range or upload more data.</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                    Performance Charts
+                    {timeRange !== 'all' && (
+                      <span className="text-lg font-normal text-muted-foreground ml-2">
+                        ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Customize which metrics to visualize over time
+                  </p>
+                </div>
+              </div>
+              
+              {/* Chart Selector */}
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Gauge className="h-5 w-5 text-primary" />
+                    Select Charts to Display
+                  </CardTitle>
+                  <CardDescription>
+                    Choose which metrics to track over time
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {Object.entries(chartConfigs).map(([metric, config]) => {
+                      const Icon = config.icon;
+                      const isEnabled = enabledCharts.includes(metric as ChartMetric);
+                      
+                      return (
+                        <Button
+                          key={metric}
+                          variant={isEnabled ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleChart(metric as ChartMetric)}
+                          className="flex items-center gap-2 h-auto p-3 flex-col"
+                        >
+                          <Icon className="h-4 w-4 mb-1" />
+                          <span className="text-xs font-medium">{config.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 text-sm text-muted-foreground">
+                    {enabledCharts.length === 0 
+                      ? "No charts selected. Select at least one metric to visualize."
+                      : `Showing ${enabledCharts.length} chart${enabledCharts.length > 1 ? 's' : ''}`
+                    }
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+
+            {/* Configurable Charts */}
+            {enabledCharts.length > 0 && (
+              <div className="space-y-6">
+                {enabledCharts.map(metric => {
+                  const config = chartConfigs[metric];
+                  const Icon = config.icon;
+                  const chartData = chartDataMap[metric];
+                  
+                  return (
+                    <Card key={metric}>
+                      <CardHeader>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-primary/10">
+                            <Icon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">
+                              {config.label} Over Time
+                            </CardTitle>
+                            <CardDescription>
+                              Track your {config.label.toLowerCase()} progress
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {chartData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis 
+                                dataKey="date" 
+                                className="text-xs"
+                                stroke="hsl(var(--muted-foreground))"
+                              />
+                              <YAxis 
+                                className="text-xs"
+                                stroke="hsl(var(--muted-foreground))"
+                                tickFormatter={config.yAxisFormatter}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'hsl(var(--background))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '6px'
+                                }}
+                                formatter={(value: number) => [config.formatter(value), config.label]}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey={metric} 
+                                stroke={config.color}
+                                strokeWidth={2}
+                                dot={{ fill: config.color, strokeWidth: 2, r: 4 }}
+                                activeDot={{ r: 6 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="text-center text-muted-foreground py-8">
+                            <p>No data available for {config.label.toLowerCase()} chart.</p>
+                            <p className="text-sm">Try selecting a different time range or upload more data.</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Empty State for Charts */}
+            {enabledCharts.length === 0 && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-8">
+                    <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                      <Gauge className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      No Charts Selected
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Select metrics above to visualize your performance data over time.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
