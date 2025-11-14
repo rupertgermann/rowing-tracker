@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Insight } from '@/lib/aiAnalysis';
+import { CloudInsight } from '@/lib/cloudAI';
 import { useInsightFeedback } from '@/hooks/useAIInsights';
 import { 
   TrendingUp, 
@@ -12,28 +13,36 @@ import {
   Lightbulb,
   ThumbsUp,
   ThumbsDown,
-  CheckCircle
+  CheckCircle,
+  Cloud,
+  Brain
 } from 'lucide-react';
 
 interface InsightCardProps {
-  insight: Insight;
+  insight: Insight | CloudInsight;
   onFeedback?: (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => void;
 }
 
 export function InsightCard({ insight, onFeedback }: InsightCardProps) {
   const { recordFeedback, getFeedback } = useInsightFeedback();
   const existingFeedback = getFeedback(insight.id);
+  const isCloudInsight = 'confidence' in insight && insight.id.startsWith('cloud-');
 
   const getInsightIcon = () => {
-    switch (insight.type) {
+    const type = insight.type;
+    
+    switch (type) {
       case 'trend':
         return insight.description.includes('improving') ? 
           <TrendingUp className="h-5 w-5" /> : 
           <TrendingDown className="h-5 w-5" />;
       case 'anomaly':
+      case 'warning':
         return <AlertTriangle className="h-5 w-5" />;
       case 'achievement':
         return <Trophy className="h-5 w-5" />;
+      case 'performance':
+        return <Brain className="h-5 w-5" />;
       case 'recommendation':
       default:
         return <Lightbulb className="h-5 w-5" />;
@@ -41,13 +50,18 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
   };
 
   const getInsightColor = () => {
-    switch (insight.type) {
+    const type = insight.type;
+    
+    switch (type) {
       case 'trend':
         return insight.description.includes('improving') ? 'text-green-600' : 'text-orange-600';
       case 'anomaly':
+      case 'warning':
         return 'text-red-600';
       case 'achievement':
         return 'text-yellow-600';
+      case 'performance':
+        return 'text-blue-600';
       case 'recommendation':
       default:
         return 'text-blue-600';
@@ -55,7 +69,9 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
   };
 
   const getPriorityBadgeVariant = () => {
-    switch (insight.priority) {
+    const priority = insight.priority;
+    
+    switch (priority) {
       case 'high':
         return 'destructive';
       case 'medium':
@@ -71,6 +87,21 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
     onFeedback?.(insight.id, feedback);
   };
 
+  const getConfidenceDisplay = () => {
+    if (!isCloudInsight) return null;
+    
+    const confidence = (insight as CloudInsight).confidence;
+    const confidenceLevel = confidence > 0.8 ? 'High' : confidence > 0.6 ? 'Medium' : 'Low';
+    const confidenceColor = confidence > 0.8 ? 'text-green-600' : confidence > 0.6 ? 'text-yellow-600' : 'text-red-600';
+    
+    return (
+      <div className={`text-xs ${confidenceColor} flex items-center gap-1`}>
+        <span>Confidence: {confidenceLevel}</span>
+        <span>({Math.round(confidence * 100)}%)</span>
+      </div>
+    );
+  };
+
   return (
     <Card className="transition-all duration-200 hover:shadow-md">
       <CardHeader className="pb-3">
@@ -80,19 +111,38 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
               {getInsightIcon()}
             </div>
             <CardTitle className="text-lg">{insight.title}</CardTitle>
+            {isCloudInsight && (
+              <Cloud className="h-4 w-4 text-blue-500" />
+            )}
           </div>
           <Badge variant={getPriorityBadgeVariant()}>
             {insight.priority}
           </Badge>
         </div>
-        <CardDescription>
-          {new Date(insight.dateGenerated).toLocaleDateString()}
+        <CardDescription className="flex items-center justify-between">
+          <span>{new Date(insight.dateGenerated).toLocaleDateString()}</span>
+          {getConfidenceDisplay()}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground leading-relaxed">
           {insight.description}
         </p>
+        
+        {/* Show evidence for cloud insights */}
+        {isCloudInsight && (insight as CloudInsight).evidence.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground">Evidence:</div>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              {(insight as CloudInsight).evidence.map((evidence, index) => (
+                <li key={index} className="flex items-start gap-1">
+                  <span className="text-blue-500">•</span>
+                  <span>{evidence}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         
         {insight.actionable && (
           <div className="flex items-center gap-2 text-xs text-blue-600">
