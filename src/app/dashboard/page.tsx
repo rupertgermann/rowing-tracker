@@ -372,13 +372,23 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {!mounted ? (
-          // Loading placeholder to match server/client
+          // Enhanced loading placeholder
           <div className="animate-pulse">
-            <div className="h-8 bg-muted rounded w-64 mb-4"></div>
+            <div className="h-8 bg-muted rounded w-64 mb-2"></div>
             <div className="h-4 bg-muted rounded w-96 mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Stats cards skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[1, 2, 3, 4].map(i => (
-                <div key={i} className="h-32 bg-muted rounded"></div>
+                <div key={i} className="h-32 bg-muted rounded-lg"></div>
+              ))}
+            </div>
+            
+            {/* Chart skeleton */}
+            <div className="h-8 bg-muted rounded w-48 mb-4"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[1, 2].map(i => (
+                <div key={i} className="h-80 bg-muted rounded-lg"></div>
               ))}
             </div>
           </div>
@@ -423,7 +433,9 @@ export default function DashboardPage() {
                       variant={timeRange === option.value ? "default" : "outline"}
                       size="sm"
                       onClick={() => setTimeRange(option.value)}
-                      className="text-xs"
+                      className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                      aria-label={`Filter to ${option.label}`}
+                      aria-pressed={timeRange === option.value}
                     >
                       {option.label}
                     </Button>
@@ -443,13 +455,13 @@ export default function DashboardPage() {
                 )}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Distance</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <TrendingUp className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary">
+                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
                       {formatDistance(filteredStats.totalDistance)}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -458,13 +470,13 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Time</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Clock className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary">
+                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
                       {formatDuration(filteredStats.totalTime)}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -473,29 +485,29 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Average Pace</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground" />
+                    <Target className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary font-mono">
+                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
                       {formatPace(avgPace)}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Per 500 meters
+                      Per 500m
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Average Power</CardTitle>
-                    <Zap className="h-4 w-4 text-muted-foreground" />
+                    <Zap className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary">
-                      {Math.round(avgPower)}W
+                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                      {avgPower > 0 ? `${Math.round(avgPower)}W` : '--'}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Average output
@@ -507,7 +519,7 @@ export default function DashboardPage() {
 
             {/* Summary Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
+              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                 <CardHeader>
                   <CardTitle className="text-lg">Total Sessions</CardTitle>
                   <CardDescription>
@@ -515,13 +527,13 @@ export default function DashboardPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
+                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
                     {stats.totalSessions}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                 <CardHeader>
                   <CardTitle className="text-lg">Current Streak</CardTitle>
                   <CardDescription>
@@ -529,25 +541,22 @@ export default function DashboardPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
+                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
                     {stats.currentStreak}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Best: {stats.bestStreak} days
-                  </p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
                 <CardHeader>
-                  <CardTitle className="text-lg">Average Stroke Rate</CardTitle>
+                  <CardTitle className="text-lg">Best Streak</CardTitle>
                   <CardDescription>
-                    Typical strokes per minute
+                    Longest consecutive streak
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
-                    {stats.avgStrokeRate > 0 ? `${Math.round(stats.avgStrokeRate)} SPM` : '--'}
+                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
+                    {stats.bestStreak}
                   </div>
                 </CardContent>
               </Card>
@@ -591,7 +600,9 @@ export default function DashboardPage() {
                           variant={chartSettings.chartType === 'line' ? "default" : "outline"}
                           size="sm"
                           onClick={() => updateChartSettings({ chartType: 'line' })}
-                          className="text-xs"
+                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Switch to line chart"
+                          aria-pressed={chartSettings.chartType === 'line'}
                         >
                           Line
                         </Button>
@@ -599,7 +610,9 @@ export default function DashboardPage() {
                           variant={chartSettings.chartType === 'bar' ? "default" : "outline"}
                           size="sm"
                           onClick={() => updateChartSettings({ chartType: 'bar' })}
-                          className="text-xs"
+                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Switch to bar chart"
+                          aria-pressed={chartSettings.chartType === 'bar'}
                         >
                           Bar
                         </Button>
@@ -607,7 +620,9 @@ export default function DashboardPage() {
                           variant={chartSettings.chartType === 'area' ? "default" : "outline"}
                           size="sm"
                           onClick={() => updateChartSettings({ chartType: 'area' })}
-                          className="text-xs"
+                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Switch to area chart"
+                          aria-pressed={chartSettings.chartType === 'area'}
                         >
                           Area
                         </Button>

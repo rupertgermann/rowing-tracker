@@ -300,7 +300,7 @@ export default function SessionsPage() {
                     <span>
                       {hasFilteredData ? 
                         `${sortedSessions.length} of ${sessions.length} sessions` : 
-                        `${sessions.length} sessions`
+                        `${sortedSessions.length} sessions`
                       }
                     </span>
                   </div>
@@ -308,7 +308,7 @@ export default function SessionsPage() {
               </CardHeader>
               <CardContent>
                 {hasFilteredData ? (
-                  <div className="rounded-md border">
+                  <div className="overflow-x-auto rounded-lg border">
                     <Table>
                       <TableHeader>
                         <TableRow>
