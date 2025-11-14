@@ -1,4 +1,5 @@
 import { Session } from '@/types/session';
+import { TrainingPlan, TrainingSession, TrainingWeek, PlanTemplate } from '@/lib/trainingPlans';
 
 // OpenAI API configuration
 interface OpenAIConfig {
@@ -394,25 +395,512 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
     }
   }
 
-  // Test API connection
-  async testConnection(): Promise<boolean> {
-    if (!this.config) return false;
-    
+  // Generate training plan using AI
+  async generateTrainingPlan(
+    goals: string[],
+    level: 'beginner' | 'intermediate' | 'advanced',
+    focus: 'general_fitness' | 'endurance' | 'speed' | 'strength' | 'competition',
+    duration: number,
+    userSessions?: Session[]
+  ): Promise<TrainingPlan> {
+    if (!this.config) {
+      throw new Error('Cloud AI service not configured');
+    }
+
     try {
-      const response = await fetch(`${this.config.baseUrl}/models`, {
+      const prompt = this.buildPlanGenerationPrompt(goals, level, focus, duration, userSessions);
+      
+      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.apiKey}`,
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: 'system',
+              content: this.getPlanGenerationSystemPrompt()
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.4, // Lower temperature for structured output
+          max_tokens: 2000
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const planData = this.parsePlanResponse(data.choices[0].message.content);
       
-      return response.ok;
+      return this.createTrainingPlanFromAI(planData, goals, level, focus, duration);
     } catch (error) {
-      console.error('API connection test failed:', error);
-      return false;
+      console.error('Training plan generation failed:', error);
+      throw error;
     }
   }
 
-  // Helper methods for formatting
+  // Modify existing training plan
+  async modifyTrainingPlan(
+    plan: TrainingPlan,
+    modificationRequest: string,
+    userSessions?: Session[]
+  ): Promise<TrainingPlan> {
+    if (!this.config) {
+      throw new Error('Cloud AI service not configured');
+    }
+
+    try {
+      const prompt = this.buildPlanModificationPrompt(plan, modificationRequest, userSessions);
+      
+      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: 'system',
+              content: this.getPlanModificationSystemPrompt()
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.4,
+          max_tokens: 2000
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const modifications = this.parsePlanModificationResponse(data.choices[0].message.content);
+      
+      return this.applyPlanModifications(plan, modifications);
+    } catch (error) {
+      console.error('Plan modification failed:', error);
+      throw error;
+    }
+  }
+
+  // Analyze plan adherence and provide recommendations
+  async analyzePlanAdherence(
+    plan: TrainingPlan,
+    userSessions: Session[]
+  ): Promise<string> {
+    if (!this.config) {
+      throw new Error('Cloud AI service not configured');
+    }
+
+    try {
+      const prompt = this.buildAdherenceAnalysisPrompt(plan, userSessions);
+      
+      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: 'system',
+              content: this.getAdherenceAnalysisSystemPrompt()
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 1000
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Adherence analysis failed:', error);
+      throw error;
+    }
+  }
+
+  // Build prompt for plan generation
+  private buildPlanGenerationPrompt(
+    goals: string[],
+    level: 'beginner' | 'intermediate' | 'advanced',
+    focus: 'general_fitness' | 'endurance' | 'speed' | 'strength' | 'competition',
+    duration: number,
+    userSessions?: Session[]
+  ): string {
+    const userContext = userSessions ? this.getUserContextForPlanning(userSessions) : '';
+    
+    return `Generate a ${duration}-week training plan for a ${level} rower focusing on ${focus}.
+
+GOALS: ${goals.join(', ')}
+
+${userContext}
+
+REQUIREMENTS:
+- Create a structured weekly plan with appropriate progression
+- Include variety of session types (endurance, intervals, tempo, recovery, technique)
+- Consider the rower's current fitness level and experience
+- Build in appropriate recovery periods
+- Make sessions realistic and achievable
+
+RESPONSE FORMAT:
+Return a JSON object with this structure:
+{
+  "title": "Plan title",
+  "description": "Brief description of the plan",
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "focus": "Week focus description",
+      "sessions": [
+        {
+          "day": 1,
+          "type": "endurance|interval|tempo|recovery|strength|technique|rest",
+          "title": "Session title",
+          "description": "Detailed session description",
+          "duration": 45,
+          "intensity": "low|medium|high",
+          "notes": "Optional coaching notes"
+        }
+      ]
+    }
+  ]
+}
+
+Create exactly ${duration} weeks with 3-6 sessions per week depending on the level and focus.`;
+  }
+
+  // Build prompt for plan modification
+  private buildPlanModificationPrompt(
+    plan: TrainingPlan,
+    modificationRequest: string,
+    userSessions?: Session[]
+  ): string {
+    const planSummary = this.summarizePlan(plan);
+    const userContext = userSessions ? this.getUserContextForPlanning(userSessions) : '';
+    
+    return `Modify the following training plan based on the user's request:
+
+CURRENT PLAN:
+${planSummary}
+
+USER REQUEST: ${modificationRequest}
+
+${userContext}
+
+RESPONSE FORMAT:
+Return a JSON object with the modifications:
+{
+  "title": "Updated plan title (if changed)",
+  "description": "Updated description (if changed)",
+  "weekModifications": [
+    {
+      "weekNumber": 1,
+      "focus": "Updated week focus (if changed)",
+      "sessionChanges": [
+        {
+          "day": 1,
+          "action": "add|modify|remove",
+          "session": { ...session data ... }
+        }
+      ]
+    }
+  ],
+  "reasoning": "Explanation of changes made"
+}
+
+Only modify what's necessary to address the user's request.`;
+  }
+
+  // Build prompt for adherence analysis
+  private buildAdherenceAnalysisPrompt(plan: TrainingPlan, userSessions: Session[]): string {
+    const adherenceData = this.calculateAdherenceMetrics(plan, userSessions);
+    
+    return `Analyze the training plan adherence and provide recommendations:
+
+PLAN ADHERENCE DATA:
+${adherenceData}
+
+USER'S RECENT SESSIONS:
+${this.summarizeRecentSessions(userSessions.slice(-10))}
+
+Provide analysis on:
+1. Current adherence rate and what it means
+2. Patterns in missed or completed sessions
+3. Recommendations for improving adherence
+4. Suggestions for plan adjustments if needed
+
+Keep the response encouraging and actionable.`;
+  }
+
+  // System prompts
+  private getPlanGenerationSystemPrompt(): string {
+    return `You are an expert rowing coach and sports scientist specializing in training plan design. 
+You create personalized, progressive training plans for rowers of all levels.
+
+Your expertise includes:
+- Exercise physiology and training principles
+- Periodization and progressive overload
+- Rowing-specific training methodologies
+- Injury prevention and recovery management
+- Goal-oriented program design
+
+Always create plans that are:
+- Scientifically sound and progressive
+- Realistic and achievable for the target level
+- Varied to maintain engagement and prevent plateaus
+- Appropriate for the stated goals and focus area
+- Include proper recovery and adaptation periods
+
+Ensure the plan structure follows proper training principles with appropriate volume and intensity progression.`;
+  }
+
+  private getPlanModificationSystemPrompt(): string {
+    return `You are an expert rowing coach helping athletes modify their training plans. 
+You understand how to adjust programs while maintaining training integrity and progression.
+
+When modifying plans:
+- Preserve the overall training structure and progression
+- Make changes that address the specific request
+- Maintain appropriate balance between training and recovery
+- Explain your reasoning for modifications
+- Ensure the plan remains realistic and achievable
+
+Always consider the athlete's current progress and capabilities when suggesting changes.`;
+  }
+
+  private getAdherenceAnalysisSystemPrompt(): string {
+    return `You are an expert rowing coach analyzing training plan adherence. 
+You provide constructive, encouraging feedback and practical recommendations.
+
+Your analysis should:
+- Identify positive patterns and successes
+- Address challenges without being critical
+- Provide specific, actionable recommendations
+- Consider the athlete's overall training load and life factors
+- Suggest plan adjustments when adherence issues indicate the plan is too difficult or easy
+
+Maintain a supportive, motivational tone while being honest about adherence patterns.`;
+  }
+
+  // Helper methods for plan generation
+  private parsePlanResponse(response: string): any {
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in AI response');
+      }
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error('Failed to parse plan response:', error);
+      throw new Error('Invalid plan format from AI');
+    }
+  }
+
+  private parsePlanModificationResponse(response: string): any {
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in AI response');
+      }
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error('Failed to parse modification response:', error);
+      throw new Error('Invalid modification format from AI');
+    }
+  }
+
+  private createTrainingPlanFromAI(
+    planData: any,
+    goals: string[],
+    level: 'beginner' | 'intermediate' | 'advanced',
+    focus: 'general_fitness' | 'endurance' | 'speed' | 'strength' | 'competition',
+    duration: number
+  ): TrainingPlan {
+    const weeks: TrainingWeek[] = planData.weeks.map((weekData: any, index: number) => ({
+      id: `week_${Date.now()}_${index}`,
+      weekNumber: weekData.weekNumber,
+      focus: weekData.focus,
+      totalVolume: weekData.sessions.reduce((total: number, session: any) => total + session.duration, 0),
+      sessions: weekData.sessions.map((sessionData: any, sessionIndex: number) => ({
+        id: `session_${Date.now()}_${index}_${sessionIndex}`,
+        day: sessionData.day,
+        week: weekData.weekNumber,
+        type: sessionData.type,
+        title: sessionData.title,
+        description: sessionData.description,
+        duration: sessionData.duration,
+        intensity: sessionData.intensity,
+        notes: sessionData.notes,
+        completed: false
+      })),
+      completed: false,
+      actualVolume: 0
+    }));
+
+    return {
+      id: `plan_${Date.now()}`,
+      title: planData.title,
+      description: planData.description,
+      goals,
+      duration,
+      level,
+      focus,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      weeks,
+      status: 'draft',
+      progress: {
+        completedWeeks: 0,
+        completedSessions: 0,
+        totalSessions: weeks.reduce((total, week) => total + week.sessions.length, 0),
+        adherenceRate: 0
+      }
+    };
+  }
+
+  private applyPlanModifications(plan: TrainingPlan, modifications: any): TrainingPlan {
+    // Apply modifications to the plan
+    const updatedPlan = { ...plan };
+    
+    if (modifications.title) {
+      updatedPlan.title = modifications.title;
+    }
+    
+    if (modifications.description) {
+      updatedPlan.description = modifications.description;
+    }
+    
+    if (modifications.weekModifications) {
+      modifications.weekModifications.forEach((weekMod: any) => {
+        const weekIndex = updatedPlan.weeks.findIndex(w => w.weekNumber === weekMod.weekNumber);
+        if (weekIndex !== -1) {
+          if (weekMod.focus) {
+            updatedPlan.weeks[weekIndex].focus = weekMod.focus;
+          }
+          
+          if (weekMod.sessionChanges) {
+            weekMod.sessionChanges.forEach((change: any) => {
+              if (change.action === 'add') {
+                updatedPlan.weeks[weekIndex].sessions.push({
+                  id: `session_${Date.now()}`,
+                  ...change.session,
+                  week: weekMod.weekNumber,
+                  completed: false
+                });
+              } else if (change.action === 'modify') {
+                const sessionIndex = updatedPlan.weeks[weekIndex].sessions.findIndex(
+                  s => s.day === change.session.day
+                );
+                if (sessionIndex !== -1) {
+                  updatedPlan.weeks[weekIndex].sessions[sessionIndex] = {
+                    ...updatedPlan.weeks[weekIndex].sessions[sessionIndex],
+                    ...change.session
+                  };
+                }
+              } else if (change.action === 'remove') {
+                updatedPlan.weeks[weekIndex].sessions = updatedPlan.weeks[weekIndex].sessions.filter(
+                  s => s.day !== change.session.day
+                );
+              }
+            });
+          }
+        }
+      });
+    }
+    
+    updatedPlan.updatedAt = new Date();
+    return updatedPlan;
+  }
+
+  private getUserContextForPlanning(sessions: Session[]): string {
+    if (!sessions || sessions.length === 0) {
+      return 'USER DATA: No previous training sessions available.';
+    }
+
+    const recentSessions = sessions.slice(-10);
+    const totalSessions = sessions.length;
+    const avgDuration = sessions.reduce((sum, s) => sum + s.duration, 0) / sessions.length;
+    const avgPace = sessions
+      .map(s => s.avgSplit)
+      .filter(p => p > 0)
+      .reduce((sum, p, _, arr) => sum + p / arr.length, 0);
+    const weeklyFrequency = this.calculateWeeklyFrequency(sessions);
+
+    return `USER DATA:
+- Experience Level: ${totalSessions < 10 ? 'Beginner' : totalSessions < 50 ? 'Intermediate' : 'Advanced'}
+- Total Sessions: ${totalSessions}
+- Average Session Duration: ${Math.round(avgDuration / 60)} minutes
+- Average Pace: ${avgPace > 0 ? this.formatPace(avgPace) : 'N/A'}/500m
+- Weekly Training Frequency: ${weeklyFrequency} sessions per week
+- Recent Activity: Last ${recentSessions.length} sessions
+
+Use this data to create an appropriate plan that matches their current fitness and experience level.`;
+  }
+
+  private calculateAdherenceMetrics(plan: TrainingPlan, sessions: Session[]): string {
+    const totalPlannedSessions = plan.progress.totalSessions;
+    const completedSessions = plan.progress.completedSessions;
+    const adherenceRate = totalPlannedSessions > 0 ? (completedSessions / totalPlannedSessions) * 100 : 0;
+
+    return `ADHERENCE METRICS:
+- Planned Sessions: ${totalPlannedSessions}
+- Completed Sessions: ${completedSessions}
+- Adherence Rate: ${adherenceRate.toFixed(1)}%
+- Completed Weeks: ${plan.progress.completedWeeks}/${plan.duration}
+- Plan Status: ${plan.status}`;
+  }
+
+  private summarizePlan(plan: TrainingPlan): string {
+    return `PLAN SUMMARY:
+- Title: ${plan.title}
+- Duration: ${plan.duration} weeks
+- Level: ${plan.level}
+- Focus: ${plan.focus}
+- Goals: ${plan.goals.join(', ')}
+- Total Sessions: ${plan.progress.totalSessions}
+- Current Progress: ${plan.progress.completedWeeks}/${plan.duration} weeks completed`;
+  }
+
+  private summarizeRecentSessions(sessions: Session[]): string {
+    return sessions.map((session, index) => {
+      const pace = session.avgSplit ? `${this.formatPace(session.avgSplit)}/500m` : 'N/A';
+      return `Session ${index + 1}: ${session.distance}m in ${this.formatDuration(session.duration)} at ${pace}`;
+    }).join('\n');
+  }
+
+  private calculateWeeklyFrequency(sessions: Session[]): number {
+    if (sessions.length < 7) return sessions.length;
+    
+    const recentSessions = sessions.slice(-28); // Last 4 weeks
+    const weeksSpan = this.getDaysSpan(recentSessions) / 7 || 1;
+    return recentSessions.length / weeksSpan;
+  }
+
   private formatPace(secondsPer500m: number): string {
     if (secondsPer500m <= 0) return '--:--';
     const minutes = Math.floor(secondsPer500m / 60);
@@ -431,6 +919,23 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
       return `${minutes}m ${secs}s`;
     } else {
       return `${secs}s`;
+    }
+  }
+  // Test API connection
+  async testConnection(): Promise<boolean> {
+    if (!this.config) return false;
+    
+    try {
+      const response = await fetch(`${this.config.baseUrl}/models`, {
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+        }
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error('API connection test failed:', error);
+      return false;
     }
   }
 }
