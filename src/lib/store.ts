@@ -112,9 +112,12 @@ function calculateStats(sessions: Session[]): SessionStats {
 function calculateStreaks(sessions: Session[]): { currentStreak: number; bestStreak: number } {
   if (sessions.length === 0) return { currentStreak: 0, bestStreak: 0 };
 
-  // Get unique dates (YYYY-MM-DD) and sort them
+  // Get unique dates (YYYY-MM-DD) and sort them - with defensive programming
   const uniqueDates = Array.from(
-    new Set(sessions.map(s => s.timestamp.toISOString().split('T')[0]))
+    new Set(sessions.map(s => {
+      const timestamp = s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp);
+      return timestamp.toISOString().split('T')[0];
+    }))
   ).sort().reverse(); // Most recent first
 
   let currentStreak = 0;
@@ -288,9 +291,15 @@ export const useRowingStore = create<RowingStore>()(
         sessions: state.sessions,
         filters: state.filters
       }),
-      // Re-compute personal records on rehydrate
+      // Convert string timestamps back to Date objects on rehydrate
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // Convert timestamps from strings to Date objects
+          state.sessions = state.sessions.map(session => ({
+            ...session,
+            timestamp: new Date(session.timestamp)
+          }));
+          // Re-compute personal records
           state.personalRecords = calculatePersonalRecords(state.sessions);
         }
       }
