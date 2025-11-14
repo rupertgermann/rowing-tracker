@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
@@ -190,28 +190,32 @@ export default function DashboardPage() {
   }, []);
 
   // Filter sessions based on selected time range
-  const filteredSessions = sessions.filter(session => {
-    if (timeRange === 'all') return true;
-    
-    const sessionDate = new Date(session.timestamp);
-    const now = new Date();
-    const daysAgo = timeRangeOptions.find(option => option.value === timeRange)?.days;
-    
-    if (!daysAgo) return true;
-    
-    const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
-    return sessionDate >= cutoffDate;
-  });
+  const filteredSessions = useMemo(() => {
+    return sessions.filter(session => {
+      if (timeRange === 'all') return true;
+      
+      const sessionDate = new Date(session.timestamp);
+      const now = new Date();
+      const daysAgo = timeRangeOptions.find(option => option.value === timeRange)?.days;
+      
+      if (!daysAgo) return true;
+      
+      const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+      return sessionDate >= cutoffDate;
+    });
+  }, [sessions, timeRange]);
 
   // Calculate filtered stats
-  const filteredStats = filteredSessions.reduce((acc, session) => {
-    return {
-      totalDistance: acc.totalDistance + session.distance,
-      totalTime: acc.totalTime + session.duration,
-      totalPower: acc.totalPower + session.avgPower,
-      sessionCount: acc.sessionCount + 1
-    };
-  }, { totalDistance: 0, totalTime: 0, totalPower: 0, sessionCount: 0 });
+  const filteredStats = useMemo(() => {
+    return filteredSessions.reduce((acc, session) => {
+      return {
+        totalDistance: acc.totalDistance + session.distance,
+        totalTime: acc.totalTime + session.duration,
+        totalPower: acc.totalPower + session.avgPower,
+        sessionCount: acc.sessionCount + 1
+      };
+    }, { totalDistance: 0, totalTime: 0, totalPower: 0, sessionCount: 0 });
+  }, [filteredSessions]);
 
   const avgPace = filteredStats.sessionCount > 0 && filteredStats.totalDistance > 0 
     ? (filteredStats.totalTime / (filteredStats.totalDistance / 500))
@@ -258,10 +262,12 @@ export default function DashboardPage() {
   };
 
   // Prepare chart data for each enabled metric
-  const chartDataMap = chartSettings.enabledCharts.reduce((acc, metric) => {
-    acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
-    return acc;
-  }, {} as Record<ChartMetric, any[]>);
+  const chartDataMap = useMemo(() => {
+    return chartSettings.enabledCharts.reduce((acc, metric) => {
+      acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
+      return acc;
+    }, {} as Record<ChartMetric, any[]>);
+  }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData]);
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
