@@ -50,8 +50,8 @@ const defaultChartSettings: ChartSettings = {
 function calculatePersonalRecords(sessions: Session[]): PersonalRecord[] {
   const records: PersonalRecord[] = [];
   
-  // Standard distances to track
-  const distances = [500, 1000, 2000, 5000];
+  // Standard distances to track (including 100m)
+  const distances = [100, 500, 1000, 2000, 5000];
   
   distances.forEach(distance => {
     // Find sessions that exactly match this distance

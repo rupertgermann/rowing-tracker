@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X } from 'lucide-react';
+import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy } from 'lucide-react';
 
 // Filter options
 interface FilterConfig {
@@ -84,8 +84,21 @@ interface SortConfig {
 }
 
 export default function SessionsPage() {
-  const { getSessions } = useRowingStore();
+  const { getSessions, getPersonalRecords } = useRowingStore();
   const sessions = getSessions();
+  const personalRecords = getPersonalRecords();
+  
+  // Helper function to check if session is a personal record
+  const isPersonalRecord = (session: any): { isPR: boolean; distances: string[] } => {
+    const prDistances = personalRecords
+      .filter(pr => pr.sessionId === session.id)
+      .map(pr => formatDistance(pr.distance));
+    
+    return {
+      isPR: prDistances.length > 0,
+      distances: prDistances
+    };
+  };
   const [mounted, setMounted] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: 'date',
@@ -366,16 +379,33 @@ export default function SessionsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedSessions.map((session) => (
-                          <TableRow key={session.id} className="cursor-pointer hover:bg-muted/50">
-                            <TableCell>
-                              <Link 
-                                href={`/sessions/${session.id}`}
-                                className="text-sm font-medium hover:underline"
-                              >
-                                {formatDate(session.timestamp)}
-                              </Link>
-                            </TableCell>
+                        {sortedSessions.map((session) => {
+                          const prInfo = isPersonalRecord(session);
+                          return (
+                            <TableRow 
+                              key={session.id} 
+                              className={`cursor-pointer hover:bg-muted/50 ${prInfo.isPR ? 'bg-primary/5' : ''}`}
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Link 
+                                    href={`/sessions/${session.id}`}
+                                    className="text-sm font-medium hover:underline"
+                                  >
+                                    {formatDate(session.timestamp)}
+                                  </Link>
+                                  {prInfo.isPR && (
+                                    <Badge 
+                                      variant="secondary" 
+                                      className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
+                                      title={`Personal Record: ${prInfo.distances.join(', ')}`}
+                                    >
+                                      <Trophy className="h-3 w-3 mr-1" />
+                                      PR
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
                             <TableCell className="text-right">
                               <Badge variant="secondary">
                                 {formatDistance(session.distance)}
@@ -394,7 +424,8 @@ export default function SessionsPage() {
                               {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>

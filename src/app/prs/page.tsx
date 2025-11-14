@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,12 @@ function formatDate(date: Date): string {
 
 export default function PRsPage() {
   const { getPersonalRecords, getSessions } = useRowingStore();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const personalRecords = getPersonalRecords();
   const sessions = getSessions();
 
@@ -59,6 +66,25 @@ export default function PRsPage() {
     session.avgStrokeRate > best.avgStrokeRate ? session : best, 
     sessions[0] || { avgStrokeRate: 0, timestamp: new Date() }
   );
+
+  // Show loading placeholder during hydration
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-64 mb-4"></div>
+            <div className="h-4 bg-muted rounded w-96 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-32 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -161,7 +187,7 @@ export default function PRsPage() {
                   <CardContent className="pt-6">
                     <div className="text-center text-muted-foreground">
                       <p>No distance records yet.</p>
-                      <p className="text-sm">Complete sessions at 500m, 1000m, 2000m, or 5000m to set records.</p>
+                      <p className="text-sm">Complete sessions at 100m, 500m, 1000m, 2000m, or 5000m to set records.</p>
                     </div>
                   </CardContent>
                 </Card>
