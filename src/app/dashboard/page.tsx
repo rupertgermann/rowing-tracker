@@ -265,18 +265,11 @@ export default function DashboardPage() {
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
-    console.log('Chart clicked:', data); // Debug: Log what Recharts passes
     if (data && data.activeIndex !== undefined && chartData[data.activeIndex]) {
       const dataPoint = chartData[data.activeIndex];
-      console.log('Data point found:', dataPoint); // Debug: Log the data point
       if (dataPoint.sessionId) {
-        console.log('Navigating to session:', dataPoint.sessionId); // Debug: Log navigation
         router.push(`/sessions/${dataPoint.sessionId}`);
-      } else {
-        console.log('No sessionId found in data point'); // Debug: Log missing ID
       }
-    } else {
-      console.log('No valid data point found'); // Debug: Log missing data
     }
   };
 
