@@ -63,12 +63,24 @@ export interface PrivacySettings {
   chatRetention: number; // days
 }
 
+export interface AISettings {
+  openaiApiKey: string;
+  cloudAIEnabled: boolean;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+  chatSystemPrompt: string;
+  planGenerationPrompt: string;
+}
+
 export interface Settings {
   userPreferences: UserPreferences;
   dataManagement: DataManagement;
   trainingSettings: TrainingSettings;
   notificationSettings: NotificationSettings;
   privacySettings: PrivacySettings;
+  aiSettings: AISettings;
   version: string; // For migration purposes
   updatedAt: Date;
 }
@@ -138,6 +150,16 @@ export class SettingsService {
       sessionRetention: 365,
       chatRetention: 90
     },
+    aiSettings: {
+      openaiApiKey: '',
+      cloudAIEnabled: false,
+      model: 'gpt-4-turbo-preview',
+      temperature: 0.7,
+      maxTokens: 1500,
+      systemPrompt: 'You are an expert rowing coach and sports scientist...',
+      chatSystemPrompt: 'You are a personal AI rowing coach...',
+      planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...'
+    },
     version: this.CURRENT_VERSION,
     updatedAt: new Date()
   };
@@ -190,6 +212,10 @@ export class SettingsService {
     return this.getSettings().privacySettings;
   }
 
+  getAISettings(): AISettings {
+    return this.getSettings().aiSettings;
+  }
+
   // Update specific category
   updateUserPreferences(updates: Partial<UserPreferences>): void {
     const settings = this.getSettings();
@@ -222,6 +248,13 @@ export class SettingsService {
   updatePrivacySettings(updates: Partial<PrivacySettings>): void {
     const settings = this.getSettings();
     settings.privacySettings = { ...settings.privacySettings, ...updates };
+    settings.updatedAt = new Date();
+    this.saveSettings(settings);
+  }
+
+  updateAISettings(updates: Partial<AISettings>): void {
+    const settings = this.getSettings();
+    settings.aiSettings = { ...settings.aiSettings, ...updates };
     settings.updatedAt = new Date();
     this.saveSettings(settings);
   }
@@ -335,12 +368,24 @@ export class SettingsService {
   private migrateSettings(settings: any): Settings {
     // Handle future settings migrations here
     if (!settings.version || settings.version !== this.CURRENT_VERSION) {
-      // Apply migration logic based on version
+      // Apply migration logic based on version - deep merge to ensure all properties exist
       return {
-        ...this.defaultSettings,
-        ...settings,
+        userPreferences: { ...this.defaultSettings.userPreferences, ...settings.userPreferences },
+        dataManagement: { ...this.defaultSettings.dataManagement, ...settings.dataManagement },
+        trainingSettings: { ...this.defaultSettings.trainingSettings, ...settings.trainingSettings },
+        notificationSettings: { ...this.defaultSettings.notificationSettings, ...settings.notificationSettings },
+        privacySettings: { ...this.defaultSettings.privacySettings, ...settings.privacySettings },
+        aiSettings: { ...this.defaultSettings.aiSettings, ...settings.aiSettings },
         version: this.CURRENT_VERSION,
         updatedAt: new Date()
+      };
+    }
+
+    // Even for same version, ensure aiSettings exists (for backward compatibility)
+    if (!settings.aiSettings) {
+      return {
+        ...settings,
+        aiSettings: { ...this.defaultSettings.aiSettings }
       };
     }
 
@@ -351,7 +396,7 @@ export class SettingsService {
     try {
       // Basic structure validation
       const requiredKeys = ['userPreferences', 'dataManagement', 'trainingSettings', 
-                           'notificationSettings', 'privacySettings'];
+                           'notificationSettings', 'privacySettings', 'aiSettings'];
       
       return requiredKeys.every(key => key in settings);
     } catch (error) {

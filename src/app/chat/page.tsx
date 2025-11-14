@@ -282,7 +282,7 @@ export default function ChatPage() {
                   Add your OpenAI API key to start chatting with your AI coach.
                 </p>
                 <Button variant="outline" size="sm" asChild>
-                  <a href="/dashboard#ai-settings">Configure AI</a>
+                  <a href="/settings">Configure AI</a>
                 </Button>
               </div>
             ) : sessions.length === 0 ? (

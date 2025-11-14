@@ -8,7 +8,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings } from '@/lib/settings';
+import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
+import { cloudAI } from '@/lib/cloudAI';
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -16,6 +17,7 @@ import {
   Target, 
   Bell, 
   Shield,
+  Brain,
   Download,
   Upload,
   Trash2,
@@ -23,10 +25,12 @@ import {
   Save,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
+  Key,
+  TestTube
 } from 'lucide-react';
 
-type SettingsCategory = 'userPreferences' | 'dataManagement' | 'trainingSettings' | 'notificationSettings' | 'privacySettings';
+type SettingsCategory = 'userPreferences' | 'dataManagement' | 'trainingSettings' | 'notificationSettings' | 'privacySettings' | 'aiSettings';
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('userPreferences');
@@ -34,6 +38,10 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // AI Settings state moved to component level (React Rules of Hooks)
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     loadSettings();
@@ -69,6 +77,9 @@ export default function SettingsPage() {
           break;
         case 'privacySettings':
           settings.updatePrivacySettings(updates);
+          break;
+        case 'aiSettings':
+          settings.updateAISettings(updates);
           break;
       }
 
@@ -147,7 +158,8 @@ export default function SettingsPage() {
     { id: 'dataManagement', name: 'Data Management', icon: Database, description: 'Export, import, and storage management' },
     { id: 'trainingSettings', name: 'Training Settings', icon: Target, description: 'Training zones, goals, and preferences' },
     { id: 'notificationSettings', name: 'Notifications', icon: Bell, description: 'Alerts and reminders' },
-    { id: 'privacySettings', name: 'Privacy', icon: Shield, description: 'Data sharing and privacy controls' }
+    { id: 'privacySettings', name: 'Privacy', icon: Shield, description: 'Data sharing and privacy controls' },
+    { id: 'aiSettings', name: 'AI Coach', icon: Brain, description: 'Configure AI assistant and training plan generation' }
   ];
 
   const renderUserPreferences = () => (
@@ -660,6 +672,193 @@ export default function SettingsPage() {
     </div>
   );
 
+  const renderAISettings = () => {
+    // ✅ No hooks here - moved to component level
+    // Conditional logic is safe now
+    if (!settingsData?.aiSettings) {
+      return (
+        <div className="text-center py-8">
+          <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-medium mb-2">AI Settings Not Available</h3>
+          <p className="text-sm text-muted-foreground">
+            Please refresh the page to load AI settings.
+          </p>
+        </div>
+      );
+    }
+
+    // ✅ Test connection function uses component-level state
+    const testConnection = async () => {
+      setIsTestingConnection(true);
+      setConnectionStatus('testing');
+      
+      try {
+        // Configure cloudAI with current settings
+        if (settingsData.aiSettings.openaiApiKey) {
+          cloudAI.initialize(settingsData.aiSettings.openaiApiKey);
+          
+          const success = await cloudAI.testConnection();
+          setConnectionStatus(success ? 'success' : 'error');
+        } else {
+          setConnectionStatus('error');
+        }
+      } catch (error) {
+        setConnectionStatus('error');
+      } finally {
+        setIsTestingConnection(false);
+        setTimeout(() => setConnectionStatus('idle'), 3000);
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">OpenAI Configuration</CardTitle>
+            <CardDescription>Configure your AI coach with OpenAI API</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="apiKey">API Key</Label>
+              <Input
+                id="apiKey"
+                type="password"
+                placeholder="sk-..."
+                value={settingsData.aiSettings.openaiApiKey}
+                onChange={(e) => saveSettings('aiSettings', { openaiApiKey: e.target.value })}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Your API key is stored locally and never shared
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={settingsData.aiSettings.cloudAIEnabled}
+                onCheckedChange={(checked) => saveSettings('aiSettings', { cloudAIEnabled: checked })}
+              />
+              <Label>Enable Cloud AI Features</Label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="model">Model</Label>
+                <select
+                  id="model"
+                  value={settingsData.aiSettings.model}
+                  onChange={(e) => saveSettings('aiSettings', { model: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="gpt-4-turbo-preview">GPT-4 Turbo Preview</option>
+                  <option value="gpt-4">GPT-4</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="temperature">Temperature ({settingsData.aiSettings.temperature})</Label>
+                <Input
+                  id="temperature"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={settingsData.aiSettings.temperature}
+                  onChange={(e) => saveSettings('aiSettings', { temperature: parseFloat(e.target.value) })}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="maxTokens">Max Tokens</Label>
+              <Input
+                id="maxTokens"
+                type="number"
+                min="100"
+                max="4000"
+                value={settingsData.aiSettings.maxTokens}
+                onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
+                className="mt-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={testConnection}
+                disabled={!settingsData.aiSettings.openaiApiKey || isTestingConnection}
+                variant="outline"
+              >
+                {isTestingConnection ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                ) : (
+                  <TestTube className="h-4 w-4 mr-2" />
+                )}
+                Test Connection
+              </Button>
+
+              {connectionStatus === 'success' && (
+                <Badge className="bg-green-100 text-green-800">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+              )}
+              
+              {connectionStatus === 'error' && (
+                <Badge variant="destructive">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Failed
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">AI Prompts</CardTitle>
+            <CardDescription>Customize how your AI coach responds</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="systemPrompt">Analysis System Prompt</Label>
+              <textarea
+                id="systemPrompt"
+                value={settingsData.aiSettings.systemPrompt}
+                onChange={(e) => saveSettings('aiSettings', { systemPrompt: e.target.value })}
+                className="w-full mt-1 p-2 border rounded-md h-24 resize-y"
+                placeholder="System prompt for training analysis..."
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
+              <textarea
+                id="chatSystemPrompt"
+                value={settingsData.aiSettings.chatSystemPrompt}
+                onChange={(e) => saveSettings('aiSettings', { chatSystemPrompt: e.target.value })}
+                className="w-full mt-1 p-2 border rounded-md h-24 resize-y"
+                placeholder="System prompt for chat conversations..."
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="planGenerationPrompt">Plan Generation Prompt</Label>
+              <textarea
+                id="planGenerationPrompt"
+                value={settingsData.aiSettings.planGenerationPrompt}
+                onChange={(e) => saveSettings('aiSettings', { planGenerationPrompt: e.target.value })}
+                className="w-full mt-1 p-2 border rounded-md h-24 resize-y"
+                placeholder="System prompt for training plan generation..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderCategoryContent = () => {
     switch (activeCategory) {
       case 'userPreferences':
@@ -672,6 +871,8 @@ export default function SettingsPage() {
         return renderNotificationSettings();
       case 'privacySettings':
         return renderPrivacySettings();
+      case 'aiSettings':
+        return renderAISettings();
       default:
         return null;
     }
