@@ -264,22 +264,19 @@ export default function DashboardPage() {
   }, {} as Record<ChartMetric, any[]>);
 
   // Handle chart data point click
-  const handleChartClick = (data: any) => {
+  const handleChartClick = (data: any, chartData: any[]) => {
     console.log('Chart clicked:', data); // Debug: Log what Recharts passes
-    if (data && data.sessionId) {
-      console.log('Navigating to session:', data.sessionId); // Debug: Log navigation
-      router.push(`/sessions/${data.sessionId}`);
-    } else if (data && data.activePayload && data.activePayload.length > 0) {
-      // For Bar/Area charts, extract from activePayload
-      const sessionId = data.activePayload[0].payload.sessionId;
-      if (sessionId) {
-        console.log('Navigating to session from payload:', sessionId); // Debug: Log navigation
-        router.push(`/sessions/${sessionId}`);
+    if (data && data.activeIndex !== undefined && chartData[data.activeIndex]) {
+      const dataPoint = chartData[data.activeIndex];
+      console.log('Data point found:', dataPoint); // Debug: Log the data point
+      if (dataPoint.sessionId) {
+        console.log('Navigating to session:', dataPoint.sessionId); // Debug: Log navigation
+        router.push(`/sessions/${dataPoint.sessionId}`);
       } else {
-        console.log('No sessionId found in activePayload'); // Debug: Log missing ID
+        console.log('No sessionId found in data point'); // Debug: Log missing ID
       }
     } else {
-      console.log('No sessionId found in clicked data'); // Debug: Log missing ID
+      console.log('No valid data point found'); // Debug: Log missing data
     }
   };
 
@@ -295,7 +292,7 @@ export default function DashboardPage() {
     // Props for Bar/Area charts (need container onClick)
     const barAreaProps = {
       ...commonProps,
-      onClick: handleChartClick
+      onClick: (data: any) => handleChartClick(data, chartData)
     };
 
     const commonChartElements = (
@@ -358,7 +355,13 @@ export default function DashboardPage() {
               activeDot={{ 
                 r: 6, 
                 cursor: 'pointer',
-                onClick: (e: any, payload: any) => handleChartClick(payload)
+                onClick: (e: any, payload: any) => {
+                  // For Line charts, payload is the data point, but let's be safe and use index lookup
+                  const dataIndex = chartData.findIndex(item => item.date === payload.date);
+                  if (dataIndex !== -1) {
+                    handleChartClick({ activeIndex: dataIndex }, chartData);
+                  }
+                }
               }}
             />
           </LineChart>
