@@ -160,6 +160,21 @@ function prepareChartData(sessions: any[]) {
     }));
 }
 
+// Custom tooltip component with full styling control
+const CustomTooltip = ({ active, payload, label, config }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-gray-300 border-2 border-black rounded-lg p-2 shadow-lg">
+        <p className="text-black font-medium text-sm">{label}</p>
+        <p className="text-black text-sm">
+          {config.formatter(payload[0].value)} - {config.label}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function DashboardPage() {
   const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
   const sessions = getSessions();
@@ -256,28 +271,20 @@ export default function DashboardPage() {
 
     const commonChartElements = (
       <>
-        <CartesianGrid strokeDasharray="3 3" stroke="#6b7280" />
+        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
         <XAxis 
           dataKey="date" 
           className="text-xs"
-          stroke="#6b7280"
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          stroke="#374151"
+          tick={{ fill: '#374151', fontSize: 10 }}
         />
         <YAxis 
           className="text-xs"
-          stroke="#6b7280"
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          stroke="#374151"
+          tick={{ fill: '#374151', fontSize: 10 }}
           tickFormatter={config.yAxisFormatter}
         />
-        <Tooltip 
-          contentStyle={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #6b7280',
-            borderRadius: '6px',
-            color: '#111827'
-          }}
-          formatter={(value: number) => [config.formatter(value), config.label]}
-        />
+        <Tooltip content={<CustomTooltip config={config} />} />
       </>
     );
 
