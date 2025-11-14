@@ -208,7 +208,12 @@ export class TrainingPlansService {
     this.updatePlanProgress(plan);
 
     // Save updated plan
-    this.updatePlan(planId, plan);
+    const plans = this.getPlans();
+    const planIndex = plans.findIndex(p => p.id === planId);
+    if (planIndex !== -1) {
+      plans[planIndex] = { ...plan, updatedAt: new Date() };
+      this.savePlans(plans);
+    }
   }
 
   // Get current week for active plan

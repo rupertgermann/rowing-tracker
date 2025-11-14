@@ -93,6 +93,18 @@ export default function PlansPage() {
           planForm.duration,
           userSessions
         );
+        
+        // Save AI-generated plan to localStorage
+        trainingPlans.createPlan({
+          title: newPlan.title,
+          description: newPlan.description,
+          goals: newPlan.goals,
+          level: newPlan.level,
+          focus: newPlan.focus,
+          duration: newPlan.duration,
+          weeks: newPlan.weeks,
+          status: newPlan.status
+        });
       } else {
         // Template-based plan
         const templates = trainingPlans.getTemplates();
