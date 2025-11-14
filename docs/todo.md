@@ -47,6 +47,27 @@ Build a stunning web app to visualize SmartRow CSV exports with beautiful analyt
 
 ---
 
+## Phase 1b: Design System & Theming (Days 2-3 overlap)
+
+- [ ] Create `docs/design-system.md` as the single source of truth for visual design
+  - Define dark theme palette (backgrounds, foregrounds, accents, status colors)
+  - Define typography scale (display vs body fonts, card metrics, table text)
+  - Define spacing, cards, charts, tables, and empty state guidelines
+- [ ] Wire Tailwind + shadcn to the design system
+  - Add CSS variables for colors in `globals.css` (background, foreground, primary, secondary, accent, etc.)
+  - Extend `tailwind.config.ts` to use CSS variables for colors and surfaces
+  - Configure shadcn theme tokens (primary, secondary, destructive, muted, border)
+- [ ] Implement dark theme as default
+  - Use Tailwind dark mode (class strategy)
+  - Ensure backgrounds, cards, and typography match `docs/design-system.md`
+  - Verify basic accessibility (contrast) on key screens (Upload, Dashboard, Sessions list)
+- [ ] Centralize chart colors
+  - Create `lib/chartTheme.ts` with named colors for volume, pace, power, stroke rate
+  - Align Recharts colors with the design system and CSS variables
+  - Apply consistent tooltip styling across charts
+
+---
+
 ## Phase 2: CSV Import Flow (Day 3)
 
 ### Upload UI
