@@ -256,23 +256,23 @@ export default function DashboardPage() {
 
     const commonChartElements = (
       <>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <CartesianGrid strokeDasharray="3 3" stroke="#6b7280" />
         <XAxis 
           dataKey="date" 
           className="text-xs"
           stroke="#6b7280"
-          tick={{ fill: '#6b7280' }}
+          tick={{ fill: '#6b7280', fontSize: 10 }}
         />
         <YAxis 
           className="text-xs"
           stroke="#6b7280"
-          tick={{ fill: '#6b7280' }}
+          tick={{ fill: '#6b7280', fontSize: 10 }}
           tickFormatter={config.yAxisFormatter}
         />
         <Tooltip 
           contentStyle={{
             backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
+            border: '1px solid #6b7280',
             borderRadius: '6px',
             color: '#111827'
           }}
