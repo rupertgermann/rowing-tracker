@@ -1,0 +1,402 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRowingStore } from '@/lib/store';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  Calendar, 
+  TrendingUp, 
+  Clock, 
+  Zap, 
+  Target, 
+  Activity,
+  Flame,
+  Gauge
+} from 'lucide-react';
+
+// Helper functions for formatting data
+function formatDistance(meters: number): string {
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(1)}km`;
+  }
+  return `${meters}m`;
+}
+
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${secs}s`;
+  }
+  return `${minutes}m ${secs}s`;
+}
+
+function formatPace(secondsPer500m: number): string {
+  if (secondsPer500m <= 0) return '--:--';
+  const minutes = Math.floor(secondsPer500m / 60);
+  const seconds = Math.floor(secondsPer500m % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')} / 500m`;
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+export default function SessionDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { getSessions } = useRowingStore();
+  const sessions = getSessions();
+  
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const sessionId = params.id as string;
+    const foundSession = sessions.find(s => s.id === sessionId);
+    
+    if (foundSession) {
+      setSession(foundSession);
+    }
+    setLoading(false);
+  }, [params.id, sessions]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-muted rounded w-64 mb-4"></div>
+            <div className="h-4 bg-muted rounded w-96 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-32 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-16">
+            <h1 className="text-2xl font-bold text-foreground mb-4">
+              Session Not Found
+            </h1>
+            <p className="text-muted-foreground mb-8">
+              The session you're looking for doesn't exist or has been deleted.
+            </p>
+            <Button asChild>
+              <Link href="/sessions">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Sessions
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Find previous and next sessions for navigation
+  const sortedSessions = [...sessions].sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+  
+  const currentIndex = sortedSessions.findIndex(s => s.id === session.id);
+  const previousSession = currentIndex > 0 ? sortedSessions[currentIndex - 1] : null;
+  const nextSession = currentIndex < sortedSessions.length - 1 ? sortedSessions[currentIndex + 1] : null;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header with Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <Button variant="ghost" asChild className="mb-4">
+              <Link href="/sessions" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Sessions
+              </Link>
+            </Button>
+            <h1 className="text-3xl font-bold text-foreground">
+              Session Details
+            </h1>
+            <p className="text-muted-foreground flex items-center gap-2 mt-2">
+              <Calendar className="h-4 w-4" />
+              {formatDate(session.timestamp)}
+            </p>
+          </div>
+          
+          {/* Previous/Next Navigation */}
+          <div className="flex items-center gap-2">
+            {previousSession && (
+              <Button variant="outline" asChild>
+                <Link href={`/sessions/${previousSession.id}`}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Link>
+              </Button>
+            )}
+            {nextSession && (
+              <Button variant="outline" asChild>
+                <Link href={`/sessions/${nextSession.id}`}>
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Primary Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Distance</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {formatDistance(session.distance)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Duration</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {formatDuration(session.duration)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Average Pace</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary font-mono">
+                {formatPace(session.avgSplit)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Average Power</CardTitle>
+              <Zap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Detailed Statistics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Pace & Power */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-primary" />
+                Pace & Power
+              </CardTitle>
+              <CardDescription>
+                Split times and power output
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm text-muted-foreground">Average Split</span>
+                  <div className="text-lg font-semibold font-mono">
+                    {formatPace(session.avgSplit)}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Best Split</span>
+                  <div className="text-lg font-semibold font-mono">
+                    {formatPace(session.minSplit)}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Average Power</span>
+                  <div className="text-lg font-semibold">
+                    {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Maximum Power</span>
+                  <div className="text-lg font-semibold">
+                    {session.maxPower > 0 ? `${Math.round(session.maxPower)}W` : '--'}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stroke Rate & Energy */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Stroke Rate & Energy
+              </CardTitle>
+              <CardDescription>
+                Stroke metrics and energy expenditure
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm text-muted-foreground">Average Stroke Rate</span>
+                  <div className="text-lg font-semibold">
+                    {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Maximum Stroke Rate</span>
+                  <div className="text-lg font-semibold">
+                    {session.maxStrokeRate > 0 ? `${Math.round(session.maxStrokeRate)} SPM` : '--'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Energy Burned</span>
+                  <div className="text-lg font-semibold">
+                    {session.energy > 0 ? `${Math.round(session.energy)} kCal` : '--'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Total Work</span>
+                  <div className="text-lg font-semibold">
+                    {session.avgWork > 0 ? `${Math.round(session.avgWork)} J` : '--'}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Stroke Count</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {session.strokeCount.toLocaleString()}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Total strokes
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Stroke Length</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {session.avgStrokeLength > 0 ? `${session.avgStrokeLength.toFixed(2)}m` : '--'}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Average length per stroke
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Power per KG</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {session.wattPerKg > 0 ? `${session.wattPerKg.toFixed(1)} W/kg` : '--'}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Power-to-weight ratio
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Session Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5 text-primary" />
+              Session Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold mb-2">Performance</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Distance:</span>
+                    <span>{formatDistance(session.distance)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Duration:</span>
+                    <span>{formatDuration(session.duration)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Average Pace:</span>
+                    <span>{formatPace(session.avgSplit)}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Power Output</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Average Power:</span>
+                    <span>{session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Maximum Power:</span>
+                    <span>{session.maxPower > 0 ? `${Math.round(session.maxPower)}W` : '--'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Power per KG:</span>
+                    <span>{session.wattPerKg > 0 ? `${session.wattPerKg.toFixed(1)} W/kg` : '--'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
