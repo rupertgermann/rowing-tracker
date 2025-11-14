@@ -6,8 +6,10 @@ import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
+import { InsightCard } from '@/components/ai/InsightCard';
+import { useAIInsights } from '@/hooks/useAIInsights';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -184,6 +186,9 @@ export default function DashboardPage() {
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
+
+  // AI Insights hook
+  const { insights, trends, trainingLoad, anomalies, isAnalyzable, lastAnalyzed } = useAIInsights();
 
   useEffect(() => {
     setMounted(true);
@@ -719,6 +724,83 @@ export default function DashboardPage() {
                     <p className="text-muted-foreground mb-4">
                       Select metrics above to visualize your performance data over time.
                     </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Insights Section */}
+            {isAnalyzable && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+                      <Brain className="h-6 w-6 text-blue-600" />
+                      AI Insights
+                    </h2>
+                    <p className="text-muted-foreground">
+                      Personalized recommendations based on your training data
+                    </p>
+                  </div>
+                  {lastAnalyzed && (
+                    <div className="text-xs text-muted-foreground">
+                      Last analyzed: {lastAnalyzed.toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+
+                {insights.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {insights.map((insight) => (
+                      <InsightCard
+                        key={insight.id}
+                        insight={insight}
+                        onFeedback={(insightId, feedback) => {
+                          console.log(`Insight ${insightId} received feedback: ${feedback}`);
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center py-8">
+                        <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                          <Brain className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground mb-2">
+                          Analyzing Your Data
+                        </h3>
+                        <p className="text-muted-foreground mb-4">
+                          AI is processing your training patterns to generate personalized insights.
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          More sessions will provide better recommendations.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Empty State for AI Insights */}
+            {!isAnalyzable && sessions.length > 0 && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-8">
+                    <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                      <Brain className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      AI Insights Coming Soon
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Complete at least 5 sessions to unlock personalized AI recommendations and insights.
+                    </p>
+                    <div className="text-sm text-muted-foreground">
+                      Sessions needed: {sessions.length}/5
+                    </div>
                   </div>
                 </CardContent>
               </Card>
