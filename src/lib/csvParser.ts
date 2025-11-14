@@ -1,0 +1,253 @@
+import Papa from 'papaparse';
+import { Session, RawCsvRow, ImportResult } from '@/types/session';
+
+/**
+ * Parse European decimal format (comma to dot)
+ * Handles empty values and whitespace
+ */
+function parseEuropeanNumber(value: string): number {
+  if (!value || value.trim() === '') return 0;
+  const cleaned = value.trim().replace(',', '.');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Parse timestamp from SmartRow format: "YYYY-MM-DD HH:MM:SS.mmm"
+ */
+function parseTimestamp(timestamp: string): Date {
+  // Handle both with and without milliseconds
+  const cleanTimestamp = timestamp.trim();
+  
+  // Try parsing with milliseconds first
+  const withMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})$/.exec(cleanTimestamp);
+  if (withMs) {
+    return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
+  }
+  
+  // Try parsing without milliseconds
+  const withoutMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$/.exec(cleanTimestamp);
+  if (withoutMs) {
+    return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
+  }
+  
+  // Fallback - try direct parsing
+  const date = new Date(cleanTimestamp);
+  return isNaN(date.getTime()) ? new Date() : date;
+}
+
+/**
+ * Generate unique session ID based on timestamp and distance
+ */
+function generateSessionId(timestamp: Date, distance: number): string {
+  return `${timestamp.getTime()}-${distance}`;
+}
+
+/**
+ * Transform raw CSV row to Session object
+ */
+function transformRowToSession(row: RawCsvRow): Session {
+  const timestamp = parseTimestamp(row['Time stamp (UTC)']);
+  const distance = parseEuropeanNumber(row['Distance (m)']);
+  const duration = parseEuropeanNumber(row['Time']);
+  
+  return {
+    id: generateSessionId(timestamp, distance),
+    timestamp,
+    distance,
+    duration,
+    energy: parseEuropeanNumber(row['Energy (kCal)']),
+    strokeCount: parseEuropeanNumber(row['Stroke count (#)']),
+    avgPower: parseEuropeanNumber(row['Average power (W)']),
+    maxPower: parseEuropeanNumber(row['Maximum power (W)']),
+    wattPerKg: parseEuropeanNumber(row['Watt per KG']),
+    avgSplit: parseEuropeanNumber(row['Average split (s)']),
+    minSplit: parseEuropeanNumber(row['Minimum split (s)']),
+    avgWork: parseEuropeanNumber(row['Average work (J)']),
+    avgStrokeLength: parseEuropeanNumber(row['Average stroke length (m)']),
+    avgStrokeRate: parseEuropeanNumber(row['Average stroke rate (SPM)']),
+    maxStrokeRate: parseEuropeanNumber(row['Maximum stroke rate (SPM)']),
+  };
+}
+
+/**
+ * Check if a session is a duplicate based on timestamp and distance
+ */
+function isDuplicateSession(newSession: Session, existingSessions: Session[]): boolean {
+  return existingSessions.some(existing => 
+    existing.id === newSession.id ||
+    (Math.abs(existing.timestamp.getTime() - newSession.timestamp.getTime()) < 1000 && // within 1 second
+     existing.distance === newSession.distance)
+  );
+}
+
+/**
+ * Parse SmartRow CSV file and return sessions with import statistics
+ */
+export async function parseSmartRowCsv(
+  file: File, 
+  existingSessions: Session[] = []
+): Promise<{ sessions: Session[], result: ImportResult }> {
+  return new Promise((resolve) => {
+    const errors: string[] = [];
+    const importedSessions: Session[] = [];
+    let duplicatesSkipped = 0;
+    let totalDistance = 0;
+    let totalTime = 0;
+
+    Papa.parse<RawCsvRow>(file, {
+      delimiter: ';',
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.replace(/\r/g, '').trim(),
+      transform: (value) => value.replace(/\r/g, '').trim(),
+      complete: (results) => {
+        try {
+          // Validate required columns
+          const requiredColumns = [
+            'Time stamp (UTC)',
+            'Distance (m)',
+            'Time',
+            'Energy (kCal)',
+            'Stroke count (#)',
+            'Average power (W)',
+            'Maximum power (W)',
+            'Average split (s)',
+            'Minimum split (s)',
+            'Average stroke rate (SPM)',
+            'Maximum stroke rate (SPM)'
+          ];
+
+          const actualColumns = results.meta.fields || [];
+          const missingColumns = requiredColumns.filter(col => !actualColumns.includes(col));
+          
+          if (missingColumns.length > 0) {
+            errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
+            resolve({
+              sessions: [],
+              result: {
+                totalRows: results.data.length,
+                importedSessions: 0,
+                duplicatesSkipped: 0,
+                errors,
+                totalDistance: 0,
+                totalTime: 0
+              }
+            });
+            return;
+          }
+
+          // Process each row
+          results.data.forEach((row, index) => {
+            try {
+              const session = transformRowToSession(row);
+              
+              // Validate session data
+              if (session.distance <= 0 || session.duration <= 0) {
+                errors.push(`Row ${index + 1}: Invalid distance or duration`);
+                return;
+              }
+
+              // Check for duplicates
+              if (isDuplicateSession(session, existingSessions)) {
+                duplicatesSkipped++;
+                return;
+              }
+
+              importedSessions.push(session);
+              totalDistance += session.distance;
+              totalTime += session.duration;
+
+            } catch (error) {
+              errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          });
+
+          resolve({
+            sessions: importedSessions,
+            result: {
+              totalRows: results.data.length,
+              importedSessions: importedSessions.length,
+              duplicatesSkipped,
+              errors,
+              totalDistance,
+              totalTime
+            }
+          });
+
+        } catch (error) {
+          errors.push(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          resolve({
+            sessions: [],
+            result: {
+              totalRows: results.data.length,
+              importedSessions: 0,
+              duplicatesSkipped: 0,
+              errors,
+              totalDistance: 0,
+              totalTime: 0
+            }
+          });
+        }
+      },
+      error: (error) => {
+        errors.push(`CSV parsing error: ${error.message}`);
+        resolve({
+          sessions: [],
+          result: {
+            totalRows: 0,
+            importedSessions: 0,
+            duplicatesSkipped: 0,
+            errors,
+            totalDistance: 0,
+            totalTime: 0
+          }
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Validate CSV file format before parsing
+ */
+export function validateSmartRowCsv(file: File): Promise<{ isValid: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    // Check file extension
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      resolve({ isValid: false, error: 'File must be a CSV file' });
+      return;
+    }
+
+    // Read first few lines to validate format
+    Papa.parse(file, {
+      delimiter: ';',
+      preview: 2, // Only read first 2 lines
+      complete: (results) => {
+        const headers = results.data[0] as string[];
+        
+        if (!headers || headers.length === 0) {
+          resolve({ isValid: false, error: 'CSV file appears to be empty' });
+          return;
+        }
+
+        // Check for key SmartRow columns
+        const keyColumns = ['Time stamp (UTC)', 'Distance (m)', 'Time'];
+        const missingKeyColumns = keyColumns.filter(col => !headers.includes(col));
+        
+        if (missingKeyColumns.length > 0) {
+          resolve({ 
+            isValid: false, 
+            error: `This doesn't appear to be a SmartRow CSV file. Missing: ${missingKeyColumns.join(', ')}` 
+          });
+          return;
+        }
+
+        resolve({ isValid: true });
+      },
+      error: (error) => {
+        resolve({ isValid: false, error: `Failed to read CSV: ${error.message}` });
+      }
+    });
+  });
+}

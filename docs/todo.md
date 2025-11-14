@@ -11,7 +11,7 @@ Build a stunning web app to visualize SmartRow CSV exports with beautiful analyt
 ## Phase 1: Foundation & Setup (Days 1-2)
 
 ### Documentation
-- [x] Create comprehensive README.md
+- [ ] Create comprehensive README.md
   - Project overview
   - Tech stack
   - Setup instructions
