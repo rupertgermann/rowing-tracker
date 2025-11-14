@@ -153,7 +153,7 @@ export class SettingsService {
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o', // Updated to latest default model
       temperature: 0.7,
       maxTokens: 1500,
       systemPrompt: 'You are an expert rowing coach and sports scientist...',

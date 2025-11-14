@@ -750,14 +750,35 @@ export default function SettingsPage() {
                   onChange={(e) => saveSettings('aiSettings', { model: e.target.value })}
                   className="w-full mt-1 p-2 border rounded-md"
                 >
-                  <option value="gpt-4-turbo-preview">GPT-4 Turbo Preview</option>
-                  <option value="gpt-4">GPT-4</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <optgroup label="Latest Models (GPT-5 Series)">
+                    <option value="gpt-5">GPT-5</option>
+                    <option value="gpt-5-mini">GPT-5 Mini</option>
+                    <option value="gpt-5-nano">GPT-5 Nano</option>
+                  </optgroup>
+                  <optgroup label="GPT-4 Series">
+                    <option value="gpt-4o">GPT-4o (Recommended)</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-4">GPT-4</option>
+                  </optgroup>
+                  <optgroup label="GPT-3.5 Series">
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  </optgroup>
                 </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {settingsData.aiSettings.model.startsWith('gpt-5') 
+                    ? "GPT-5 models use reasoning instead of temperature" 
+                    : "Adjust temperature for creativity control"}
+                </p>
               </div>
 
               <div>
-                <Label htmlFor="temperature">Temperature ({settingsData.aiSettings.temperature})</Label>
+                <Label htmlFor="temperature">
+                  {settingsData.aiSettings.model.startsWith('gpt-5') 
+                    ? `Reasoning Effort (${settingsData.aiSettings.temperature === 0.7 ? 'medium' : settingsData.aiSettings.temperature < 0.5 ? 'minimal' : 'high'})` 
+                    : `Temperature (${settingsData.aiSettings.temperature})`
+                  }
+                </Label>
                 <Input
                   id="temperature"
                   type="range"
@@ -767,7 +788,13 @@ export default function SettingsPage() {
                   value={settingsData.aiSettings.temperature}
                   onChange={(e) => saveSettings('aiSettings', { temperature: parseFloat(e.target.value) })}
                   className="mt-1"
+                  disabled={settingsData.aiSettings.model.startsWith('gpt-5')}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {settingsData.aiSettings.model.startsWith('gpt-5') 
+                    ? "GPT-5 uses reasoning depth instead of temperature" 
+                    : "Controls randomness: 0 = focused, 1 = creative"}
+                </p>
               </div>
             </div>
 
