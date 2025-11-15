@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { Session } from '@/types/session';
 import { aiAnalysis, Insight, TrendData, TrainingLoadData, AnomalyData } from '@/lib/aiAnalysis';
@@ -21,6 +21,20 @@ export function useAIInsights(): AIInsightData {
   const { getSessions } = useRowingStore();
   const sessions = getSessions();
   const [cloudAIError, setCloudAIError] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // State for analysis results
+  const [data, setData] = useState<AIInsightData>({
+    insights: [],
+    trends: [],
+    trainingLoad: null,
+    anomalies: [],
+    isAnalyzable: false,
+    lastAnalyzed: null,
+    usingCloudAI: false,
+    cloudAIError: null,
+    isCloudAIConfigured: false
+  });
 
   // Initialize cloud AI from user settings
   const initializeCloudAI = useCallback(() => {
@@ -75,18 +89,18 @@ export function useAIInsights(): AIInsightData {
         isAnalyzable: false,
         lastAnalyzed: null,
         usingCloudAI: false,
-        cloudAIError: error instanceof Error ? error.message : 'Analysis failed',
+        cloudAIError: 'Local analysis failed',
         isCloudAIConfigured: false
       };
     }
   };
 
-  const analysisData = useMemo(() => {
-    // Need minimum sessions for meaningful analysis
-    const isAnalyzable = sessions.length >= 3; // Reduced for cloud AI
+  // Main analysis function
+  const performAnalysis = useCallback(async () => {
+    const isAnalyzable = sessions.length >= 3;
     const isCloudAIConfigured = initializeCloudAI();
-    const isAIAvailableForUse = isAIAvailable();
-    
+    const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
+
     if (!isAnalyzable) {
       return {
         insights: [],
@@ -101,12 +115,17 @@ export function useAIInsights(): AIInsightData {
       };
     }
 
-    // Try Cloud AI first if configured and available, fallback to local analysis
+    // Try Cloud AI first if configured and available
     if (isAIAvailableForUse) {
+      setIsAnalyzing(true);
       try {
-        // For now, return local analysis with cloud AI flag
-        // In a real implementation, this would be an async operation
-        const localInsights = aiAnalysis.generateInsights(sessions);
+        // Initialize cloud AI with latest settings
+        initializeCloudAI();
+        
+        // Generate insights using cloud AI
+        const cloudInsights = await cloudAI.generateInsights(sessions);
+        
+        // Generate local trends and other data (cloud AI only handles insights)
         const trends = [
           aiAnalysis.analyzeTrend(sessions, 'avgSplit'),
           aiAnalysis.analyzeTrend(sessions, 'avgPower'),
@@ -117,20 +136,25 @@ export function useAIInsights(): AIInsightData {
         const trainingLoad = aiAnalysis.calculateTrainingLoad(sessions);
         const anomalies = aiAnalysis.detectAnomalies(sessions);
 
+        setIsAnalyzing(false);
+        setCloudAIError(null);
+
         return {
-          insights: localInsights.slice(0, 5),
+          insights: cloudInsights.slice(0, 5),
           trends,
           trainingLoad,
           anomalies: anomalies.slice(0, 3),
           isAnalyzable: true,
           lastAnalyzed: new Date(),
-          usingCloudAI: false, // Will be true when async cloud AI is implemented
+          usingCloudAI: true,
           cloudAIError: null,
           isCloudAIConfigured: true
         };
       } catch (error) {
         console.error('Cloud AI failed, falling back to local analysis:', error);
-        setCloudAIError(error instanceof Error ? error.message : 'Cloud AI error');
+        setIsAnalyzing(false);
+        const errorMessage = error instanceof Error ? error.message : 'Cloud AI error';
+        setCloudAIError(errorMessage);
         
         // Fallback to local analysis
         return getLocalAnalysis(sessions);
@@ -141,7 +165,32 @@ export function useAIInsights(): AIInsightData {
     return getLocalAnalysis(sessions);
   }, [sessions, initializeCloudAI]);
 
-  return analysisData;
+  // Run analysis when sessions change
+  useEffect(() => {
+    let isMounted = true;
+    
+    const runAnalysis = async () => {
+      try {
+        const result = await performAnalysis();
+        if (isMounted) {
+          setData(result);
+        }
+      } catch (error) {
+        console.error('Analysis error:', error);
+        if (isMounted) {
+          setData(getLocalAnalysis(sessions));
+        }
+      }
+    };
+
+    runAnalysis();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [performAnalysis, sessions]);
+
+  return data;
 }
 
 // Async function for cloud AI insights (to be used with proper async handling)

@@ -264,6 +264,13 @@ Use this data to provide personalized coaching and reference their actual perfor
       const anonymizedData = this.anonymizeSessions(sessions);
       const prompt = this.buildInsightPrompt(anonymizedData);
       
+      console.log('=== DEBUG: AI Insights Prompt ===');
+      console.log('System Prompt:', this.getSystemPrompt());
+      console.log('User Prompt:', prompt);
+      console.log('Sessions Count:', sessions.length);
+      console.log('Anonymized Data:', anonymizedData);
+      console.log('================================');
+      
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -351,7 +358,9 @@ ANALYSIS REQUIREMENTS:
 5. Goal Progress: Evaluate progress toward typical rowing goals
 
 RESPONSE FORMAT:
-Return a JSON array of insights with this structure:
+IMPORTANT: Return ONLY a JSON array. Do not include any explanations, markdown, or additional text. Your entire response must be valid JSON that can be parsed directly.
+
+Return a JSON array with this structure:
 [
   {
     "type": "performance|recommendation|trend|achievement|warning",
@@ -364,7 +373,9 @@ Return a JSON array of insights with this structure:
   }
 ]
 
-Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`;
+Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.
+
+CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no explanations, no introductory text.`;
   }
 
   // Create readable session summary for the AI
@@ -386,33 +397,72 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
   // Parse AI response into structured insights
   private parseInsightResponse(response: string): CloudInsight[] {
     try {
-      // Extract JSON from response (in case there's extra text)
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in AI response');
+      console.log('Raw AI response:', response); // Debug logging
+      
+      // Multiple attempts to extract JSON from response
+      let jsonString = '';
+      
+      // Try 1: Look for JSON array with markdown code blocks
+      const markdownMatch = response.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+      if (markdownMatch) {
+        jsonString = markdownMatch[1];
+      } else {
+        // Try 2: Look for JSON array without markdown
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          jsonString = jsonMatch[0];
+        } else {
+          // Try 3: Look for JSON object with insights property
+          const objectMatch = response.match(/\{[\s\S]*"insights"[\s\S]*\}/);
+          if (objectMatch) {
+            const parsed = JSON.parse(objectMatch[0]);
+            jsonString = JSON.stringify(parsed.insights || parsed);
+          } else {
+            // Try 4: Try to parse the entire response as JSON
+            try {
+              const parsed = JSON.parse(response.trim());
+              jsonString = JSON.stringify(Array.isArray(parsed) ? parsed : parsed.insights || parsed);
+            } catch {
+              throw new Error('No JSON found in AI response. Response was: ' + response.substring(0, 200));
+            }
+          }
+        }
       }
       
-      const insightsData = JSON.parse(jsonMatch[0]);
+      // Clean up the JSON string
+      jsonString = jsonString
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+        .replace(/\\n/g, '\\\\n') // Fix escaped newlines
+        .trim();
       
-      return insightsData.map((insight: any, index: number) => ({
+      console.log('Extracted JSON:', jsonString); // Debug logging
+      
+      const insightsData = JSON.parse(jsonString);
+      
+      // Ensure we have an array
+      const insightsArray = Array.isArray(insightsData) ? insightsData : [insightsData];
+      
+      return insightsArray.map((insight: any, index: number) => ({
         id: `cloud-insight-${Date.now()}-${index}`,
         type: insight.type || 'recommendation',
         title: insight.title || 'Performance Insight',
         description: insight.description || 'No description provided',
         actionable: Boolean(insight.actionable),
         priority: insight.priority || 'medium',
-        confidence: Math.max(0, Math.min(1, insight.confidence || 0.5)),
+        confidence: Math.max(0, Math.min(1, Number(insight.confidence) || 0.5)),
         evidence: Array.isArray(insight.evidence) ? insight.evidence : [],
         dateGenerated: new Date()
       }));
     } catch (error) {
       console.error('Failed to parse AI response:', error);
-      // Return fallback insight
+      console.error('Response content:', response);
+      
+      // Return fallback insight instead of throwing
       return [{
-        id: `fallback-${Date.now()}`,
-        type: 'warning' as const,
+        id: `cloud-insight-fallback-${Date.now()}`,
+        type: 'recommendation',
         title: 'AI Analysis Error',
-        description: 'Unable to process AI insights. Please try again later.',
+        description: `Unable to process AI analysis: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your AI configuration.`,
         actionable: false,
         priority: 'low' as const,
         confidence: 0,
