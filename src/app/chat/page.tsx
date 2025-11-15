@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -423,8 +424,37 @@ export default function ChatPage() {
                             : 'bg-muted'
                         }`}
                       >
-                        <div className="text-sm whitespace-pre-wrap">
-                          {message.content}
+                        <div className="text-sm">
+                          {message.role === 'assistant' ? (
+                            <div className="prose prose-sm max-w-none dark:prose-invert">
+                              <ReactMarkdown
+                                components={{
+                                  // Custom styling for common markdown elements
+                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1">{children}</li>,
+                                  code: ({className, children}) => {
+                                    const isInline = !className;
+                                    return isInline 
+                                      ? <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                                      : <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2"><code>{children}</code></pre>;
+                                  },
+                                  strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+                                  em: ({children}) => <em className="italic">{children}</em>,
+                                  h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                  h2: ({children}) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                                  h3: ({children}) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                                  blockquote: ({children}) => <blockquote className="border-l-4 border-muted-foreground pl-3 italic">{children}</blockquote>,
+                                }}
+                                disallowedElements={['script', 'iframe', 'object', 'embed']}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <div className="whitespace-pre-wrap">{message.content}</div>
+                          )}
                         </div>
                         <div className="text-xs opacity-70 mt-1">
                           {formatTime(message.timestamp)}

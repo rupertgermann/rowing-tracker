@@ -38,10 +38,68 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Toast component for overlay notifications
+  const Toast = ({ message, type, onExit }: { message: string; type: 'success' | 'error'; onExit: () => void }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    
+    useEffect(() => {
+      // Trigger fade-in animation on mount
+      setIsVisible(true);
+    }, []);
+    
+    const handleExit = () => {
+      setIsVisible(false);
+      setTimeout(onExit, 300); // Wait for slide-out animation
+    };
+    
+    useEffect(() => {
+      // Auto-dismiss and trigger exit animation
+      const exitTimer = setTimeout(handleExit, type === 'success' ? 3000 : 5000);
+      return () => clearTimeout(exitTimer);
+    }, [type, onExit]);
+    
+    return (
+      <div
+        className={`
+          fixed bottom-4 right-4 z-50 max-w-sm transform transition-all duration-300 ease-in-out
+          ${isVisible 
+            ? 'translate-x-0 opacity-100 scale-100'  // Fade in (visible)
+            : 'translate-x-0 opacity-0 scale-100'    // Start faded out (no slide)
+          }
+        `}
+      >
+        <div
+          className={`
+            rounded-lg border p-4 shadow-lg flex items-center gap-3
+            ${type === 'success' 
+              ? 'bg-green-700 text-white border-green-800' 
+              : 'border-red-200 text-red-800 bg-red-50'
+            }
+          `}
+        >
+          {type === 'success' ? (
+            <CheckCircle className="h-5 w-5 flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+          )}
+          <span className="text-sm font-medium leading-relaxed">{message}</span>
+        </div>
+      </div>
+    );
+  };
   
   // AI Settings state moved to component level (React Rules of Hooks)
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  
+  // Auto-dismiss connection status with proper cleanup
+  useEffect(() => {
+    if (connectionStatus === 'success' || connectionStatus === 'error') {
+      const timeoutId = setTimeout(() => setConnectionStatus('idle'), 3000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [connectionStatus]);
 
   useEffect(() => {
     loadSettings();
@@ -85,7 +143,6 @@ export default function SettingsPage() {
 
       loadSettings();
       setSuccessMessage('Settings saved successfully');
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       setErrorMessage('Failed to save settings');
     } finally {
@@ -706,7 +763,6 @@ export default function SettingsPage() {
         setConnectionStatus('error');
       } finally {
         setIsTestingConnection(false);
-        setTimeout(() => setConnectionStatus('idle'), 3000);
       }
     };
 
@@ -714,30 +770,58 @@ export default function SettingsPage() {
       switch (connectionStatus) {
         case 'testing':
           return (
-            <Badge variant="outline" className="!text-blue-600 border-blue-200 bg-blue-50">
+            <span 
+              className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
+              style={{
+                color: '#1e40af',
+                backgroundColor: '#dbeafe',
+                borderColor: '#93c5fd'
+              }}
+            >
               <RotateCcw className="h-3 w-3 mr-1 animate-spin" />
               Testing...
-            </Badge>
+            </span>
           );
         case 'success':
           return (
-            <Badge variant="outline" className="!text-green-600 border-green-200 bg-green-50">
+            <span 
+              className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
+              style={{
+                color: '#166534',
+                backgroundColor: '#dcfce7',
+                borderColor: '#86efac'
+              }}
+            >
               <CheckCircle className="h-3 w-3 mr-1" />
               Connected
-            </Badge>
+            </span>
           );
         case 'error':
           return (
-            <Badge variant="outline" className="!text-red-600 border-red-200 bg-red-50">
+            <span 
+              className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
+              style={{
+                color: '#dc2626',
+                backgroundColor: '#fee2e2',
+                borderColor: '#fca5a5'
+              }}
+            >
               <AlertTriangle className="h-3 w-3 mr-1" />
               Failed
-            </Badge>
+            </span>
           );
         default:
           return (
-            <Badge variant="outline" className="!text-muted-foreground">
+            <span 
+              className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
+              style={{
+                color: '#6b7280',
+                backgroundColor: '#f9fafb',
+                borderColor: '#d1d5db'
+              }}
+            >
               Not tested
-            </Badge>
+            </span>
           );
       }
     };
@@ -1023,19 +1107,20 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Success/Error Messages */}
+      {/* Toast Overlays */}
       {successMessage && (
-        <Alert className="mb-4 border-green-200 bg-green-50">
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>{successMessage}</AlertDescription>
-        </Alert>
+        <Toast 
+          message={successMessage} 
+          type="success" 
+          onExit={() => setSuccessMessage(null)} 
+        />
       )}
-      
       {errorMessage && (
-        <Alert className="mb-4 border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
+        <Toast 
+          message={errorMessage} 
+          type="error" 
+          onExit={() => setErrorMessage(null)} 
+        />
       )}
 
       <div className="flex gap-6">
