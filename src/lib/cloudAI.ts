@@ -332,15 +332,52 @@ Focus on practical advice that helps rowers improve performance while avoiding i
 
   // Build user prompt with session data using configurable prompt
   private buildInsightPrompt(sessions: any[]): string {
-    const recentSessions = sessions.slice(-10); // Last 10 sessions
+    // Include more sessions for better progress analysis
+    const recentSessions = sessions.slice(-20); // Last 20 sessions for better context
     const sessionSummary = this.createSessionSummary(recentSessions);
+    
+    // Add training summary for progress analysis
+    const trainingSummary = this.createTrainingSummary(sessions);
     
     // Get configurable insights prompt from settings
     const settings = SettingsService.getInstance().getSettings();
     const insightsPrompt = settings.aiSettings.insightsPrompt || this.getDefaultInsightsPrompt();
     
-    // Replace {sessionData} placeholder with actual session data
-    return insightsPrompt.replace('{sessionData}', sessionSummary);
+    // Restructure prompt to make analysis task clear
+    let finalPrompt = `You are an expert rowing coach analyzing training data. The user has a specific request below.
+
+USER REQUEST:
+${insightsPrompt}
+
+TRAINING DATA FOR ANALYSIS:
+Below is the user's rowing workout data that you should analyze to answer their request.
+
+${trainingSummary}
+
+${sessionSummary}
+
+YOUR TASK:
+Analyze the training data above to address the user's request. Provide personalized insights, trends, and actionable recommendations based on the data.
+
+RESPONSE FORMAT:
+Return ONLY a JSON array of insights. Do not include the training data in your response - only your analysis and insights.
+
+JSON structure:
+[
+  {
+    "type": "performance|recommendation|trend|achievement|warning",
+    "title": "Brief insight title",
+    "description": "Detailed explanation with specific advice",
+    "actionable": true/false,
+    "priority": "high|medium|low", 
+    "confidence": 0.0-1.0,
+    "evidence": ["specific data points supporting this insight"]
+  }
+]
+
+CRITICAL: Your response must be ONLY the JSON array of insights. Do not include any explanations, markdown, or the training data itself.`;
+    
+    return finalPrompt;
   }
 
   // Default insights prompt fallback
@@ -392,6 +429,51 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
   - Power: ${power}
   - Stroke Rate: ${strokeRate}`;
     }).join('\n\n');
+  }
+
+  // Create aggregated training summary for progress analysis
+  private createTrainingSummary(sessions: any[]): string {
+    if (sessions.length === 0) {
+      return 'No training data available.';
+    }
+
+    const totalSessions = sessions.length;
+    const totalDuration = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const totalDistance = sessions.reduce((sum, s) => sum + (s.distance || 0), 0);
+    const avgPace = sessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / sessions.filter(s => s.pace).length || 0;
+    const avgPower = sessions.filter(s => s.power).reduce((sum, s) => sum + s.power, 0) / sessions.filter(s => s.power).length || 0;
+    const avgStrokeRate = sessions.filter(s => s.strokeRate).reduce((sum, s) => sum + s.strokeRate, 0) / sessions.filter(s => s.strokeRate).length || 0;
+
+    // Calculate recent vs older comparisons for progress
+    const recentSessions = sessions.slice(-5);
+    const olderSessions = sessions.slice(-10, -5);
+    
+    const recentAvgPace = recentSessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / recentSessions.filter(s => s.pace).length || 0;
+    const olderAvgPace = olderSessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / olderSessions.filter(s => s.pace).length || 0;
+    
+    const paceTrend = recentAvgPace < olderAvgPace ? 'improving (faster)' : recentAvgPace > olderAvgPace ? 'declining (slower)' : 'stable';
+
+    // Date range
+    const dates = sessions.map(s => new Date(s.date)).sort((a, b) => a.getTime() - b.getTime());
+    const startDate = dates[0]?.toLocaleDateString();
+    const endDate = dates[dates.length - 1]?.toLocaleDateString();
+
+    return `TRAINING SUMMARY:
+Total Sessions: ${totalSessions}
+Training Period: ${startDate} to ${endDate}
+Total Duration: ${this.formatDuration(totalDuration)} (${Math.round(totalDuration / 60)} hours)
+Total Distance: ${this.formatDistance(totalDistance)} (${Math.round(totalDistance / 1000)} km)
+
+AVERAGES:
+Average Pace: ${avgPace ? this.formatPace(avgPace) + '/500m' : 'N/A'}
+Average Power: ${avgPower ? Math.round(avgPower) + 'W' : 'N/A'}
+Average Stroke Rate: ${avgStrokeRate ? Math.round(avgStrokeRate) + ' spm' : 'N/A'}
+
+RECENT TRENDS (last 5 sessions vs previous 5):
+Pace Trend: ${paceTrend}
+
+TRAINING FREQUENCY:
+Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates.length - 1]?.getTime() - dates[0]?.getTime()) / (1000 * 60 * 60 * 24 * 7)))).toFixed(1)}`;
   }
 
   // Parse AI response into structured insights
@@ -1078,6 +1160,14 @@ Use this data to create an appropriate plan that matches their current fitness a
       return `${minutes}m ${secs}s`;
     } else {
       return `${secs}s`;
+    }
+  }
+
+  private formatDistance(meters: number): string {
+    if (meters >= 1000) {
+      return `${(meters / 1000).toFixed(1)}km`;
+    } else {
+      return `${Math.round(meters)}m`;
     }
   }
   // Test API connection
