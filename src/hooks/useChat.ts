@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { cloudAI, ChatMessage, ChatSession } from '@/lib/cloudAI';
 import { chatStorage } from '@/lib/chatStorage';
+import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 
 export interface ChatState {
   currentSession: ChatSession | null;
@@ -25,9 +26,11 @@ export function useChat() {
     isSearching: false
   });
 
-  // Load sessions on mount
+  // Load sessions on mount and initialize AI
   useEffect(() => {
     loadSessions();
+    // Initialize AI from settings on mount
+    initializeCloudAIFromSettings();
   }, []);
 
   const loadSessions = useCallback(() => {
@@ -92,6 +95,16 @@ export function useChat() {
   // Send message to AI
   const sendMessage = useCallback(async (content: string) => {
     if (!state.currentSession || !content.trim()) return;
+
+    // Ensure AI is configured before sending
+    if (!isAIAvailable()) {
+      const errorMessage = getAIConfigurationErrorMessage();
+      setState(prev => ({
+        ...prev,
+        error: errorMessage || 'Cloud AI is not configured. Please configure your OpenAI API key in Settings.'
+      }));
+      return;
+    }
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -281,8 +294,8 @@ export function useChat() {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Check if AI is configured
-  const isAIConfigured = cloudAI.isConfigured();
+  // Check if AI is configured and available
+  const isAIConfigured = isAIAvailable();
 
   return {
     // State

@@ -3,6 +3,7 @@ import { useRowingStore } from '@/lib/store';
 import { Session } from '@/types/session';
 import { aiAnalysis, Insight, TrendData, TrainingLoadData, AnomalyData } from '@/lib/aiAnalysis';
 import { cloudAI, CloudInsight } from '@/lib/cloudAI';
+import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 
 export interface AIInsightData {
   insights: (Insight | CloudInsight)[];
@@ -21,16 +22,21 @@ export function useAIInsights(): AIInsightData {
   const sessions = getSessions();
   const [cloudAIError, setCloudAIError] = useState<string | null>(null);
 
-  // Initialize cloud AI if API key is available
+  // Initialize cloud AI from user settings
   const initializeCloudAI = useCallback(() => {
     try {
-      const isConfigured = cloudAI.initialize();
+      const isConfigured = initializeCloudAIFromSettings();
       if (isConfigured) {
         setCloudAIError(null);
+      } else {
+        // Set error message if initialization failed
+        const errorMessage = getAIConfigurationErrorMessage();
+        setCloudAIError(errorMessage);
       }
       return isConfigured;
     } catch (error) {
-      setCloudAIError(error instanceof Error ? error.message : 'Failed to initialize Cloud AI');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize Cloud AI';
+      setCloudAIError(errorMessage);
       return false;
     }
   }, []);
@@ -79,6 +85,7 @@ export function useAIInsights(): AIInsightData {
     // Need minimum sessions for meaningful analysis
     const isAnalyzable = sessions.length >= 3; // Reduced for cloud AI
     const isCloudAIConfigured = initializeCloudAI();
+    const isAIAvailableForUse = isAIAvailable();
     
     if (!isAnalyzable) {
       return {
@@ -94,8 +101,8 @@ export function useAIInsights(): AIInsightData {
       };
     }
 
-    // Try Cloud AI first if configured, fallback to local analysis
-    if (isCloudAIConfigured) {
+    // Try Cloud AI first if configured and available, fallback to local analysis
+    if (isAIAvailableForUse) {
       try {
         // For now, return local analysis with cloud AI flag
         // In a real implementation, this would be an async operation
@@ -155,6 +162,11 @@ export async function getCloudInsights(sessions: Session[]): Promise<CloudInsigh
 // Helper hook for insight feedback (supports both local and cloud insights)
 export function useInsightFeedback() {
   const handleInsightFeedback = (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+    
     // Store feedback in localStorage for future ML improvements
     const feedbackKey = `insight_feedback_${insightId}`;
     const existingFeedback = localStorage.getItem(feedbackKey);
@@ -176,6 +188,11 @@ export function useInsightFeedback() {
   };
 
   const getInsightFeedback = (insightId: string) => {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
+    
     const feedbackKey = `insight_feedback_${insightId}`;
     const feedbackData = localStorage.getItem(feedbackKey);
     

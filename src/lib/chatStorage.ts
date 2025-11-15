@@ -17,6 +17,11 @@ export class ChatStorageService {
   // Get all chat sessions
   getSessions(): ChatSession[] {
     try {
+      // Guard against SSR/non-browser environments
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return [];
+      }
+      
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) return [];
       
@@ -38,11 +43,19 @@ export class ChatStorageService {
 
   // Get current session ID
   getCurrentSessionId(): string | null {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
     return localStorage.getItem(this.CURRENT_SESSION_KEY);
   }
 
   // Set current session ID
   setCurrentSessionId(sessionId: string): void {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
     localStorage.setItem(this.CURRENT_SESSION_KEY, sessionId);
   }
 
@@ -117,12 +130,19 @@ export class ChatStorageService {
 
     // If deleted session was current, clear current session
     if (this.getCurrentSessionId() === sessionId) {
-      localStorage.removeItem(this.CURRENT_SESSION_KEY);
+      // Guard against SSR/non-browser environments
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        localStorage.removeItem(this.CURRENT_SESSION_KEY);
+      }
     }
   }
 
   // Clear all sessions
   clearAllSessions(): void {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
     localStorage.removeItem(this.STORAGE_KEY);
     localStorage.removeItem(this.CURRENT_SESSION_KEY);
   }
@@ -200,6 +220,10 @@ export class ChatStorageService {
   // Private helper methods
   private saveSessions(sessions: ChatSession[]): void {
     try {
+      // Guard against SSR/non-browser environments
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return;
+      }
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
     } catch (error) {
       console.error('Failed to save chat sessions:', error);

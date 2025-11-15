@@ -176,6 +176,11 @@ export class SettingsService {
   // Get all settings
   getSettings(): Settings {
     try {
+      // Guard against SSR/non-browser environments
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return { ...this.defaultSettings };
+      }
+      
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) {
         return { ...this.defaultSettings };
@@ -268,6 +273,10 @@ export class SettingsService {
   }
 
   resetAllSettings(): void {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
     localStorage.removeItem(this.STORAGE_KEY);
   }
 
@@ -298,6 +307,16 @@ export class SettingsService {
   // Storage management
   calculateStorageUsage(): DataManagement['storageUsage'] {
     try {
+      // Guard against SSR/non-browser environments
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return {
+          sessions: 0,
+          chatHistory: 0,
+          trainingPlans: 0,
+          total: 0
+        };
+      }
+      
       const sessions = localStorage.getItem('rowing_sessions');
       const chatHistory = localStorage.getItem('rowing_ai_chat_sessions');
       const trainingPlans = localStorage.getItem('rowing_training_plans');
@@ -327,6 +346,11 @@ export class SettingsService {
 
   // Clear data
   clearDataCategory(category: 'sessions' | 'chatHistory' | 'trainingPlans'): void {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+    
     switch (category) {
       case 'sessions':
         localStorage.removeItem('rowing_sessions');
@@ -343,6 +367,11 @@ export class SettingsService {
   }
 
   clearAllData(): void {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+    
     // Clear all app-specific localStorage items
     const keysToRemove = [
       'rowing_sessions',
@@ -359,6 +388,10 @@ export class SettingsService {
   // Private helper methods
   private saveSettings(settings: Settings): void {
     try {
+      // Guard against SSR/non-browser environments
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return;
+      }
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Failed to save settings:', error);

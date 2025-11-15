@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
-import { AISettings } from '@/components/ai/AISettings';
 import { useAIInsights } from '@/hooks/useAIInsights';
 
 // Time range options
@@ -182,28 +181,6 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 export default function DashboardPage() {
   const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'ai-settings'>('overview');
-
-  // Handle hash-based navigation for AI settings
-  useEffect(() => {
-    const handleHashChange = () => {
-      if (window.location.hash === '#ai-settings') {
-        setActiveTab('ai-settings');
-      } else {
-        setActiveTab('overview');
-      }
-    };
-
-    // Check initial hash
-    handleHashChange();
-    
-    // Listen for hash changes
-    window.addEventListener('hashchange', handleHashChange);
-    
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, []);
 
   const sessions = getSessions();
   const stats = getStats();
@@ -443,43 +420,10 @@ export default function DashboardPage() {
         ) : (
           // Dashboard content
           <div className="space-y-8">
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-4 border-b">
-              <button
-                onClick={() => {
-                  setActiveTab('overview');
-                  window.location.hash = '';
-                }}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'overview'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('ai-settings');
-                  window.location.hash = 'ai-settings';
-                }}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'ai-settings'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                AI Settings
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === 'overview' ? (
-              <>
-                {/* Time Range Selector */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-foreground mb-2">
+            {/* Dashboard Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground mb-2">
                   Dashboard Analytics
                 </h2>
                 <p className="text-muted-foreground">
@@ -884,10 +828,6 @@ export default function DashboardPage() {
                 </Link>
               </Button>
             </div>
-            </>
-            ) : (
-              <AISettings />
-            )}
           </div>
         )}
       </div>

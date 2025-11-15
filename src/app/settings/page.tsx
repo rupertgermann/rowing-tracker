@@ -710,178 +710,272 @@ export default function SettingsPage() {
       }
     };
 
+    const getConnectionStatusDisplay = () => {
+      switch (connectionStatus) {
+        case 'testing':
+          return (
+            <Badge variant="outline" className="!text-blue-600 border-blue-200 bg-blue-50">
+              <RotateCcw className="h-3 w-3 mr-1 animate-spin" />
+              Testing...
+            </Badge>
+          );
+        case 'success':
+          return (
+            <Badge variant="outline" className="!text-green-600 border-green-200 bg-green-50">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Connected
+            </Badge>
+          );
+        case 'error':
+          return (
+            <Badge variant="outline" className="!text-red-600 border-red-200 bg-red-50">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Failed
+            </Badge>
+          );
+        default:
+          return (
+            <Badge variant="outline" className="!text-muted-foreground">
+              Not tested
+            </Badge>
+          );
+      }
+    };
+
+    const isConfigured = settingsData.aiSettings.cloudAIEnabled && 
+                        settingsData.aiSettings.openaiApiKey && 
+                        connectionStatus === 'success';
+
     return (
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">OpenAI Configuration</CardTitle>
-            <CardDescription>Configure your AI coach with OpenAI API</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              AI Coach Settings
+            </CardTitle>
+            <CardDescription>
+              Configure AI-powered insights and analysis
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="sk-..."
-                value={settingsData.aiSettings.openaiApiKey}
-                onChange={(e) => saveSettings('aiSettings', { openaiApiKey: e.target.value })}
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Your API key is stored locally and never shared
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
+          <CardContent className="space-y-6">
+            {/* Cloud AI Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-medium">Enable Cloud AI Features</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable advanced AI insights using OpenAI GPT models
+                </p>
+              </div>
               <Switch
                 checked={settingsData.aiSettings.cloudAIEnabled}
                 onCheckedChange={(checked) => saveSettings('aiSettings', { cloudAIEnabled: checked })}
               />
-              <Label>Enable Cloud AI Features</Label>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="model">Model</Label>
-                <select
-                  id="model"
-                  value={settingsData.aiSettings.model}
-                  onChange={(e) => saveSettings('aiSettings', { model: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md"
-                >
-                  <optgroup label="Latest Models (GPT-5 Series)">
-                    <option value="gpt-5">GPT-5</option>
-                    <option value="gpt-5-mini">GPT-5 Mini</option>
-                    <option value="gpt-5-nano">GPT-5 Nano</option>
-                  </optgroup>
-                  <optgroup label="GPT-4 Series">
-                    <option value="gpt-4o">GPT-4o (Recommended)</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-4">GPT-4</option>
-                  </optgroup>
-                  <optgroup label="GPT-3.5 Series">
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                  </optgroup>
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {settingsData.aiSettings.model.startsWith('gpt-5') 
-                    ? "GPT-5 models use reasoning instead of temperature" 
-                    : "Adjust temperature for creativity control"}
-                </p>
-              </div>
+            {settingsData.aiSettings.cloudAIEnabled && (
+              <>
+                {/* API Key Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey" className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    OpenAI API Key
+                  </Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder="sk-..."
+                    value={settingsData.aiSettings.openaiApiKey}
+                    onChange={(e) => saveSettings('aiSettings', { openaiApiKey: e.target.value })}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your API key is stored locally and never shared with third parties.
+                    Get your key from{' '}
+                    <a 
+                      href="https://platform.openai.com/api-keys" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      OpenAI Platform
+                    </a>
+                  </p>
+                </div>
 
-              <div>
-                <Label htmlFor="temperature">
-                  {settingsData.aiSettings.model.startsWith('gpt-5') 
-                    ? `Reasoning Effort (${settingsData.aiSettings.temperature === 0.7 ? 'medium' : settingsData.aiSettings.temperature < 0.5 ? 'minimal' : 'high'})` 
-                    : `Temperature (${settingsData.aiSettings.temperature})`
-                  }
-                </Label>
-                <Input
-                  id="temperature"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={settingsData.aiSettings.temperature}
-                  onChange={(e) => saveSettings('aiSettings', { temperature: parseFloat(e.target.value) })}
-                  className="mt-1"
-                  disabled={settingsData.aiSettings.model.startsWith('gpt-5')}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {settingsData.aiSettings.model.startsWith('gpt-5') 
-                    ? "GPT-5 uses reasoning depth instead of temperature" 
-                    : "Controls randomness: 0 = focused, 1 = creative"}
-                </p>
-              </div>
-            </div>
+                {/* Connection Status */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">Connection Status</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Test your API key to ensure it works correctly
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getConnectionStatusDisplay()}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={testConnection}
+                      disabled={!settingsData.aiSettings.openaiApiKey || isTestingConnection}
+                      className="flex items-center gap-1"
+                    >
+                      <RotateCcw className={`h-3 w-3 ${isTestingConnection ? 'animate-spin' : ''}`} />
+                      Test
+                    </Button>
+                  </div>
+                </div>
 
-            <div>
-              <Label htmlFor="maxTokens">Max Tokens</Label>
-              <Input
-                id="maxTokens"
-                type="number"
-                min="100"
-                max="4000"
-                value={settingsData.aiSettings.maxTokens}
-                onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
-                className="mt-1"
-              />
-            </div>
+                {/* Model Configuration */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="model">Model</Label>
+                    <select
+                      id="model"
+                      value={settingsData.aiSettings.model}
+                      onChange={(e) => saveSettings('aiSettings', { model: e.target.value })}
+                      className="w-full mt-1 p-2 border rounded-md"
+                    >
+                      <optgroup label="Latest Models (GPT-5 Series)">
+                        <option value="gpt-5">GPT-5</option>
+                        <option value="gpt-5-mini">GPT-5 Mini</option>
+                        <option value="gpt-5-nano">GPT-5 Nano</option>
+                      </optgroup>
+                      <optgroup label="GPT-4 Series">
+                        <option value="gpt-4o">GPT-4o (Recommended)</option>
+                        <option value="gpt-4o-mini">GPT-4o Mini</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="gpt-4">GPT-4</option>
+                      </optgroup>
+                      <optgroup label="GPT-3.5 Series">
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                      </optgroup>
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {settingsData.aiSettings.model.startsWith('gpt-5') 
+                        ? "GPT-5 models use reasoning instead of temperature" 
+                        : "Adjust temperature for creativity control"}
+                    </p>
+                  </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={testConnection}
-                disabled={!settingsData.aiSettings.openaiApiKey || isTestingConnection}
-                variant="outline"
-              >
-                {isTestingConnection ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                ) : (
-                  <TestTube className="h-4 w-4 mr-2" />
+                  <div>
+                    <Label htmlFor="temperature">
+                      {settingsData.aiSettings.model.startsWith('gpt-5') 
+                        ? `Reasoning Effort (${settingsData.aiSettings.temperature === 0.7 ? 'medium' : settingsData.aiSettings.temperature < 0.5 ? 'minimal' : 'high'})` 
+                        : `Temperature (${settingsData.aiSettings.temperature})`
+                      }
+                    </Label>
+                    <Input
+                      id="temperature"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={settingsData.aiSettings.temperature}
+                      onChange={(e) => saveSettings('aiSettings', { temperature: parseFloat(e.target.value) })}
+                      className="mt-1"
+                      disabled={settingsData.aiSettings.model.startsWith('gpt-5')}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {settingsData.aiSettings.model.startsWith('gpt-5') 
+                        ? "GPT-5 uses reasoning depth instead of temperature" 
+                        : "Controls randomness: 0 = focused, 1 = creative"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="maxTokens">Max Tokens</Label>
+                  <Input
+                    id="maxTokens"
+                    type="number"
+                    min="100"
+                    max="4000"
+                    value={settingsData.aiSettings.maxTokens}
+                    onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
+                    className="mt-1"
+                  />
+                </div>
+
+                {/* Privacy Notice */}
+                <Alert>
+                  <Shield className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Privacy & Data:</strong> Your workout data is anonymized before sending to AI services. 
+                    Only metrics like pace, power, and distance are shared - no personal information is transmitted.
+                  </AlertDescription>
+                </Alert>
+
+                {/* Configuration Status */}
+                {isConfigured && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <Brain className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      <strong>AI Coach is ready!</strong> You'll now receive advanced AI-powered insights 
+                      based on your training data. These insights will appear alongside local analysis 
+                      in your dashboard and chat.
+                    </AlertDescription>
+                  </Alert>
                 )}
-                Test Connection
-              </Button>
+              </>
+            )}
 
-              {connectionStatus === 'success' && (
-                <Badge className="bg-green-100 text-green-800">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Connected
-                </Badge>
-              )}
-              
-              {connectionStatus === 'error' && (
-                <Badge variant="destructive">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  Failed
-                </Badge>
-              )}
-            </div>
+            {/* Local AI Info */}
+            {!settingsData.aiSettings.cloudAIEnabled && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Local Analysis Only:</strong> You'll receive insights based on statistical 
+                  analysis of your training data. Enable Cloud AI for more advanced, personalized recommendations.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">AI Prompts</CardTitle>
-            <CardDescription>Customize how your AI coach responds</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="systemPrompt">Analysis System Prompt</Label>
-              <textarea
-                id="systemPrompt"
-                value={settingsData.aiSettings.systemPrompt}
-                onChange={(e) => saveSettings('aiSettings', { systemPrompt: e.target.value })}
-                className="w-full mt-1 p-2 border rounded-md h-24 resize-y"
-                placeholder="System prompt for training analysis..."
-              />
-            </div>
+        {/* Advanced Configuration */}
+        {settingsData.aiSettings.cloudAIEnabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Advanced Configuration</CardTitle>
+              <CardDescription>Customize AI prompts and behavior</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="systemPrompt">System Prompt</Label>
+                <textarea
+                  id="systemPrompt"
+                  rows={3}
+                  value={settingsData.aiSettings.systemPrompt}
+                  onChange={(e) => saveSettings('aiSettings', { systemPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-none"
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
-              <textarea
-                id="chatSystemPrompt"
-                value={settingsData.aiSettings.chatSystemPrompt}
-                onChange={(e) => saveSettings('aiSettings', { chatSystemPrompt: e.target.value })}
-                className="w-full mt-1 p-2 border rounded-md h-24 resize-y"
-                placeholder="System prompt for chat conversations..."
-              />
-            </div>
+              <div>
+                <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
+                <textarea
+                  id="chatSystemPrompt"
+                  rows={3}
+                  value={settingsData.aiSettings.chatSystemPrompt}
+                  onChange={(e) => saveSettings('aiSettings', { chatSystemPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-none"
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="planGenerationPrompt">Plan Generation Prompt</Label>
-              <textarea
-                id="planGenerationPrompt"
-                value={settingsData.aiSettings.planGenerationPrompt}
-                onChange={(e) => saveSettings('aiSettings', { planGenerationPrompt: e.target.value })}
-                className="w-full mt-1 p-2 border rounded-md h-24 resize-y"
-                placeholder="System prompt for training plan generation..."
-              />
-            </div>
-          </CardContent>
-        </Card>
+              <div>
+                <Label htmlFor="planGenerationPrompt">Training Plan Generation Prompt</Label>
+                <textarea
+                  id="planGenerationPrompt"
+                  rows={3}
+                  value={settingsData.aiSettings.planGenerationPrompt}
+                  onChange={(e) => saveSettings('aiSettings', { planGenerationPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-none"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   };
