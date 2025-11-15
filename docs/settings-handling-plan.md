@@ -184,18 +184,23 @@
 
 ### 5.5. Dashboard AI tab alignment
 
-**Goal:** Remove duplicated AI configuration UI on the dashboard and remove dependence on `AISettings` component as a source of truth.
+**Goal:** Move all AI configuration UI into the Settings module and remove the Dashboard AI settings tab entirely.
 
-**Minimal change option (recommended):**
-- On `DashboardPage`:
-  - Remove the actual rendering of `<AISettings />` if present (in the `ai-settings` tab content).
-  - Instead, for the "AI Settings" tab:
-    - Show a short message + button linking to `/settings` with `#aiSettings` category active.
-    - This keeps the dashboard clean and moves configuration exclusively into the main Settings page.
+**Planned behavior:**
+- The **Settings page** is the **only** place where the user can edit AI coach configuration (`aiSettings`).
+- The **Dashboard** focuses on analytics and AI insights, and only links to `/settings#aiSettings` where configuration is needed.
+
+**Changes on `DashboardPage`:**
+- Remove the `AISettings` import and any rendering of `<AISettings />`.
+- Remove the AI-specific tab handling:
+  - Delete `activeTab` state that switches between `overview` and `ai-settings`.
+  - Remove the hash-based navigation effect that listens to `window.location.hash` for `#ai-settings`.
+  - Simplify the layout so the dashboard always renders the overview/analytics content.
+- Wherever the dashboard wants to prompt the user to configure AI (for example, above AI insights or in empty states), use a simple link/button to `/settings#aiSettings` instead of embedding configuration controls.
 
 **Result:**
-- The only place where AI coach configuration is edited is the `Settings` page.
-- All AI features read from the same `SettingsService.aiSettings` state.
+- AI coach configuration is edited **only** in the Settings page.
+- The dashboard becomes simpler (no settings tab logic) and just consumes `aiSettings` via `useAIInsights` / `cloudAI`.
 
 ### 5.6. Optional: Reflect model & temperature from settings in `cloudAI`
 
@@ -207,6 +212,27 @@
   - Optionally add a tiny `configureFromSettings(ai: AISettings)` function that updates:
     - `this.config.model`.
 - For now, to keep changes small, we can **skip this step** and leave model/temperature as UI-only hints, or add a very small follow-up once everything else works.
+
+### 5.7. Dashboard chart settings and chart type
+
+**Current behavior:**  
+- Dashboard chart preferences (`enabledCharts` and `chartType`) live in `useRowingStore` (`src/lib/store.ts`) as part of `chartSettings`.
+- They are persisted via Zustand's `persist` middleware under the `rowing-tracker-storage` key, alongside `sessions` and `filters`.
+- The Settings page already exposes a `userPreferences.defaultChartType` field, which is a global default but not directly wired to the dashboard's `chartSettings.chartType`.
+
+**Decision:**  
+- **Do not move** dashboard chart settings into `SettingsService` for now.
+- Rationale:
+  - Chart settings are tightly coupled to rowing session data and the dashboard store.
+  - Zustand `persist` already provides a clear, scoped persistence mechanism for this feature.
+  - Wiring `chartSettings` through `SettingsService` would add extra plumbing and two-way synchronization without a clear benefit, and would increase the risk of breaking the dashboard.
+- We therefore keep:
+  - `SettingsService.userPreferences.defaultChartType` as a global preference.
+  - `useRowingStore.chartSettings` as the canonical source for dashboard chart display state.
+
+**Optional follow-up (not in this refactor):**
+- Initialize `defaultChartSettings.chartType` based on `userPreferences.defaultChartType`, or update `userPreferences.defaultChartType` when the user changes chart type on the dashboard.
+- This would tighten the conceptual link between global preference and dashboard behavior, but is intentionally out of scope for the current, minimal-change refactor.
 
 ## 6. Risk Assessment & Safeguards
 
@@ -236,7 +262,7 @@
 2. **Introduce AI initialization helper** (e.g., in `cloudAI` or a tiny `aiConfig` utility).
 3. **Update `useAIInsights`** to use the helper instead of raw `cloudAI.initialize()` with no args.
 4. **Update `useChat`** to ensure AI is configured before sending messages and to surface a clear error when not configured.
-5. **Simplify Dashboard AI tab** to link to `/settings` for config instead of using `AISettings` as a separate store.
+5. **Remove the Dashboard AI tab** and any hash-based tab handling, and replace AI config controls with simple links/buttons to `/settings#aiSettings` where needed (e.g. next to AI insights).
 6. **Manual test flow** (after changes):
    - Open `/settings`, configure AI coach (toggle on, set API key), test connection.
    - Visit `/chat`: verify `New Chat` is enabled, messages send successfully when AI is enabled and fail cleanly when disabled.
