@@ -1029,33 +1029,61 @@ export default function SettingsPage() {
                 <Label htmlFor="systemPrompt">System Prompt</Label>
                 <textarea
                   id="systemPrompt"
-                  rows={3}
+                  rows={4}
                   value={settingsData.aiSettings.systemPrompt}
                   onChange={(e) => saveSettings('aiSettings', { systemPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none"
+                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  placeholder="Configure the base system prompt for AI interactions..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Base system prompt used for all AI interactions. Sets the AI's personality and expertise level.
+                </p>
               </div>
 
               <div>
                 <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
                 <textarea
                   id="chatSystemPrompt"
-                  rows={3}
+                  rows={4}
                   value={settingsData.aiSettings.chatSystemPrompt}
                   onChange={(e) => saveSettings('aiSettings', { chatSystemPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none"
+                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  placeholder="Configure the chat-specific system prompt for AI coach conversations..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Specific system prompt for chat interactions. Defines how the AI coach behaves in conversations.
+                </p>
               </div>
 
               <div>
                 <Label htmlFor="planGenerationPrompt">Training Plan Generation Prompt</Label>
                 <textarea
                   id="planGenerationPrompt"
-                  rows={3}
+                  rows={4}
                   value={settingsData.aiSettings.planGenerationPrompt}
                   onChange={(e) => saveSettings('aiSettings', { planGenerationPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none"
+                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  placeholder="Configure the prompt used for generating training plans..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controls how the AI generates personalized training plans based on your goals and fitness level.
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="insightsPrompt">AI Insights Prompt</Label>
+                <textarea
+                  id="insightsPrompt"
+                  rows={8}
+                  value={settingsData.aiSettings.insightsPrompt}
+                  onChange={(e) => saveSettings('aiSettings', { insightsPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  placeholder="Configure the prompt used for generating AI insights in the dashboard..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This prompt controls how the AI analyzes your rowing data and generates insights. 
+                  Use {`{sessionData}`} as a placeholder for the actual session data.
+                </p>
               </div>
             </CardContent>
           </Card>

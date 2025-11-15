@@ -64,14 +64,15 @@ export interface PrivacySettings {
 }
 
 export interface AISettings {
-  openaiApiKey: string;
   cloudAIEnabled: boolean;
+  openaiApiKey: string;
   model: string;
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
   chatSystemPrompt: string;
   planGenerationPrompt: string;
+  insightsPrompt: string;
 }
 
 export interface Settings {
@@ -158,7 +159,34 @@ export class SettingsService {
       maxTokens: 1500,
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: 'You are a personal AI rowing coach...',
-      planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...'
+      planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...',
+      insightsPrompt: `Analyze the following indoor rowing workout data and provide personalized insights:
+
+SESSION DATA:
+{sessionData}
+
+ANALYSIS REQUIREMENTS:
+1. Performance Trends: Analyze pace, power, and stroke rate patterns
+2. Training Load: Assess volume and intensity balance
+3. Recovery Needs: Identify signs of overtraining or under-recovery
+4. Technique Indicators: Look for efficiency patterns
+5. Goal Progress: Evaluate progress toward typical rowing goals
+
+RESPONSE FORMAT:
+Return a JSON array of insights with this structure:
+[
+  {
+    "type": "performance|recommendation|trend|achievement|warning",
+    "title": "Brief insight title",
+    "description": "Detailed explanation with specific advice",
+    "actionable": true/false,
+    "priority": "high|medium|low", 
+    "confidence": 0.0-1.0,
+    "evidence": ["specific data points supporting this insight"]
+  }
+]
+
+Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`
     },
     version: this.CURRENT_VERSION,
     updatedAt: new Date()

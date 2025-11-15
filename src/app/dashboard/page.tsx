@@ -10,6 +10,7 @@ import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain }
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
+import { SettingsService } from '@/lib/settings';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -178,12 +179,12 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
   return null;
 };
 
-export default function DashboardPage() {
-  const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
+const Dashboard = () => {
   const router = useRouter();
-
+  const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
+  
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
@@ -833,4 +834,6 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;

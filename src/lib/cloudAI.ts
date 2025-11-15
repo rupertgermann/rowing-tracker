@@ -1,5 +1,6 @@
 import { Session } from '@/types/session';
 import { TrainingPlan, TrainingSession, TrainingWeek, PlanTemplate } from '@/lib/trainingPlans';
+import { SettingsService } from '@/lib/settings';
 
 // OpenAI API configuration
 interface OpenAIConfig {
@@ -41,6 +42,7 @@ export interface CloudInsight {
 export class CloudAIService {
   private static instance: CloudAIService;
   private config: OpenAIConfig | null = null;
+  private aiSettings: any = null; // Store AI settings for API calls
   
   private constructor() {}
   
@@ -51,7 +53,7 @@ export class CloudAIService {
     return CloudAIService.instance;
   }
 
-  // Initialize with API key from environment or user input
+  // Initialize with API key and configuration from settings
   initialize(apiKey?: string): boolean {
     // Priority: user-provided key > environment variable
     const key = apiKey || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
@@ -61,11 +63,26 @@ export class CloudAIService {
       return false;
     }
     
+    // Get AI settings for model configuration
+    const settings = SettingsService.getInstance().getSettings();
+    const aiSettings = settings.aiSettings;
+    
+    // Always update config (even if already initialized) to pick up settings changes
     this.config = {
       apiKey: key,
-      model: 'gpt-4-turbo-preview',
+      model: aiSettings.model || 'gpt-4o', // Use user's model choice
       baseUrl: 'https://api.openai.com/v1'
     };
+    
+    // Always update AI settings for use in API calls
+    this.aiSettings = aiSettings;
+    
+    console.log('CloudAI initialized with settings:', {
+      model: this.config.model,
+      temperature: this.aiSettings.temperature,
+      maxTokens: this.aiSettings.maxTokens,
+      insightsPrompt: this.aiSettings.insightsPrompt?.substring(0, 100) + '...'
+    });
     
     return true;
   }
@@ -265,8 +282,8 @@ Use this data to provide personalized coaching and reference their actual perfor
               content: prompt
             }
           ],
-          temperature: 0.3, // Lower temperature for consistent insights
-          max_tokens: 1500
+          temperature: this.aiSettings?.temperature || 0.7, // Use user's temperature setting
+          max_tokens: this.aiSettings?.maxTokens || 1500 // Use user's maxTokens setting
         })
       });
 
@@ -306,15 +323,25 @@ Always provide:
 Focus on practical advice that helps rowers improve performance while avoiding injury and overtraining.`;
   }
 
-  // Build user prompt with session data
+  // Build user prompt with session data using configurable prompt
   private buildInsightPrompt(sessions: any[]): string {
     const recentSessions = sessions.slice(-10); // Last 10 sessions
     const sessionSummary = this.createSessionSummary(recentSessions);
     
+    // Get configurable insights prompt from settings
+    const settings = SettingsService.getInstance().getSettings();
+    const insightsPrompt = settings.aiSettings.insightsPrompt || this.getDefaultInsightsPrompt();
+    
+    // Replace {sessionData} placeholder with actual session data
+    return insightsPrompt.replace('{sessionData}', sessionSummary);
+  }
+
+  // Default insights prompt fallback
+  private getDefaultInsightsPrompt(): string {
     return `Analyze the following indoor rowing workout data and provide personalized insights:
 
 SESSION DATA:
-${sessionSummary}
+{sessionData}
 
 ANALYSIS REQUIREMENTS:
 1. Performance Trends: Analyze pace, power, and stroke rate patterns
