@@ -66,8 +66,7 @@ export interface PrivacySettings {
 export interface AISettings {
   cloudAIEnabled: boolean;
   openaiApiKey: string;
-  model: string;
-  temperature: number;
+  model: string; // Always gpt-5.1
   maxTokens: number;
   systemPrompt: string;
   chatSystemPrompt: string;
@@ -154,8 +153,7 @@ export class SettingsService {
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
-      model: 'gpt-4o', // Updated to latest default model
-      temperature: 0.7,
+      model: 'gpt-5.1', // GPT-5.1 only
       maxTokens: 1500,
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: 'You are a personal AI rowing coach...',

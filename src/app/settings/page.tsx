@@ -913,69 +913,29 @@ export default function SettingsPage() {
                 {/* Model Configuration */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="model">Model</Label>
-                    <select
-                      id="model"
-                      value={settingsData.aiSettings.model}
-                      onChange={(e) => saveSettings('aiSettings', { model: e.target.value })}
-                      className="w-full mt-1 p-2 border rounded-md"
-                    >
-                      <optgroup label="Latest Models (GPT-5 Series)">
-                        <option value="gpt-5">GPT-5</option>
-                        <option value="gpt-5-mini">GPT-5 Mini</option>
-                        <option value="gpt-5-nano">GPT-5 Nano</option>
-                      </optgroup>
-                      <optgroup label="GPT-4 Series">
-                        <option value="gpt-4o">GPT-4o (Recommended)</option>
-                        <option value="gpt-4o-mini">GPT-4o Mini</option>
-
-                      </optgroup>
-      
-                    </select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {settingsData.aiSettings.model.startsWith('gpt-5') 
-                        ? "GPT-5 models use reasoning instead of temperature" 
-                        : "Adjust temperature for creativity control"}
-                    </p>
+                    <Label>Model</Label>
+                    <div className="mt-1 p-2 border rounded-md bg-gray-50">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="default" className="bg-blue-600">GPT-5.1</Badge>
+                        <span className="text-sm text-gray-600">Latest model with optimal performance</span>
+                      </div>
+                    </div>
                   </div>
-
                   <div>
-                    <Label htmlFor="temperature">
-                      {settingsData.aiSettings.model.startsWith('gpt-5') 
-                        ? `Reasoning Effort (${settingsData.aiSettings.temperature === 0.7 ? 'medium' : settingsData.aiSettings.temperature < 0.5 ? 'minimal' : 'high'})` 
-                        : `Temperature (${settingsData.aiSettings.temperature})`
-                      }
-                    </Label>
+                    <Label htmlFor="maxTokens">Max Tokens</Label>
                     <Input
-                      id="temperature"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={settingsData.aiSettings.temperature}
-                      onChange={(e) => saveSettings('aiSettings', { temperature: parseFloat(e.target.value) })}
+                      id="maxTokens"
+                      type="number"
+                      min="100"
+                      max="4000"
+                      value={settingsData.aiSettings.maxTokens}
+                      onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
                       className="mt-1"
-                      disabled={settingsData.aiSettings.model.startsWith('gpt-5')}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      {settingsData.aiSettings.model.startsWith('gpt-5') 
-                        ? "GPT-5 uses reasoning depth instead of temperature" 
-                        : "Controls randomness: 0 = focused, 1 = creative"}
+                      Maximum number of tokens in AI responses
                     </p>
                   </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="maxTokens">Max Tokens</Label>
-                  <Input
-                    id="maxTokens"
-                    type="number"
-                    min="100"
-                    max="4000"
-                    value={settingsData.aiSettings.maxTokens}
-                    onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
-                    className="mt-1"
-                  />
                 </div>
 
                 {/* Privacy Notice */}
