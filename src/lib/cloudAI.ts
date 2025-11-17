@@ -429,11 +429,13 @@ Use this data to provide personalized coaching and reference their actual perfor
                       items: { type: "string" }
                     }
                   },
-                  required: ["type", "title", "description", "actionable", "priority", "confidence", "evidence"]
+                  required: ["type", "title", "description", "actionable", "priority", "confidence", "evidence"],
+                  additionalProperties: false
                 }
               }
             },
-            required: ["insights"]
+            required: ["insights"],
+            additionalProperties: false
           }
         }
       };
@@ -716,7 +718,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         instructions: this.getPlanGenerationSystemPrompt(),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
-        maxTokens: 4000,
+        maxTokens: this.aiSettings?.maxTokens || 4000,
         jsonSchema: {
           name: "training_plan",
           schema: {
@@ -744,21 +746,25 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
                           intensity: { type: "string" },
                           notes: { type: "string" }
                         },
-                        required: ["day", "type", "title", "description", "duration", "intensity"]
+                        required: ["day", "type", "title", "description", "duration", "intensity", "notes"],
+                        additionalProperties: false
                       }
                     }
                   },
-                  required: ["weekNumber", "focus", "sessions"]
+                  required: ["weekNumber", "focus", "sessions"],
+                  additionalProperties: false
                 }
               }
             },
-            required: ["title", "description", "weeks"]
+            required: ["title", "description", "weeks"],
+            additionalProperties: false
           }
         }
       };
       
       const response = await this.makeApiCall(config);
-      const planData = JSON.parse(this.parseResponse(response));
+      const content = this.parseResponse(response);
+      const planData = JSON.parse(content);
       
       return this.createTrainingPlanFromAI(planData, goals, level, focus, duration);
     } catch (error) {
@@ -786,7 +792,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         instructions: this.getPlanModificationSystemPrompt(),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
-        maxTokens: 2000,
+        maxTokens: this.aiSettings?.maxTokens || 4000,
         jsonSchema: {
           name: "training_plan",
           schema: {
@@ -814,15 +820,18 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
                           intensity: { type: "string" },
                           notes: { type: "string" }
                         },
-                        required: ["day", "type", "title", "description", "duration", "intensity"]
+                        required: ["day", "type", "title", "description", "duration", "intensity", "notes"],
+                        additionalProperties: false
                       }
                     }
                   },
-                  required: ["weekNumber", "focus", "sessions"]
+                  required: ["weekNumber", "focus", "sessions"],
+                  additionalProperties: false
                 }
               }
             },
-            required: ["title", "description", "weeks"]
+            required: ["title", "description", "weeks"],
+            additionalProperties: false
           }
         }
       };

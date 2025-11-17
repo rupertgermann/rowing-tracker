@@ -1063,7 +1063,7 @@ export default function SettingsPage() {
                         id="maxTokens"
                         type="number"
                         min="100"
-                        max="4000"
+                        max="16000"
                         value={settingsData.aiSettings.maxTokens}
                         onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
                         className="mt-1"
