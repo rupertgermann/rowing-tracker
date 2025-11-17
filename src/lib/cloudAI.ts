@@ -891,37 +891,13 @@ GOALS: ${goals.join(', ')}
 ${userContext}
 
 REQUIREMENTS:
-- Create a structured weekly plan with appropriate progression
-- Include variety of session types (endurance, intervals, tempo, recovery, technique)
-- Consider the rower's current fitness level and experience
-- Build in appropriate recovery periods
+- Create structured weekly plan with appropriate progression
+- Include variety: endurance, intervals, tempo, recovery, technique
+- Match current fitness level and experience
+- Build in recovery periods
 - Make sessions realistic and achievable
 
-RESPONSE FORMAT:
-Return a JSON object with this structure:
-{
-  "title": "Plan title",
-  "description": "Brief description of the plan",
-  "weeks": [
-    {
-      "weekNumber": 1,
-      "focus": "Week focus description",
-      "sessions": [
-        {
-          "day": 1,
-          "type": "endurance|interval|tempo|recovery|strength|technique|rest",
-          "title": "Session title",
-          "description": "Detailed session description",
-          "duration": 45,
-          "intensity": "low|medium|high",
-          "notes": "Optional coaching notes"
-        }
-      ]
-    }
-  ]
-}
-
-Create exactly ${duration} weeks with 3-6 sessions per week depending on the level and focus.`;
+Create exactly ${duration} weeks with 3-6 sessions per week.`;
   }
 
   // Build prompt for plan modification
