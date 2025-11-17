@@ -17,24 +17,29 @@ interface ApiRequestConfig {
   // Optional system-level guidance (higher priority than input)
   instructions?: string;
   
+  // Model selection per use case
+  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1';
+  
   // Reasoning effort per use case
   reasoning: "none" | "low" | "medium" | "high";
   
   // Output verbosity
   verbosity: "low" | "medium" | "high";
   
-  // Token limit
+  // Maximum output tokens
   maxTokens: number;
   
-  // State management
-  store?: boolean;
+  // Optional conversation chaining
   previousResponseId?: string;
   
-  // Structured outputs
+  // Optional structured output format
   jsonSchema?: {
     name: string;
     schema: object;
   };
+  
+  // Optional storage control
+  store?: boolean;
   
   // Tools (rarely used in our app)
   tools?: Array<{
@@ -52,6 +57,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   sessionId: string;
+  responseId?: string; // AI response ID for conversation chaining
 }
 
 export interface ChatSession {
@@ -114,9 +120,9 @@ export class CloudAIService {
     this.aiSettings = aiSettings;
     
     console.log('CloudAI initialized with settings:', {
-      chatModel: this.aiSettings.chat.model,
-      insightsModel: this.aiSettings.insights.model,
-      trainingPlansModel: this.aiSettings.trainingPlans.model,
+      chatReasoning: this.aiSettings.chat.reasoning,
+      insightsReasoning: this.aiSettings.insights.reasoning,
+      trainingPlansReasoning: this.aiSettings.trainingPlans.reasoning,
       maxTokens: this.aiSettings.maxTokens,
       insightsPrompt: this.aiSettings.insightsPrompt?.substring(0, 100) + '...'
     });
@@ -135,7 +141,7 @@ export class CloudAIService {
     conversationHistory: ChatMessage[] = [],
     userSessions?: Session[],
     previousResponseId?: string
-  ): Promise<string> {
+  ): Promise<{ content: string; responseId: string }> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
     }
@@ -145,6 +151,7 @@ export class CloudAIService {
       const config: ApiRequestConfig = {
         input: message,
         instructions: this.getChatSystemPrompt(userSessions),
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: 1000,
@@ -152,9 +159,12 @@ export class CloudAIService {
         store: true            // Store for future chaining
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       
-      return this.parseResponse(response);
+      return { 
+        content: this.parseResponse(response), 
+        responseId: response.id 
+      };
     } catch (error) {
       console.error('Chat AI failed:', error);
       throw error;
@@ -162,9 +172,9 @@ export class CloudAIService {
   }
 
   // Build GPT-5.1 Responses API request
-  private buildRequest(config: ApiRequestConfig, model: string = 'gpt-5.1'): object {
+  private buildRequest(config: ApiRequestConfig): object {
     const request: any = {
-      model: model,
+      model: config.model, // Use model from config instead of hardcoded
       max_output_tokens: config.maxTokens
     };
     
@@ -176,8 +186,30 @@ export class CloudAIService {
       request.instructions = config.instructions;
     }
     
-    // Reasoning effort
-    request.reasoning = { effort: config.reasoning };
+    // Reasoning effort - map model-specific values
+    const reasoningMapping: Record<string, Record<string, string>> = {
+      'gpt-5-mini': {
+        'none': 'minimal', // Map 'none' to 'minimal' for gpt-5-mini
+        'low': 'low',
+        'medium': 'medium', 
+        'high': 'high'
+      },
+      'gpt-5-nano': {
+        'none': 'minimal', // Assume same mapping as gpt-5-mini
+        'low': 'low',
+        'medium': 'medium',
+        'high': 'high'
+      },
+      'gpt-5.1': {
+        'none': 'none', // Keep 'none' for gpt-5.1 if supported
+        'low': 'low',
+        'medium': 'medium',
+        'high': 'high'
+      }
+    };
+    
+    const mappedReasoning = reasoningMapping[config.model]?.[config.reasoning] || config.reasoning;
+    request.reasoning = { effort: mappedReasoning };
     
     // Verbosity and structured outputs
     request.text = { verbosity: config.verbosity };
@@ -234,8 +266,8 @@ export class CloudAIService {
   }
 
   // Make API call to GPT-5.1 Responses API
-  private async makeApiCall(config: ApiRequestConfig, model: string = 'gpt-5.1'): Promise<any> {
-    const requestBody = this.buildRequest(config, model);
+  private async makeApiCall(config: ApiRequestConfig): Promise<any> {
+    const requestBody = this.buildRequest(config);
     
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -401,6 +433,7 @@ Use this data to provide personalized coaching and reference their actual perfor
       
       const config: ApiRequestConfig = {
         input: `${this.getSystemPrompt()}\n\n${prompt}`,
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 1500,
@@ -425,16 +458,18 @@ Use this data to provide personalized coaching and reference their actual perfor
                       items: { type: "string" }
                     }
                   },
-                  required: ["type", "title", "description", "actionable", "priority", "confidence", "evidence"]
+                  required: ["type", "title", "description", "actionable", "priority", "confidence", "evidence"],
+                  additionalProperties: false
                 }
               }
             },
-            required: ["insights"]
+            required: ["insights"],
+            additionalProperties: false
           }
         }
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       const content = this.parseResponse(response);
       const data = JSON.parse(content);
       
@@ -709,10 +744,11 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanGenerationSystemPrompt()}\n\n${prompt}`,
-        instructions: this.getPlanGenerationSystemPrompt(),
+        instructions: "Generate a structured training plan following the specified JSON schema",
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
-        maxTokens: 4000,
+        maxTokens: this.aiSettings?.maxTokens || 4000,
         jsonSchema: {
           name: "training_plan",
           schema: {
@@ -740,21 +776,25 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
                           intensity: { type: "string" },
                           notes: { type: "string" }
                         },
-                        required: ["day", "type", "title", "description", "duration", "intensity"]
+                        required: ["day", "type", "title", "description", "duration", "intensity", "notes"],
+                        additionalProperties: false
                       }
                     }
                   },
-                  required: ["weekNumber", "focus", "sessions"]
+                  required: ["weekNumber", "focus", "sessions"],
+                  additionalProperties: false
                 }
               }
             },
-            required: ["title", "description", "weeks"]
+            required: ["title", "description", "weeks"],
+            additionalProperties: false
           }
         }
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
-      const planData = JSON.parse(this.parseResponse(response));
+      const response = await this.makeApiCall(config);
+      const content = this.parseResponse(response);
+      const planData = JSON.parse(content);
       
       return this.createTrainingPlanFromAI(planData, goals, level, focus, duration);
     } catch (error) {
@@ -779,10 +819,11 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanModificationSystemPrompt()}\n\n${prompt}`,
-        instructions: this.getPlanModificationSystemPrompt(),
+        instructions: "Modify the training plan following the specified JSON schema",
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
-        maxTokens: 2000,
+        maxTokens: this.aiSettings?.maxTokens || 4000,
         jsonSchema: {
           name: "training_plan",
           schema: {
@@ -810,20 +851,23 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
                           intensity: { type: "string" },
                           notes: { type: "string" }
                         },
-                        required: ["day", "type", "title", "description", "duration", "intensity"]
+                        required: ["day", "type", "title", "description", "duration", "intensity", "notes"],
+                        additionalProperties: false
                       }
                     }
                   },
-                  required: ["weekNumber", "focus", "sessions"]
+                  required: ["weekNumber", "focus", "sessions"],
+                  additionalProperties: false
                 }
               }
             },
-            required: ["title", "description", "weeks"]
+            required: ["title", "description", "weeks"],
+            additionalProperties: false
           }
         }
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       const modifications = JSON.parse(this.parseResponse(response));
       
       return this.applyPlanModifications(plan, modifications);
@@ -848,12 +892,13 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       
       const config: ApiRequestConfig = {
         input: `${this.getAdherenceAnalysisSystemPrompt()}\n\n${prompt}`,
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: 1000
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       return this.parseResponse(response);
     } catch (error) {
       console.error('Adherence analysis failed:', error);
@@ -878,37 +923,13 @@ GOALS: ${goals.join(', ')}
 ${userContext}
 
 REQUIREMENTS:
-- Create a structured weekly plan with appropriate progression
-- Include variety of session types (endurance, intervals, tempo, recovery, technique)
-- Consider the rower's current fitness level and experience
-- Build in appropriate recovery periods
+- Create structured weekly plan with appropriate progression
+- Include variety: endurance, intervals, tempo, recovery, technique
+- Match current fitness level and experience
+- Build in recovery periods
 - Make sessions realistic and achievable
 
-RESPONSE FORMAT:
-Return a JSON object with this structure:
-{
-  "title": "Plan title",
-  "description": "Brief description of the plan",
-  "weeks": [
-    {
-      "weekNumber": 1,
-      "focus": "Week focus description",
-      "sessions": [
-        {
-          "day": 1,
-          "type": "endurance|interval|tempo|recovery|strength|technique|rest",
-          "title": "Session title",
-          "description": "Detailed session description",
-          "duration": 45,
-          "intensity": "low|medium|high",
-          "notes": "Optional coaching notes"
-        }
-      ]
-    }
-  ]
-}
-
-Create exactly ${duration} weeks with 3-6 sessions per week depending on the level and focus.`;
+Create exactly ${duration} weeks with 3-6 sessions per week.`;
   }
 
   // Build prompt for plan modification

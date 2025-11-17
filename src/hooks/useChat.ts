@@ -124,21 +124,29 @@ export function useChat() {
         } : null
       }));
 
-      // Get AI response
+      // Get AI response with conversation chaining
       const userSessions = getSessions();
       const conversationHistory = state.currentSession.messages;
+      
+      // Get the last AI response ID for conversation chaining
+      const lastAIMessage = conversationHistory
+        .filter(msg => msg.role === 'assistant' && msg.responseId)
+        .pop();
+      const previousResponseId = lastAIMessage?.responseId;
       
       const aiResponse = await cloudAI.sendChatMessage(
         content.trim(),
         conversationHistory,
-        userSessions
+        userSessions,
+        previousResponseId
       );
 
       // Add AI response (only if not empty)
-      if (aiResponse && aiResponse.trim()) {
+      if (aiResponse.content && aiResponse.content.trim()) {
         const assistantMessage = chatStorage.addMessage(state.currentSession.id, {
           role: 'assistant',
-          content: aiResponse
+          content: aiResponse.content,
+          responseId: aiResponse.responseId
         });
 
         // Update state with AI response

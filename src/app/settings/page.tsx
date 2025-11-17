@@ -918,8 +918,8 @@ export default function SettingsPage() {
                       <h3 className="text-lg font-semibold">AI Configuration per Use Case</h3>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Configure different models and reasoning levels for each AI feature. 
-                      Balance speed, cost, and quality based on your needs.
+                      Configure reasoning levels and verbosity for each AI feature. 
+                      All features use GPT-5.1 for optimal performance and quality.
                     </p>
                   </div>
 
@@ -935,36 +935,20 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Model</Label>
-                          <select
-                            value={settingsData.aiSettings.chat?.model || 'gpt-5.1-nano'}
-                            onChange={(e) => saveSettings('aiSettings', { 
-                              chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
-                            })}
-                            className="w-full mt-1 p-2 border rounded-md"
-                          >
-                            <option value="gpt-5.1-nano">GPT-5.1 Nano (Fastest)</option>
-                            <option value="gpt-5.1-mini">GPT-5.1 Mini (Balanced)</option>
-                            <option value="gpt-5.1">GPT-5.1 (Highest Quality)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <Label>Reasoning Effort</Label>
-                          <select
-                            value={settingsData.aiSettings.chat?.reasoning || 'none'}
-                            onChange={(e) => saveSettings('aiSettings', { 
-                              chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
-                            })}
-                            className="w-full mt-1 p-2 border rounded-md"
-                          >
-                            <option value="none">None (Ultra-fast)</option>
-                            <option value="low">Low (Fast)</option>
-                            <option value="medium">Medium (Balanced)</option>
-                            <option value="high">High (Quality)</option>
-                          </select>
-                        </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="minimal">Minimal (Ultra-fast)</option>
+                          <option value="low">Low (Fast)</option>
+                          <option value="medium">Medium (Balanced)</option>
+                          <option value="high">High (Quality)</option>
+                        </select>
                       </div>
                       <div>
                         <Label>Response Verbosity</Label>
@@ -979,6 +963,23 @@ export default function SettingsPage() {
                           <option value="medium">Medium (Natural)</option>
                           <option value="high">High (Detailed)</option>
                         </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.chat?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Choose model based on speed vs quality preference
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -995,36 +996,20 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Model</Label>
-                          <select
-                            value={settingsData.aiSettings.insights?.model || 'gpt-5.1-mini'}
-                            onChange={(e) => saveSettings('aiSettings', { 
-                              insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
-                            })}
-                            className="w-full mt-1 p-2 border rounded-md"
-                          >
-                            <option value="gpt-5.1-nano">GPT-5.1 Nano (Fastest)</option>
-                            <option value="gpt-5.1-mini">GPT-5.1 Mini (Balanced)</option>
-                            <option value="gpt-5.1">GPT-5.1 (Highest Quality)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <Label>Reasoning Effort</Label>
-                          <select
-                            value={settingsData.aiSettings.insights?.reasoning || 'medium'}
-                            onChange={(e) => saveSettings('aiSettings', { 
-                              insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
-                            })}
-                            className="w-full mt-1 p-2 border rounded-md"
-                          >
-                            <option value="none">None (Ultra-fast)</option>
-                            <option value="low">Low (Fast)</option>
-                            <option value="medium">Medium (Balanced)</option>
-                            <option value="high">High (Quality)</option>
-                          </select>
-                        </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.insights?.reasoning || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="minimal">Minimal (Ultra-fast)</option>
+                          <option value="low">Low (Fast)</option>
+                          <option value="medium">Medium (Balanced)</option>
+                          <option value="high">High (Quality)</option>
+                        </select>
                       </div>
                       <div>
                         <Label>Response Verbosity</Label>
@@ -1039,6 +1024,23 @@ export default function SettingsPage() {
                           <option value="medium">Medium (Natural)</option>
                           <option value="high">High (Detailed)</option>
                         </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.insights?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Analysis tasks work well with balanced models
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -1055,36 +1057,20 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Model</Label>
-                          <select
-                            value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.1'}
-                            onChange={(e) => saveSettings('aiSettings', { 
-                              trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
-                            })}
-                            className="w-full mt-1 p-2 border rounded-md"
-                          >
-                            <option value="gpt-5.1-nano">GPT-5.1 Nano (Fastest)</option>
-                            <option value="gpt-5.1-mini">GPT-5.1 Mini (Balanced)</option>
-                            <option value="gpt-5.1">GPT-5.1 (Highest Quality)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <Label>Reasoning Effort</Label>
-                          <select
-                            value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
-                            onChange={(e) => saveSettings('aiSettings', { 
-                              trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
-                            })}
-                            className="w-full mt-1 p-2 border rounded-md"
-                          >
-                            <option value="none">None (Ultra-fast)</option>
-                            <option value="low">Low (Fast)</option>
-                            <option value="medium">Medium (Balanced)</option>
-                            <option value="high">High (Quality)</option>
-                          </select>
-                        </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="minimal">Minimal (Ultra-fast)</option>
+                          <option value="low">Low (Fast)</option>
+                          <option value="medium">Medium (Balanced)</option>
+                          <option value="high">High (Quality)</option>
+                        </select>
                       </div>
                       <div>
                         <Label>Response Verbosity</Label>
@@ -1100,6 +1086,23 @@ export default function SettingsPage() {
                           <option value="high">High (Detailed)</option>
                         </select>
                       </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.1'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Complex planning benefits from the most capable model
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -1111,7 +1114,7 @@ export default function SettingsPage() {
                         id="maxTokens"
                         type="number"
                         min="100"
-                        max="4000"
+                        max="16000"
                         value={settingsData.aiSettings.maxTokens}
                         onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
                         className="mt-1"

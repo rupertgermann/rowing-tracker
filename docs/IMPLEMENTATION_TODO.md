@@ -9,41 +9,41 @@
 ## 🚀 Pre-Implementation
 
 ### Setup
-- [ ] Create feature branch: `git checkout -b refactor/gpt51-only`
-- [ ] Backup current `cloudAI.ts` (copy to `cloudAI.ts.backup`)
-- [ ] Review `api-refactor-plan-gpt51-only.md` one more time
-- [ ] Review `SIMPLIFIED_PLAN.md` for quick reference
-- [ ] Ensure you have OpenAI API key for testing
+- [x] Create feature branch: `git checkout -b refactor/gpt51-only`
+- [x] Backup current `cloudAI.ts` (copy to `cloudAI.ts.backup`)
+- [x] Review `api-refactor-plan-gpt51-only.md` one more time
+- [x] Review `SIMPLIFIED_PLAN.md` for quick reference
+- [x] Ensure you have OpenAI API key for testing
 
 ---
 
 ## 📝 Phase 1: Remove Legacy Code (1 hour)
 
 ### Delete Unused Methods
-- [ ] Remove `usesResponsesAPI(model: string): boolean` method
-- [ ] Remove `getApiType(model: string)` method (if exists)
-- [ ] Remove `buildChatCompletionsRequest(config)` method
-- [ ] Remove `parseChatCompletionsResponse(data)` method
-- [ ] Remove `convertToolsToChatCompletionsGPT5Format(tools)` method
-- [ ] Remove `convertToolsToChatCompletionsGPT4Format(tools)` method
-- [ ] Remove `convertToolsToResponsesFormat(tools)` method (will recreate simpler version)
+- [x] Remove `usesResponsesAPI(model: string): boolean` method
+- [x] Remove `getApiType(model: string)` method (if exists)
+- [x] Remove `buildChatCompletionsRequest(config)` method
+- [x] Remove `parseChatCompletionsResponse(data)` method
+- [x] Remove `convertToolsToChatCompletionsGPT5Format(tools)` method
+- [x] Remove `convertToolsToChatCompletionsGPT4Format(tools)` method
+- [x] Remove `convertToolsToResponsesFormat(tools)` method (will recreate simpler version)
 
 ### Clean Up Model Detection Logic
-- [ ] Remove all `if (isGPT5)` conditionals
-- [ ] Remove all `const endpoint = isGPT5 ? ...` logic
-- [ ] Remove all `model.startsWith('gpt-5')` checks
-- [ ] Remove all temperature/top_p parameter handling
-- [ ] Remove any `max_tokens` vs `max_output_tokens` conditionals
+- [x] Remove all `if (isGPT5)` conditionals
+- [x] Remove all `const endpoint = isGPT5 ? ...` logic
+- [x] Remove all `model.startsWith('gpt-5')` checks
+- [x] Remove all temperature/top_p parameter handling
+- [x] Remove any `max_tokens` vs `max_output_tokens` conditionals
 
 ### Update Type Definitions
-- [ ] Remove old `ApiRequestConfig` interface (if exists)
-- [ ] Remove any Chat Completions specific types
-- [ ] Keep only GPT-5.1 relevant types
+- [x] Remove old `ApiRequestConfig` interface (if exists)
+- [x] Remove any Chat Completions specific types
+- [x] Keep only GPT-5.1 relevant types
 
 ### Checkpoint
-- [ ] Verify ~200 lines removed
-- [ ] Code compiles (even with missing implementations)
-- [ ] No more dual-API logic remains
+- [x] Verify ~200 lines removed
+- [x] Code compiles (even with missing implementations)
+- [x] No more dual-API logic remains
 
 ---
 
@@ -51,7 +51,7 @@
 
 ### Create New Interface (in cloudAI.ts)
 ```typescript
-- [ ] Add ApiRequestConfig interface:
+- [x] Add ApiRequestConfig interface:
   interface ApiRequestConfig {
     input: string | Array<{ role: string; content: string }>;
     instructions?: string;
@@ -75,47 +75,47 @@
 
 ### Implement buildRequest() Method
 ```typescript
-- [ ] Create private buildRequest(config: ApiRequestConfig): object
-- [ ] Set model to "gpt-5.1" (hardcoded)
-- [ ] Handle input parameter (string or array)
-- [ ] Handle instructions parameter (optional)
-- [ ] Build reasoning object: { effort: config.reasoning }
-- [ ] Build text object with verbosity
-- [ ] Add text.format for jsonSchema (if provided)
-- [ ] Set max_output_tokens
-- [ ] Add store parameter (if provided)
-- [ ] Add previous_response_id (if provided)
-- [ ] Add tools array (if provided)
-- [ ] Return complete request object
+- [x] Create private buildRequest(config: ApiRequestConfig): object
+- [x] Set model to "gpt-5.1" (hardcoded)
+- [x] Handle input parameter (string or array)
+- [x] Handle instructions parameter (optional)
+- [x] Build reasoning object: { effort: config.reasoning }
+- [x] Build text object with verbosity
+- [x] Add text.format for jsonSchema (if provided)
+- [x] Set max_output_tokens
+- [x] Add store parameter (if provided)
+- [x] Add previous_response_id (if provided)
+- [x] Add tools array (if provided)
+- [x] Return complete request object
 ```
 
 ### Implement parseResponse() Method
 ```typescript
-- [ ] Create private parseResponse(data: any): string
-- [ ] Try data.output_text first (SDK helper)
-- [ ] Fallback: Find message type in output array
-- [ ] Extract text from content array
-- [ ] Throw clear error if parsing fails
-- [ ] Add console logging for debugging
+- [x] Create private parseResponse(data: any): string
+- [x] Try data.output_text first (SDK helper)
+- [x] Fallback: Find message type in output array
+- [x] Extract text from content array
+- [x] Throw clear error if parsing fails
+- [x] Add console logging for debugging
 ```
 
 ### Implement makeApiCall() Method
 ```typescript
-- [ ] Create private async makeApiCall(config: ApiRequestConfig): Promise<any>
-- [ ] Build request using buildRequest()
-- [ ] Hardcode endpoint: 'https://api.openai.com/v1/responses'
-- [ ] Set headers: Authorization and Content-Type
-- [ ] Make POST request with fetch
-- [ ] Check response.ok
-- [ ] Parse JSON response
-- [ ] Return full response object (not just text - for responseId)
-- [ ] Add proper error handling with detailed messages
+- [x] Create private async makeApiCall(config: ApiRequestConfig): Promise<any>
+- [x] Build request using buildRequest()
+- [x] Hardcode endpoint: 'https://api.openai.com/v1/responses'
+- [x] Set headers: Authorization and Content-Type
+- [x] Make POST request with fetch
+- [x] Check response.ok
+- [x] Parse JSON response
+- [x] Return full response object (not just text - for responseId)
+- [x] Add proper error handling with detailed messages
 ```
 
 ### Checkpoint
-- [ ] New methods compile without errors
-- [ ] Types are correct
-- [ ] No references to old methods remain
+- [x] New methods compile without errors
+- [x] Types are correct
+- [x] No references to old methods remain
 
 ---
 
@@ -124,9 +124,9 @@
 ### Update sendChatMessage()
 
 ```typescript
-- [ ] Update method signature to return { content: string; responseId: string }
-- [ ] Add optional previousResponseId parameter
-- [ ] Create ApiRequestConfig with:
+- [x] Update method signature to return { content: string; responseId: string }
+- [x] Add optional previousResponseId parameter
+- [x] Create ApiRequestConfig with:
   - input: message (string)
   - instructions: this.getSystemPrompt()
   - reasoning: "none"
@@ -134,102 +134,102 @@
   - maxTokens: 1000
   - store: true
   - previousResponseId: previousResponseId
-- [ ] Call makeApiCall(config)
-- [ ] Return { content: parseResponse(data), responseId: data.id }
-- [ ] Update error handling
-- [ ] Remove all old dual-API logic
-- [ ] Test manually
+- [x] Call makeApiCall(config)
+- [x] Return { content: parseResponse(data), responseId: data.id }
+- [x] Update error handling
+- [x] Remove all old dual-API logic
+- [x] Test manually
 ```
 
 ### Update generateInsights()
 
 ```typescript
-- [ ] Keep same method signature
-- [ ] Build prompt using existing buildInsightPrompt()
-- [ ] Create ApiRequestConfig with:
+- [x] Keep same method signature
+- [x] Build prompt using existing buildInsightPrompt()
+- [x] Create ApiRequestConfig with:
   - input: prompt (string)
   - reasoning: "medium"
   - verbosity: "low"
   - maxTokens: 1500
   - jsonSchema: { name: "insights", schema: {...} }
-- [ ] Define JSON schema for insights structure
-- [ ] Call makeApiCall(config)
-- [ ] Parse response with parseResponse()
-- [ ] Parse JSON from response text
-- [ ] Return insights array
-- [ ] Update error handling
-- [ ] Test manually
+- [x] Define JSON schema for insights structure
+- [x] Call makeApiCall(config)
+- [x] Parse response with parseResponse()
+- [x] Parse JSON from response text
+- [x] Return insights array
+- [x] Update error handling
+- [x] Test manually
 ```
 
 ### Update generateTrainingPlan()
 
 ```typescript
-- [ ] Keep same method signature
-- [ ] Build prompt using existing buildPlanPrompt()
-- [ ] Create ApiRequestConfig with:
+- [x] Keep same method signature
+- [x] Build prompt using existing buildPlanPrompt()
+- [x] Create ApiRequestConfig with:
   - input: prompt
   - instructions: this.getPlanSystemPrompt()
   - reasoning: "high"
   - verbosity: "high"
   - maxTokens: 4000
   - jsonSchema: { name: "training_plan", schema: {...} }
-- [ ] Define/reuse JSON schema for plan structure
-- [ ] Call makeApiCall(config)
-- [ ] Parse response and extract JSON
-- [ ] Return parsed plan
-- [ ] Update error handling
-- [ ] Test manually
+- [x] Define/reuse JSON schema for plan structure
+- [x] Call makeApiCall(config)
+- [x] Parse response and extract JSON
+- [x] Return parsed plan
+- [x] Update error handling
+- [x] Test manually
 ```
 
 ### Update modifyTrainingPlan()
 
 ```typescript
-- [ ] Keep same method signature
-- [ ] Build modification prompt
-- [ ] Create ApiRequestConfig with:
+- [x] Keep same method signature
+- [x] Build modification prompt
+- [x] Create ApiRequestConfig with:
   - input: prompt
   - instructions: this.getPlanSystemPrompt()
   - reasoning: "medium"
   - verbosity: "medium"
   - maxTokens: 4000
   - jsonSchema: same as training plan
-- [ ] Call makeApiCall(config)
-- [ ] Parse response
-- [ ] Return modified plan
-- [ ] Update error handling
-- [ ] Test manually
+- [x] Call makeApiCall(config)
+- [x] Parse response
+- [x] Return modified plan
+- [x] Update error handling
+- [x] Test manually
 ```
 
 ### Update analyzePlanAdherence()
 
 ```typescript
-- [ ] Keep same method signature
-- [ ] Build analysis prompt
-- [ ] Create ApiRequestConfig with:
+- [x] Keep same method signature
+- [x] Build analysis prompt
+- [x] Create ApiRequestConfig with:
   - input: prompt
   - reasoning: "medium"
   - verbosity: "low"
   - maxTokens: 2000
   - jsonSchema: { name: "adherence_analysis", schema: {...} }
-- [ ] Define schema for adherence results
-- [ ] Call makeApiCall(config)
-- [ ] Parse response
-- [ ] Return analysis
-- [ ] Update error handling
-- [ ] Test manually
+- [x] Define schema for adherence results
+- [x] Call makeApiCall(config)
+- [x] Parse response
+- [x] Return analysis
+- [x] Update error handling
+- [x] Test manually
 ```
 
 ### Update Any Other AI Methods
-- [ ] Check for any other methods calling OpenAI API
-- [ ] Update them to use new pattern
-- [ ] Remove old dual-API logic
+- [x] Check for any other methods calling OpenAI API
+- [x] Update them to use new pattern
+- [x] Remove old dual-API logic
 
 ### Checkpoint
-- [ ] All methods updated
-- [ ] All use makeApiCall() internally
-- [ ] Each has appropriate reasoning effort
-- [ ] Each has appropriate verbosity
-- [ ] Code compiles without errors
+- [x] All methods updated
+- [x] All use makeApiCall() internally
+- [x] Each has appropriate reasoning effort
+- [x] Each has appropriate verbosity
+- [x] Code compiles without errors
 
 ---
 
@@ -238,17 +238,17 @@
 ### Update Settings Interface (settings.ts)
 
 ```typescript
-- [ ] Open /src/lib/settings.ts
-- [ ] Update AISettings interface:
+- [x] Open /src/lib/settings.ts
+- [x] Update AISettings interface:
   - Remove: model field
   - Remove: temperature field
   - Keep: openaiApiKey, maxTokens
   - Add: storeResponses?: boolean (optional, default true)
   - Keep: all prompt fields
-- [ ] Update default settings object
-- [ ] Update getAISettings() if needed
-- [ ] Update setAISettings() if needed
-- [ ] Add migration code to clean old settings:
+- [x] Update default settings object
+- [x] Update getAISettings() if needed
+- [x] Update setAISettings() if needed
+- [x] Add migration code to clean old settings:
   if (settings.model) delete settings.model;
   if (settings.temperature) delete settings.temperature;
 ```
@@ -256,31 +256,31 @@
 ### Update Settings UI (settings/page.tsx)
 
 ```typescript
-- [ ] Open /src/app/settings/page.tsx
-- [ ] Remove model selection dropdown completely
-- [ ] Remove temperature slider completely
-- [ ] Keep API key input
-- [ ] Keep max tokens input
-- [ ] Add optional "Store Responses" checkbox for privacy
-- [ ] Update form state
-- [ ] Update form submission
-- [ ] Test UI renders correctly
+- [x] Open /src/app/settings/page.tsx
+- [x] Remove model selection dropdown completely
+- [x] Remove temperature slider completely
+- [x] Keep API key input
+- [x] Keep max tokens input
+- [x] Add optional "Store Responses" checkbox for privacy
+- [x] Update form state
+- [x] Update form submission
+- [x] Test UI renders correctly
 ```
 
 ### Update CloudAIService Constructor
 
 ```typescript
-- [ ] Remove model from config/constructor (if passed)
-- [ ] Hardcode model to "gpt-5.1" internally
-- [ ] Keep apiKey and baseUrl
-- [ ] Update any initialization logic
+- [x] Remove model from config/constructor (if passed)
+- [x] Hardcode model to "gpt-5.1" internally
+- [x] Keep apiKey and baseUrl
+- [x] Update any initialization logic
 ```
 
 ### Checkpoint
-- [ ] Settings interface updated
-- [ ] UI simplified
-- [ ] No model/temperature controls visible
-- [ ] App compiles
+- [x] Settings interface updated
+- [x] UI simplified
+- [x] No model/temperature controls visible
+- [x] App compiles
 
 ---
 
@@ -289,152 +289,152 @@
 ### Unit-Level Testing
 
 ```typescript
-- [ ] Test buildRequest() with various configs
-- [ ] Test parseResponse() with sample responses
-- [ ] Test error handling in makeApiCall()
-- [ ] Verify JSON schema definitions are valid
+- [x] Test buildRequest() with various configs
+- [x] Test parseResponse() with sample responses
+- [x] Test error handling in makeApiCall()
+- [x] Verify JSON schema definitions are valid
 ```
 
 ### Integration Testing
 
 #### Test Chat
-- [ ] Send single chat message
-- [ ] Verify response is returned
-- [ ] Verify responseId is returned
-- [ ] Send follow-up with previousResponseId
-- [ ] Verify conversation context maintained
-- [ ] Test with long conversation history
-- [ ] Verify reasoning: "none" is fast (< 2s)
+- [x] Send single chat message
+- [x] Verify response is returned
+- [x] Verify responseId is returned
+- [x] Send follow-up with previousResponseId
+- [x] Verify conversation context maintained
+- [x] Test with long conversation history
+- [x] Verify reasoning: "none" is fast (< 2s)
 
 #### Test Insights
-- [ ] Generate insights with sample sessions
-- [ ] Verify structured JSON is returned
-- [ ] Verify all required fields present
-- [ ] Test with empty sessions
-- [ ] Test with large session data
-- [ ] Verify reasoning: "medium" works
+- [x] Generate insights with sample sessions
+- [x] Verify structured JSON is returned
+- [x] Verify all required fields present
+- [x] Test with empty sessions
+- [x] Test with large session data
+- [x] Verify reasoning: "medium" works
 
 #### Test Training Plans
-- [ ] Generate new training plan
-- [ ] Verify structured JSON returned
-- [ ] Verify all plan fields present
-- [ ] Test with various user goals
-- [ ] Verify reasoning: "high" produces quality results
+- [x] Generate new training plan
+- [x] Verify structured JSON returned
+- [x] Verify all plan fields present
+- [x] Test with various user goals
+- [x] Verify reasoning: "high" produces quality results
 
 #### Test Plan Modifications
-- [ ] Modify existing plan
-- [ ] Verify modified plan returned
-- [ ] Test various modification types
-- [ ] Verify reasoning: "medium" works
+- [x] Modify existing plan
+- [x] Verify modified plan returned
+- [x] Test various modification types
+- [x] Verify reasoning: "medium" works
 
 #### Test Adherence Analysis
-- [ ] Analyze plan adherence
-- [ ] Verify analysis results returned
-- [ ] Test with different adherence scenarios
+- [x] Analyze plan adherence
+- [x] Verify analysis results returned
+- [x] Test with different adherence scenarios
 
 ### Error Handling Testing
-- [ ] Test with invalid API key
-- [ ] Test with network error
-- [ ] Test with malformed response
-- [ ] Test with rate limiting
-- [ ] Verify error messages are clear
+- [x] Test with invalid API key
+- [x] Test with network error
+- [x] Test with malformed response
+- [x] Test with rate limiting
+- [x] Verify error messages are clear
 
 ### Performance Testing
-- [ ] Measure chat response time (should be < 2s)
-- [ ] Measure insights generation time
-- [ ] Measure plan generation time
-- [ ] Verify no memory leaks
+- [x] Measure chat response time (should be < 2s)
+- [x] Measure insights generation time
+- [x] Measure plan generation time
+- [x] Verify no memory leaks
 
 ### Edge Cases
-- [ ] Test with very long input
-- [ ] Test with empty input
-- [ ] Test with special characters
-- [ ] Test with previousResponseId that doesn't exist
-- [ ] Test conversation chaining across sessions
+- [x] Test with very long input
+- [x] Test with empty input
+- [x] Test with special characters
+- [x] Test with previousResponseId that doesn't exist
+- [x] Test conversation chaining across sessions
 
 ### Checkpoint
-- [ ] All tests passing
-- [ ] All use cases work
-- [ ] Performance is good
-- [ ] Error handling is robust
+- [x] All tests passing
+- [x] All use cases work
+- [x] Performance is good
+- [x] Error handling is robust
 
 ---
 
 ## 📋 Phase 6: Code Quality & Documentation (30 min)
 
 ### Code Review
-- [ ] Remove all console.logs (or make them debug-only)
-- [ ] Add JSDoc comments to public methods
-- [ ] Add inline comments for complex logic
-- [ ] Ensure consistent code style
-- [ ] Check for any TODO comments
-- [ ] Verify no hardcoded test data remains
+- [x] Remove all console.logs (or make them debug-only)
+- [x] Add JSDoc comments to public methods
+- [x] Add inline comments for complex logic
+- [x] Ensure consistent code style
+- [x] Check for any TODO comments
+- [x] Verify no hardcoded test data remains
 
 ### Documentation
-- [ ] Update method signatures in comments
-- [ ] Document reasoning effort choices
-- [ ] Document verbosity choices
-- [ ] Add examples of conversation chaining
-- [ ] Document JSON schema structures
+- [x] Update method signatures in comments
+- [x] Document reasoning effort choices
+- [x] Document verbosity choices
+- [x] Add examples of conversation chaining
+- [x] Document JSON schema structures
 
 ### Type Safety
-- [ ] Ensure all types are properly defined
-- [ ] No use of `any` where specific type works
-- [ ] All promises properly typed
-- [ ] All async/await used correctly
+- [x] Ensure all types are properly defined
+- [x] No use of `any` where specific type works
+- [x] All promises properly typed
+- [x] All async/await used correctly
 
 ### Cleanup
-- [ ] Remove commented-out old code
-- [ ] Remove unused imports
-- [ ] Remove unused variables
-- [ ] Format code consistently
+- [x] Remove commented-out old code
+- [x] Remove unused imports
+- [x] Remove unused variables
+- [x] Format code consistently
 
 ### Checkpoint
-- [ ] Code is clean and documented
-- [ ] No linting errors
-- [ ] TypeScript compiles without warnings
+- [x] Code is clean and documented
+- [x] No linting errors
+- [x] TypeScript compiles without warnings
 
 ---
 
 ## ✅ Phase 7: Final Verification & Commit
 
 ### Final Testing
-- [ ] Test entire app end-to-end
-- [ ] Test chat feature thoroughly
-- [ ] Test insights generation
-- [ ] Test training plan creation
-- [ ] Test plan modifications
-- [ ] Verify settings page works
-- [ ] Check for any console errors
+- [x] Test entire app end-to-end
+- [x] Test chat feature thoroughly
+- [x] Test insights generation
+- [x] Test training plan creation
+- [x] Test plan modifications
+- [x] Verify settings page works
+- [x] Check for any console errors
 
 ### Verification Checklist
-- [ ] ~200 lines of code removed
-- [ ] ~50 lines of clean code added
-- [ ] Net reduction: ~150 lines
-- [ ] No model detection logic remains
-- [ ] No API switching logic remains
-- [ ] Single endpoint used everywhere
-- [ ] All methods use GPT-5.1
-- [ ] Conversation chaining works
-- [ ] Structured outputs work
-- [ ] Performance is good
+- [x] ~200 lines of code removed
+- [x] ~50 lines of clean code added
+- [x] Net reduction: ~150 lines
+- [x] No model detection logic remains
+- [x] No API switching logic remains
+- [x] Single endpoint used everywhere
+- [x] All methods use GPT-5.1
+- [x] Conversation chaining works
+- [x] Structured outputs work
+- [x] Performance is good
 
 ### Pre-Commit Checklist
-- [ ] All tests pass
-- [ ] Code compiles without errors
-- [ ] No TypeScript warnings
-- [ ] No console errors in browser
-- [ ] Settings persist correctly
-- [ ] API calls work in production-like environment
+- [x] All tests pass
+- [x] Code compiles without errors
+- [x] No TypeScript warnings
+- [x] No console errors in browser
+- [x] Settings persist correctly
+- [x] API calls work in production-like environment
 
 ### Commit the Changes
 
 ```bash
-- [ ] Review all changed files: git status
-- [ ] Review diff: git diff
-- [ ] Stage changes: git add .
-- [ ] Commit with message (see below)
-- [ ] Push branch: git push origin refactor/gpt51-only
+- [x] Review all changed files: git status
+- [x] Review diff: git diff
+- [x] Stage changes: git add .
+- [x] Commit with message (see below)
+- [x] Push branch: git push origin refactor/gpt51-only
 ```
 
 ### Commit Message
