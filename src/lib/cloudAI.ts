@@ -52,6 +52,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   sessionId: string;
+  responseId?: string; // AI response ID for conversation chaining
 }
 
 export interface ChatSession {
@@ -114,9 +115,9 @@ export class CloudAIService {
     this.aiSettings = aiSettings;
     
     console.log('CloudAI initialized with settings:', {
-      chatModel: this.aiSettings.chat.model,
-      insightsModel: this.aiSettings.insights.model,
-      trainingPlansModel: this.aiSettings.trainingPlans.model,
+      chatReasoning: this.aiSettings.chat.reasoning,
+      insightsReasoning: this.aiSettings.insights.reasoning,
+      trainingPlansReasoning: this.aiSettings.trainingPlans.reasoning,
       maxTokens: this.aiSettings.maxTokens,
       insightsPrompt: this.aiSettings.insightsPrompt?.substring(0, 100) + '...'
     });
@@ -135,7 +136,7 @@ export class CloudAIService {
     conversationHistory: ChatMessage[] = [],
     userSessions?: Session[],
     previousResponseId?: string
-  ): Promise<string> {
+  ): Promise<{ content: string; responseId: string }> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
     }
@@ -152,9 +153,12 @@ export class CloudAIService {
         store: true            // Store for future chaining
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       
-      return this.parseResponse(response);
+      return { 
+        content: this.parseResponse(response), 
+        responseId: response.id 
+      };
     } catch (error) {
       console.error('Chat AI failed:', error);
       throw error;
@@ -162,9 +166,9 @@ export class CloudAIService {
   }
 
   // Build GPT-5.1 Responses API request
-  private buildRequest(config: ApiRequestConfig, model: string = 'gpt-5.1'): object {
+  private buildRequest(config: ApiRequestConfig): object {
     const request: any = {
-      model: model,
+      model: 'gpt-5.1',
       max_output_tokens: config.maxTokens
     };
     
@@ -234,8 +238,8 @@ export class CloudAIService {
   }
 
   // Make API call to GPT-5.1 Responses API
-  private async makeApiCall(config: ApiRequestConfig, model: string = 'gpt-5.1'): Promise<any> {
-    const requestBody = this.buildRequest(config, model);
+  private async makeApiCall(config: ApiRequestConfig): Promise<any> {
+    const requestBody = this.buildRequest(config);
     
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -434,7 +438,7 @@ Use this data to provide personalized coaching and reference their actual perfor
         }
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       const content = this.parseResponse(response);
       const data = JSON.parse(content);
       
@@ -753,7 +757,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         }
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       const planData = JSON.parse(this.parseResponse(response));
       
       return this.createTrainingPlanFromAI(planData, goals, level, focus, duration);
@@ -823,7 +827,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         }
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       const modifications = JSON.parse(this.parseResponse(response));
       
       return this.applyPlanModifications(plan, modifications);
@@ -853,7 +857,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         maxTokens: 1000
       };
       
-      const response = await this.makeApiCall(config, useCaseConfig.model);
+      const response = await this.makeApiCall(config);
       return this.parseResponse(response);
     } catch (error) {
       console.error('Adherence analysis failed:', error);

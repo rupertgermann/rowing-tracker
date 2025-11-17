@@ -64,7 +64,6 @@ export interface PrivacySettings {
 }
 
 export interface UseCaseConfig {
-  model: 'gpt-5.1' | 'gpt-5.1-mini' | 'gpt-5.1-nano';
   reasoning: 'none' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
 }
@@ -167,17 +166,14 @@ export class SettingsService {
       
       // Per-use-case configurations with smart defaults
       chat: {
-        model: 'gpt-5.1-nano',    // Fastest for real-time chat
         reasoning: 'none',        // Ultra-fast responses
         verbosity: 'medium'       // Natural conversation
       },
       insights: {
-        model: 'gpt-5.1-mini',   // Balanced for analysis
         reasoning: 'medium',      // Good quality/speed ratio
         verbosity: 'low'          // Concise insights
       },
       trainingPlans: {
-        model: 'gpt-5.1',         // Best quality for plans
         reasoning: 'high',        // Maximum reasoning
         verbosity: 'high'         // Detailed explanations
       },
@@ -459,9 +455,9 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
       
       // Check if this is the old format (has flat model/temperature properties)
       if (oldAiSettings.model || oldAiSettings.temperature !== undefined) {
-        console.log('Migrating AI settings from old format to new nested structure');
+        console.log('Migrating AI settings from old format to new GPT-5.1 only structure');
         
-        // Transform old flat settings to new nested structure
+        // Transform old flat settings to new nested structure (GPT-5.1 only)
         migratedSettings.aiSettings = {
           ...this.defaultSettings.aiSettings,
           // Preserve old properties that still exist
@@ -473,10 +469,31 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           planGenerationPrompt: oldAiSettings.planGenerationPrompt ?? this.defaultSettings.aiSettings.planGenerationPrompt,
           insightsPrompt: oldAiSettings.insightsPrompt ?? this.defaultSettings.aiSettings.insightsPrompt,
           
-          // New nested structure with smart defaults based on old model
+          // New nested structure without model fields (hardcoded to GPT-5.1)
           chat: this.defaultSettings.aiSettings.chat,
           insights: this.defaultSettings.aiSettings.insights,
           trainingPlans: this.defaultSettings.aiSettings.trainingPlans
+        };
+      } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model) {
+        // Check if this is the nested format with model fields
+        console.log('Migrating AI settings from nested with model fields to GPT-5.1 only structure');
+        
+        migratedSettings.aiSettings = {
+          ...this.defaultSettings.aiSettings,
+          ...oldAiSettings,
+          // Remove model fields from nested configs, keep other settings
+          chat: {
+            reasoning: oldAiSettings.chat?.reasoning ?? this.defaultSettings.aiSettings.chat.reasoning,
+            verbosity: oldAiSettings.chat?.verbosity ?? this.defaultSettings.aiSettings.chat.verbosity
+          },
+          insights: {
+            reasoning: oldAiSettings.insights?.reasoning ?? this.defaultSettings.aiSettings.insights.reasoning,
+            verbosity: oldAiSettings.insights?.verbosity ?? this.defaultSettings.aiSettings.insights.verbosity
+          },
+          trainingPlans: {
+            reasoning: oldAiSettings.trainingPlans?.reasoning ?? this.defaultSettings.aiSettings.trainingPlans.reasoning,
+            verbosity: oldAiSettings.trainingPlans?.verbosity ?? this.defaultSettings.aiSettings.trainingPlans.verbosity
+          }
         };
       } else {
         // New format - just ensure all nested properties exist
