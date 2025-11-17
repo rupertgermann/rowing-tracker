@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
@@ -190,7 +190,7 @@ const Dashboard = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
 
   // AI Insights hook
-  const { insights, trends, trainingLoad, anomalies, isAnalyzable, lastAnalyzed } = useAIInsights();
+  const { insights, trends, trainingLoad, anomalies, isAnalyzable, lastAnalyzed, refreshInsights } = useAIInsights();
 
   useEffect(() => {
     setMounted(true);
@@ -744,11 +744,22 @@ const Dashboard = () => {
                       Personalized recommendations based on your training data
                     </p>
                   </div>
-                  {lastAnalyzed && (
-                    <div className="text-xs text-muted-foreground">
-                      Last analyzed: {lastAnalyzed.toLocaleTimeString()}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshInsights}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
+                    {lastAnalyzed && (
+                      <div className="text-xs text-muted-foreground">
+                        Last analyzed: {lastAnalyzed.toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {insights.length > 0 ? (

@@ -15,13 +15,101 @@ export interface AIInsightData {
   usingCloudAI: boolean;
   cloudAIError: string | null;
   isCloudAIConfigured: boolean;
+  refreshInsights?: () => void;
 }
 
-export function useAIInsights(): AIInsightData {
+// Cache utilities for AI insights
+interface InsightCache {
+  data: AIInsightData;
+  cacheKey: string;
+  timestamp: number;
+}
+
+const CACHE_KEY = 'rowing_ai_insights_cache';
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Generate cache key based on session data
+const generateCacheKey = (sessions: Session[], usingCloudAI: boolean): string => {
+  if (!sessions || sessions.length === 0) return 'no-sessions';
+  
+  const sessionCount = sessions.length;
+  const lastSessionTimestamp = sessions
+    .map(s => new Date(s.timestamp).getTime())
+    .sort((a, b) => b - a)[0] || 0;
+  
+  return `${sessionCount}-${lastSessionTimestamp}-${usingCloudAI}`;
+};
+
+// Get cached insights if valid
+const getCachedInsights = (sessions: Session[], usingCloudAI: boolean): AIInsightData | null => {
+  // Guard against SSR/non-browser environments
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return null;
+  }
+  
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
+    
+    const cache: InsightCache = JSON.parse(cached);
+    const currentCacheKey = generateCacheKey(sessions, usingCloudAI);
+    
+    // Check if cache is still valid
+    const isExpired = Date.now() - cache.timestamp > CACHE_EXPIRY_MS;
+    const isKeyMatch = cache.cacheKey === currentCacheKey;
+    
+    if (!isExpired && isKeyMatch) {
+      // Convert timestamp back to Date object
+      return {
+        ...cache.data,
+        lastAnalyzed: cache.data.lastAnalyzed ? new Date(cache.data.lastAnalyzed) : null
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to read cached insights:', error);
+    // Clear corrupted cache
+    localStorage.removeItem(CACHE_KEY);
+  }
+  
+  return null;
+};
+
+// Save insights to cache
+const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AIInsightData): void => {
+  // Guard against SSR/non-browser environments
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  try {
+    const cache: InsightCache = {
+      data,
+      cacheKey: generateCacheKey(sessions, usingCloudAI),
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch (error) {
+    console.warn('Failed to cache insights:', error);
+  }
+};
+
+// Clear cached insights
+const clearCachedInsights = (): void => {
+  // Guard against SSR/non-browser environments
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  localStorage.removeItem(CACHE_KEY);
+};
+
+export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const { getSessions } = useRowingStore();
   const sessions = getSessions();
   const [cloudAIError, setCloudAIError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // State for analysis results
   const [data, setData] = useState<AIInsightData>({
@@ -53,6 +141,12 @@ export function useAIInsights(): AIInsightData {
       setCloudAIError(errorMessage);
       return false;
     }
+  }, []);
+
+  // Manual refresh function
+  const refreshInsights = useCallback(() => {
+    clearCachedInsights();
+    setRefreshTrigger(prev => prev + 1);
   }, []);
 
   const getLocalAnalysis = (sessionData: Session[]) => {
@@ -165,15 +259,36 @@ export function useAIInsights(): AIInsightData {
     return getLocalAnalysis(sessions);
   }, [sessions, initializeCloudAI]);
 
-  // Run analysis when sessions change
+  // Run analysis when sessions change or refresh is triggered
   useEffect(() => {
     let isMounted = true;
     
     const runAnalysis = async () => {
       try {
+        // Check cache first (unless force refresh)
+        if (!forceRefresh) {
+          const isCloudAIConfigured = initializeCloudAI();
+          const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
+          const usingCloudAI = isAIAvailableForUse;
+          
+          const cachedData = getCachedInsights(sessions, usingCloudAI);
+          if (cachedData) {
+            if (isMounted) {
+              setData(cachedData);
+            }
+            return;
+          }
+        }
+        
+        // Generate new insights
         const result = await performAnalysis();
         if (isMounted) {
           setData(result);
+          // Cache the results
+          const isCloudAIConfigured = initializeCloudAI();
+          const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
+          const usingCloudAI = isAIAvailableForUse;
+          saveCachedInsights(sessions, usingCloudAI, result);
         }
       } catch (error) {
         console.error('Analysis error:', error);
@@ -188,9 +303,9 @@ export function useAIInsights(): AIInsightData {
     return () => {
       isMounted = false;
     };
-  }, [performAnalysis, sessions]);
+  }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI]);
 
-  return data;
+  return { ...data, refreshInsights };
 }
 
 // Async function for cloud AI insights (to be used with proper async handling)
