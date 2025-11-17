@@ -105,30 +105,101 @@ export class CloudAIService {
     try {
       const messages = this.buildChatMessages(message, conversationHistory, userSessions);
       
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      // Debug: Log input format
+      console.log('=== CHAT INPUT DEBUG ===');
+      console.log('Original messages:', JSON.stringify(messages, null, 2));
+      
+      // GPT-5 models use the Responses API, GPT-4 uses Chat Completions API
+      const isGPT5 = this.usesResponsesAPI(this.config.model);
+      const endpoint = isGPT5 ? '/responses' : '/chat/completions';
+      console.log('Using endpoint:', endpoint);
+      console.log('Model:', this.config.model);
+      console.log('Is GPT-5:', isGPT5);
+      
+      const requestBody = isGPT5 
+        ? {
+            // GPT-5 Responses API format
+            model: this.config.model,
+            input: this.convertMessagesToInput(messages),
+            reasoning: { effort: this.getReasoningEffort(this.config.model) },
+            text: { verbosity: "medium" }, // Balanced chat responses
+            max_output_tokens: 1000
+          }
+        : {
+            // GPT-4 Chat Completions API format
+            model: this.config.model,
+            messages,
+            temperature: 0.7, // Higher temperature for more conversational responses
+            max_tokens: 1000
+          };
+
+      // Debug: Log request body
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages,
-          temperature: 0.7, // Higher temperature for more conversational responses
-          max_tokens: 1000
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Chat API Error Details:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText,
+          model: this.config.model,
+          endpoint: endpoint
+        });
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}. Details: ${errorText}`);
       }
 
       const data = await response.json();
-      return data.choices[0].message.content;
+      
+      // Debug: Log complete response structure
+      console.log('=== CHAT API RESPONSE DEBUG ===');
+      console.log('API Type:', isGPT5 ? 'Responses API' : 'Chat Completions API');
+      console.log('Model:', this.config.model);
+      console.log('Full response:', JSON.stringify(data, null, 2));
+      console.log('Response keys:', Object.keys(data));
+      console.log('Response type:', typeof data);
+      
+      // Extract content based on API type
+      let extractedContent = '';
+      
+      if (isGPT5) {
+        // GPT-5 Responses API: find the first message output with text content
+        const messageOutput = data.output?.find((item: any) => item.type === 'message' && item.content);
+        if (messageOutput?.content?.length > 0) {
+          const textContent = messageOutput.content.find((c: any) => c.type === 'output_text' && c.text);
+          extractedContent = textContent?.text || '';
+        }
+      } else {
+        // GPT-4 Chat Completions API
+        extractedContent = data.choices?.[0]?.message?.content || '';
+      }
+      
+      console.log('Extracted content:', extractedContent);
+      console.log('Content type:', typeof extractedContent);
+      console.log('Content length:', extractedContent?.length || 0);
+      console.log('================================');
+      
+      return extractedContent;
     } catch (error) {
       console.error('Chat AI failed:', error);
       throw error;
     }
+  }
+
+  // Convert messages array to input string for Responses API
+  private convertMessagesToInput(messages: any[]): string {
+    return messages.map(msg => {
+      const role = msg.role === 'system' ? 'System' : msg.role === 'user' ? 'User' : 'Assistant';
+      return `${role}: ${msg.content}`;
+    }).join('\n\n');
   }
 
   // Build chat message array with system prompt and conversation context
@@ -250,6 +321,21 @@ Use this data to provide personalized coaching and reference their actual perfor
     }));
   }
 
+  // Determine if model uses Responses API (GPT-5) or Chat Completions API (GPT-4 and earlier)
+  private usesResponsesAPI(model: string): boolean {
+    return model.startsWith('gpt-5');
+  }
+
+  // Get reasoning effort based on specific GPT-5 model
+  private getReasoningEffort(model: string): string {
+    if (model === 'gpt-5.1' || model === 'gpt-5.1-2025-11-13') {
+      return 'none'; // GPT-5.1 supports "none" for fastest responses
+    } else if (model.startsWith('gpt-5')) {
+      return 'minimal'; // Other GPT-5 models use "minimal" instead of "none"
+    }
+    return 'low'; // Fallback for non-GPT-5 models (shouldn't reach here)
+  }
+
   // Generate rowing-specific insights using OpenAI
   async generateInsights(sessions: Session[]): Promise<CloudInsight[]> {
     if (!this.config) {
@@ -271,35 +357,66 @@ Use this data to provide personalized coaching and reference their actual perfor
       console.log('Anonymized Data:', anonymizedData);
       console.log('================================');
       
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      // GPT-5 models use the Responses API, GPT-4 uses Chat Completions API
+      const isGPT5 = this.usesResponsesAPI(this.config.model);
+      const endpoint = isGPT5 ? '/responses' : '/chat/completions';
+      
+      const requestBody = isGPT5 
+        ? {
+            // GPT-5 Responses API format
+            model: this.config.model,
+            input: `${this.getSystemPrompt()}\n\n${prompt}`,
+            reasoning: { effort: this.getReasoningEffort(this.config.model) },
+            text: { verbosity: "low" }, // Concise output for insights
+            max_output_tokens: this.aiSettings?.maxTokens || 1500
+          }
+        : {
+            // GPT-4 Chat Completions API format
+            model: this.config.model,
+            messages: [
+              { role: 'system', content: this.getSystemPrompt() },
+              { role: 'user', content: prompt }
+            ],
+            temperature: this.aiSettings?.temperature || 0.7,
+            max_tokens: this.aiSettings?.maxTokens || 1500
+          };
+
+      const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            {
-              role: 'system',
-              content: this.getSystemPrompt()
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: this.aiSettings?.temperature || 0.7, // Use user's temperature setting
-          max_tokens: this.aiSettings?.maxTokens || 1500 // Use user's maxTokens setting
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('OpenAI API Error Details:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText,
+          model: this.config.model,
+          endpoint: endpoint,
+          requestBody: requestBody
+        });
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}. Details: ${errorText}`);
       }
 
       const data = await response.json();
-      const insights = this.parseInsightResponse(data.choices[0].message.content);
+      
+      // Extract content based on API type
+      // GPT-5 Responses API uses output_text, GPT-4 Chat Completions uses choices[0].message.content
+      const content = data.output_text || data.choices?.[0]?.message?.content || '';
+      
+      console.log('=== DEBUG: API Response ===');
+      console.log('API Type:', isGPT5 ? 'Responses API' : 'Chat Completions API');
+      console.log('Endpoint:', endpoint);
+      console.log('Response content length:', content.length);
+      console.log('Content preview:', content.substring(0, 200));
+      console.log('================================');
+      
+      const insights = this.parseInsightResponse(content);
       
       return insights;
     } catch (error) {

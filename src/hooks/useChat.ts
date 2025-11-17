@@ -134,21 +134,29 @@ export function useChat() {
         userSessions
       );
 
-      // Add AI response
-      const assistantMessage = chatStorage.addMessage(state.currentSession.id, {
-        role: 'assistant',
-        content: aiResponse
-      });
+      // Add AI response (only if not empty)
+      if (aiResponse && aiResponse.trim()) {
+        const assistantMessage = chatStorage.addMessage(state.currentSession.id, {
+          role: 'assistant',
+          content: aiResponse
+        });
 
-      // Update state with AI response
-      setState(prev => ({
-        ...prev,
-        currentSession: prev.currentSession ? {
-          ...prev.currentSession,
-          messages: [...prev.currentSession.messages, assistantMessage]
-        } : null,
-        isLoading: false
-      }));
+        // Update state with AI response
+        setState(prev => ({
+          ...prev,
+          currentSession: prev.currentSession ? {
+            ...prev.currentSession,
+            messages: [...prev.currentSession.messages, assistantMessage]
+          } : null,
+          isLoading: false
+        }));
+      } else {
+        // Just stop loading if response is empty
+        setState(prev => ({
+          ...prev,
+          isLoading: false
+        }));
+      }
 
     } catch (error) {
       console.error('Failed to send message:', error);
