@@ -764,9 +764,9 @@ const Dashboard = () => {
 
                 {insights.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {insights.map((insight) => (
+                    {insights.map((insight, index) => (
                       <InsightCard
-                        key={insight.id}
+                        key={insight.id || `local-${insight.type}-${index}`}
                         insight={insight}
                         onFeedback={(insightId, feedback) => {
                           console.log(`Insight ${insightId} received feedback: ${feedback}`);

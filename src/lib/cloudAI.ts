@@ -715,7 +715,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanGenerationSystemPrompt()}\n\n${prompt}`,
-        instructions: this.getPlanGenerationSystemPrompt(),
+        instructions: "Generate a structured training plan following the specified JSON schema",
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 4000,
@@ -789,7 +789,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanModificationSystemPrompt()}\n\n${prompt}`,
-        instructions: this.getPlanModificationSystemPrompt(),
+        instructions: "Modify the training plan following the specified JSON schema",
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 4000,

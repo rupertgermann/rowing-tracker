@@ -26,7 +26,7 @@ interface InsightCardProps {
 export function InsightCard({ insight, onFeedback }: InsightCardProps) {
   const { recordFeedback, getFeedback } = useInsightFeedback();
   const existingFeedback = getFeedback(insight.id);
-  const isCloudInsight = 'confidence' in insight && insight.id.startsWith('cloud-');
+  const isCloudInsight = 'confidence' in insight && insight.id && insight.id.startsWith('cloud-');
 
   const getInsightIcon = () => {
     const type = insight.type;
