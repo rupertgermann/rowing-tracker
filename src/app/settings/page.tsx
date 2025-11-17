@@ -928,12 +928,9 @@ export default function SettingsPage() {
                       <optgroup label="GPT-4 Series">
                         <option value="gpt-4o">GPT-4o (Recommended)</option>
                         <option value="gpt-4o-mini">GPT-4o Mini</option>
-                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                        <option value="gpt-4">GPT-4</option>
+
                       </optgroup>
-                      <optgroup label="GPT-3.5 Series">
-                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                      </optgroup>
+      
                     </select>
                     <p className="text-xs text-muted-foreground mt-1">
                       {settingsData.aiSettings.model.startsWith('gpt-5') 
