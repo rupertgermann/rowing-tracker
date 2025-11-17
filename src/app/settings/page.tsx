@@ -938,13 +938,13 @@ export default function SettingsPage() {
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
-                          value={settingsData.aiSettings.chat?.reasoning || 'none'}
+                          value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
                           onChange={(e) => saveSettings('aiSettings', { 
                             chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="none">None (Ultra-fast)</option>
+                          <option value="minimal">Minimal (Ultra-fast)</option>
                           <option value="low">Low (Fast)</option>
                           <option value="medium">Medium (Balanced)</option>
                           <option value="high">High (Quality)</option>
@@ -963,6 +963,23 @@ export default function SettingsPage() {
                           <option value="medium">Medium (Natural)</option>
                           <option value="high">High (Detailed)</option>
                         </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.chat?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Choose model based on speed vs quality preference
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -988,7 +1005,7 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="none">None (Ultra-fast)</option>
+                          <option value="minimal">Minimal (Ultra-fast)</option>
                           <option value="low">Low (Fast)</option>
                           <option value="medium">Medium (Balanced)</option>
                           <option value="high">High (Quality)</option>
@@ -1007,6 +1024,23 @@ export default function SettingsPage() {
                           <option value="medium">Medium (Natural)</option>
                           <option value="high">High (Detailed)</option>
                         </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.insights?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Analysis tasks work well with balanced models
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -1032,7 +1066,7 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="none">None (Ultra-fast)</option>
+                          <option value="minimal">Minimal (Ultra-fast)</option>
                           <option value="low">Low (Fast)</option>
                           <option value="medium">Medium (Balanced)</option>
                           <option value="high">High (Quality)</option>
@@ -1051,6 +1085,23 @@ export default function SettingsPage() {
                           <option value="medium">Medium (Natural)</option>
                           <option value="high">High (Detailed)</option>
                         </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.1'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Complex planning benefits from the most capable model
+                        </p>
                       </div>
                     </CardContent>
                   </Card>

@@ -64,8 +64,9 @@ export interface PrivacySettings {
 }
 
 export interface UseCaseConfig {
-  reasoning: 'none' | 'low' | 'medium' | 'high';
+  reasoning: 'minimal' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
+  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1';
 }
 
 export interface AISettings {
@@ -97,7 +98,7 @@ export interface Settings {
 export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
-  private readonly CURRENT_VERSION = '1.0.0';
+  private readonly CURRENT_VERSION = '1.1.0'; // Bumped to fix model field migration
   
   private defaultSettings: Settings = {
     userPreferences: {
@@ -166,16 +167,19 @@ export class SettingsService {
       
       // Per-use-case configurations with smart defaults
       chat: {
-        reasoning: 'none',        // Ultra-fast responses
-        verbosity: 'medium'       // Natural conversation
+        reasoning: 'minimal',      // Ultra-fast responses (compatible with all models)
+        verbosity: 'medium',       // Natural conversation
+        model: 'gpt-5-mini'        // Good balance of speed and quality
       },
       insights: {
         reasoning: 'medium',      // Good quality/speed ratio
-        verbosity: 'low'          // Concise insights
+        verbosity: 'low',         // Concise insights
+        model: 'gpt-5-mini'       // Efficient for analysis tasks
       },
       trainingPlans: {
         reasoning: 'high',        // Maximum reasoning
-        verbosity: 'high'         // Detailed explanations
+        verbosity: 'high',        // Detailed explanations
+        model: 'gpt-5.1'          // Best quality for complex plans
       },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: 'You are a personal AI rowing coach...',
@@ -475,25 +479,16 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           trainingPlans: this.defaultSettings.aiSettings.trainingPlans
         };
       } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model) {
-        // Check if this is the nested format with model fields
-        console.log('Migrating AI settings from nested with model fields to GPT-5.1 only structure');
+        // This is already the new nested format with model fields - preserve it
+        console.log('Preserving existing AI settings with model fields');
         
         migratedSettings.aiSettings = {
           ...this.defaultSettings.aiSettings,
           ...oldAiSettings,
-          // Remove model fields from nested configs, keep other settings
-          chat: {
-            reasoning: oldAiSettings.chat?.reasoning ?? this.defaultSettings.aiSettings.chat.reasoning,
-            verbosity: oldAiSettings.chat?.verbosity ?? this.defaultSettings.aiSettings.chat.verbosity
-          },
-          insights: {
-            reasoning: oldAiSettings.insights?.reasoning ?? this.defaultSettings.aiSettings.insights.reasoning,
-            verbosity: oldAiSettings.insights?.verbosity ?? this.defaultSettings.aiSettings.insights.verbosity
-          },
-          trainingPlans: {
-            reasoning: oldAiSettings.trainingPlans?.reasoning ?? this.defaultSettings.aiSettings.trainingPlans.reasoning,
-            verbosity: oldAiSettings.trainingPlans?.verbosity ?? this.defaultSettings.aiSettings.trainingPlans.verbosity
-          }
+          // Preserve the nested structure with model fields
+          chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
+          insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
+          trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans }
         };
       } else {
         // New format - just ensure all nested properties exist
@@ -512,13 +507,35 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
     
     // Handle version migration and ensure all properties exist
     if (!settings.version || settings.version !== this.CURRENT_VERSION) {
+      // Additional migration: ensure model fields exist in nested configs (v1.1.0 fix)
+      if (migratedSettings.aiSettings) {
+        const needsModelMigration = 
+          !migratedSettings.aiSettings.chat?.model ||
+          !migratedSettings.aiSettings.insights?.model ||
+          !migratedSettings.aiSettings.trainingPlans?.model;
+        
+        if (needsModelMigration) {
+          console.log('Adding missing model fields to AI settings');
+          migratedSettings.aiSettings = {
+            ...migratedSettings.aiSettings,
+            chat: {
+              ...this.defaultSettings.aiSettings.chat,
+              ...migratedSettings.aiSettings.chat
+            },
+            insights: {
+              ...this.defaultSettings.aiSettings.insights,
+              ...migratedSettings.aiSettings.insights
+            },
+            trainingPlans: {
+              ...this.defaultSettings.aiSettings.trainingPlans,
+              ...migratedSettings.aiSettings.trainingPlans
+            }
+          };
+        }
+      }
+      
       return {
-        userPreferences: { ...this.defaultSettings.userPreferences, ...settings.userPreferences },
-        dataManagement: { ...this.defaultSettings.dataManagement, ...settings.dataManagement },
-        trainingSettings: { ...this.defaultSettings.trainingSettings, ...settings.trainingSettings },
-        notificationSettings: { ...this.defaultSettings.notificationSettings, ...settings.notificationSettings },
-        privacySettings: { ...this.defaultSettings.privacySettings, ...settings.privacySettings },
-        aiSettings: migratedSettings.aiSettings,
+        ...migratedSettings,
         version: this.CURRENT_VERSION,
         updatedAt: new Date()
       };

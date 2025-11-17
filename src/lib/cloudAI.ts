@@ -17,24 +17,29 @@ interface ApiRequestConfig {
   // Optional system-level guidance (higher priority than input)
   instructions?: string;
   
+  // Model selection per use case
+  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1';
+  
   // Reasoning effort per use case
   reasoning: "none" | "low" | "medium" | "high";
   
   // Output verbosity
   verbosity: "low" | "medium" | "high";
   
-  // Token limit
+  // Maximum output tokens
   maxTokens: number;
   
-  // State management
-  store?: boolean;
+  // Optional conversation chaining
   previousResponseId?: string;
   
-  // Structured outputs
+  // Optional structured output format
   jsonSchema?: {
     name: string;
     schema: object;
   };
+  
+  // Optional storage control
+  store?: boolean;
   
   // Tools (rarely used in our app)
   tools?: Array<{
@@ -146,6 +151,7 @@ export class CloudAIService {
       const config: ApiRequestConfig = {
         input: message,
         instructions: this.getChatSystemPrompt(userSessions),
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: 1000,
@@ -168,7 +174,7 @@ export class CloudAIService {
   // Build GPT-5.1 Responses API request
   private buildRequest(config: ApiRequestConfig): object {
     const request: any = {
-      model: 'gpt-5.1',
+      model: config.model, // Use model from config instead of hardcoded
       max_output_tokens: config.maxTokens
     };
     
@@ -180,8 +186,30 @@ export class CloudAIService {
       request.instructions = config.instructions;
     }
     
-    // Reasoning effort
-    request.reasoning = { effort: config.reasoning };
+    // Reasoning effort - map model-specific values
+    const reasoningMapping: Record<string, Record<string, string>> = {
+      'gpt-5-mini': {
+        'none': 'minimal', // Map 'none' to 'minimal' for gpt-5-mini
+        'low': 'low',
+        'medium': 'medium', 
+        'high': 'high'
+      },
+      'gpt-5-nano': {
+        'none': 'minimal', // Assume same mapping as gpt-5-mini
+        'low': 'low',
+        'medium': 'medium',
+        'high': 'high'
+      },
+      'gpt-5.1': {
+        'none': 'none', // Keep 'none' for gpt-5.1 if supported
+        'low': 'low',
+        'medium': 'medium',
+        'high': 'high'
+      }
+    };
+    
+    const mappedReasoning = reasoningMapping[config.model]?.[config.reasoning] || config.reasoning;
+    request.reasoning = { effort: mappedReasoning };
     
     // Verbosity and structured outputs
     request.text = { verbosity: config.verbosity };
@@ -405,6 +433,7 @@ Use this data to provide personalized coaching and reference their actual perfor
       
       const config: ApiRequestConfig = {
         input: `${this.getSystemPrompt()}\n\n${prompt}`,
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 1500,
@@ -716,6 +745,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const config: ApiRequestConfig = {
         input: `${this.getPlanGenerationSystemPrompt()}\n\n${prompt}`,
         instructions: "Generate a structured training plan following the specified JSON schema",
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 4000,
@@ -790,6 +820,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const config: ApiRequestConfig = {
         input: `${this.getPlanModificationSystemPrompt()}\n\n${prompt}`,
         instructions: "Modify the training plan following the specified JSON schema",
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 4000,
@@ -861,6 +892,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       
       const config: ApiRequestConfig = {
         input: `${this.getAdherenceAnalysisSystemPrompt()}\n\n${prompt}`,
+        model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: 1000
