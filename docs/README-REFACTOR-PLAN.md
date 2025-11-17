@@ -6,6 +6,14 @@
 **Timeline:** 3-5 hours  
 **Complexity:** Low  
 
+---
+
+## 🚀 **START HERE: [IMPLEMENTATION_TODO.md](./IMPLEMENTATION_TODO.md)** 
+
+**Complete step-by-step checklist with 60+ actionable tasks organized by phase.**
+
+---
+
 ### Active Documents
 
 1. **📘 Main Plan:** [`api-refactor-plan-gpt51-only.md`](./api-refactor-plan-gpt51-only.md)
