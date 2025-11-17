@@ -910,31 +910,216 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Model Configuration */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Per-Use-Case Configuration */}
+                <div className="space-y-6">
                   <div>
-                    <Label>Model</Label>
-                    <div className="mt-1 p-2 border rounded-md bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="default" className="bg-blue-600">GPT-5.1</Badge>
-                        <span className="text-sm text-gray-600">Latest model with optimal performance</span>
-                      </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Brain className="h-4 w-4" />
+                      <h3 className="text-lg font-semibold">AI Configuration per Use Case</h3>
                     </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="maxTokens">Max Tokens</Label>
-                    <Input
-                      id="maxTokens"
-                      type="number"
-                      min="100"
-                      max="4000"
-                      value={settingsData.aiSettings.maxTokens}
-                      onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Maximum number of tokens in AI responses
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Configure different models and reasoning levels for each AI feature. 
+                      Balance speed, cost, and quality based on your needs.
                     </p>
+                  </div>
+
+                  {/* Chat Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        Chat & Conversation
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Real-time conversation with your AI coach
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Model</Label>
+                          <select
+                            value={settingsData.aiSettings.chat?.model || 'gpt-5.1-nano'}
+                            onChange={(e) => saveSettings('aiSettings', { 
+                              chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
+                            })}
+                            className="w-full mt-1 p-2 border rounded-md"
+                          >
+                            <option value="gpt-5.1-nano">GPT-5.1 Nano (Fastest)</option>
+                            <option value="gpt-5.1-mini">GPT-5.1 Mini (Balanced)</option>
+                            <option value="gpt-5.1">GPT-5.1 (Highest Quality)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label>Reasoning Effort</Label>
+                          <select
+                            value={settingsData.aiSettings.chat?.reasoning || 'none'}
+                            onChange={(e) => saveSettings('aiSettings', { 
+                              chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
+                            })}
+                            className="w-full mt-1 p-2 border rounded-md"
+                          >
+                            <option value="none">None (Ultra-fast)</option>
+                            <option value="low">Low (Fast)</option>
+                            <option value="medium">Medium (Balanced)</option>
+                            <option value="high">High (Quality)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.chat?.verbosity || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            chat: { ...settingsData.aiSettings.chat, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="low">Low (Concise)</option>
+                          <option value="medium">Medium (Natural)</option>
+                          <option value="high">High (Detailed)</option>
+                        </select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Insights Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        Performance Insights
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Analysis of your workout data and trends
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Model</Label>
+                          <select
+                            value={settingsData.aiSettings.insights?.model || 'gpt-5.1-mini'}
+                            onChange={(e) => saveSettings('aiSettings', { 
+                              insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
+                            })}
+                            className="w-full mt-1 p-2 border rounded-md"
+                          >
+                            <option value="gpt-5.1-nano">GPT-5.1 Nano (Fastest)</option>
+                            <option value="gpt-5.1-mini">GPT-5.1 Mini (Balanced)</option>
+                            <option value="gpt-5.1">GPT-5.1 (Highest Quality)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label>Reasoning Effort</Label>
+                          <select
+                            value={settingsData.aiSettings.insights?.reasoning || 'medium'}
+                            onChange={(e) => saveSettings('aiSettings', { 
+                              insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
+                            })}
+                            className="w-full mt-1 p-2 border rounded-md"
+                          >
+                            <option value="none">None (Ultra-fast)</option>
+                            <option value="low">Low (Fast)</option>
+                            <option value="medium">Medium (Balanced)</option>
+                            <option value="high">High (Quality)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.insights?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            insights: { ...settingsData.aiSettings.insights, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="low">Low (Concise)</option>
+                          <option value="medium">Medium (Natural)</option>
+                          <option value="high">High (Detailed)</option>
+                        </select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Training Plans Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        Training Plans
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Personalized training plan generation and modification
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Model</Label>
+                          <select
+                            value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.1'}
+                            onChange={(e) => saveSettings('aiSettings', { 
+                              trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
+                            })}
+                            className="w-full mt-1 p-2 border rounded-md"
+                          >
+                            <option value="gpt-5.1-nano">GPT-5.1 Nano (Fastest)</option>
+                            <option value="gpt-5.1-mini">GPT-5.1 Mini (Balanced)</option>
+                            <option value="gpt-5.1">GPT-5.1 (Highest Quality)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label>Reasoning Effort</Label>
+                          <select
+                            value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
+                            onChange={(e) => saveSettings('aiSettings', { 
+                              trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
+                            })}
+                            className="w-full mt-1 p-2 border rounded-md"
+                          >
+                            <option value="none">None (Ultra-fast)</option>
+                            <option value="low">Low (Fast)</option>
+                            <option value="medium">Medium (Balanced)</option>
+                            <option value="high">High (Quality)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.trainingPlans?.verbosity || 'high'}
+                          onChange={(e) => saveSettings('aiSettings', { 
+                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="low">Low (Concise)</option>
+                          <option value="medium">Medium (Natural)</option>
+                          <option value="high">High (Detailed)</option>
+                        </select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Global Settings */}
+                  <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="maxTokens">Global Max Tokens</Label>
+                      <Input
+                        id="maxTokens"
+                        type="number"
+                        min="100"
+                        max="4000"
+                        value={settingsData.aiSettings.maxTokens}
+                        onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Maximum number of tokens in AI responses (applies to all use cases)
+                      </p>
+                    </div>
                   </div>
                 </div>
 

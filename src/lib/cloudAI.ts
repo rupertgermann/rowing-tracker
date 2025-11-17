@@ -106,7 +106,7 @@ export class CloudAIService {
     // Always update config (even if already initialized) to pick up settings changes
     this.config = {
       apiKey: key,
-      model: aiSettings.model || 'gpt-4o', // Use user's model choice
+      model: 'gpt-5.1', // Default model (per-use-case models are used in actual calls)
       baseUrl: 'https://api.openai.com/v1'
     };
     
@@ -114,8 +114,9 @@ export class CloudAIService {
     this.aiSettings = aiSettings;
     
     console.log('CloudAI initialized with settings:', {
-      model: this.config.model,
-      temperature: this.aiSettings.temperature,
+      chatModel: this.aiSettings.chat.model,
+      insightsModel: this.aiSettings.insights.model,
+      trainingPlansModel: this.aiSettings.trainingPlans.model,
       maxTokens: this.aiSettings.maxTokens,
       insightsPrompt: this.aiSettings.insightsPrompt?.substring(0, 100) + '...'
     });
@@ -140,17 +141,18 @@ export class CloudAIService {
     }
 
     try {
+      const useCaseConfig = this.aiSettings.chat;
       const config: ApiRequestConfig = {
         input: message,
         instructions: this.getChatSystemPrompt(userSessions),
-        reasoning: "none",      // Ultra-fast for chat
-        verbosity: "medium",    // Conversational responses
+        reasoning: useCaseConfig.reasoning,
+        verbosity: useCaseConfig.verbosity,
         maxTokens: 1000,
         previousResponseId,    // Automatic context chaining
         store: true            // Store for future chaining
       };
       
-      const response = await this.makeApiCall(config);
+      const response = await this.makeApiCall(config, useCaseConfig.model);
       
       return this.parseResponse(response);
     } catch (error) {
@@ -160,9 +162,9 @@ export class CloudAIService {
   }
 
   // Build GPT-5.1 Responses API request
-  private buildRequest(config: ApiRequestConfig): object {
+  private buildRequest(config: ApiRequestConfig, model: string = 'gpt-5.1'): object {
     const request: any = {
-      model: "gpt-5.1",
+      model: model,
       max_output_tokens: config.maxTokens
     };
     
@@ -232,8 +234,8 @@ export class CloudAIService {
   }
 
   // Make API call to GPT-5.1 Responses API
-  private async makeApiCall(config: ApiRequestConfig): Promise<any> {
-    const requestBody = this.buildRequest(config);
+  private async makeApiCall(config: ApiRequestConfig, model: string = 'gpt-5.1'): Promise<any> {
+    const requestBody = this.buildRequest(config, model);
     
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -395,11 +397,12 @@ Use this data to provide personalized coaching and reference their actual perfor
     try {
       const anonymizedData = this.anonymizeSessions(sessions);
       const prompt = this.buildInsightPrompt(anonymizedData);
+      const useCaseConfig = this.aiSettings.insights;
       
       const config: ApiRequestConfig = {
         input: `${this.getSystemPrompt()}\n\n${prompt}`,
-        reasoning: "medium",    // Balanced quality/speed
-        verbosity: "low",       // Concise output
+        reasoning: useCaseConfig.reasoning,
+        verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 1500,
         jsonSchema: {
           name: "insights",
@@ -431,7 +434,7 @@ Use this data to provide personalized coaching and reference their actual perfor
         }
       };
       
-      const response = await this.makeApiCall(config);
+      const response = await this.makeApiCall(config, useCaseConfig.model);
       const content = this.parseResponse(response);
       const data = JSON.parse(content);
       
@@ -703,11 +706,12 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
     try {
       const prompt = this.buildPlanGenerationPrompt(goals, level, focus, duration, userSessions);
       
+      const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanGenerationSystemPrompt()}\n\n${prompt}`,
         instructions: this.getPlanGenerationSystemPrompt(),
-        reasoning: "high",        // Maximum reasoning for best plans
-        verbosity: "high",        // Detailed explanations
+        reasoning: useCaseConfig.reasoning,
+        verbosity: useCaseConfig.verbosity,
         maxTokens: 4000,
         jsonSchema: {
           name: "training_plan",
@@ -749,7 +753,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         }
       };
       
-      const response = await this.makeApiCall(config);
+      const response = await this.makeApiCall(config, useCaseConfig.model);
       const planData = JSON.parse(this.parseResponse(response));
       
       return this.createTrainingPlanFromAI(planData, goals, level, focus, duration);
@@ -772,11 +776,12 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
     try {
       const prompt = this.buildPlanModificationPrompt(plan, modificationRequest, userSessions);
       
+      const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanModificationSystemPrompt()}\n\n${prompt}`,
         instructions: this.getPlanModificationSystemPrompt(),
-        reasoning: "medium",      // Moderate reasoning
-        verbosity: "medium",      // Balanced output
+        reasoning: useCaseConfig.reasoning,
+        verbosity: useCaseConfig.verbosity,
         maxTokens: 2000,
         jsonSchema: {
           name: "training_plan",
@@ -818,7 +823,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         }
       };
       
-      const response = await this.makeApiCall(config);
+      const response = await this.makeApiCall(config, useCaseConfig.model);
       const modifications = JSON.parse(this.parseResponse(response));
       
       return this.applyPlanModifications(plan, modifications);
@@ -839,15 +844,16 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
 
     try {
       const prompt = this.buildAdherenceAnalysisPrompt(plan, userSessions);
+      const useCaseConfig = this.aiSettings.insights;
       
       const config: ApiRequestConfig = {
         input: `${this.getAdherenceAnalysisSystemPrompt()}\n\n${prompt}`,
-        reasoning: "medium",    // Moderate reasoning
-        verbosity: "low",       // Concise output
+        reasoning: useCaseConfig.reasoning,
+        verbosity: useCaseConfig.verbosity,
         maxTokens: 1000
       };
       
-      const response = await this.makeApiCall(config);
+      const response = await this.makeApiCall(config, useCaseConfig.model);
       return this.parseResponse(response);
     } catch (error) {
       console.error('Adherence analysis failed:', error);

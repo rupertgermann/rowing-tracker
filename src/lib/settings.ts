@@ -63,11 +63,21 @@ export interface PrivacySettings {
   chatRetention: number; // days
 }
 
+export interface UseCaseConfig {
+  model: 'gpt-5.1' | 'gpt-5.1-mini' | 'gpt-5.1-nano';
+  reasoning: 'none' | 'low' | 'medium' | 'high';
+  verbosity: 'low' | 'medium' | 'high';
+}
+
 export interface AISettings {
   cloudAIEnabled: boolean;
   openaiApiKey: string;
-  model: string; // Always gpt-5.1
   maxTokens: number;
+  
+  // Per-use-case configuration
+  chat: UseCaseConfig;
+  insights: UseCaseConfig;
+  trainingPlans: UseCaseConfig;
   systemPrompt: string;
   chatSystemPrompt: string;
   planGenerationPrompt: string;
@@ -153,8 +163,24 @@ export class SettingsService {
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
-      model: 'gpt-5.1', // GPT-5.1 only
       maxTokens: 1500,
+      
+      // Per-use-case configurations with smart defaults
+      chat: {
+        model: 'gpt-5.1-nano',    // Fastest for real-time chat
+        reasoning: 'none',        // Ultra-fast responses
+        verbosity: 'medium'       // Natural conversation
+      },
+      insights: {
+        model: 'gpt-5.1-mini',   // Balanced for analysis
+        reasoning: 'medium',      // Good quality/speed ratio
+        verbosity: 'low'          // Concise insights
+      },
+      trainingPlans: {
+        model: 'gpt-5.1',         // Best quality for plans
+        reasoning: 'high',        // Maximum reasoning
+        verbosity: 'high'         // Detailed explanations
+      },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: 'You are a personal AI rowing coach...',
       planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...',
@@ -425,30 +451,63 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
   }
 
   private migrateSettings(settings: any): Settings {
-    // Handle future settings migrations here
+    let migratedSettings = { ...settings };
+    
+    // Handle AI settings migration from old flat structure to new nested structure
+    if (settings.aiSettings) {
+      const oldAiSettings = settings.aiSettings;
+      
+      // Check if this is the old format (has flat model/temperature properties)
+      if (oldAiSettings.model || oldAiSettings.temperature !== undefined) {
+        console.log('Migrating AI settings from old format to new nested structure');
+        
+        // Transform old flat settings to new nested structure
+        migratedSettings.aiSettings = {
+          ...this.defaultSettings.aiSettings,
+          // Preserve old properties that still exist
+          cloudAIEnabled: oldAiSettings.cloudAIEnabled ?? this.defaultSettings.aiSettings.cloudAIEnabled,
+          openaiApiKey: oldAiSettings.openaiApiKey ?? this.defaultSettings.aiSettings.openaiApiKey,
+          maxTokens: oldAiSettings.maxTokens ?? this.defaultSettings.aiSettings.maxTokens,
+          systemPrompt: oldAiSettings.systemPrompt ?? this.defaultSettings.aiSettings.systemPrompt,
+          chatSystemPrompt: oldAiSettings.chatSystemPrompt ?? this.defaultSettings.aiSettings.chatSystemPrompt,
+          planGenerationPrompt: oldAiSettings.planGenerationPrompt ?? this.defaultSettings.aiSettings.planGenerationPrompt,
+          insightsPrompt: oldAiSettings.insightsPrompt ?? this.defaultSettings.aiSettings.insightsPrompt,
+          
+          // New nested structure with smart defaults based on old model
+          chat: this.defaultSettings.aiSettings.chat,
+          insights: this.defaultSettings.aiSettings.insights,
+          trainingPlans: this.defaultSettings.aiSettings.trainingPlans
+        };
+      } else {
+        // New format - just ensure all nested properties exist
+        migratedSettings.aiSettings = {
+          ...this.defaultSettings.aiSettings,
+          ...oldAiSettings,
+          chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
+          insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
+          trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans }
+        };
+      }
+    } else {
+      // No AI settings exist - use defaults
+      migratedSettings.aiSettings = { ...this.defaultSettings.aiSettings };
+    }
+    
+    // Handle version migration and ensure all properties exist
     if (!settings.version || settings.version !== this.CURRENT_VERSION) {
-      // Apply migration logic based on version - deep merge to ensure all properties exist
       return {
         userPreferences: { ...this.defaultSettings.userPreferences, ...settings.userPreferences },
         dataManagement: { ...this.defaultSettings.dataManagement, ...settings.dataManagement },
         trainingSettings: { ...this.defaultSettings.trainingSettings, ...settings.trainingSettings },
         notificationSettings: { ...this.defaultSettings.notificationSettings, ...settings.notificationSettings },
         privacySettings: { ...this.defaultSettings.privacySettings, ...settings.privacySettings },
-        aiSettings: { ...this.defaultSettings.aiSettings, ...settings.aiSettings },
+        aiSettings: migratedSettings.aiSettings,
         version: this.CURRENT_VERSION,
         updatedAt: new Date()
       };
     }
 
-    // Even for same version, ensure aiSettings exists (for backward compatibility)
-    if (!settings.aiSettings) {
-      return {
-        ...settings,
-        aiSettings: { ...this.defaultSettings.aiSettings }
-      };
-    }
-
-    return settings;
+    return migratedSettings;
   }
 
   private validateSettings(settings: any): boolean {
