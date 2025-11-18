@@ -11,6 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
+import { SplitTimeChart } from '@/components/SplitTimeChart';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -307,13 +308,13 @@ const Dashboard = () => {
         <XAxis 
           dataKey="date" 
           className="text-xs"
-          stroke="#374151"
-          tick={{ fill: '#374151', fontSize: 10 }}
+          stroke="#6b7280"
+          tick={{ fill: '#6b7280', fontSize: 10 }}
         />
         <YAxis 
           className="text-xs"
-          stroke="#374151"
-          tick={{ fill: '#374151', fontSize: 10 }}
+          stroke="#6b7280"
+          tick={{ fill: '#6b7280', fontSize: 10 }}
           tickFormatter={config.yAxisFormatter}
         />
         <Tooltip content={<CustomTooltip config={config} />} />
@@ -730,6 +731,19 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Split Time Chart */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-6">
+                Pace Analysis
+                {timeRange !== 'all' && (
+                  <span className="text-lg font-normal text-muted-foreground ml-2">
+                    ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
+                  </span>
+                )}
+              </h2>
+              <SplitTimeChart sessions={filteredSessions} />
+            </div>
 
             {/* AI Insights Section */}
             {isAnalyzable && (
