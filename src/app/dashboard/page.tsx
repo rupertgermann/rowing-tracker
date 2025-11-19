@@ -12,6 +12,8 @@ import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
+import { Insight } from '@/lib/aiAnalysis';
+import { CloudInsight } from '@/lib/cloudAI';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -191,7 +193,21 @@ const Dashboard = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
 
   // AI Insights hook
-  const { insights, trends, trainingLoad, anomalies, isAnalyzable, lastAnalyzed, refreshInsights } = useAIInsights();
+  const { 
+    insights, 
+    trends, 
+    trainingLoad, 
+    anomalies, 
+    isAnalyzable, 
+    lastAnalyzed, 
+    refreshInsights,
+    archivedInsights,
+    archiveInsight,
+    unarchiveInsight,
+    deleteInsight,
+    isArchivedView,
+    setIsArchivedView
+  } = useAIInsights();
 
   useEffect(() => {
     setMounted(true);
@@ -759,6 +775,24 @@ const Dashboard = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant={!isArchivedView ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setIsArchivedView?.(false)}
+                        className="text-xs"
+                      >
+                        Current
+                      </Button>
+                      <Button
+                        variant={isArchivedView ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setIsArchivedView?.(true)}
+                        className="text-xs"
+                      >
+                        Archive ({archivedInsights?.length || 0})
+                      </Button>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -770,21 +804,28 @@ const Dashboard = () => {
                     </Button>
                     {lastAnalyzed && (
                       <div className="text-xs text-muted-foreground">
-                        Last analyzed: {lastAnalyzed.toLocaleTimeString()}
+                        Last analyzed: {lastAnalyzed.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })} at {lastAnalyzed.toLocaleTimeString()}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {insights.length > 0 ? (
+                {(isArchivedView ? archivedInsights ?? [] : insights ?? [])?.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {insights.map((insight, index) => (
+                    {(isArchivedView ? archivedInsights ?? [] : insights ?? [])?.map((insight: Insight | CloudInsight, index: number) => (
                       <InsightCard
                         key={insight.id || `local-${insight.type}-${index}`}
                         insight={insight}
                         onFeedback={(insightId, feedback) => {
                           console.log(`Insight ${insightId} received feedback: ${feedback}`);
                         }}
+                        isArchived={isArchivedView}
+                        onArchive={isArchivedView ? unarchiveInsight : archiveInsight}
+                        onDelete={isArchivedView ? deleteInsight : undefined}
                       />
                     ))}
                   </div>
@@ -796,10 +837,13 @@ const Dashboard = () => {
                           <Brain className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Analyzing Your Data
+                          {isArchivedView ? 'No Archived Insights' : 'Analyzing Your Data'}
                         </h3>
                         <p className="text-muted-foreground mb-4">
-                          AI is processing your training patterns to generate personalized insights.
+                          {isArchivedView 
+                            ? 'Archive insights you want to save for later reference.'
+                            : 'AI is processing your training patterns to generate personalized insights.'
+                          }
                         </p>
                         <p className="text-sm text-muted-foreground">
                           More sessions will provide better recommendations.

@@ -15,15 +15,50 @@ import {
   ThumbsDown,
   CheckCircle,
   Cloud,
-  Brain
+  Brain,
+  Archive,
+  Trash2
 } from 'lucide-react';
+
+// Helper function to safely format dates from insights
+const formatInsightDate = (dateGenerated: Date | string): string => {
+  try {
+    // If it's already a Date object, use it directly
+    if (dateGenerated instanceof Date) {
+      return dateGenerated.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    
+    // If it's a string, try to parse it
+    const parsedDate = new Date(dateGenerated);
+    if (isNaN(parsedDate.getTime())) {
+      // If parsing fails, return a fallback
+      return 'Recent';
+    }
+    
+    return parsedDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.warn('Failed to format insight date:', error);
+    return 'Recent';
+  }
+};
 
 interface InsightCardProps {
   insight: Insight | CloudInsight;
   onFeedback?: (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => void;
+  isArchived?: boolean;
+  onArchive?: (insightId: string) => void;
+  onDelete?: (insightId: string) => void;
 }
 
-export function InsightCard({ insight, onFeedback }: InsightCardProps) {
+export function InsightCard({ insight, onFeedback, isArchived = false, onArchive, onDelete }: InsightCardProps) {
   const { recordFeedback, getFeedback } = useInsightFeedback();
   const existingFeedback = getFeedback(insight.id);
   const isCloudInsight = 'confidence' in insight && insight.id && insight.id.startsWith('cloud-');
@@ -87,6 +122,16 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
     onFeedback?.(insight.id, feedback);
   };
 
+  const handleArchive = () => {
+    onArchive?.(insight.id);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to permanently delete this insight?')) {
+      onDelete?.(insight.id);
+    }
+  };
+
   const getConfidenceDisplay = () => {
     if (!isCloudInsight) return null;
     
@@ -120,7 +165,7 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
           </Badge>
         </div>
         <CardDescription className="flex items-center justify-between">
-          <span>{new Date(insight.dateGenerated).toLocaleDateString()}</span>
+          <span>{formatInsightDate(insight.dateGenerated)}</span>
           {getConfidenceDisplay()}
         </CardDescription>
       </CardHeader>
@@ -182,6 +227,28 @@ export function InsightCard({ insight, onFeedback }: InsightCardProps) {
                 >
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Took action
+                </Button>
+              )}
+              {onArchive && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleArchive}
+                  className="h-6 px-2 text-xs hover:text-orange-600"
+                >
+                  <Archive className="h-3 w-3 mr-1" />
+                  {isArchived ? 'Unarchive' : 'Archive'}
+                </Button>
+              )}
+              {isArchived && onDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="h-6 px-2 text-xs hover:text-red-600"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete
                 </Button>
               )}
             </div>

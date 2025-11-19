@@ -16,6 +16,12 @@ export interface AIInsightData {
   cloudAIError: string | null;
   isCloudAIConfigured: boolean;
   refreshInsights?: () => void;
+  archivedInsights?: (Insight | CloudInsight)[];
+  archiveInsight?: (insightId: string) => void;
+  unarchiveInsight?: (insightId: string) => void;
+  deleteInsight?: (insightId: string) => void;
+  isArchivedView?: boolean;
+  setIsArchivedView?: (isArchived: boolean) => void;
 }
 
 // Cache utilities for AI insights
@@ -26,7 +32,9 @@ interface InsightCache {
 }
 
 const CACHE_KEY = 'rowing_ai_insights_cache';
+const ARCHIVE_KEY = 'rowing_ai_insights_archive';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const AUTO_ARCHIVE_DAYS = 30; // Archive insights older than 30 days
 
 // Generate cache key based on session data
 const generateCacheKey = (sessions: Session[], usingCloudAI: boolean): string => {
@@ -104,12 +112,117 @@ const clearCachedInsights = (): void => {
   localStorage.removeItem(CACHE_KEY);
 };
 
+// Archive helper functions
+const getArchivedInsights = (): (Insight | CloudInsight)[] => {
+  // Guard against SSR/non-browser environments
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [];
+  }
+  
+  try {
+    const archived = localStorage.getItem(ARCHIVE_KEY);
+    if (!archived) return [];
+    
+    const parsed = JSON.parse(archived);
+    // Convert date strings back to Date objects
+    return parsed.map((insight: any) => ({
+      ...insight,
+      dateGenerated: new Date(insight.dateGenerated)
+    }));
+  } catch (error) {
+    console.warn('Failed to read archived insights:', error);
+    return [];
+  }
+};
+
+const saveArchivedInsights = (archivedInsights: (Insight | CloudInsight)[]): void => {
+  // Guard against SSR/non-browser environments
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  try {
+    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archivedInsights));
+  } catch (error) {
+    console.warn('Failed to save archived insights:', error);
+  }
+};
+
+const archiveInsight = (insightId: string, currentInsights: (Insight | CloudInsight)[]): {
+  updatedInsights: (Insight | CloudInsight)[];
+  archivedInsights: (Insight | CloudInsight)[];
+} => {
+  const insightToArchive = currentInsights.find(insight => insight.id === insightId);
+  if (!insightToArchive) {
+    return { updatedInsights: currentInsights, archivedInsights: getArchivedInsights() };
+  }
+  
+  const updatedInsights = currentInsights.filter(insight => insight.id !== insightId);
+  const existingArchived = getArchivedInsights();
+  const newArchivedInsights = [...existingArchived, insightToArchive];
+  
+  saveArchivedInsights(newArchivedInsights);
+  return { updatedInsights, archivedInsights: newArchivedInsights };
+};
+
+const unarchiveInsight = (insightId: string): (Insight | CloudInsight) => {
+  const archivedInsights = getArchivedInsights();
+  const insightToUnarchive = archivedInsights.find(insight => insight.id === insightId);
+  
+  if (!insightToUnarchive) {
+    throw new Error('Insight not found in archive');
+  }
+  
+  const updatedArchived = archivedInsights.filter(insight => insight.id !== insightId);
+  saveArchivedInsights(updatedArchived);
+  
+  return insightToUnarchive;
+};
+
+// Delete insight permanently from archive
+const deleteInsight = (insightId: string): void => {
+  const archivedInsights = getArchivedInsights();
+  const updatedArchived = archivedInsights.filter(insight => insight.id !== insightId);
+  saveArchivedInsights(updatedArchived);
+};
+
+// Auto-archive old insights
+const autoArchiveOldInsights = (insights: (Insight | CloudInsight)[]): {
+  updatedInsights: (Insight | CloudInsight)[];
+  newlyArchived: (Insight | CloudInsight)[];
+} => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - AUTO_ARCHIVE_DAYS);
+  
+  const oldInsights = insights.filter(insight => {
+    const insightDate = new Date(insight.dateGenerated);
+    return insightDate < cutoffDate;
+  });
+  
+  const updatedInsights = insights.filter(insight => {
+    const insightDate = new Date(insight.dateGenerated);
+    return insightDate >= cutoffDate;
+  });
+  
+  if (oldInsights.length > 0) {
+    const existingArchived = getArchivedInsights();
+    const newArchived = [...existingArchived, ...oldInsights];
+    saveArchivedInsights(newArchived);
+  }
+  
+  return {
+    updatedInsights,
+    newlyArchived: oldInsights
+  };
+};
+
 export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const { getSessions } = useRowingStore();
   const sessions = getSessions();
   const [cloudAIError, setCloudAIError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isArchivedView, setIsArchivedView] = useState(false);
   
   // State for analysis results
   const [data, setData] = useState<AIInsightData>({
@@ -121,7 +234,9 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     lastAnalyzed: null,
     usingCloudAI: false,
     cloudAIError: null,
-    isCloudAIConfigured: false
+    isCloudAIConfigured: false,
+    archivedInsights: [],
+    isArchivedView: false
   });
 
   // Initialize cloud AI from user settings
@@ -145,8 +260,71 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
   // Manual refresh function
   const refreshInsights = useCallback(() => {
+    // Archive all existing insights before refresh
+    setData(prevData => {
+      if (prevData.insights.length > 0) {
+        const existingArchived = getArchivedInsights();
+        const newArchived = [...existingArchived, ...prevData.insights];
+        saveArchivedInsights(newArchived);
+        
+        return {
+          ...prevData,
+          insights: [],
+          archivedInsights: newArchived
+        };
+      }
+      return prevData;
+    });
+    
     clearCachedInsights();
     setRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  // Archive insight function
+  const archiveInsightCallback = useCallback((insightId: string) => {
+    setData(prevData => {
+      const { updatedInsights, archivedInsights } = archiveInsight(insightId, prevData.insights);
+      return {
+        ...prevData,
+        insights: updatedInsights,
+        archivedInsights
+      };
+    });
+  }, []);
+
+  // Unarchive insight function
+  const unarchiveInsightCallback = useCallback((insightId: string) => {
+    try {
+      const unarchivedInsight = unarchiveInsight(insightId);
+      setData(prevData => ({
+        ...prevData,
+        insights: [...prevData.insights, unarchivedInsight],
+        archivedInsights: getArchivedInsights()
+      }));
+    } catch (error) {
+      console.error('Failed to unarchive insight:', error);
+    }
+  }, []);
+
+  // Set archived view function
+  const setIsArchivedViewCallback = useCallback((isArchived: boolean) => {
+    setIsArchivedView(isArchived);
+    setData(prevData => ({
+      ...prevData,
+      isArchivedView: isArchived
+    }));
+  }, []);
+
+  // Delete insight function
+  const deleteInsightCallback = useCallback((insightId: string) => {
+    deleteInsight(insightId);
+    setData(prevData => {
+      const updatedArchived = prevData.archivedInsights?.filter(insight => insight.id !== insightId) || [];
+      return {
+        ...prevData,
+        archivedInsights: updatedArchived
+      };
+    });
   }, []);
 
   const getLocalAnalysis = (sessionData: Session[]) => {
@@ -162,8 +340,15 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       const trainingLoad = aiAnalysis.calculateTrainingLoad(sessionData);
       const anomalies = aiAnalysis.detectAnomalies(sessionData);
 
+      // Auto-archive old insights
+      const { updatedInsights, newlyArchived } = autoArchiveOldInsights(insights.slice(0, 5));
+      
+      if (newlyArchived.length > 0) {
+        console.log(`Auto-archived ${newlyArchived.length} old insights`);
+      }
+
       return {
-        insights: insights.slice(0, 5),
+        insights: updatedInsights,
         trends,
         trainingLoad,
         anomalies: anomalies.slice(0, 3),
@@ -283,12 +468,18 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         // Generate new insights
         const result = await performAnalysis();
         if (isMounted) {
-          setData(result);
+          const archivedInsights = getArchivedInsights();
+          const updatedResult = {
+            ...result,
+            archivedInsights,
+            isArchivedView
+          };
+          setData(updatedResult);
           // Cache the results
           const isCloudAIConfigured = initializeCloudAI();
           const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
           const usingCloudAI = isAIAvailableForUse;
-          saveCachedInsights(sessions, usingCloudAI, result);
+          saveCachedInsights(sessions, usingCloudAI, updatedResult);
         }
       } catch (error) {
         console.error('Analysis error:', error);
@@ -305,7 +496,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     };
   }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI]);
 
-  return { ...data, refreshInsights };
+  return { 
+    ...data, 
+    refreshInsights,
+    archiveInsight: archiveInsightCallback,
+    unarchiveInsight: unarchiveInsightCallback,
+    deleteInsight: deleteInsightCallback,
+    setIsArchivedView: setIsArchivedViewCallback
+  };
 }
 
 // Async function for cloud AI insights (to be used with proper async handling)
