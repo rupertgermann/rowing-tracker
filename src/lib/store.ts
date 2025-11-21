@@ -40,6 +40,11 @@ export interface SessionsViewSettings {
   };
 }
 
+export interface SessionAnalysisSettings {
+  activeTab: 'overview' | 'charts' | 'segments' | 'analysis';
+  segmentSize: 100 | 500;
+}
+
 interface ChartSettings {
   enabledCharts: ChartMetric[];
   chartType: ChartType;
@@ -53,6 +58,7 @@ interface RowingStore {
   chartSettings: ChartSettings;
   dashboardSettings: DashboardSettings;
   sessionsViewSettings: SessionsViewSettings;
+  sessionAnalysisSettings: SessionAnalysisSettings;
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -66,6 +72,7 @@ interface RowingStore {
   
   updateDashboardSettings: (settings: Partial<DashboardSettings> | Partial<DashboardSettings['comparisonWidget']> | Partial<DashboardSettings['periodStats']>) => void;
   updateSessionsViewSettings: (settings: Partial<SessionsViewSettings> | Partial<SessionsViewSettings['filters']> | Partial<SessionsViewSettings['sortConfig']>) => void;
+  updateSessionAnalysisSettings: (settings: Partial<SessionAnalysisSettings>) => void;
   
   // Computed getters
   getSessions: () => Session[];
@@ -108,6 +115,11 @@ const defaultSessionsViewSettings: SessionsViewSettings = {
     field: 'date',
     direction: 'desc'
   }
+};
+
+const defaultSessionAnalysisSettings: SessionAnalysisSettings = {
+  activeTab: 'overview',
+  segmentSize: 500
 };
 
 // Calculate personal records from sessions
@@ -302,6 +314,7 @@ export const useRowingStore = create<RowingStore>()(
       chartSettings: defaultChartSettings,
       dashboardSettings: defaultDashboardSettings,
       sessionsViewSettings: defaultSessionsViewSettings,
+      sessionAnalysisSettings: defaultSessionAnalysisSettings,
 
       // Actions
       addSessions: (newSessions) => {
@@ -453,6 +466,15 @@ export const useRowingStore = create<RowingStore>()(
           });
       },
 
+      updateSessionAnalysisSettings: (settings) => {
+        set((state) => ({
+          sessionAnalysisSettings: {
+            ...state.sessionAnalysisSettings,
+            ...settings
+          }
+        }));
+      },
+
       // Computed getters
       getSessions: () => get().sessions,
       
@@ -486,7 +508,8 @@ export const useRowingStore = create<RowingStore>()(
         filters: state.filters,
         chartSettings: state.chartSettings,
         dashboardSettings: state.dashboardSettings,
-        sessionsViewSettings: state.sessionsViewSettings
+        sessionsViewSettings: state.sessionsViewSettings,
+        sessionAnalysisSettings: state.sessionAnalysisSettings
       }),
       // Convert string timestamps back to Date objects on rehydrate
       onRehydrateStorage: () => (state) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -24,6 +24,7 @@ import { calculateAdvancedStats, calculateSegments, calculateRollingAverages, ca
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Assuming these exist or standard tabs
 import { ComposedChart } from 'recharts';
+import { useRowingStore } from '@/lib/store';
 
 interface SessionAnalysisProps {
   data: StrokeData[];
@@ -73,6 +74,19 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function SessionAnalysis({ data }: SessionAnalysisProps) {
+  const { sessionAnalysisSettings, updateSessionAnalysisSettings } = useRowingStore();
+  const activeTab = sessionAnalysisSettings?.activeTab ?? 'overview';
+  const segmentSize = sessionAnalysisSettings?.segmentSize ?? 500;
+
+  const handleTabChange = (value: string) => {
+    if (value === activeTab) return;
+    updateSessionAnalysisSettings({ activeTab: value as typeof activeTab });
+  };
+
+  const handleSegmentSizeChange = (size: 100 | 500) => {
+    if (size === segmentSize) return;
+    updateSessionAnalysisSettings({ segmentSize: size });
+  };
   // Enrich data if strokeLength is missing (backward compatibility for previously uploaded sessions)
   const enrichedData = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -97,9 +111,6 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
       };
     });
   }, [data]);
-
-  const [activeTab, setActiveTab] = useState('overview');
-  const [segmentSize, setSegmentSize] = useState(500); // Default to 500m segments
 
   const stats = useMemo(() => calculateAdvancedStats(enrichedData), [enrichedData]);
   const rolling5 = useMemo(() => calculateRollingAverages(enrichedData, 5), [enrichedData]);
@@ -228,7 +239,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
           </CardContent>
         </Card>
       </div>
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="overview">Overview & Stats</TabsTrigger>
           <TabsTrigger value="charts">Performance Graphs</TabsTrigger>
@@ -479,7 +490,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setSegmentSize(100)}
+                onClick={() => handleSegmentSizeChange(100)}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   segmentSize === 100
                     ? 'bg-primary text-primary-foreground'
@@ -489,7 +500,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 100m
               </button>
               <button
-                onClick={() => setSegmentSize(500)}
+                onClick={() => handleSegmentSizeChange(500)}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   segmentSize === 500
                     ? 'bg-primary text-primary-foreground'
