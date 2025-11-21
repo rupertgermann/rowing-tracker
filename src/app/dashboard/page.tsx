@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, Trophy, Medal } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
@@ -486,7 +486,8 @@ const Dashboard = () => {
 
             {/* Key Metrics */}
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
+              <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
+                <Activity className="h-6 w-6 text-primary" />
                 Key Metrics
                 {timeRange !== 'all' && (
                   <span className="text-lg font-normal text-muted-foreground ml-2">
@@ -495,61 +496,69 @@ const Dashboard = () => {
                 )}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-blue-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Distance</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-blue-500/10 rounded-full">
+                      <TrendingUp className="h-4 w-4 text-blue-500 transition-transform duration-200 group-hover:scale-110" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-foreground transition-colors duration-200">
                       {formatDistance(filteredStats.totalDistance)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {filteredStats.sessionCount} sessions
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-cyan-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Time</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-cyan-500/10 rounded-full">
+                      <Clock className="h-4 w-4 text-cyan-500 transition-transform duration-200 group-hover:scale-110" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-foreground transition-colors duration-200">
                       {formatDuration(filteredStats.totalTime)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-1">
                       All sessions
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-emerald-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Average Pace</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-emerald-500/10 rounded-full">
+                      <Target className="h-4 w-4 text-emerald-500 transition-transform duration-200 group-hover:scale-110" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-foreground transition-colors duration-200">
                       {formatPace(avgPace)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Per 500m
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-amber-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Average Power</CardTitle>
-                    <Zap className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-amber-500/10 rounded-full">
+                      <Zap className="h-4 w-4 text-amber-500 transition-transform duration-200 group-hover:scale-110" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-foreground transition-colors duration-200">
                       {avgPower > 0 ? `${Math.round(avgPower)}W` : '--'}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Average output
                     </p>
                   </CardContent>
@@ -557,49 +566,79 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
-                <CardHeader>
-                  <CardTitle className="text-lg">Total Sessions</CardTitle>
-                  <CardDescription>
-                    Number of workouts tracked
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
-                    {stats.totalSessions}
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Summary Stats & Awards */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
+                <Trophy className="h-6 w-6 text-yellow-500" />
+                Achievements & Stats
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-t-4 border-t-primary bg-gradient-to-br from-card to-muted/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      Total Sessions
+                    </CardTitle>
+                    <CardDescription>
+                      Lifetime workout count
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-4xl font-bold text-foreground">
+                      {stats.totalSessions}
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
-                <CardHeader>
-                  <CardTitle className="text-lg">Current Streak</CardTitle>
-                  <CardDescription>
-                    Consecutive days with sessions
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
-                    {stats.currentStreak}
-                  </div>
-                </CardContent>
-              </Card>
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-t-4 border-t-orange-500 bg-gradient-to-br from-card to-orange-500/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Flame className="h-5 w-5 text-orange-500" />
+                      Current Streak
+                    </CardTitle>
+                    <CardDescription>
+                      Consecutive days active
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-4xl font-bold text-foreground">
+                        {stats.currentStreak}
+                      </div>
+                      <span className="text-muted-foreground font-medium">days</span>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
-                <CardHeader>
-                  <CardTitle className="text-lg">Best Streak</CardTitle>
-                  <CardDescription>
-                    Longest consecutive streak
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
-                    {stats.bestStreak}
+                {/* Best Streak - Trophy Card */}
+                <Card className="relative overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1 border-none ring-2 ring-yellow-500/50 bg-gradient-to-br from-yellow-500/10 via-background to-yellow-500/5">
+                  <div className="absolute top-0 right-0 p-3 opacity-10 rotate-12">
+                    <Trophy className="h-24 w-24 text-yellow-500" />
                   </div>
-                </CardContent>
-              </Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+                      <Trophy className="h-5 w-5 fill-yellow-500" />
+                      Best Streak Record
+                    </CardTitle>
+                    <CardDescription>
+                      Longest consecutive streak
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-4xl font-bold text-foreground">
+                        {stats.bestStreak}
+                      </div>
+                      <span className="text-muted-foreground font-medium">days</span>
+                    </div>
+                    {stats.currentStreak >= stats.bestStreak && stats.bestStreak > 0 && (
+                      <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-500">
+                        Current Record!
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
             {/* Monthly Comparison Header Cards */}

@@ -139,7 +139,7 @@ export function PeriodComparisonStats() {
   if (availableMonths.length === 0) return null;
 
   return (
-    <div className="w-full p-1 rounded-xl border bg-card/30 mb-6">
+    <div className="w-full p-1 rounded-xl border bg-card/30 mb-6 transition-all hover:border-primary/30 hover:shadow-sm">
       <div className="px-3 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-border/50 mb-2">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-primary" />
