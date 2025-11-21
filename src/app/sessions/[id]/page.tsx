@@ -7,6 +7,10 @@ import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { parseStrokeCsv, StrokeData } from '@/lib/strokeParser';
+import { SessionAnalysis } from '@/components/SessionAnalysis';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -17,7 +21,8 @@ import {
   Target, 
   Activity,
   Flame,
-  Gauge
+  Gauge,
+  Upload
 } from 'lucide-react';
 
 // Helper functions for formatting data
@@ -65,6 +70,29 @@ export default function SessionDetailPage() {
   
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [strokeData, setStrokeData] = useState<StrokeData[] | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAnalyzing(true);
+    try {
+      const result = await parseStrokeCsv(file);
+      if (result.data.length > 0) {
+        setStrokeData(result.data);
+      } else if (result.error) {
+        // Simple alert for now, could be improved with a toast
+        alert(result.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Failed to process file');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   useEffect(() => {
     const sessionId = params.id as string;
@@ -350,7 +378,7 @@ export default function SessionDetailPage() {
         </div>
 
         {/* Session Summary */}
-        <Card>
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Flame className="h-5 w-5 text-primary" />
@@ -396,6 +424,52 @@ export default function SessionDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Advanced Analysis Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            <Activity className="h-6 w-6" />
+            Stroke Analysis
+          </h2>
+          
+          {!strokeData ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
+                  <div className="p-4 rounded-full bg-muted">
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Upload Stroke Data</h3>
+                    <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                      Upload a SmartRow CSV export to view detailed stroke-by-stroke analysis, charts, and metrics.
+                    </p>
+                  </div>
+                  <div className="w-full max-w-xs">
+                    <Label htmlFor="csv-upload" className="sr-only">Upload CSV</Label>
+                    <Input 
+                      id="csv-upload" 
+                      type="file" 
+                      accept=".csv" 
+                      onChange={handleFileUpload} 
+                      disabled={analyzing}
+                    />
+                  </div>
+                  {analyzing && <p className="text-sm text-muted-foreground">Analyzing data...</p>}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+               <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => setStrokeData(null)} size="sm">
+                    Clear Analysis
+                  </Button>
+               </div>
+               <SessionAnalysis data={strokeData} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
