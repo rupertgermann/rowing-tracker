@@ -6,7 +6,8 @@ import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Calendar, Target, Zap, TrendingUp, Medal } from 'lucide-react';
+import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown } from 'lucide-react';
+import { AwardsList } from '@/components/AwardsList';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -250,6 +251,15 @@ export default function PRsPage() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+
+            {/* Achievements Section */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
+                <Crown className="h-6 w-6 text-primary" />
+                Achievements
+              </h2>
+              <AwardsList />
             </div>
 
             {/* Summary */}

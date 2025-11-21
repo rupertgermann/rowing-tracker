@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
+import { AWARDS, EarnedAward } from '@/lib/awards';
 
 // Chart configuration types
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime';
@@ -54,6 +55,8 @@ interface RowingStore {
   // State
   sessions: Session[];
   personalRecords: PersonalRecord[];
+  earnedAwards: EarnedAward[];
+  newlyEarnedAward: EarnedAward | null; // For notification
   filters: SessionFilters;
   chartSettings: ChartSettings;
   dashboardSettings: DashboardSettings;
@@ -69,6 +72,7 @@ interface RowingStore {
   updateSession: (updatedSession: Session) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
+  dismissNewAward: () => void;
   
   updateDashboardSettings: (settings: Partial<DashboardSettings> | Partial<DashboardSettings['comparisonWidget']> | Partial<DashboardSettings['periodStats']>) => void;
   updateSessionsViewSettings: (settings: Partial<SessionsViewSettings> | Partial<SessionsViewSettings['filters']> | Partial<SessionsViewSettings['sortConfig']>) => void;
@@ -310,6 +314,8 @@ export const useRowingStore = create<RowingStore>()(
       // Initial state
       sessions: [],
       personalRecords: [],
+      earnedAwards: [],
+      newlyEarnedAward: null,
       filters: defaultFilters,
       chartSettings: defaultChartSettings,
       dashboardSettings: defaultDashboardSettings,
@@ -325,9 +331,28 @@ export const useRowingStore = create<RowingStore>()(
           const updatedSessions = [...state.sessions, ...uniqueNewSessions];
           const updatedRecords = calculatePersonalRecords(updatedSessions);
           
+          // Check for new awards
+          const currentAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
+          const stats = calculateStats(updatedSessions);
+          let newAward: EarnedAward | null = null;
+          const updatedAwards = [...state.earnedAwards];
+
+          AWARDS.forEach(award => {
+            if (!currentAwardIds.has(award.id)) {
+              if (award.condition(updatedSessions, stats)) {
+                const earned = { awardId: award.id, earnedAt: new Date() };
+                updatedAwards.push(earned);
+                // Only set one new award for notification to avoid spam, or the last one
+                newAward = earned;
+              }
+            }
+          });
+          
           return {
             sessions: updatedSessions,
-            personalRecords: updatedRecords
+            personalRecords: updatedRecords,
+            earnedAwards: updatedAwards,
+            newlyEarnedAward: state.newlyEarnedAward || newAward // Keep existing if not dismissed, or overwrite? Let's allow overwrite to show latest
           };
         });
       },
@@ -335,7 +360,9 @@ export const useRowingStore = create<RowingStore>()(
       clearSessions: () => {
         set({
           sessions: [],
-          personalRecords: []
+          personalRecords: [],
+          earnedAwards: [],
+          newlyEarnedAward: null
         });
       },
 
@@ -384,6 +411,10 @@ export const useRowingStore = create<RowingStore>()(
 
       resetChartSettings: () => {
         set({ chartSettings: defaultChartSettings });
+      },
+
+      dismissNewAward: () => {
+        set({ newlyEarnedAward: null });
       },
 
       updateDashboardSettings: (newSettings) => {
@@ -509,7 +540,8 @@ export const useRowingStore = create<RowingStore>()(
         chartSettings: state.chartSettings,
         dashboardSettings: state.dashboardSettings,
         sessionsViewSettings: state.sessionsViewSettings,
-        sessionAnalysisSettings: state.sessionAnalysisSettings
+        sessionAnalysisSettings: state.sessionAnalysisSettings,
+        earnedAwards: state.earnedAwards
       }),
       // Convert string timestamps back to Date objects on rehydrate
       onRehydrateStorage: () => (state) => {
@@ -521,6 +553,34 @@ export const useRowingStore = create<RowingStore>()(
           }));
           // Re-compute personal records
           state.personalRecords = calculatePersonalRecords(state.sessions);
+          
+          // Rehydrate awards dates
+          if (state.earnedAwards) {
+            state.earnedAwards = state.earnedAwards.map(a => ({
+              ...a,
+              earnedAt: new Date(a.earnedAt)
+            }));
+          }
+
+          // Check for retroactive awards
+          const stats = calculateStats(state.sessions);
+          const currentAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
+          let hasNewRetroactiveAwards = false;
+          const updatedAwards = [...state.earnedAwards];
+
+          AWARDS.forEach(award => {
+             if (!currentAwardIds.has(award.id)) {
+                if (award.condition(state.sessions, stats)) {
+                   updatedAwards.push({ awardId: award.id, earnedAt: new Date() });
+                   hasNewRetroactiveAwards = true;
+                }
+             }
+          });
+
+          if (hasNewRetroactiveAwards) {
+             state.earnedAwards = updatedAwards;
+             // We intentionally don't trigger newlyEarnedAward for retroactive ones to avoid spamming notifications on reload
+          }
         }
       }
     }
