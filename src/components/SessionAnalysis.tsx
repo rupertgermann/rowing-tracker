@@ -248,28 +248,28 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             Choose how you want to explore this session: summary metrics, visual performance trends, interval segments, or deep-dive analysis.
           </p>
         </div>
-        <TabsList className="grid w-full grid-cols-4 gap-2 mb-8 rounded-2xl bg-secondary/50 p-2 shadow-sm border border-border/70">
+        <TabsList className="grid w-full grid-cols-4 gap-2 mb-8 rounded-2xl bg-secondary/50 p-2 shadow-sm border border-border/70 h-auto">
           <TabsTrigger
             value="overview"
-            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+            className="h-12 rounded-xl text-sm font-semibold transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/80"
           >
             Overview & Stats
           </TabsTrigger>
           <TabsTrigger
             value="charts"
-            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+            className="h-12 rounded-xl text-sm font-semibold transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/80"
           >
             Performance Graphs
           </TabsTrigger>
           <TabsTrigger
             value="segments"
-            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+            className="h-12 rounded-xl text-sm font-semibold transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/80"
           >
             Segments
           </TabsTrigger>
           <TabsTrigger
             value="analysis"
-            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+            className="h-12 rounded-xl text-sm font-semibold transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/80"
           >
             Deep Analysis
           </TabsTrigger>
