@@ -8,7 +8,8 @@ import {
   Zap,
   Activity,
   TrendingUp,
-  Target
+  Target,
+  Crown
 } from 'lucide-react';
 
 export interface Award {
@@ -26,7 +27,60 @@ export interface EarnedAward {
 }
 
 export const AWARDS: Award[] = [
+  // Session Count Milestones
+  {
+    id: 'sessions-1',
+    title: 'First Splash',
+    description: 'Complete your first rowing session',
+    icon: Medal,
+    color: 'text-blue-400',
+    condition: (sessions) => sessions.length >= 1
+  },
+  {
+    id: 'sessions-10',
+    title: 'Getting Habitual',
+    description: 'Complete 10 rowing sessions',
+    icon: Medal,
+    color: 'text-blue-600',
+    condition: (sessions) => sessions.length >= 10
+  },
+  {
+    id: 'sessions-50',
+    title: 'Committed',
+    description: 'Complete 50 rowing sessions',
+    icon: Trophy,
+    color: 'text-indigo-600',
+    condition: (sessions) => sessions.length >= 50
+  },
+  {
+    id: 'sessions-100',
+    title: 'Century Club',
+    description: 'Complete 100 rowing sessions',
+    icon: Trophy,
+    color: 'text-violet-600',
+    condition: (sessions) => sessions.length >= 100
+  },
+  {
+    id: 'sessions-365',
+    title: 'Year of Rowing',
+    description: 'Complete 365 rowing sessions',
+    icon: Crown,
+    color: 'text-gold-500',
+    condition: (sessions) => sessions.length >= 365
+  },
+
   // Duration Milestones
+  {
+    id: 'duration-1h',
+    title: 'Hour of Power',
+    description: 'Accumulate 1 hour of total rowing time',
+    icon: Timer,
+    color: 'text-sky-500',
+    condition: (sessions) => {
+      const totalSeconds = sessions.reduce((acc, s) => acc + s.duration, 0);
+      return totalSeconds >= 3600;
+    }
+  },
   {
     id: 'duration-5h',
     title: 'Dedicated Rower',
@@ -58,6 +112,28 @@ export const AWARDS: Award[] = [
     condition: (sessions) => {
       const totalSeconds = sessions.reduce((acc, s) => acc + s.duration, 0);
       return totalSeconds >= 24 * 3600;
+    }
+  },
+  {
+    id: 'duration-50h',
+    title: 'Pro Status',
+    description: 'Accumulate 50 hours of total rowing time',
+    icon: Timer,
+    color: 'text-fuchsia-500',
+    condition: (sessions) => {
+      const totalSeconds = sessions.reduce((acc, s) => acc + s.duration, 0);
+      return totalSeconds >= 50 * 3600;
+    }
+  },
+  {
+    id: 'duration-100h',
+    title: 'Rowing Legend',
+    description: 'Accumulate 100 hours of total rowing time',
+    icon: Timer,
+    color: 'text-pink-600',
+    condition: (sessions) => {
+      const totalSeconds = sessions.reduce((acc, s) => acc + s.duration, 0);
+      return totalSeconds >= 100 * 3600;
     }
   },
 
@@ -94,8 +170,67 @@ export const AWARDS: Award[] = [
     color: 'text-rose-600',
     condition: (_, stats) => stats && stats.bestStreak >= 10
   },
+  {
+    id: 'streak-14',
+    title: 'Two Week Titan',
+    description: 'Row for 14 consecutive days',
+    icon: Flame,
+    color: 'text-rose-700',
+    condition: (_, stats) => stats && stats.bestStreak >= 14
+  },
+  {
+    id: 'streak-21',
+    title: 'Habit Master',
+    description: 'Row for 21 consecutive days',
+    icon: Flame,
+    color: 'text-rose-800',
+    condition: (_, stats) => stats && stats.bestStreak >= 21
+  },
+  {
+    id: 'streak-30',
+    title: 'Monthly Master',
+    description: 'Row for 30 consecutive days',
+    icon: Flame,
+    color: 'text-rose-900',
+    condition: (_, stats) => stats && stats.bestStreak >= 30
+  },
+  {
+    id: 'streak-45',
+    title: 'Unbreakable',
+    description: 'Row for 45 consecutive days',
+    icon: Flame,
+    color: 'text-pink-600',
+    condition: (_, stats) => stats && stats.bestStreak >= 45
+  },
+  {
+    id: 'streak-60',
+    title: 'Two Month Triumph',
+    description: 'Row for 60 consecutive days',
+    icon: Flame,
+    color: 'text-pink-700',
+    condition: (_, stats) => stats && stats.bestStreak >= 60
+  },
+  {
+    id: 'streak-100',
+    title: 'Century Streak',
+    description: 'Row for 100 consecutive days',
+    icon: Crown,
+    color: 'text-fuchsia-600',
+    condition: (_, stats) => stats && stats.bestStreak >= 100
+  },
 
   // Distance Milestones
+  {
+    id: 'dist-10k',
+    title: '10k Warmup',
+    description: 'Row a total of 10,000 meters',
+    icon: Activity,
+    color: 'text-teal-500',
+    condition: (sessions) => {
+      const totalDist = sessions.reduce((acc, s) => acc + s.distance, 0);
+      return totalDist >= 10000;
+    }
+  },
   {
     id: 'dist-50k',
     title: '50k Club',
@@ -119,6 +254,17 @@ export const AWARDS: Award[] = [
     }
   },
   {
+    id: 'dist-250k',
+    title: 'Quarter Million',
+    description: 'Row a total of 250,000 meters',
+    icon: Target,
+    color: 'text-green-700',
+    condition: (sessions) => {
+      const totalDist = sessions.reduce((acc, s) => acc + s.distance, 0);
+      return totalDist >= 250000;
+    }
+  },
+  {
     id: 'dist-500k',
     title: 'Half Million',
     description: 'Row a total of 500,000 meters',
@@ -129,14 +275,98 @@ export const AWARDS: Award[] = [
       return totalDist >= 500000;
     }
   },
+  {
+    id: 'dist-750k',
+    title: 'Three Quarter Mill',
+    description: 'Row a total of 750,000 meters',
+    icon: Trophy,
+    color: 'text-yellow-600',
+    condition: (sessions) => {
+      const totalDist = sessions.reduce((acc, s) => acc + s.distance, 0);
+      return totalDist >= 750000;
+    }
+  },
+  {
+    id: 'dist-1m',
+    title: 'Million Meter Club',
+    description: 'Row a total of 1,000,000 meters',
+    icon: Crown,
+    color: 'text-amber-500',
+    condition: (sessions) => {
+      const totalDist = sessions.reduce((acc, s) => acc + s.distance, 0);
+      return totalDist >= 1000000;
+    }
+  },
   
-  // Power Achievements
+  // Power & Performance Achievements
+  {
+    id: 'power-150',
+    title: 'Strong Pulls',
+    description: 'Maintain an average power of 150W+ in a session (>5min)',
+    icon: Zap,
+    color: 'text-amber-400',
+    condition: (sessions) => sessions.some(s => s.avgPower >= 150 && s.duration > 300)
+  },
   {
     id: 'power-200',
     title: 'Powerhouse',
-    description: 'Maintain an average power of 200W+ in a session',
+    description: 'Maintain an average power of 200W+ in a session (>5min)',
     icon: Zap,
-    color: 'text-yellow-400',
-    condition: (sessions) => sessions.some(s => s.avgPower >= 200 && s.duration > 300) // min 5 mins
+    color: 'text-yellow-500',
+    condition: (sessions) => sessions.some(s => s.avgPower >= 200 && s.duration > 300)
   },
+  {
+    id: 'power-250',
+    title: 'Watt Monster',
+    description: 'Maintain an average power of 250W+ in a session (>5min)',
+    icon: Zap,
+    color: 'text-orange-500',
+    condition: (sessions) => sessions.some(s => s.avgPower >= 250 && s.duration > 300)
+  },
+  {
+    id: 'power-300',
+    title: 'Elite Power',
+    description: 'Maintain an average power of 300W+ in a session (>5min)',
+    icon: Zap,
+    color: 'text-red-600',
+    condition: (sessions) => sessions.some(s => s.avgPower >= 300 && s.duration > 300)
+  },
+  {
+    id: 'speed-demon',
+    title: 'Speed Demon',
+    description: 'Row 500m with an average pace under 1:45',
+    icon: TrendingUp,
+    color: 'text-red-500',
+    condition: (sessions) => sessions.some(s => s.distance === 500 && s.avgSplit < 105) // 105 seconds = 1:45
+  },
+  {
+    id: 'speed-light',
+    title: 'Lightspeed',
+    description: 'Row 500m with an average pace under 1:35',
+    icon: TrendingUp,
+    color: 'text-purple-600',
+    condition: (sessions) => sessions.some(s => s.distance === 500 && s.avgSplit < 95) // 95 seconds = 1:35
+  },
+  {
+    id: 'early-bird',
+    title: 'Early Bird',
+    description: 'Complete a session before 8 AM',
+    icon: Timer,
+    color: 'text-orange-400',
+    condition: (sessions) => sessions.some(s => {
+      const date = new Date(s.timestamp);
+      return date.getHours() < 8 && date.getHours() >= 4;
+    })
+  },
+  {
+    id: 'night-owl',
+    title: 'Night Owl',
+    description: 'Complete a session after 9 PM',
+    icon: Timer,
+    color: 'text-purple-400',
+    condition: (sessions) => sessions.some(s => {
+      const date = new Date(s.timestamp);
+      return date.getHours() >= 21;
+    })
+  }
 ];
