@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
@@ -460,12 +460,6 @@ const Analytics = () => {
             {/* Analytics Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" asChild className="mb-1">
-                  <Link href="/dashboard" className="flex items-center gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Dashboard
-                  </Link>
-                </Button>
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">
                     Performance Analytics
