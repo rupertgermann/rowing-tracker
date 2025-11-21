@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,6 +88,7 @@ export default function SessionsPage() {
   const { getSessions, getPersonalRecords, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
   const sessions = getSessions();
   const personalRecords = getPersonalRecords();
+  const router = useRouter();
   
   // Helper function to check if session is a personal record
   const isPersonalRecord = (session: any): { isPR: boolean; distances: string[] } => {
@@ -193,6 +195,10 @@ export default function SessionsPage() {
         distanceRange: 'all'
       }
     });
+  };
+
+  const handleRowNavigate = (sessionId: string) => {
+    router.push(`/sessions/${sessionId}`);
   };
 
   return (
@@ -388,7 +394,15 @@ export default function SessionsPage() {
                           return (
                             <TableRow 
                               key={session.id} 
-                              className={`cursor-pointer hover:bg-muted/50 ${prInfo.isPR ? 'bg-primary/5' : ''}`}
+                              tabIndex={0}
+                              onClick={() => handleRowNavigate(session.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  handleRowNavigate(session.id);
+                                }
+                              }}
+                              className={`cursor-pointer hover:bg-muted/50 focus:bg-muted/70 focus-visible:outline-none ${prInfo.isPR ? 'bg-primary/5' : ''}`}
                             >
                               <TableCell>
                                 <div className="flex items-center gap-2">
