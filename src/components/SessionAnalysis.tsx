@@ -20,9 +20,10 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StrokeData } from '@/types/session';
-import { calculateAdvancedStats } from '@/lib/analysisUtils';
+import { calculateAdvancedStats, calculateSegments, calculateRollingAverages, calculatePerformanceSummary } from '@/lib/analysisUtils';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Assuming these exist or standard tabs
+import { ComposedChart } from 'recharts';
 
 interface SessionAnalysisProps {
   data: StrokeData[];
@@ -97,8 +98,34 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
     });
   }, [data]);
 
-  const stats = useMemo(() => calculateAdvancedStats(enrichedData), [enrichedData]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [segmentSize, setSegmentSize] = useState(500); // Default to 500m segments
+
+  const stats = useMemo(() => calculateAdvancedStats(enrichedData), [enrichedData]);
+  const rolling5 = useMemo(() => calculateRollingAverages(enrichedData, 5), [enrichedData]);
+  const rolling10 = useMemo(() => calculateRollingAverages(enrichedData, 10), [enrichedData]);
+  
+  // Calculate segments based on selected size
+  const segments = useMemo(() => calculateSegments(enrichedData, segmentSize), [enrichedData, segmentSize]);
+  
+  const performanceSummary = useMemo(() => calculatePerformanceSummary(enrichedData, segments), [enrichedData, segments]);
+
+  // Combine rolling data for charts
+  const rollingData = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < Math.min(rolling5.length, rolling10.length); i++) {
+      const strokeIdx = i + 10; // Rolling averages start after the window
+      result.push({
+        strokeIndex: strokeIdx,
+        distance: enrichedData[strokeIdx]?.distance || 0,
+        power5: rolling5[i].power,
+        power10: rolling10[i].power,
+        split5: rolling5[i].split,
+        split10: rolling10[i].split
+      });
+    }
+    return result;
+  }, [rolling5, rolling10, enrichedData]);
 
   // Prepare histogram data
   const distributions = useMemo(() => {
@@ -126,12 +153,86 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
     };
   }, [enrichedData]);
 
+  const formatTime = (seconds: number) => {
+    if (seconds === 0) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = (seconds % 60).toFixed(1);
+    return `${mins}:${secs.padStart(4, '0')}`;
+  };
+
+  const formatSplit = (splitSeconds: number) => {
+    if (splitSeconds === 0) return '--:--';
+    const totalSeconds = Math.round(splitSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const tenths = Math.round((splitSeconds % 1) * 10);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}.${tenths}`;
+  };
+
+  const formatWatts = (watts: number) => `${watts.toFixed(0)} W`;
+  const formatSPM = (spm: number) => `${spm.toFixed(1)} spm`;
+  const formatBPM = (bpm: number) => `${Math.round(bpm)} bpm`;
+  const formatMeters = (meters: number) => `${meters.toFixed(1)} m`;
+  const formatKilojoules = (kj: number) => `${kj.toFixed(1)} kJ`;
+
   return (
     <div className="space-y-8">
+      {/* Performance Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Best 500m</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">{formatSplit(performanceSummary.best500mSplit)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Worst 500m</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">{formatSplit(performanceSummary.worst500mSplit)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Peak 10-Stroke Power</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">{formatWatts(performanceSummary.peak10StrokePower)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Most Consistent 500m</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">Segment {performanceSummary.mostConsistent500m}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Total Work</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">{formatKilojoules(performanceSummary.totalWork)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Avg Stroke Length</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">{formatMeters(performanceSummary.avgStrokeLength)}</div>
+          </CardContent>
+        </Card>
+      </div>
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="overview">Overview & Stats</TabsTrigger>
           <TabsTrigger value="charts">Performance Graphs</TabsTrigger>
+          <TabsTrigger value="segments">Segments</TabsTrigger>
           <TabsTrigger value="analysis">Deep Analysis</TabsTrigger>
         </TabsList>
 
@@ -366,6 +467,247 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* TAB: SEGMENTS */}
+        <TabsContent value="segments" className="space-y-6">
+          {/* Segment Size Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium">Segment Analysis</h3>
+              <p className="text-sm text-muted-foreground">Analyze performance by distance segments</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSegmentSize(100)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  segmentSize === 100
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                100m
+              </button>
+              <button
+                onClick={() => setSegmentSize(500)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  segmentSize === 500
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                500m
+              </button>
+            </div>
+          </div>
+
+          {/* Segment Analysis */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{segmentSize}m Segment Analysis</CardTitle>
+              <CardDescription>Average power, split, and stroke rate for each {segmentSize}m segment</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[350px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={segments} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis 
+                      dataKey="segmentNumber" 
+                      label={{ value: 'Segment', position: 'insideBottomRight', offset: -10 }}
+                      tickFormatter={(val) => `${val}`}
+                    />
+                    <YAxis yAxisId="left" label={{ value: 'Power (W)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Split (s/500m)', angle: 90, position: 'insideRight' }} />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-background border rounded p-2">
+                              <p className="font-medium">Segment {data.segmentNumber}</p>
+                              <p className="text-sm">Distance: {data.distance.toFixed(0)}m</p>
+                              <p className="text-sm">Power: {Math.round(data.avgPower)}W</p>
+                              <p className="text-sm">Split: {formatSplit(data.avgSplit)}</p>
+                              <p className="text-sm">SPM: {data.avgSPM.toFixed(1)}</p>
+                              <p className="text-sm">Strokes: {data.strokeCount}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="avgPower" name="Avg Power" fill="#2563eb" opacity={0.8} />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="avgSplit" 
+                      name="Avg Split" 
+                      stroke="#dc2626" 
+                      strokeWidth={3}
+                      dot={{ fill: '#dc2626', r: 5 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Rolling Averages */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rolling Power Average</CardTitle>
+                <CardDescription>5-stroke vs 10-stroke rolling average power</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis 
+                        dataKey="strokeIndex" 
+                        label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }}
+                      />
+                      <YAxis label={{ value: 'Power (W)', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-background border rounded p-2">
+                                <p className="font-medium">Stroke {data.strokeIndex}</p>
+                                <p className="text-sm">Distance: {data.distance.toFixed(0)}m</p>
+                                <p className="text-sm">5-stroke avg: {Math.round(data.power5)}W</p>
+                                <p className="text-sm">10-stroke avg: {Math.round(data.power10)}W</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="power5" 
+                        name="5-Stroke Avg" 
+                        stroke="#2563eb" 
+                        dot={false} 
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="power10" 
+                        name="10-Stroke Avg" 
+                        stroke="#10b981" 
+                        dot={false} 
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Rolling Split Average</CardTitle>
+                <CardDescription>5-stroke vs 10-stroke rolling average split time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis 
+                        dataKey="strokeIndex" 
+                        label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }}
+                      />
+                      <YAxis 
+                        label={{ value: 'Split (s/500m)', angle: -90, position: 'insideLeft' }}
+                        reversed={true}
+                        tickFormatter={(val) => formatSplit(val)}
+                      />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-background border rounded p-2">
+                                <p className="font-medium">Stroke {data.strokeIndex}</p>
+                                <p className="text-sm">Distance: {data.distance.toFixed(0)}m</p>
+                                <p className="text-sm">5-stroke avg: {formatSplit(data.split5)}</p>
+                                <p className="text-sm">10-stroke avg: {formatSplit(data.split10)}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="split5" 
+                        name="5-Stroke Avg" 
+                        stroke="#dc2626" 
+                        dot={false} 
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="split10" 
+                        name="10-Stroke Avg" 
+                        stroke="#f59e0b" 
+                        dot={false} 
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Segment Details Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{segmentSize}m Segment Details</CardTitle>
+              <CardDescription>Detailed metrics for each {segmentSize}m segment</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Segment</th>
+                      <th className="text-left p-2">Distance</th>
+                      <th className="text-left p-2">Split</th>
+                      <th className="text-left p-2">Power</th>
+                      <th className="text-left p-2">SPM</th>
+                      <th className="text-left p-2">Stroke Length</th>
+                      <th className="text-left p-2">Strokes</th>
+                      <th className="text-left p-2">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {segments.map((segment) => (
+                      <tr key={segment.segmentNumber} className="border-b hover:bg-muted/50">
+                        <td className="p-2 font-medium">{segment.segmentNumber}</td>
+                        <td className="p-2">{segment.distance.toFixed(0)}m</td>
+                        <td className="p-2">{formatSplit(segment.avgSplit)}</td>
+                        <td className="p-2">{Math.round(segment.avgPower)}W</td>
+                        <td className="p-2">{segment.avgSPM.toFixed(1)}</td>
+                        <td className="p-2">{segment.avgStrokeLength.toFixed(2)}m</td>
+                        <td className="p-2">{segment.strokeCount}</td>
+                        <td className="p-2">{formatTime(segment.duration)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* TAB: ANALYSIS */}
