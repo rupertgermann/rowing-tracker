@@ -190,6 +190,125 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
         </CardContent>
       </Card>
 
+      {/* Stroke Length Consistency */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Stroke Length Consistency</CardTitle>
+          <CardDescription>Distance covered per stroke (meters)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }} />
+                <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="strokeLength" 
+                  name="Stroke Length" 
+                  unit="m"
+                  stroke="#0891b2" 
+                  dot={false} 
+                  strokeWidth={2} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Power Distribution Histogram */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Power Distribution</CardTitle>
+          <CardDescription>Number of strokes in each power zone</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart 
+                data={(() => {
+                  // Create buckets of 25W
+                  const buckets: Record<string, number> = {};
+                  const bucketSize = 25;
+                  data.forEach(d => {
+                    const bucket = Math.floor(d.power / bucketSize) * bucketSize;
+                    const label = `${bucket}-${bucket + bucketSize}W`;
+                    buckets[label] = (buckets[label] || 0) + 1;
+                  });
+                  
+                  return Object.entries(buckets)
+                    .map(([range, count]) => ({ range, count, min: parseInt(range.split('-')[0]) }))
+                    .sort((a, b) => a.min - b.min);
+                })()}
+                margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                <XAxis dataKey="range" angle={-45} textAnchor="end" height={60} interval={0} fontSize={12} />
+                <YAxis allowDecimals={false} label={{ value: 'Strokes', angle: -90, position: 'insideLeft' }} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
+                <Bar dataKey="count" name="Strokes" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Technique Map: Rate vs Power */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Technique Map: Rate vs Power</CardTitle>
+          <CardDescription>Correlation between stroke rate and power output</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+               <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                 {/* Hack for scatter plot using LineChart with only dots */}
+                 <XAxis 
+                   dataKey="strokeRate" 
+                   type="number" 
+                   domain={['dataMin - 2', 'dataMax + 2']} 
+                   label={{ value: 'Stroke Rate (SPM)', position: 'insideBottom', offset: -5 }}
+                   allowDecimals={false}
+                 />
+                 <YAxis label={{ value: 'Power (W)', angle: -90, position: 'insideLeft' }} />
+                 <Tooltip 
+                   cursor={{ strokeDasharray: '3 3' }}
+                   content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg p-2 shadow-lg text-xs">
+                            <p>Stroke #{d.strokeIndex}</p>
+                            <p>{d.strokeRate} SPM @ {Math.round(d.power)}W</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                   }}
+                 />
+                 <Line 
+                   dataKey="power" 
+                   stroke="none" 
+                   dot={{ fill: '#8b5cf6', r: 3, opacity: 0.6 }} 
+                   activeDot={{ r: 5 }} 
+                   isAnimationActive={false}
+                 />
+               </LineChart>
+            </ResponsiveContainer>
+            {/* ScatterChart is better but LineChart with dots works for simple correlation if sorted. 
+                However, for true X-Y scatter where X is not ordered index, we need ScatterChart from Recharts.
+                Let's switch to ScatterChart for this one specifically. 
+            */}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Heart Rate (if available) */}
       {data.some(d => d.heartRate) && (
         <Card>

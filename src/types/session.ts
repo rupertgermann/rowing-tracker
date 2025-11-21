@@ -34,6 +34,7 @@ export interface StrokeData {
   avgSplit: number;
   strokeRate: number;
   heartRate: number | null;
+  strokeLength?: number; // Calculated distance per stroke
 }
 
 /**

@@ -40,11 +40,18 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
             .map((row: any) => {
               if (!row['Stroke (#)']) return null;
 
+              const distance = parseEuropeanNumber(row['Distance (m)']);
+              // Calculate stroke length based on previous cumulative distance
+              // For first stroke, it's just the distance
+              // results.data is the array, but we are mapping.
+              // access previous row from original data array if possible, but index is tricky in map if we filter nulls.
+              // Better: calculate it after mapping or use a closure variable.
+              
               return {
                 strokeIndex: parseInt(row['Stroke (#)']),
                 time: parseInt(row['Second (#)']),
                 timestamp: row['Timestamp (UTC)'],
-                distance: parseEuropeanNumber(row['Distance (m)']),
+                distance: distance,
                 work: parseEuropeanNumber(row['Work (J)']),
                 power: parseEuropeanNumber(row['Actual power (W)']),
                 avgPower: parseEuropeanNumber(row['Average power (W)']),
@@ -52,11 +59,25 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
                 avgSplit: parseEuropeanNumber(row['Average split (s)']),
                 strokeRate: parseEuropeanNumber(row['Stroke rate (SPM)']),
                 heartRate: row['Heart rate (bpm)'] ? parseEuropeanNumber(row['Heart rate (bpm)']) : null,
+                // strokeLength will be calculated in a second pass to ensure accuracy with filtered data
               };
             })
             .filter((item): item is StrokeData => item !== null);
 
-          resolve({ data: parsedData });
+          // Calculate stroke lengths
+          // Sort by index just in case
+          parsedData.sort((a, b) => a.strokeIndex - b.strokeIndex);
+          
+          const enrichedData = parsedData.map((stroke, i) => {
+            const prevDistance = i > 0 ? parsedData[i-1].distance : 0;
+            const length = stroke.distance - prevDistance;
+            return {
+              ...stroke,
+              strokeLength: parseFloat(length.toFixed(2))
+            };
+          });
+
+          resolve({ data: enrichedData });
         } catch (e) {
           resolve({ data: [], error: 'Failed to parse stroke data.' });
         }
