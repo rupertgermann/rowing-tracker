@@ -670,43 +670,41 @@ const Analytics = () => {
                   
                   return (
                     <Card key={metric}>
-                      <CardHeader>
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-md bg-primary/10">
-                            <Icon className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">
-                              {config.label} Over Time
-                            </CardTitle>
-                            <CardDescription>
-                              {config.isSpecial 
-                                ? 'Track your pace progression with 3-session moving average and stroke rate indicators'
-                                : `Track your ${config.label.toLowerCase()} progress`
-                              }
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {config.isSpecial && metric === 'splitTime' ? (
-                          // Special handling for Pace Analysis - always show if enabled
-                          <div className="w-full">
-                            {renderChart(metric, chartData, config)}
-                          </div>
-                        ) : chartData.length > 0 ? (
-                          <div className="w-full">
-                            <ResponsiveContainer width="100%" height={300}>
-                              {renderChart(metric, chartData, config)}
-                            </ResponsiveContainer>
-                          </div>
-                        ) : (
-                          <div className="text-center text-muted-foreground py-8">
-                            <p>No data available for {config.label.toLowerCase()} chart.</p>
-                            <p className="text-sm">Try selecting a different time range or upload more data.</p>
-                          </div>
-                        )}
-                      </CardContent>
+                      {config.isSpecial && metric === 'splitTime' ? (
+                        <SplitTimeChart sessions={filteredSessions} />
+                      ) : (
+                        <>
+                          <CardHeader>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-md bg-primary/10">
+                                <Icon className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg">
+                                  {config.label} Over Time
+                                </CardTitle>
+                                <CardDescription>
+                                  {`Track your ${config.label.toLowerCase()} progress`}
+                                </CardDescription>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {chartData.length > 0 ? (
+                              <div className="w-full">
+                                <ResponsiveContainer width="100%" height={300}>
+                                  {renderChart(metric, chartData, config)}
+                                </ResponsiveContainer>
+                              </div>
+                            ) : (
+                              <div className="text-center text-muted-foreground py-8">
+                                <p>No data available for {config.label.toLowerCase()} chart.</p>
+                                <p className="text-sm">Try selecting a different time range or upload more data.</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </>
+                      )}
                     </Card>
                   );
                 })}
