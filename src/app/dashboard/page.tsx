@@ -15,6 +15,8 @@ import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
 import { CloudInsight } from '@/lib/cloudAI';
 
+import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
+
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
 
@@ -585,6 +587,9 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Metric Comparison Widget */}
+            <MetricComparisonWidget />
 
             {/* Chart Configuration */}
             <div>
