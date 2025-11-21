@@ -240,11 +240,39 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
         </Card>
       </div>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="overview">Overview & Stats</TabsTrigger>
-          <TabsTrigger value="charts">Performance Graphs</TabsTrigger>
-          <TabsTrigger value="segments">Segments</TabsTrigger>
-          <TabsTrigger value="analysis">Deep Analysis</TabsTrigger>
+        <div className="flex flex-col gap-2 mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Analysis Modules
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Choose how you want to explore this session: summary metrics, visual performance trends, interval segments, or deep-dive analysis.
+          </p>
+        </div>
+        <TabsList className="grid w-full grid-cols-4 gap-2 mb-8 rounded-2xl bg-secondary/50 p-2 shadow-sm border border-border/70">
+          <TabsTrigger
+            value="overview"
+            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+          >
+            Overview & Stats
+          </TabsTrigger>
+          <TabsTrigger
+            value="charts"
+            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+          >
+            Performance Graphs
+          </TabsTrigger>
+          <TabsTrigger
+            value="segments"
+            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+          >
+            Segments
+          </TabsTrigger>
+          <TabsTrigger
+            value="analysis"
+            className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg"
+          >
+            Deep Analysis
+          </TabsTrigger>
         </TabsList>
 
         {/* TAB: OVERVIEW */}

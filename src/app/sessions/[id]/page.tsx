@@ -396,54 +396,6 @@ export default function SessionDetailPage() {
           </Card>
         </div>
 
-        {/* Session Summary */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Flame className="h-5 w-5 text-primary" />
-              Session Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-2">Performance</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Distance:</span>
-                    <span>{formatDistance(session.distance)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Duration:</span>
-                    <span>{formatDuration(session.duration)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Average Pace:</span>
-                    <span>{formatPace(session.avgSplit)}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Power Output</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Average Power:</span>
-                    <span>{session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Maximum Power:</span>
-                    <span>{session.maxPower > 0 ? `${Math.round(session.maxPower)}W` : '--'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Power per KG:</span>
-                    <span>{session.wattPerKg > 0 ? `${session.wattPerKg.toFixed(1)} W/kg` : '--'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Advanced Analysis Section */}
         <div>
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
