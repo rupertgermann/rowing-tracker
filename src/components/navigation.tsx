@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon } from 'lucide-react';
+import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
+  { name: 'Analytics', href: '/analytics', icon: Gauge },
   { name: 'Sessions', href: '/sessions', icon: List },
   { name: 'Personal Records', href: '/prs', icon: Trophy },
   { name: 'Training Plans', href: '/plans', icon: Target },

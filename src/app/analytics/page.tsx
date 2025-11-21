@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, ArrowLeft } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
@@ -14,9 +14,6 @@ import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
 import { CloudInsight } from '@/lib/cloudAI';
-
-import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
-import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -185,7 +182,7 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
   return null;
 };
 
-const Dashboard = () => {
+const Analytics = () => {
   const router = useRouter();
   const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
   const sessions = getSessions();
@@ -441,17 +438,25 @@ const Dashboard = () => {
             </Button>
           </div>
         ) : (
-          // Dashboard content
+          // Analytics content
           <div className="space-y-8">
-            {/* Dashboard Header */}
+            {/* Analytics Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground mb-2">
-                  Dashboard Analytics
-                </h2>
-                <p className="text-muted-foreground">
-                  Track your rowing performance and progress
-                </p>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" asChild className="mb-1">
+                  <Link href="/dashboard" className="flex items-center gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Dashboard
+                  </Link>
+                </Button>
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                    Performance Analytics
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Deep dive into your rowing performance metrics and trends
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground mr-2">Time Range:</span>
@@ -473,10 +478,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Monthly Comparison Header Cards */}
-            <PeriodComparisonStats />
-
-            {/* Key Metrics */}
+            {/* Key Metrics Summary */}
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">
                 Key Metrics
@@ -549,73 +551,151 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+            {/* Chart Configuration */}
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                    Performance Charts
+                    {timeRange !== 'all' && (
+                      <span className="text-lg font-normal text-muted-foreground ml-2">
+                        ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Customize which metrics to visualize over time
+                  </p>
+                </div>
+              </div>
+              
+              {/* Chart Selector */}
+              <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle className="text-lg">Total Sessions</CardTitle>
-                  <CardDescription>
-                    Number of workouts tracked
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
-                    {stats.totalSessions}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Gauge className="h-5 w-5 text-primary" />
+                        Select Charts to Display
+                      </CardTitle>
+                      <CardDescription>
+                        Choose which metrics to track over time
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground mr-2">Chart Type:</span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant={chartSettings.chartType === 'line' ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => updateChartSettings({ chartType: 'line' })}
+                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Switch to line chart"
+                          aria-pressed={chartSettings.chartType === 'line'}
+                        >
+                          Line
+                        </Button>
+                        <Button
+                          variant={chartSettings.chartType === 'bar' ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => updateChartSettings({ chartType: 'bar' })}
+                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Switch to bar chart"
+                          aria-pressed={chartSettings.chartType === 'bar'}
+                        >
+                          Bar
+                        </Button>
+                        <Button
+                          variant={chartSettings.chartType === 'area' ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => updateChartSettings({ chartType: 'area' })}
+                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Switch to area chart"
+                          aria-pressed={chartSettings.chartType === 'area'}
+                        >
+                          Area
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
-                <CardHeader>
-                  <CardTitle className="text-lg">Current Streak</CardTitle>
-                  <CardDescription>
-                    Consecutive days with sessions
-                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
-                    {stats.currentStreak}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {Object.entries(chartConfigs).map(([metric, config]) => {
+                      const Icon = config.icon;
+                      const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
+                      
+                      return (
+                        <Button
+                          key={metric}
+                          variant={isEnabled ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleChart(metric as ChartMetric)}
+                          className="flex items-center gap-2 h-auto p-3 flex-col"
+                        >
+                          <Icon className="h-4 w-4 mb-1" />
+                          <span className="text-xs font-medium">{config.label}</span>
+                        </Button>
+                      );
+                    })}
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
-                <CardHeader>
-                  <CardTitle className="text-lg">Best Streak</CardTitle>
-                  <CardDescription>
-                    Longest consecutive streak
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground transition-colors duration-200 group-hover:text-primary/80">
-                    {stats.bestStreak}
+                  <div className="mt-4 text-sm text-muted-foreground">
+                    {chartSettings.enabledCharts.length === 0 
+                      ? "No charts selected. Select at least one metric to visualize."
+                      : `Showing ${chartSettings.enabledCharts.length} chart${chartSettings.enabledCharts.length > 1 ? 's' : ''} as ${chartSettings.chartType} visualization${chartSettings.chartType !== 'line' ? 's' : ''}`
+                    }
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Metric Comparison Widget */}
-            <MetricComparisonWidget />
-
-            {/* Analytics Preview */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
-                    Performance Analytics
-                  </h2>
-                  <p className="text-muted-foreground">
-                    Dive deeper into your performance metrics and trends
-                  </p>
-                </div>
-                <Button asChild>
-                  <Link href="/analytics" className="flex items-center gap-2">
-                    <Gauge className="h-4 w-4" />
-                    View Full Analytics
-                  </Link>
-                </Button>
+            {/* Configurable Charts */}
+            {chartSettings.enabledCharts.length > 0 && (
+              <div className="space-y-6">
+                {chartSettings.enabledCharts.map(metric => {
+                  const config = chartConfigs[metric];
+                  const Icon = config.icon;
+                  const chartData = chartDataMap[metric];
+                  
+                  return (
+                    <Card key={metric}>
+                      <CardHeader>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-primary/10">
+                            <Icon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">
+                              {config.label} Over Time
+                            </CardTitle>
+                            <CardDescription>
+                              Track your {config.label.toLowerCase()} progress
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {chartData.length > 0 ? (
+                          <div className="w-full">
+                            <ResponsiveContainer width="100%" height={300}>
+                              {renderChart(metric, chartData, config)}
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className="text-center text-muted-foreground py-8">
+                            <p>No data available for {config.label.toLowerCase()} chart.</p>
+                            <p className="text-sm">Try selecting a different time range or upload more data.</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
-              
+            )}
+
+            {/* Empty State for Charts */}
+            {chartSettings.enabledCharts.length === 0 && (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center py-8">
@@ -623,157 +703,27 @@ const Dashboard = () => {
                       <Gauge className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">
-                      Detailed Analytics Available
+                      No Charts Selected
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      View interactive charts, pace analysis, and performance trends in the dedicated analytics section.
+                      Select metrics above to visualize your performance data over time.
                     </p>
-                    <Button asChild variant="outline">
-                      <Link href="/analytics">
-                        Go to Analytics
-                      </Link>
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            )}
 
-            {/* AI Insights Section */}
-            {isAnalyzable && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
-                      <Brain className="h-6 w-6 text-blue-600" />
-                      AI Insights
-                    </h2>
-                    <p className="text-muted-foreground">
-                      Personalized recommendations based on your training data
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant={!isArchivedView ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setIsArchivedView?.(false)}
-                        className="text-xs"
-                      >
-                        Current
-                      </Button>
-                      <Button
-                        variant={isArchivedView ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setIsArchivedView?.(true)}
-                        className="text-xs"
-                      >
-                        Archive ({archivedInsights?.length || 0})
-                      </Button>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={refreshInsights}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Refresh
-                    </Button>
-                    {lastAnalyzed && (
-                      <div className="text-xs text-muted-foreground">
-                        Last analyzed: {lastAnalyzed.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })} at {lastAnalyzed.toLocaleTimeString()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {(isArchivedView ? archivedInsights ?? [] : insights ?? [])?.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {(isArchivedView ? archivedInsights ?? [] : insights ?? [])?.map((insight: Insight | CloudInsight, index: number) => (
-                      <InsightCard
-                        key={insight.id || `local-${insight.type}-${index}`}
-                        insight={insight}
-                        onFeedback={(insightId, feedback) => {
-                          console.log(`Insight ${insightId} received feedback: ${feedback}`);
-                        }}
-                        isArchived={isArchivedView}
-                        onArchive={isArchivedView ? unarchiveInsight : archiveInsight}
-                        onDelete={isArchivedView ? deleteInsight : undefined}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-8">
-                        <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                          <Brain className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          {isArchivedView ? 'No Archived Insights' : 'Analyzing Your Data'}
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          {isArchivedView 
-                            ? 'Archive insights you want to save for later reference.'
-                            : 'AI is processing your training patterns to generate personalized insights.'
-                          }
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          More sessions will provide better recommendations.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+            {/* Split Time Chart */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-6">
+                Pace Analysis
+                {timeRange !== 'all' && (
+                  <span className="text-lg font-normal text-muted-foreground ml-2">
+                    ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
+                  </span>
                 )}
-              </div>
-            )}
-
-            {/* Empty State for AI Insights */}
-            {!isAnalyzable && sessions.length > 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                      <Brain className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      AI Insights Coming Soon
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      Complete at least 5 sessions to unlock personalized AI recommendations and insights.
-                    </p>
-                    <div className="text-sm text-muted-foreground">
-                      Sessions needed: {sessions.length}/5
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button asChild variant="outline" className="flex-1">
-                <Link href="/sessions" className="flex items-center justify-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  View All Sessions
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="flex-1">
-                <Link href="/prs" className="flex items-center justify-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Personal Records
-                </Link>
-              </Button>
-              <Button asChild className="flex-1">
-                <Link href="/upload" className="flex items-center justify-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Add More Data
-                </Link>
-              </Button>
+              </h2>
+              <SplitTimeChart sessions={filteredSessions} />
             </div>
           </div>
         )}
@@ -782,4 +732,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Analytics;
