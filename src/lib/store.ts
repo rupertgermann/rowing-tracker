@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 
 // Chart configuration types
-type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration';
+export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime';
 type ChartType = 'line' | 'bar' | 'area';
 
 // Dashboard Persistence Types

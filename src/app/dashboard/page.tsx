@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useRowingStore } from '@/lib/store';
+import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw } from 'lucide-react';
@@ -38,7 +38,6 @@ const timeRangeOptions: TimeRangeOption[] = [
 ];
 
 // Chart configuration options
-type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration';
 
 interface ChartConfig {
   metric: ChartMetric;
@@ -49,6 +48,7 @@ interface ChartConfig {
   formatter: (value: number) => string;
   yAxisFormatter: (value: number) => string;
   unit: string;
+  isSpecial?: boolean; // For charts that don't follow standard metric pattern
 }
 
 const chartConfigs: Record<ChartMetric, ChartConfig> = {
@@ -111,6 +111,17 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     formatter: (value: number) => formatDuration(value),
     yAxisFormatter: (value: number) => `${Math.round(value / 60)}m`,
     unit: 'minutes'
+  },
+  splitTime: {
+    metric: 'splitTime',
+    label: 'Pace Analysis',
+    icon: Target,
+    color: '#f97316', // Orange-500
+    fillOpacity: 0.3,
+    formatter: (value: number) => formatPace(value),
+    yAxisFormatter: (value: number) => formatPace(value),
+    unit: 'time per 500m',
+    isSpecial: true
   }
 };
 

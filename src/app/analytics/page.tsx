@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useRowingStore } from '@/lib/store';
+import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, ArrowLeft } from 'lucide-react';
@@ -35,7 +35,6 @@ const timeRangeOptions: TimeRangeOption[] = [
 ];
 
 // Chart configuration options
-type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration';
 
 interface ChartConfig {
   metric: ChartMetric;
@@ -46,6 +45,7 @@ interface ChartConfig {
   formatter: (value: number) => string;
   yAxisFormatter: (value: number) => string;
   unit: string;
+  isSpecial?: boolean; // For charts that don't follow standard metric pattern
 }
 
 const chartConfigs: Record<ChartMetric, ChartConfig> = {
@@ -108,6 +108,17 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     formatter: (value: number) => formatDuration(value),
     yAxisFormatter: (value: number) => `${Math.round(value / 60)}m`,
     unit: 'minutes'
+  },
+  splitTime: {
+    metric: 'splitTime',
+    label: 'Pace Analysis',
+    icon: Target,
+    color: '#f97316', // Orange-500
+    fillOpacity: 0.3,
+    formatter: (value: number) => formatPace(value),
+    yAxisFormatter: (value: number) => formatPace(value),
+    unit: 'time per 500m',
+    isSpecial: true
   }
 };
 
@@ -273,6 +284,7 @@ const Analytics = () => {
       case 'strokeRate': return session.avgStrokeRate;
       case 'energy': return session.energy;
       case 'duration': return session.duration;
+      case 'splitTime': return session.avgSplit; // For compatibility, though splitTime uses special rendering
       default: return 0;
     }
   };
@@ -307,6 +319,11 @@ const Analytics = () => {
 
   // Render chart based on selected type
   const renderChart = (metric: ChartMetric, chartData: any[], config: ChartConfig) => {
+    // Special handling for Pace Analysis (splitTime) - use SplitTimeChart component
+    if (config.isSpecial && metric === 'splitTime') {
+      return <SplitTimeChart sessions={filteredSessions} />;
+    }
+
     const commonProps = {
       width: '100%' as const,
       height: 300,
@@ -669,13 +686,21 @@ const Analytics = () => {
                               {config.label} Over Time
                             </CardTitle>
                             <CardDescription>
-                              Track your {config.label.toLowerCase()} progress
+                              {config.isSpecial 
+                                ? 'Track your pace progression with 3-session moving average and stroke rate indicators'
+                                : `Track your ${config.label.toLowerCase()} progress`
+                              }
                             </CardDescription>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        {chartData.length > 0 ? (
+                        {config.isSpecial && metric === 'splitTime' ? (
+                          // Special handling for Pace Analysis - always show if enabled
+                          <div className="w-full">
+                            {renderChart(metric, chartData, config)}
+                          </div>
+                        ) : chartData.length > 0 ? (
                           <div className="w-full">
                             <ResponsiveContainer width="100%" height={300}>
                               {renderChart(metric, chartData, config)}
@@ -713,19 +738,7 @@ const Analytics = () => {
               </Card>
             )}
 
-            {/* Split Time Chart */}
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Pace Analysis
-                {timeRange !== 'all' && (
-                  <span className="text-lg font-normal text-muted-foreground ml-2">
-                    ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
-                  </span>
-                )}
-              </h2>
-              <SplitTimeChart sessions={filteredSessions} />
             </div>
-          </div>
         )}
       </div>
     </div>
