@@ -637,7 +637,7 @@ const Analytics = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                     {Object.entries(chartConfigs).map(([metric, config]) => {
                       const Icon = config.icon;
                       const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
