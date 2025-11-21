@@ -57,12 +57,14 @@ function getQuarter(d: Date): number {
 }
 
 export function MetricComparisonWidget() {
-  const { getSessions } = useRowingStore();
+  const { getSessions, dashboardSettings, updateDashboardSettings } = useRowingStore();
   const sessions = getSessions();
 
-  const [metric, setMetric] = useState<Metric>('distance');
-  const [period, setPeriod] = useState<Period>('week');
-  const [chartType, setChartType] = useState<ChartType>('bar');
+  const { metric, period, chartType } = dashboardSettings.comparisonWidget;
+  
+  const setMetric = (m: Metric) => updateDashboardSettings({ metric: m });
+  const setPeriod = (p: Period) => updateDashboardSettings({ period: p });
+  const setChartType = (c: ChartType) => updateDashboardSettings({ chartType: c });
 
   const aggregatedData = useMemo(() => {
     if (!sessions.length) return [];

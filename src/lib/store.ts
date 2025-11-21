@@ -6,6 +6,40 @@ import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/s
 type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration';
 type ChartType = 'line' | 'bar' | 'area';
 
+// Dashboard Persistence Types
+export type DashboardTimeRange = '7days' | '30days' | '90days' | 'all';
+export type ComparisonMetric = 'distance' | 'duration' | 'energy' | 'power' | 'pace' | 'strokeRate';
+export type ComparisonPeriod = 'week' | 'month' | 'quarter' | 'year';
+export type ComparisonChartType = 'bar' | 'line' | 'area';
+
+export interface DashboardSettings {
+  timeRange: DashboardTimeRange;
+  comparisonWidget: {
+    metric: ComparisonMetric;
+    period: ComparisonPeriod;
+    chartType: ComparisonChartType;
+  };
+  periodStats: {
+    periodA: string;
+    periodB: string;
+  };
+}
+
+// Sessions View Persistence Types
+export type SessionsDateFilter = 'all' | '7days' | '30days' | '90days';
+export type SessionsDistanceFilter = 'all' | '100' | '500' | '1000' | '2000' | '5000+';
+
+export interface SessionsViewSettings {
+  filters: {
+    dateRange: SessionsDateFilter;
+    distanceRange: SessionsDistanceFilter;
+  };
+  sortConfig: {
+    field: 'date' | 'distance' | 'pace' | 'power';
+    direction: 'asc' | 'desc';
+  };
+}
+
 interface ChartSettings {
   enabledCharts: ChartMetric[];
   chartType: ChartType;
@@ -17,6 +51,8 @@ interface RowingStore {
   personalRecords: PersonalRecord[];
   filters: SessionFilters;
   chartSettings: ChartSettings;
+  dashboardSettings: DashboardSettings;
+  sessionsViewSettings: SessionsViewSettings;
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -26,6 +62,9 @@ interface RowingStore {
   deleteSession: (sessionId: string) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
+  
+  updateDashboardSettings: (settings: Partial<DashboardSettings> | Partial<DashboardSettings['comparisonWidget']> | Partial<DashboardSettings['periodStats']>) => void;
+  updateSessionsViewSettings: (settings: Partial<SessionsViewSettings> | Partial<SessionsViewSettings['filters']> | Partial<SessionsViewSettings['sortConfig']>) => void;
   
   // Computed getters
   getSessions: () => Session[];
@@ -44,6 +83,30 @@ const defaultFilters: SessionFilters = {
 const defaultChartSettings: ChartSettings = {
   enabledCharts: ['distance', 'power', 'pace'],
   chartType: 'line'
+};
+
+const defaultDashboardSettings: DashboardSettings = {
+  timeRange: 'all',
+  comparisonWidget: {
+    metric: 'distance',
+    period: 'week',
+    chartType: 'bar'
+  },
+  periodStats: {
+    periodA: '',
+    periodB: ''
+  }
+};
+
+const defaultSessionsViewSettings: SessionsViewSettings = {
+  filters: {
+    dateRange: 'all',
+    distanceRange: 'all'
+  },
+  sortConfig: {
+    field: 'date',
+    direction: 'desc'
+  }
 };
 
 // Calculate personal records from sessions
@@ -236,6 +299,8 @@ export const useRowingStore = create<RowingStore>()(
       personalRecords: [],
       filters: defaultFilters,
       chartSettings: defaultChartSettings,
+      dashboardSettings: defaultDashboardSettings,
+      sessionsViewSettings: defaultSessionsViewSettings,
 
       // Actions
       addSessions: (newSessions) => {
@@ -292,6 +357,86 @@ export const useRowingStore = create<RowingStore>()(
         set({ chartSettings: defaultChartSettings });
       },
 
+      updateDashboardSettings: (newSettings) => {
+        set((state) => {
+          // Handle nested update for comparisonWidget
+           if ('metric' in newSettings || 'period' in newSettings || 'chartType' in newSettings) {
+               return {
+                   dashboardSettings: {
+                       ...state.dashboardSettings,
+                       comparisonWidget: {
+                           ...state.dashboardSettings.comparisonWidget,
+                           ...newSettings
+                       }
+                   }
+               }
+           }
+
+           // Handle nested update for periodStats
+           if ('periodA' in newSettings || 'periodB' in newSettings) {
+               return {
+                   dashboardSettings: {
+                       ...state.dashboardSettings,
+                       periodStats: {
+                           ...state.dashboardSettings.periodStats,
+                           ...newSettings
+                       }
+                   }
+               }
+           }
+           
+           // Otherwise merge top level
+           // Note: If newSettings contains nested objects (comparisonWidget, periodStats) as full/partial objects, this merge handles it if TS allows
+           // But since we typed it as Union of Partials, we might need to be careful if someone passes { comparisonWidget: ... }
+           // Current signature allows Partial<DashboardSettings>, so newSettings.comparisonWidget is valid.
+           // But we need to deep merge if we want to preserve other fields in nested objects
+           
+           const updatedSettings = { ...state.dashboardSettings };
+           
+           if ('comparisonWidget' in newSettings && newSettings.comparisonWidget) {
+               updatedSettings.comparisonWidget = { ...updatedSettings.comparisonWidget, ...newSettings.comparisonWidget };
+           }
+           
+           if ('periodStats' in newSettings && newSettings.periodStats) {
+               updatedSettings.periodStats = { ...updatedSettings.periodStats, ...newSettings.periodStats };
+           }
+           
+           if ('timeRange' in newSettings) {
+               updatedSettings.timeRange = newSettings.timeRange!;
+           }
+           
+           return { dashboardSettings: updatedSettings };
+        });
+      },
+
+      updateSessionsViewSettings: (newSettings) => {
+          set((state) => {
+              const updatedSettings = { ...state.sessionsViewSettings };
+              
+              // Check if input is filters partial
+              if ('dateRange' in newSettings || 'distanceRange' in newSettings) {
+                   updatedSettings.filters = { ...updatedSettings.filters, ...newSettings };
+                   return { sessionsViewSettings: updatedSettings };
+              }
+              
+              // Check if input is sortConfig partial
+              if ('field' in newSettings || 'direction' in newSettings) {
+                   updatedSettings.sortConfig = { ...updatedSettings.sortConfig, ...newSettings };
+                    return { sessionsViewSettings: updatedSettings };
+              }
+              
+              // Otherwise it's the root object partial (SessionsViewSettings)
+              if ('filters' in newSettings && newSettings.filters) {
+                  updatedSettings.filters = { ...updatedSettings.filters, ...newSettings.filters };
+              }
+              if ('sortConfig' in newSettings && newSettings.sortConfig) {
+                  updatedSettings.sortConfig = { ...updatedSettings.sortConfig, ...newSettings.sortConfig };
+              }
+              
+              return { sessionsViewSettings: updatedSettings };
+          });
+      },
+
       // Computed getters
       getSessions: () => get().sessions,
       
@@ -323,7 +468,9 @@ export const useRowingStore = create<RowingStore>()(
       partialize: (state) => ({
         sessions: state.sessions,
         filters: state.filters,
-        chartSettings: state.chartSettings
+        chartSettings: state.chartSettings,
+        dashboardSettings: state.dashboardSettings,
+        sessionsViewSettings: state.sessionsViewSettings
       }),
       // Convert string timestamps back to Date objects on rehydrate
       onRehydrateStorage: () => (state) => {

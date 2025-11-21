@@ -16,6 +16,7 @@ import { Insight } from '@/lib/aiAnalysis';
 import { CloudInsight } from '@/lib/cloudAI';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
+import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -186,13 +187,15 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 
 const Dashboard = () => {
   const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings } = useRowingStore();
+  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
   
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
-  const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  
+  const timeRange = dashboardSettings.timeRange;
+  const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
 
   // AI Insights hook
   const { 
@@ -469,6 +472,9 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Monthly Comparison Header Cards */}
+            <PeriodComparisonStats />
 
             {/* Key Metrics */}
             <div>

@@ -84,7 +84,7 @@ interface SortConfig {
 }
 
 export default function SessionsPage() {
-  const { getSessions, getPersonalRecords } = useRowingStore();
+  const { getSessions, getPersonalRecords, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
   const sessions = getSessions();
   const personalRecords = getPersonalRecords();
   
@@ -100,14 +100,9 @@ export default function SessionsPage() {
     };
   };
   const [mounted, setMounted] = useState(false);
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    field: 'date',
-    direction: 'desc'
-  });
-  const [filters, setFilters] = useState<FilterConfig>({
-    dateRange: 'all',
-    distanceRange: 'all'
-  });
+  
+  const sortConfig = sessionsViewSettings.sortConfig;
+  const filters = sessionsViewSettings.filters;
 
   useEffect(() => {
     setMounted(true);
@@ -174,10 +169,10 @@ export default function SessionsPage() {
 
   // Handle column sort
   const handleSort = (field: SortField) => {
-    setSortConfig(prev => ({
+    updateSessionsViewSettings({
       field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
+      direction: sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    });
   };
 
   // Get sort icon for column
@@ -192,9 +187,11 @@ export default function SessionsPage() {
 
   // Clear all filters
   const clearFilters = () => {
-    setFilters({
-      dateRange: 'all',
-      distanceRange: 'all'
+    updateSessionsViewSettings({
+      filters: {
+        dateRange: 'all',
+        distanceRange: 'all'
+      }
     });
   };
 
@@ -257,7 +254,7 @@ export default function SessionsPage() {
                           key={option.value}
                           variant={filters.dateRange === option.value ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setFilters(prev => ({ ...prev, dateRange: option.value as any }))}
+                          onClick={() => updateSessionsViewSettings({ dateRange: option.value as any })}
                         >
                           {option.label}
                         </Button>
@@ -274,7 +271,7 @@ export default function SessionsPage() {
                           key={option.value}
                           variant={filters.distanceRange === option.value ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setFilters(prev => ({ ...prev, distanceRange: option.value as any }))}
+                          onClick={() => updateSessionsViewSettings({ distanceRange: option.value as any })}
                         >
                           {option.label}
                         </Button>
