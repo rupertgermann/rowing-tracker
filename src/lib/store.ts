@@ -60,6 +60,7 @@ interface RowingStore {
   updateFilters: (filters: Partial<SessionFilters>) => void;
   resetFilters: () => void;
   deleteSession: (sessionId: string) => void;
+  updateSession: (updatedSession: Session) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
   
@@ -338,6 +339,21 @@ export const useRowingStore = create<RowingStore>()(
       deleteSession: (sessionId) => {
         set((state) => {
           const updatedSessions = state.sessions.filter(s => s.id !== sessionId);
+          const updatedRecords = calculatePersonalRecords(updatedSessions);
+          
+          return {
+            sessions: updatedSessions,
+            personalRecords: updatedRecords
+          };
+        });
+      },
+
+      updateSession: (updatedSession) => {
+        set((state) => {
+          const updatedSessions = state.sessions.map(s => 
+            s.id === updatedSession.id ? updatedSession : s
+          );
+          // Recalculate records in case this update improved something (unlikely for just adding strokeData, but good practice)
           const updatedRecords = calculatePersonalRecords(updatedSessions);
           
           return {

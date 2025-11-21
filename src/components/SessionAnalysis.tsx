@@ -16,7 +16,7 @@ import {
   Bar,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { StrokeData } from '@/lib/strokeParser';
+import { StrokeData } from '@/types/session';
 
 interface SessionAnalysisProps {
   data: StrokeData[];

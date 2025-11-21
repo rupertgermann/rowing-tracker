@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { parseStrokeCsv, StrokeData } from '@/lib/strokeParser';
+import { parseStrokeCsv } from '@/lib/strokeParser';
+import { StrokeData } from '@/types/session';
 import { SessionAnalysis } from '@/components/SessionAnalysis';
 import { 
   ArrowLeft, 
@@ -65,7 +66,7 @@ function formatDate(date: Date): string {
 export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { getSessions } = useRowingStore();
+  const { getSessions, updateSession } = useRowingStore();
   const sessions = getSessions();
   
   const [session, setSession] = useState<any>(null);
@@ -75,13 +76,17 @@ export default function SessionDetailPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !session) return;
 
     setAnalyzing(true);
     try {
       const result = await parseStrokeCsv(file);
       if (result.data.length > 0) {
         setStrokeData(result.data);
+        // Persist the stroke data to the session
+        const updatedSession = { ...session, strokeData: result.data };
+        updateSession(updatedSession);
+        setSession(updatedSession); // Update local state
       } else if (result.error) {
         // Simple alert for now, could be improved with a toast
         alert(result.error);
@@ -94,12 +99,26 @@ export default function SessionDetailPage() {
     }
   };
 
+  const handleClearAnalysis = () => {
+    if (!session) return;
+    if (confirm('Are you sure you want to remove the detailed stroke analysis from this session?')) {
+      const updatedSession = { ...session };
+      delete updatedSession.strokeData;
+      updateSession(updatedSession);
+      setSession(updatedSession);
+      setStrokeData(null);
+    }
+  };
+
   useEffect(() => {
     const sessionId = params.id as string;
     const foundSession = sessions.find(s => s.id === sessionId);
     
     if (foundSession) {
       setSession(foundSession);
+      if (foundSession.strokeData) {
+        setStrokeData(foundSession.strokeData);
+      }
     }
     setLoading(false);
   }, [params.id, sessions]);
@@ -462,7 +481,7 @@ export default function SessionDetailPage() {
           ) : (
             <div className="space-y-6">
                <div className="flex justify-end">
-                  <Button variant="outline" onClick={() => setStrokeData(null)} size="sm">
+                  <Button variant="outline" onClick={handleClearAnalysis} size="sm">
                     Clear Analysis
                   </Button>
                </div>

@@ -19,6 +19,21 @@ export interface Session {
   avgStrokeLength: number; // meters
   avgStrokeRate: number;   // SPM
   maxStrokeRate: number;
+  strokeData?: StrokeData[]; // Optional detailed stroke data
+}
+
+export interface StrokeData {
+  strokeIndex: number;
+  time: number; // Second (#)
+  timestamp: string;
+  distance: number; // Cumulative distance
+  work: number;
+  power: number; // Actual power
+  avgPower: number;
+  split: number; // Actual split (s) - likely per 500m
+  avgSplit: number;
+  strokeRate: number;
+  heartRate: number | null;
 }
 
 /**

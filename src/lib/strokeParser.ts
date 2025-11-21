@@ -1,18 +1,5 @@
 import Papa from 'papaparse';
-
-export interface StrokeData {
-  strokeIndex: number;
-  time: number; // Second (#)
-  timestamp: string;
-  distance: number; // Cumulative distance
-  work: number;
-  power: number; // Actual power
-  avgPower: number;
-  split: number; // Actual split (s) - likely per 500m
-  avgSplit: number;
-  strokeRate: number;
-  heartRate: number | null;
-}
+import { StrokeData } from '@/types/session';
 
 /**
  * Parse European decimal format (comma to dot)
