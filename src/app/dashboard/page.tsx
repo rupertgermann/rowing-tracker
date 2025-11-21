@@ -724,27 +724,6 @@ const Dashboard = () => {
             {/* Metric Comparison Widget */}
             <MetricComparisonWidget />
 
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button asChild variant="outline" className="flex-1">
-                <Link href="/sessions" className="flex items-center justify-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  View All Sessions
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="flex-1">
-                <Link href="/prs" className="flex items-center justify-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Personal Records
-                </Link>
-              </Button>
-              <Button asChild className="flex-1">
-                <Link href="/upload" className="flex items-center justify-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Add More Data
-                </Link>
-              </Button>
-            </div>
           </div>
         )}
       </div>
