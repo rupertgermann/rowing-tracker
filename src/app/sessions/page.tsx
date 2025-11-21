@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy } from 'lucide-react';
+import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles } from 'lucide-react';
 
 // Filter options
 interface FilterConfig {
@@ -373,11 +373,18 @@ export default function SessionsPage() {
                               Stroke Rate
                             </div>
                           </TableHead>
+                          <TableHead className="text-right">
+                            <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                              <Sparkles className="h-4 w-4" />
+                              Stroke Data
+                            </div>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {sortedSessions.map((session) => {
                           const prInfo = isPersonalRecord(session);
+                          const hasStrokeData = !!(session.strokeData && session.strokeData.length > 0);
                           return (
                             <TableRow 
                               key={session.id} 
@@ -419,6 +426,16 @@ export default function SessionsPage() {
                             </TableCell>
                             <TableCell className="text-right text-sm">
                               {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {hasStrokeData ? (
+                                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  Enhanced
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No stroke file</span>
+                              )}
                             </TableCell>
                           </TableRow>
                           );
