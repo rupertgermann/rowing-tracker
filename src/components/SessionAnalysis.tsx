@@ -72,7 +72,32 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function SessionAnalysis({ data }: SessionAnalysisProps) {
-  const stats = useMemo(() => calculateAdvancedStats(data), [data]);
+  // Enrich data if strokeLength is missing (backward compatibility for previously uploaded sessions)
+  const enrichedData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    // Check if we need to calculate strokeLength
+    const needsCalculation = typeof data[0].strokeLength === 'undefined';
+    
+    if (!needsCalculation) {
+       return data;
+    }
+
+    console.log('Calculating stroke lengths on the fly for visualization...');
+    // Sort by index to ensure correct delta calculation
+    const sorted = [...data].sort((a, b) => a.strokeIndex - b.strokeIndex);
+    
+    return sorted.map((stroke, i) => {
+      const prevDistance = i > 0 ? sorted[i-1].distance : 0;
+      const length = stroke.distance - prevDistance;
+      return {
+        ...stroke,
+        strokeLength: Math.max(0, parseFloat(length.toFixed(2)))
+      };
+    });
+  }, [data]);
+
+  const stats = useMemo(() => calculateAdvancedStats(enrichedData), [enrichedData]);
   const [activeTab, setActiveTab] = useState('overview');
 
   // Prepare histogram data
@@ -80,7 +105,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
     const powerBuckets: Record<string, number> = {};
     const spmBuckets: Record<string, number> = {};
     
-    data.forEach(d => {
+    enrichedData.forEach(d => {
       // Power (25W buckets)
       const pBucket = Math.floor(d.power / 25) * 25;
       const pLabel = `${pBucket}-${pBucket + 25}`;
@@ -99,7 +124,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
         .map(([rate, count]) => ({ rate: parseInt(rate), count }))
         .sort((a, b) => a.rate - b.rate)
     };
-  }, [data]);
+  }, [enrichedData]);
 
   return (
     <div className="space-y-8">
@@ -165,7 +190,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             <CardContent>
               <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis 
                       dataKey="distance" 
@@ -215,7 +240,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis 
                       dataKey="distance" 
@@ -259,7 +284,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <AreaChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} />
                     <YAxis label={{ value: 'Work (J)', angle: -90, position: 'insideLeft' }} />
@@ -289,7 +314,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             <CardContent>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }} />
                     <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft' }} />
@@ -311,7 +336,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
           </Card>
 
           {/* Heart Rate (if available) */}
-          {data.some(d => d.heartRate) && (
+          {enrichedData.some(d => d.heartRate) && (
             <Card>
               <CardHeader>
                 <CardTitle>Heart Rate Response</CardTitle>
@@ -320,7 +345,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <CardContent>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                       <XAxis dataKey="time" tickFormatter={formatDuration} label={{ value: 'Time', position: 'insideBottomRight', offset: -10 }} />
                       <YAxis domain={['dataMin - 10', 'dataMax + 10']} />
@@ -402,7 +427,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                         <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
                         <YAxis type="number" dataKey="power" name="Power" unit="W" domain={['auto', 'auto']} />
                         <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                        <Scatter name="Rate vs Power" data={data} fill="#8b5cf6" fillOpacity={0.6} />
+                        <Scatter name="Rate vs Power" data={enrichedData} fill="#8b5cf6" fillOpacity={0.6} />
                      </ScatterChart>
                   </ResponsiveContainer>
                 </div>
@@ -437,7 +462,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                              name
                            ]}
                          />
-                         <Scatter name="Rate vs Split" data={data} fill="#10b981" fillOpacity={0.6} />
+                         <Scatter name="Rate vs Split" data={enrichedData} fill="#10b981" fillOpacity={0.6} />
                       </ScatterChart>
                    </ResponsiveContainer>
                  </div>
