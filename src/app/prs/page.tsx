@@ -90,15 +90,17 @@ export default function PRsPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center space-y-4 mb-8">
-          <div className="flex items-center justify-center gap-3">
-            <Trophy className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">Personal Records</h1>
-            <Trophy className="h-8 w-8 text-primary" />
+        <div className="text-center space-y-4 mb-10">
+          <div className="inline-flex flex-col items-center justify-center px-6 py-4 rounded-2xl bg-gradient-to-br from-gold-100 via-background to-transparent border border-gold-200/60 shadow-[0_25px_60px_-35px_rgba(255,215,0,0.8)]">
+            <div className="flex items-center justify-center gap-3">
+              <Trophy className="h-8 w-8 text-[#d4af37] drop-shadow" />
+              <h1 className="text-3xl font-bold text-foreground tracking-tight">Personal Records</h1>
+              <Trophy className="h-8 w-8 text-[#d4af37] drop-shadow" />
+            </div>
+            <p className="text-muted-foreground text-base mt-3">
+              Celebrate your standout performances across every distance
+            </p>
           </div>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Your best performances across standard distances and metrics
-          </p>
         </div>
 
         {!hasData ? (
@@ -133,21 +135,24 @@ export default function PRsPage() {
               {hasPRs ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {personalRecords.map((record) => (
-                    <Card key={record.distance} className="relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/20 to-primary/5 rounded-bl-full" />
-                      <CardHeader className="pb-4">
+                    <Card
+                      key={record.distance}
+                      className="relative overflow-hidden border border-gold-200/40 bg-gradient-to-br from-gold-50/60 via-background to-transparent shadow-[0_20px_45px_-25px_rgba(255,215,0,0.9)]"
+                    >
+                      <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-gold-200/60 to-transparent rounded-bl-full opacity-80" />
+                      <CardHeader className="pb-4 relative z-10">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <Trophy className="h-5 w-5 text-primary" />
+                          <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
+                            <Trophy className="h-5 w-5 text-[#d4af37] fill-[#f7e5a5]" />
                             {formatDistance(record.distance)}
                           </CardTitle>
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge className="bg-gradient-to-r from-gold-400 to-amber-500 text-gold-950 text-xs border border-gold-500 shadow-sm">
                             BEST TIME
                           </Badge>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="text-3xl font-bold text-primary font-mono">
+                      <CardContent className="space-y-4 relative z-10">
+                        <div className="text-3xl font-bold text-foreground font-mono">
                           {formatDuration(record.bestTime)}
                         </div>
                         
@@ -167,12 +172,17 @@ export default function PRsPage() {
                         </div>
                         
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
+                          <Calendar className="h-4 w-4 text-gold-500" />
                           <span>Achieved: {formatDate(record.date)}</span>
                         </div>
                         
                         {record.sessionId && (
-                          <Button asChild variant="outline" size="sm" className="w-full">
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-gold-300 text-gold-700 hover:bg-gold-50"
+                          >
                             <Link href={`/sessions/${record.sessionId}`}>
                               View Session
                             </Link>
@@ -203,38 +213,38 @@ export default function PRsPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Best Average Power */}
-                <Card>
+                <Card className="border border-gold-200/60 bg-gradient-to-br from-amber-50 via-background to-transparent">
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
+                      <Zap className="h-5 w-5 text-gold-500" />
                       Best Average Power
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold text-primary">
+                    <div className="text-3xl font-bold">
                       {bestPower.avgPower > 0 ? `${Math.round(bestPower.avgPower)}W` : '--'}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
+                      <Calendar className="h-4 w-4 text-yellow-500" />
                       <span>Session: {formatDate(bestPower.timestamp)}</span>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Best Stroke Rate */}
-                <Card>
+                <Card className="border border-yellow-200/60 bg-gradient-to-br from-amber-50 via-background to-transparent">
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Target className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg flex items-center gap-2 text-yellow-700">
+                      <Target className="h-5 w-5 text-yellow-500" />
                       Best Stroke Rate
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold text-primary">
+                    <div className="text-3xl font-bold">
                       {bestStrokeRate.avgStrokeRate > 0 ? `${Math.round(bestStrokeRate.avgStrokeRate)} SPM` : '--'}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
+                      <Calendar className="h-4 w-4 text-yellow-500" />
                       <span>Session: {formatDate(bestStrokeRate.timestamp)}</span>
                     </div>
                   </CardContent>
