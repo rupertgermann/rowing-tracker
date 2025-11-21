@@ -347,6 +347,139 @@ export const AWARDS: Award[] = [
     color: 'text-purple-600',
     condition: (sessions) => sessions.some(s => s.distance === 500 && s.avgSplit < 95) // 95 seconds = 1:35
   },
+  
+  // Improvement Awards (vs Baseline)
+  {
+    id: 'improve-power-10',
+    title: 'Power Up',
+    description: 'Improve Average Power by 10% compared to your first 3 sessions',
+    icon: TrendingUp,
+    color: 'text-green-500',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      // Sort by date to find baseline
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      // Filter for valid workouts (>5 min)
+      const valid = sorted.filter(s => s.duration > 300);
+      if (valid.length < 5) return false;
+      
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
+      const best = Math.max(...valid.map(s => s.avgPower));
+      
+      return best >= baseline * 1.10;
+    }
+  },
+  {
+    id: 'improve-power-25',
+    title: 'Major Gains',
+    description: 'Improve Average Power by 25% compared to your first 3 sessions',
+    icon: TrendingUp,
+    color: 'text-green-600',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const valid = sorted.filter(s => s.duration > 300);
+      if (valid.length < 5) return false;
+      
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
+      const best = Math.max(...valid.map(s => s.avgPower));
+      
+      return best >= baseline * 1.25;
+    }
+  },
+  {
+    id: 'improve-power-50',
+    title: 'Beast Mode',
+    description: 'Improve Average Power by 50% compared to your first 3 sessions',
+    icon: TrendingUp,
+    color: 'text-emerald-600',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const valid = sorted.filter(s => s.duration > 300);
+      if (valid.length < 5) return false;
+      
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
+      const best = Math.max(...valid.map(s => s.avgPower));
+      
+      return best >= baseline * 1.50;
+    }
+  },
+  {
+    id: 'improve-power-75',
+    title: 'Unleashed',
+    description: 'Improve Average Power by 75% compared to your first 3 sessions',
+    icon: TrendingUp,
+    color: 'text-teal-600',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const valid = sorted.filter(s => s.duration > 300);
+      if (valid.length < 5) return false;
+      
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
+      const best = Math.max(...valid.map(s => s.avgPower));
+      
+      return best >= baseline * 1.75;
+    }
+  },
+  {
+    id: 'improve-power-100',
+    title: 'Double Power',
+    description: 'Double your Average Power (+100%) compared to your first 3 sessions',
+    icon: Zap,
+    color: 'text-yellow-600',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const valid = sorted.filter(s => s.duration > 300);
+      if (valid.length < 5) return false;
+      
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
+      const best = Math.max(...valid.map(s => s.avgPower));
+      
+      return best >= baseline * 2.0;
+    }
+  },
+  {
+    id: 'improve-pace-5',
+    title: 'Picking Up Speed',
+    description: 'Improve Average Pace by 5% compared to your first 3 sessions',
+    icon: TrendingUp,
+    color: 'text-blue-500',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const valid = sorted.filter(s => s.duration > 300 && s.avgSplit > 0);
+      if (valid.length < 5) return false;
+      
+      // Lower split is better. Baseline split.
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgSplit, 0) / 3;
+      const best = Math.min(...valid.map(s => s.avgSplit));
+      
+      // 5% faster means split is 95% of baseline or less
+      return best <= baseline * 0.95;
+    }
+  },
+  {
+    id: 'improve-pace-10',
+    title: 'Rapid Evolution',
+    description: 'Improve Average Pace by 10% compared to your first 3 sessions',
+    icon: TrendingUp,
+    color: 'text-blue-600',
+    condition: (sessions) => {
+      if (sessions.length < 10) return false;
+      const sorted = [...sessions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const valid = sorted.filter(s => s.duration > 300 && s.avgSplit > 0);
+      if (valid.length < 5) return false;
+      
+      const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgSplit, 0) / 3;
+      const best = Math.min(...valid.map(s => s.avgSplit));
+      
+      return best <= baseline * 0.90;
+    }
+  },
+
   {
     id: 'early-bird',
     title: 'Early Bird',
