@@ -484,9 +484,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Monthly Comparison Header Cards */}
-            <PeriodComparisonStats />
-
             {/* Key Metrics */}
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">
@@ -605,49 +602,8 @@ const Dashboard = () => {
               </Card>
             </div>
 
-            {/* Metric Comparison Widget */}
-            <MetricComparisonWidget />
-
-            {/* Analytics Preview */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
-                    Performance Analytics
-                  </h2>
-                  <p className="text-muted-foreground">
-                    Dive deeper into your performance metrics and trends
-                  </p>
-                </div>
-                <Button asChild>
-                  <Link href="/analytics" className="flex items-center gap-2">
-                    <Gauge className="h-4 w-4" />
-                    View Full Analytics
-                  </Link>
-                </Button>
-              </div>
-              
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                      <Gauge className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      Detailed Analytics Available
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      View interactive charts, pace analysis, and performance trends in the dedicated analytics section.
-                    </p>
-                    <Button asChild variant="outline">
-                      <Link href="/analytics">
-                        Go to Analytics
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Monthly Comparison Header Cards */}
+            <PeriodComparisonStats />
 
             {/* AI Insights Section */}
             {isAnalyzable && (
@@ -764,6 +720,9 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Metric Comparison Widget */}
+            <MetricComparisonWidget />
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
