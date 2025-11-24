@@ -124,21 +124,62 @@ export function useChat() {
         } : null
       }));
 
+      // Create placeholder assistant message
+      const placeholderId = crypto.randomUUID();
+      const placeholderMessage: ChatMessage = {
+        id: placeholderId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        sessionId: state.currentSession.id
+      };
+
+      // Add placeholder to state immediately
+      setState(prev => ({
+        ...prev,
+        currentSession: prev.currentSession ? {
+          ...prev.currentSession,
+          messages: [...prev.currentSession.messages, placeholderMessage]
+        } : null
+      }));
+
+      let streamedContent = '';
+
       // Get AI response with conversation chaining
       const userSessions = getSessions();
       const conversationHistory = state.currentSession.messages;
-      
+
       // Get the last AI response ID for conversation chaining
       const lastAIMessage = conversationHistory
         .filter(msg => msg.role === 'assistant' && msg.responseId)
         .pop();
       const previousResponseId = lastAIMessage?.responseId;
-      
+
       const aiResponse = await cloudAI.sendChatMessage(
         content.trim(),
         conversationHistory,
         userSessions,
-        previousResponseId
+        previousResponseId,
+        (token) => {
+          streamedContent += token;
+          setState(prev => {
+            if (!prev.currentSession) return prev;
+
+            const updatedMessages = prev.currentSession.messages.map(msg =>
+              msg.id === placeholderId
+                ? { ...msg, content: streamedContent }
+                : msg
+            );
+
+            return {
+              ...prev,
+              currentSession: {
+                ...prev.currentSession,
+                messages: updatedMessages
+              }
+            };
+          });
+        }
       );
 
       // Add AI response (only if not empty)
@@ -149,19 +190,25 @@ export function useChat() {
           responseId: aiResponse.responseId
         });
 
-        // Update state with AI response
+        // Update state with AI response (replace placeholder)
         setState(prev => ({
           ...prev,
           currentSession: prev.currentSession ? {
             ...prev.currentSession,
-            messages: [...prev.currentSession.messages, assistantMessage]
+            messages: prev.currentSession.messages.map(msg =>
+              msg.id === placeholderId ? assistantMessage : msg
+            )
           } : null,
           isLoading: false
         }));
       } else {
-        // Just stop loading if response is empty
+        // Remove placeholder if response is empty
         setState(prev => ({
           ...prev,
+          currentSession: prev.currentSession ? {
+            ...prev.currentSession,
+            messages: prev.currentSession.messages.filter(msg => msg.id !== placeholderId)
+          } : null,
           isLoading: false
         }));
       }
@@ -204,7 +251,7 @@ export function useChat() {
       setState(prev => {
         const newSessions = prev.sessions.filter(s => s.id !== sessionId);
         const newCurrentSession = prev.currentSession?.id === sessionId ? null : prev.currentSession;
-        
+
         return {
           ...prev,
           sessions: newSessions,
@@ -316,7 +363,7 @@ export function useChat() {
   return {
     // State
     ...state,
-    
+
     // Actions
     createSession,
     switchSession,
@@ -330,7 +377,7 @@ export function useChat() {
     importSessions,
     clearError,
     loadSessions,
-    
+
     // Computed
     isAIConfigured,
     hasSessions: state.sessions.length > 0,

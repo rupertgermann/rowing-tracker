@@ -2,17 +2,18 @@
 
 import { useEffect, useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useChat } from '@/hooks/useChat';
-import { 
-  MessageCircle, 
-  Send, 
-  Search, 
-  Plus, 
+import {
+  MessageCircle,
+  Send,
+  Search,
+  Plus,
   MoreHorizontal,
   Trash2,
   Download,
@@ -133,9 +134,9 @@ export default function ChatPage() {
 
   // Format timestamp
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -149,9 +150,9 @@ export default function ChatPage() {
     } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Yesterday';
     } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
       });
     }
   };
@@ -168,7 +169,7 @@ export default function ChatPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -233,7 +234,7 @@ export default function ChatPage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            
+
             {/* Search Results */}
             {searchResults.length > 0 && (
               <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
@@ -299,11 +300,10 @@ export default function ChatPage() {
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      currentSession?.id === session.id
-                        ? 'bg-primary/10 border-primary'
-                        : 'hover:bg-muted'
-                    }`}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${currentSession?.id === session.id
+                      ? 'bg-primary/10 border-primary'
+                      : 'hover:bg-muted'
+                      }`}
                     onClick={() => switchSession(session.id)}
                   >
                     <div className="flex items-center justify-between">
@@ -408,9 +408,8 @@ export default function ChatPage() {
                   {currentSession.messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex gap-3 ${
-                        message.role === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
+                      className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'
+                        }`}
                     >
                       {message.role === 'assistant' && (
                         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -418,34 +417,40 @@ export default function ChatPage() {
                         </div>
                       )}
                       <div
-                        className={`max-w-[70%] rounded-lg p-3 ${
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        }`}
+                        className={`max-w-[70%] rounded-lg p-3 ${message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                          }`}
                       >
                         <div className="text-sm">
                           {message.role === 'assistant' ? (
                             <div className="prose prose-sm max-w-none dark:prose-invert">
                               <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
                                 components={{
                                   // Custom styling for common markdown elements
-                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                                  ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                                  ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                                  li: ({children}) => <li className="mb-1">{children}</li>,
-                                  code: ({className, children}) => {
+                                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                                  code: ({ className, children }) => {
                                     const isInline = !className;
-                                    return isInline 
+                                    return isInline
                                       ? <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>
                                       : <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2"><code>{children}</code></pre>;
                                   },
-                                  strong: ({children}) => <strong className="font-semibold">{children}</strong>,
-                                  em: ({children}) => <em className="italic">{children}</em>,
-                                  h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                                  h2: ({children}) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                                  h3: ({children}) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
-                                  blockquote: ({children}) => <blockquote className="border-l-4 border-muted-foreground pl-3 italic">{children}</blockquote>,
+                                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                  em: ({ children }) => <em className="italic">{children}</em>,
+                                  h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                  h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                                  h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                                  blockquote: ({ children }) => <blockquote className="border-l-4 border-muted-foreground pl-3 italic">{children}</blockquote>,
+                                  table: ({ children }) => <div className="overflow-x-auto mb-4"><table className="min-w-full divide-y divide-border border rounded-md">{children}</table></div>,
+                                  thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
+                                  tbody: ({ children }) => <tbody className="divide-y divide-border bg-card">{children}</tbody>,
+                                  tr: ({ children }) => <tr className="hover:bg-muted/50 transition-colors">{children}</tr>,
+                                  th: ({ children }) => <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{children}</th>,
+                                  td: ({ children }) => <td className="px-3 py-2 whitespace-nowrap text-sm">{children}</td>,
                                 }}
                                 disallowedElements={['script', 'iframe', 'object', 'embed']}
                               >
@@ -467,7 +472,7 @@ export default function ChatPage() {
                       )}
                     </div>
                   ))}
-                  
+
                   {/* Loading indicator */}
                   {isLoading && (
                     <div className="flex gap-3 justify-start">
@@ -481,7 +486,7 @@ export default function ChatPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   <div ref={messagesEndRef} />
                 </div>
               </CardContent>
@@ -522,7 +527,7 @@ export default function ChatPage() {
                   {isAIConfigured ? 'Select a Conversation' : 'AI Coach Not Ready'}
                 </h3>
                 <p className="text-muted-foreground mb-4">
-                  {isAIConfigured 
+                  {isAIConfigured
                     ? 'Choose an existing conversation or start a new one.'
                     : 'Configure your OpenAI API key to begin chatting with your AI coach.'
                   }

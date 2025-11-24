@@ -48,6 +48,9 @@ interface ApiRequestConfig {
     description: string;
     parameters?: object;
   }>;
+
+  // Streaming callback
+  onToken?: (token: string) => void;
 }
 
 // Chat message types
@@ -140,7 +143,8 @@ export class CloudAIService {
     message: string,
     conversationHistory: ChatMessage[] = [],
     userSessions?: Session[],
-    previousResponseId?: string
+    previousResponseId?: string,
+    onToken?: (token: string) => void
   ): Promise<{ content: string; responseId: string }> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
@@ -215,7 +219,8 @@ export class CloudAIService {
           maxTokens: 1000,
           previousResponseId: currentPreviousResponseId,
           store: true,
-          tools: tools
+          tools: tools,
+          onToken: onToken // Pass streaming callback
         };
 
         console.log('API Request Config:', config);
@@ -338,6 +343,11 @@ export class CloudAIService {
       request.tools = config.tools;
     }
 
+    // Streaming
+    if (config.onToken) {
+      request.stream = true;
+    }
+
     return request;
   }
 
@@ -384,6 +394,118 @@ export class CloudAIService {
       throw new Error(`OpenAI API error: ${response.status}. ${errorText}`);
     }
 
+    // Handle streaming response
+    if (config.onToken && response.body) {
+      console.log('Starting streaming response processing...');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalResponse: any = { id: '', output: [] };
+
+      // Track items being built by index
+      const activeItems: Record<number, any> = {};
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('Streaming complete');
+            break;
+          }
+
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('Received chunk (length):', chunk.length);
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            if (line.startsWith('data: ')) {
+              console.log('Parsed line:', line);
+              const dataStr = line.slice(6);
+              if (dataStr === '[DONE]') continue;
+
+              try {
+                const event = JSON.parse(dataStr);
+
+                // Capture Response ID
+                if (event.response_id && !finalResponse.id) {
+                  finalResponse.id = event.response_id;
+                }
+
+                // Handle Event Types
+                switch (event.type) {
+                  case 'response.output_item.added': {
+                    const index = event.output_index;
+                    activeItems[index] = event.item;
+                    // Initialize content if it's a message
+                    if (event.item.type === 'message' && !activeItems[index].content) {
+                      activeItems[index].content = [];
+                    }
+                    break;
+                  }
+
+                  case 'response.content_part.added': {
+                    const index = event.output_index;
+                    const partIndex = event.content_index || 0;
+                    if (activeItems[index] && activeItems[index].type === 'message') {
+                      if (!activeItems[index].content[partIndex]) {
+                        activeItems[index].content[partIndex] = event.part;
+                      }
+                    }
+                    break;
+                  }
+
+                  case 'response.content_part.delta': {
+                    const index = event.output_index;
+                    const partIndex = event.content_index || 0;
+                    if (event.delta) {
+                      // Update local state
+                      if (activeItems[index] && activeItems[index].content && activeItems[index].content[partIndex]) {
+                        activeItems[index].content[partIndex].text += event.delta;
+                      }
+
+                      // Call callback
+                      config.onToken(event.delta);
+                    }
+                    break;
+                  }
+
+                  case 'response.function_call_arguments.delta': {
+                    const index = event.output_index;
+                    if (activeItems[index] && activeItems[index].type === 'function_call') {
+                      activeItems[index].arguments += event.delta;
+                    }
+                    break;
+                  }
+
+                  case 'response.output_item.done': {
+                    const index = event.output_index;
+                    activeItems[index] = event.item; // Finalize item
+                    break;
+                  }
+                }
+
+              } catch (e) {
+                console.warn('Error parsing SSE chunk:', e, line);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error reading stream:', error);
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Construct final response object
+      finalResponse.output = Object.values(activeItems);
+      console.log('Final Streaming Response Constructed:', finalResponse);
+      return finalResponse;
+    }
+
+    // Handle standard response
     const data = await response.json();
     return data;
   }
