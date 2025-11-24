@@ -519,6 +519,9 @@ export class CloudAIService {
       const store = useRowingStore.getState();
       const sessions = store.sessions;
 
+      console.log(`[get_sessions] Total sessions in store: ${sessions.length}`);
+      console.log(`[get_sessions] Args:`, args);
+
       const includeDetails = args.includeDetails === true;
 
       if (args.sessionId) {
@@ -542,7 +545,11 @@ export class CloudAIService {
       filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       const limit = args.limit || 5;
-      return this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
+      const result = this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
+
+      console.log(`[get_sessions] Returning ${result.length} sessions (limit: ${limit}, filtered: ${filtered.length})`);
+
+      return result;
     }
 
     return { error: `Unknown tool: ${name}` };
@@ -593,6 +600,10 @@ YOUR PERSONALITY:
 TOOLS AVAILABLE:
 - get_sessions: Use this to retrieve the user's rowing history. You can filter by date or get specific sessions.
   - ALWAYS use this tool if the user asks about their past performance, specific sessions, or progress.
+  - When the user asks "how many sessions" or about the total count:
+    * Set limit to 999 (to get ALL sessions for accurate counting)
+    * Set includeDetails to FALSE
+    * Report the ACTUAL count from the returned array length
   - When the user asks for "all sessions" or requests more than 20 sessions:
     * Set limit to 999 (to get all available sessions)
     * Set includeDetails to FALSE (summaries only, no detailed stroke data)

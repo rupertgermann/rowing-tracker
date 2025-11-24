@@ -369,13 +369,27 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
         };
       }
 
-      const sessions = localStorage.getItem('rowing_sessions');
+      // Read from actual Zustand store
+      const rowingStore = localStorage.getItem('rowing-tracker-storage');
       const chatHistory = localStorage.getItem('rowing_ai_chat_sessions');
       const trainingPlans = localStorage.getItem('rowing_training_plans');
       const settings = localStorage.getItem(this.STORAGE_KEY);
 
+      // Calculate sessions size from Zustand store
+      let sessionsSize = 0;
+      if (rowingStore) {
+        try {
+          const storeData = JSON.parse(rowingStore);
+          if (storeData.state?.sessions) {
+            sessionsSize = new Blob([JSON.stringify(storeData.state.sessions)]).size;
+          }
+        } catch (e) {
+          console.error('Error parsing rowing store:', e);
+        }
+      }
+
       const usage = {
-        sessions: sessions ? new Blob([sessions]).size : 0,
+        sessions: sessionsSize,
         chatHistory: chatHistory ? new Blob([chatHistory]).size : 0,
         trainingPlans: trainingPlans ? new Blob([trainingPlans]).size : 0,
         total: 0
@@ -405,7 +419,9 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
     switch (category) {
       case 'sessions':
-        localStorage.removeItem('rowing_sessions');
+        // Sessions are stored in Zustand store ('rowing-tracker-storage')
+        // The actual clearing is handled by the settings page calling useRowingStore.getState().clearSessions()
+        // This method is kept for API consistency but doesn't need to do anything for sessions
         break;
       case 'chatHistory':
         localStorage.removeItem('rowing_ai_chat_sessions');
@@ -426,7 +442,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
     // Clear all app-specific localStorage items
     const keysToRemove = [
-      'rowing_sessions',
+      'rowing-tracker-storage',  // Zustand store containing sessions, records, awards, etc.
       'rowing_ai_chat_sessions',
       'rowing_ai_current_session',
       'rowing_training_plans',
