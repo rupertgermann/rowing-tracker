@@ -173,9 +173,13 @@ export class CloudAIService {
               sessionId: {
                 type: ["string", "null"],
                 description: "Get a specific session by ID"
+              },
+              includeDetails: {
+                type: ["boolean", "null"],
+                description: "Include detailed stroke data for deep analysis (default: false)"
               }
             },
-            required: ["limit", "startDate", "endDate", "sessionId"],
+            required: ["limit", "startDate", "endDate", "sessionId", "includeDetails"],
             additionalProperties: false
           },
           strict: true
@@ -192,6 +196,9 @@ export class CloudAIService {
         { role: 'user', content: message }
       ];
 
+      console.group('Chat Turn Debug');
+      console.log('Initial Messages:', messages);
+
       let currentInput: any = messages;
       let currentPreviousResponseId = previousResponseId;
       let finalContent = '';
@@ -199,6 +206,7 @@ export class CloudAIService {
 
       // Tool loop - handle up to 5 turns of tool calls
       for (let turn = 0; turn < 5; turn++) {
+        console.group(`Turn ${turn + 1}`);
         const config: ApiRequestConfig = {
           input: currentInput,
           model: useCaseConfig.model,
@@ -210,19 +218,26 @@ export class CloudAIService {
           tools: tools
         };
 
+        console.log('API Request Config:', config);
+
         const response = await this.makeApiCall(config);
+        console.log('API Response:', response);
+
         finalResponseId = response.id;
 
         // Check for tool calls
         const toolCalls = response.output?.filter((item: any) => item.type === 'function_call');
 
         if (toolCalls && toolCalls.length > 0) {
+          console.log('Tool Calls Detected:', toolCalls);
           // Execute tools and prepare next input
           const toolOutputs = [];
 
           for (const toolCall of toolCalls) {
             const args = JSON.parse(toolCall.arguments);
+            console.log(`Executing Tool: ${toolCall.name}`, args);
             const result = await this.executeTool(toolCall.name, args);
+            console.log(`Tool Result:`, result);
 
             toolOutputs.push({
               type: "function_call_output",
@@ -234,12 +249,18 @@ export class CloudAIService {
           // Feed tool outputs back to model
           currentInput = toolOutputs;
           currentPreviousResponseId = response.id;
+          console.log('Next Input (Tool Outputs):', currentInput);
         } else {
           // No tool calls, just get the text response
           finalContent = this.parseResponse(response);
+          console.log('Final Text Content:', finalContent);
+          console.groupEnd(); // End Turn group
           break;
         }
+        console.groupEnd(); // End Turn group
       }
+
+      console.groupEnd(); // End Chat Turn Debug group
 
       return {
         content: finalContent,
@@ -376,9 +397,11 @@ export class CloudAIService {
       const store = useRowingStore.getState();
       const sessions = store.sessions;
 
+      const includeDetails = args.includeDetails === true;
+
       if (args.sessionId) {
         const session = sessions.find(s => s.id === args.sessionId);
-        return session ? this.anonymizeSessions([session])[0] : { error: "Session not found" };
+        return session ? this.anonymizeSessions([session], includeDetails)[0] : { error: "Session not found" };
       }
 
       let filtered = [...sessions];
@@ -397,7 +420,7 @@ export class CloudAIService {
       filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       const limit = Math.min(args.limit || 5, 20);
-      return this.anonymizeSessions(filtered.slice(0, limit));
+      return this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
     }
 
     return { error: `Unknown tool: ${name}` };
@@ -426,6 +449,7 @@ YOUR PERSONALITY:
 TOOLS AVAILABLE:
 - get_sessions: Use this to retrieve the user's rowing history. You can filter by date or get specific sessions.
   - ALWAYS use this tool if the user asks about their past performance, specific sessions, or progress.
+  - Set 'includeDetails' to true ONLY if the user asks for detailed stroke analysis, consistency check, or specific workout details.
   - Do NOT assume you know the user's data unless you have called this tool.
 
 COMMUNICATION STYLE:
@@ -456,16 +480,34 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   }
 
   // Anonymize session data for privacy
-  private anonymizeSessions(sessions: Session[]): any[] {
-    return sessions.map(session => ({
-      date: new Date(session.timestamp).toISOString().split('T')[0], // Only date, no time
-      distance: session.distance,
-      duration: session.duration,
-      pace: session.avgSplit,
-      power: session.avgPower,
-      strokeRate: session.avgStrokeRate,
-      // Remove any potentially identifying information
-    }));
+  private anonymizeSessions(sessions: Session[], includeDetails: boolean = false): any[] {
+    return sessions.map(session => {
+      const baseData = {
+        id: session.id, // Include ID for reference
+        date: new Date(session.timestamp).toISOString().split('T')[0], // Only date, no time
+        distance: session.distance,
+        duration: session.duration,
+        pace: session.avgSplit,
+        power: session.avgPower,
+        strokeRate: session.avgStrokeRate,
+      };
+
+      if (includeDetails && session.strokeData) {
+        return {
+          ...baseData,
+          strokeData: session.strokeData.map(s => ({
+            time: s.time,
+            distance: s.distance,
+            power: s.power,
+            pace: s.split,
+            strokeRate: s.strokeRate,
+            heartRate: s.heartRate
+          }))
+        };
+      }
+
+      return baseData;
+    });
   }
 
 
