@@ -148,22 +148,102 @@ export class CloudAIService {
 
     try {
       const useCaseConfig = this.aiSettings.chat;
-      const config: ApiRequestConfig = {
-        input: message,
-        instructions: this.getChatSystemPrompt(userSessions),
-        model: useCaseConfig.model, // Use model from AI settings
-        reasoning: useCaseConfig.reasoning,
-        verbosity: useCaseConfig.verbosity,
-        maxTokens: 1000,
-        previousResponseId,    // Automatic context chaining
-        store: true            // Store for future chaining
-      };
 
-      const response = await this.makeApiCall(config);
+      // Define tools available to the model
+      const tools = [
+        {
+          type: "function" as const,
+          name: "get_sessions",
+          description: "Get rowing sessions from the user's history. Can filter by date range or get specific session details.",
+          parameters: {
+            type: "object",
+            properties: {
+              limit: {
+                type: ["number", "null"],
+                description: "Number of sessions to retrieve (default: 5, max: 20)"
+              },
+              startDate: {
+                type: ["string", "null"],
+                description: "Filter sessions after this date (ISO format YYYY-MM-DD)"
+              },
+              endDate: {
+                type: ["string", "null"],
+                description: "Filter sessions before this date (ISO format YYYY-MM-DD)"
+              },
+              sessionId: {
+                type: ["string", "null"],
+                description: "Get a specific session by ID"
+              }
+            },
+            required: ["limit", "startDate", "endDate", "sessionId"],
+            additionalProperties: false
+          },
+          strict: true
+        }
+      ];
+
+      // Prepare initial input messages
+      const messages = [
+        { role: 'system', content: this.getChatSystemPrompt() },
+        ...conversationHistory.slice(-10).map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        { role: 'user', content: message }
+      ];
+
+      let currentInput: any = messages;
+      let currentPreviousResponseId = previousResponseId;
+      let finalContent = '';
+      let finalResponseId = '';
+
+      // Tool loop - handle up to 5 turns of tool calls
+      for (let turn = 0; turn < 5; turn++) {
+        const config: ApiRequestConfig = {
+          input: currentInput,
+          model: useCaseConfig.model,
+          reasoning: useCaseConfig.reasoning,
+          verbosity: useCaseConfig.verbosity,
+          maxTokens: 1000,
+          previousResponseId: currentPreviousResponseId,
+          store: true,
+          tools: tools
+        };
+
+        const response = await this.makeApiCall(config);
+        finalResponseId = response.id;
+
+        // Check for tool calls
+        const toolCalls = response.output?.filter((item: any) => item.type === 'function_call');
+
+        if (toolCalls && toolCalls.length > 0) {
+          // Execute tools and prepare next input
+          const toolOutputs = [];
+
+          for (const toolCall of toolCalls) {
+            const args = JSON.parse(toolCall.arguments);
+            const result = await this.executeTool(toolCall.name, args);
+
+            toolOutputs.push({
+              type: "function_call_output",
+              call_id: toolCall.call_id,
+              output: JSON.stringify(result)
+            });
+          }
+
+          // Feed tool outputs back to model
+          currentInput = toolOutputs;
+          currentPreviousResponseId = response.id;
+        } else {
+          // No tool calls, just get the text response
+          finalContent = this.parseResponse(response);
+          break;
+        }
+      }
 
       return {
-        content: this.parseResponse(response),
-        responseId: response.id
+        content: finalContent,
+        responseId: finalResponseId
       };
     } catch (error) {
       console.error('Chat AI failed:', error);
@@ -287,12 +367,45 @@ export class CloudAIService {
     return data;
   }
 
+  // Execute tool calls
+  private async executeTool(name: string, args: any): Promise<any> {
+    if (name === 'get_sessions') {
+      // Dynamic import to avoid circular dependencies if possible, or just use the store
+      // Since we're in a class, we can access the store directly via import
+      const { useRowingStore } = await import('@/lib/store');
+      const store = useRowingStore.getState();
+      const sessions = store.sessions;
+
+      if (args.sessionId) {
+        const session = sessions.find(s => s.id === args.sessionId);
+        return session ? this.anonymizeSessions([session])[0] : { error: "Session not found" };
+      }
+
+      let filtered = [...sessions];
+
+      if (args.startDate) {
+        const start = new Date(args.startDate);
+        filtered = filtered.filter(s => new Date(s.timestamp) >= start);
+      }
+
+      if (args.endDate) {
+        const end = new Date(args.endDate);
+        filtered = filtered.filter(s => new Date(s.timestamp) <= end);
+      }
+
+      // Sort by date desc
+      filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      const limit = Math.min(args.limit || 5, 20);
+      return this.anonymizeSessions(filtered.slice(0, limit));
+    }
+
+    return { error: `Unknown tool: ${name}` };
+  }
 
 
   // Get system prompt for chat AI trainer
   private getChatSystemPrompt(sessions?: Session[]): string {
-    const sessionContext = sessions ? this.getSessionContext(sessions) : '';
-
     return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
 
 YOUR EXPERTISE:
@@ -310,7 +423,10 @@ YOUR PERSONALITY:
 - Asks clarifying questions to provide better guidance
 - Celebrates progress and provides constructive feedback
 
-${sessionContext}
+TOOLS AVAILABLE:
+- get_sessions: Use this to retrieve the user's rowing history. You can filter by date or get specific sessions.
+  - ALWAYS use this tool if the user asks about their past performance, specific sessions, or progress.
+  - Do NOT assume you know the user's data unless you have called this tool.
 
 COMMUNICATION STYLE:
 - Use conversational, encouraging language
@@ -323,31 +439,9 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   }
 
   // Get user's session context for personalized coaching
+  // Deprecated: Context is now retrieved via tools
   private getSessionContext(sessions: Session[]): string {
-    if (!sessions || sessions.length === 0) {
-      return 'USER DATA: No training sessions available yet.';
-    }
-
-    const recentSessions = sessions.slice(-5);
-    const totalSessions = sessions.length;
-    const totalDistance = sessions.reduce((sum, s) => sum + s.distance, 0);
-    const avgPace = sessions
-      .map(s => s.avgSplit)
-      .filter(p => p > 0)
-      .reduce((sum, p, _, arr) => sum + p / arr.length, 0);
-    const avgPower = sessions
-      .map(s => s.avgPower)
-      .filter(p => p > 0)
-      .reduce((sum, p, _, arr) => sum + p / arr.length, 0);
-
-    return `USER DATA:
-- Total Sessions: ${totalSessions}
-- Total Distance: ${(totalDistance / 1000).toFixed(1)}km
-- Average Pace: ${avgPace > 0 ? this.formatPace(avgPace) : 'N/A'}/500m
-- Average Power: ${avgPower > 0 ? Math.round(avgPower) + 'W' : 'N/A'}
-- Recent Activity: Last ${recentSessions.length} sessions in the past ${this.getDaysSpan(recentSessions)} days
-
-Use this data to provide personalized coaching and reference their actual performance when relevant.`;
+    return '';
   }
 
   // Calculate time span of sessions
