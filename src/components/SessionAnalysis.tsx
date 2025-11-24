@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Assuming these exist or standard tabs
 import { ComposedChart } from 'recharts';
 import { useRowingStore } from '@/lib/store';
+import { chartTheme } from '@/lib/chartUtils';
 
 interface SessionAnalysisProps {
   data: StrokeData[];
@@ -46,20 +47,20 @@ const formatSplit = (seconds: number) => {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-background border rounded-lg p-3 shadow-lg text-sm">
-        <p className="font-medium mb-2">
+      <div style={chartTheme.tooltip.contentStyle}>
+        <p style={chartTheme.tooltip.labelStyle}>
           Stroke {payload[0].payload.strokeIndex} ({formatDuration(payload[0].payload.time)})
         </p>
         {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2" style={{ color: entry.color }}>
+          <div key={index} className="flex items-center gap-2" style={{ ...chartTheme.tooltip.itemStyle, color: entry.color }}>
             <span className="font-semibold">
               {entry.name}:
             </span>
             <span>
-              {entry.name.includes('Split') 
+              {entry.name.includes('Split')
                 ? formatSplit(entry.value)
-                : entry.name === 'Distance' 
-                  ? `${entry.value}m` 
+                : entry.name === 'Distance'
+                  ? `${entry.value}m`
                   : entry.name.includes('Length')
                     ? `${entry.value}m`
                     : Math.round(entry.value)}
@@ -90,20 +91,20 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
   // Enrich data if strokeLength is missing (backward compatibility for previously uploaded sessions)
   const enrichedData = useMemo(() => {
     if (!data || data.length === 0) return [];
-    
+
     // Check if we need to calculate strokeLength
     const needsCalculation = typeof data[0].strokeLength === 'undefined';
-    
+
     if (!needsCalculation) {
-       return data;
+      return data;
     }
 
     console.log('Calculating stroke lengths on the fly for visualization...');
     // Sort by index to ensure correct delta calculation
     const sorted = [...data].sort((a, b) => a.strokeIndex - b.strokeIndex);
-    
+
     return sorted.map((stroke, i) => {
-      const prevDistance = i > 0 ? sorted[i-1].distance : 0;
+      const prevDistance = i > 0 ? sorted[i - 1].distance : 0;
       const length = stroke.distance - prevDistance;
       return {
         ...stroke,
@@ -115,10 +116,10 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
   const stats = useMemo(() => calculateAdvancedStats(enrichedData), [enrichedData]);
   const rolling5 = useMemo(() => calculateRollingAverages(enrichedData, 5), [enrichedData]);
   const rolling10 = useMemo(() => calculateRollingAverages(enrichedData, 10), [enrichedData]);
-  
+
   // Calculate segments based on selected size
   const segments = useMemo(() => calculateSegments(enrichedData, segmentSize), [enrichedData, segmentSize]);
-  
+
   const performanceSummary = useMemo(() => calculatePerformanceSummary(enrichedData, segments), [enrichedData, segments]);
 
   // Combine rolling data for charts
@@ -142,7 +143,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
   const distributions = useMemo(() => {
     const powerBuckets: Record<string, number> = {};
     const spmBuckets: Record<string, number> = {};
-    
+
     enrichedData.forEach(d => {
       // Power (25W buckets)
       const pBucket = Math.floor(d.power / 25) * 25;
@@ -303,7 +304,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                    {stats.wattsPerHeartRate > 0 ? stats.wattsPerHeartRate.toFixed(2) : '--'}
+                  {stats.wattsPerHeartRate > 0 ? stats.wattsPerHeartRate.toFixed(2) : '--'}
                 </div>
                 <p className="text-xs text-muted-foreground">Watts per Heart Rate</p>
               </CardContent>
@@ -314,7 +315,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               </CardHeader>
               <CardContent>
                 <div className={`text-2xl font-bold ${stats.powerDropoff > 5 ? 'text-red-500' : 'text-green-500'}`}>
-                    {stats.powerDropoff > 0 ? '-' : '+'}{Math.abs(Math.round(stats.powerDropoff))}%
+                  {stats.powerDropoff > 0 ? '-' : '+'}{Math.abs(Math.round(stats.powerDropoff))}%
                 </div>
                 <p className="text-xs text-muted-foreground">Power change 1st vs 2nd half</p>
               </CardContent>
@@ -332,34 +333,36 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="distance" 
-                      label={{ value: 'Distance (m)', position: 'insideBottomRight', offset: -10 }} 
+                    <XAxis
+                      dataKey="distance"
+                      label={{ value: 'Distance (m)', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
                       tickFormatter={(val) => `${val}m`}
+                      tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                      stroke={chartTheme.axis.strokeColor}
                     />
-                    <YAxis yAxisId="left" label={{ value: 'Power (W)', angle: -90, position: 'insideLeft' }} />
-                    <YAxis yAxisId="right" orientation="right" label={{ value: 'SPM', angle: 90, position: 'insideRight' }} domain={[10, 50]} />
+                    <YAxis yAxisId="left" label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis yAxisId="right" orientation="right" label={{ value: 'SPM', angle: 90, position: 'insideRight', style: chartTheme.axis.labelStyle }} domain={[10, 50]} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Line 
+                    <Line
                       yAxisId="left"
-                      type="monotone" 
-                      dataKey="power" 
-                      name="Power" 
+                      type="monotone"
+                      dataKey="power"
+                      name="Power"
                       unit="W"
-                      stroke="#2563eb" 
-                      dot={false} 
+                      stroke="#2563eb"
+                      dot={false}
                       strokeWidth={2}
                       activeDot={{ r: 6 }}
                     />
-                    <Line 
+                    <Line
                       yAxisId="right"
-                      type="monotone" 
-                      dataKey="strokeRate" 
-                      name="Stroke Rate" 
+                      type="monotone"
+                      dataKey="strokeRate"
+                      name="Stroke Rate"
                       unit=" spm"
-                      stroke="#dc2626" 
-                      dot={false} 
+                      stroke="#dc2626"
+                      dot={false}
                       strokeWidth={2}
                     />
                   </LineChart>
@@ -382,32 +385,36 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="distance" 
+                    <XAxis
+                      dataKey="distance"
                       tickFormatter={(val) => `${val}m`}
+                      tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                      stroke={chartTheme.axis.strokeColor}
                     />
-                    <YAxis 
-                      domain={['dataMin - 5', 'dataMax + 5']} 
-                      reversed={true} 
+                    <YAxis
+                      domain={['dataMin - 5', 'dataMax + 5']}
+                      reversed={true}
                       tickFormatter={(val) => formatDuration(val)}
+                      tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                      stroke={chartTheme.axis.strokeColor}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="split" 
-                      name="Actual Split" 
-                      stroke="#16a34a" 
-                      dot={false} 
-                      strokeWidth={1.5} 
+                    <Line
+                      type="monotone"
+                      dataKey="split"
+                      name="Actual Split"
+                      stroke="#16a34a"
+                      dot={false}
+                      strokeWidth={1.5}
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="avgSplit" 
-                      name="Avg Split" 
-                      stroke="#9333ea" 
-                      strokeDasharray="5 5" 
-                      dot={false} 
+                    <Line
+                      type="monotone"
+                      dataKey="avgSplit"
+                      name="Avg Split"
+                      stroke="#9333ea"
+                      strokeDasharray="5 5"
+                      dot={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -426,18 +433,18 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} />
-                    <YAxis label={{ value: 'Work (J)', angle: -90, position: 'insideLeft' }} />
+                    <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis label={{ value: 'Work (J)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Area 
-                      type="monotone" 
-                      dataKey="work" 
-                      name="Work" 
+                    <Area
+                      type="monotone"
+                      dataKey="work"
+                      name="Work"
                       unit="J"
-                      stroke="#ea580c" 
-                      fill="#ea580c" 
-                      fillOpacity={0.2} 
+                      stroke="#ea580c"
+                      fill="#ea580c"
+                      fillOpacity={0.2}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -456,18 +463,18 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }} />
-                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft' }} />
+                    <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="strokeLength" 
-                      name="Stroke Length" 
+                    <Line
+                      type="monotone"
+                      dataKey="strokeLength"
+                      name="Stroke Length"
                       unit="m"
-                      stroke="#0891b2" 
-                      dot={false} 
-                      strokeWidth={2} 
+                      stroke="#0891b2"
+                      dot={false}
+                      strokeWidth={2}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -487,18 +494,18 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis dataKey="time" tickFormatter={formatDuration} label={{ value: 'Time', position: 'insideBottomRight', offset: -10 }} />
-                      <YAxis domain={['dataMin - 10', 'dataMax + 10']} />
+                      <XAxis dataKey="time" tickFormatter={formatDuration} label={{ value: 'Time', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                      <YAxis domain={['dataMin - 10', 'dataMax + 10']} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="heartRate" 
-                        name="Heart Rate" 
+                      <Line
+                        type="monotone"
+                        dataKey="heartRate"
+                        name="Heart Rate"
                         unit=" bpm"
-                        stroke="#be123c" 
-                        dot={false} 
-                        strokeWidth={2} 
+                        stroke="#be123c"
+                        dot={false}
+                        strokeWidth={2}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -519,21 +526,19 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => handleSegmentSizeChange(100)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  segmentSize === 100
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 100
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
+                  }`}
               >
                 100m
               </button>
               <button
                 onClick={() => handleSegmentSizeChange(500)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  segmentSize === 500
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 500
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
+                  }`}
               >
                 500m
               </button>
@@ -551,14 +556,16 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={segments} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="segmentNumber" 
-                      label={{ value: 'Segment', position: 'insideBottomRight', offset: -10 }}
+                    <XAxis
+                      dataKey="segmentNumber"
+                      label={{ value: 'Segment', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
                       tickFormatter={(val) => `${val}`}
+                      tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                      stroke={chartTheme.axis.strokeColor}
                     />
-                    <YAxis yAxisId="left" label={{ value: 'Power (W)', angle: -90, position: 'insideLeft' }} />
-                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Split (s/500m)', angle: 90, position: 'insideRight' }} />
-                    <Tooltip 
+                    <YAxis yAxisId="left" label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Split (s/500m)', angle: 90, position: 'insideRight', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <Tooltip
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
@@ -578,12 +585,12 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                     />
                     <Legend />
                     <Bar yAxisId="left" dataKey="avgPower" name="Avg Power" fill="#2563eb" opacity={0.8} />
-                    <Line 
+                    <Line
                       yAxisId="right"
-                      type="monotone" 
-                      dataKey="avgSplit" 
-                      name="Avg Split" 
-                      stroke="#dc2626" 
+                      type="monotone"
+                      dataKey="avgSplit"
+                      name="Avg Split"
+                      stroke="#dc2626"
                       strokeWidth={3}
                       dot={{ fill: '#dc2626', r: 5 }}
                     />
@@ -605,12 +612,14 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis 
-                        dataKey="strokeIndex" 
-                        label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }}
+                      <XAxis
+                        dataKey="strokeIndex"
+                        label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
+                        tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                        stroke={chartTheme.axis.strokeColor}
                       />
-                      <YAxis label={{ value: 'Power (W)', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
+                      <YAxis label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                      <Tooltip
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
@@ -627,20 +636,20 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                         }}
                       />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="power5" 
-                        name="5-Stroke Avg" 
-                        stroke="#2563eb" 
-                        dot={false} 
+                      <Line
+                        type="monotone"
+                        dataKey="power5"
+                        name="5-Stroke Avg"
+                        stroke="#2563eb"
+                        dot={false}
                         strokeWidth={2}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="power10" 
-                        name="10-Stroke Avg" 
-                        stroke="#10b981" 
-                        dot={false} 
+                      <Line
+                        type="monotone"
+                        dataKey="power10"
+                        name="10-Stroke Avg"
+                        stroke="#10b981"
+                        dot={false}
                         strokeWidth={2}
                       />
                     </LineChart>
@@ -659,16 +668,20 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis 
-                        dataKey="strokeIndex" 
-                        label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10 }}
+                      <XAxis
+                        dataKey="strokeIndex"
+                        label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
+                        tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                        stroke={chartTheme.axis.strokeColor}
                       />
-                      <YAxis 
-                        label={{ value: 'Split (s/500m)', angle: -90, position: 'insideLeft' }}
+                      <YAxis
+                        label={{ value: 'Split (s/500m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }}
                         reversed={true}
                         tickFormatter={(val) => formatSplit(val)}
+                        tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                        stroke={chartTheme.axis.strokeColor}
                       />
-                      <Tooltip 
+                      <Tooltip
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
@@ -685,20 +698,20 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                         }}
                       />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="split5" 
-                        name="5-Stroke Avg" 
-                        stroke="#dc2626" 
-                        dot={false} 
+                      <Line
+                        type="monotone"
+                        dataKey="split5"
+                        name="5-Stroke Avg"
+                        stroke="#dc2626"
+                        dot={false}
                         strokeWidth={2}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="split10" 
-                        name="10-Stroke Avg" 
-                        stroke="#f59e0b" 
-                        dot={false} 
+                      <Line
+                        type="monotone"
+                        dataKey="split10"
+                        name="10-Stroke Avg"
+                        stroke="#f59e0b"
+                        dot={false}
                         strokeWidth={2}
                       />
                     </LineChart>
@@ -763,8 +776,8 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={distributions.power} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                      <XAxis dataKey="range" angle={-45} textAnchor="end" height={60} interval={0} fontSize={12} />
-                      <YAxis allowDecimals={false} />
+                      <XAxis dataKey="range" angle={-45} textAnchor="end" height={60} interval={0} fontSize={chartTheme.axis.fontSize} tick={{ fill: chartTheme.axis.tickColor }} stroke={chartTheme.axis.strokeColor} />
+                      <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
                       <Bar dataKey="count" name="Strokes" fill="#2563eb" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -784,8 +797,8 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={distributions.spm} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                      <XAxis dataKey="rate" />
-                      <YAxis allowDecimals={false} />
+                      <XAxis dataKey="rate" tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                      <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
                       <Bar dataKey="count" name="Strokes" fill="#dc2626" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -803,13 +816,13 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <CardContent>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
-                        <YAxis type="number" dataKey="power" name="Power" unit="W" domain={['auto', 'auto']} />
-                        <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                        <Scatter name="Rate vs Power" data={enrichedData} fill="#8b5cf6" fillOpacity={0.6} />
-                     </ScatterChart>
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
+                      <YAxis type="number" dataKey="power" name="Power" unit="W" domain={['auto', 'auto']} />
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                      <Scatter name="Rate vs Power" data={enrichedData} fill="#8b5cf6" fillOpacity={0.6} />
+                    </ScatterChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -817,38 +830,38 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
 
             {/* Rate vs Split Efficiency */}
             <Card>
-               <CardHeader>
-                 <CardTitle>Rate vs Split</CardTitle>
-                 <CardDescription>Efficiency check: Faster rate should equal faster split</CardDescription>
-               </CardHeader>
-               <CardContent>
-                 <div className="h-[300px] w-full">
-                   <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                         <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
-                         <YAxis 
-                           type="number" 
-                           dataKey="split" 
-                           name="Split" 
-                           unit="s" 
-                           domain={['auto', 'auto']} 
-                           reversed={true}
-                           tickFormatter={(val) => formatDuration(val)} 
-                         />
-                         <Tooltip 
-                           cursor={{ strokeDasharray: '3 3' }} 
-                           formatter={(value: any, name: any) => [
-                             name === 'Split' ? formatDuration(value) : value,
-                             name
-                           ]}
-                         />
-                         <Scatter name="Rate vs Split" data={enrichedData} fill="#10b981" fillOpacity={0.6} />
-                      </ScatterChart>
-                   </ResponsiveContainer>
-                 </div>
-               </CardContent>
-             </Card>
+              <CardHeader>
+                <CardTitle>Rate vs Split</CardTitle>
+                <CardDescription>Efficiency check: Faster rate should equal faster split</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
+                      <YAxis
+                        type="number"
+                        dataKey="split"
+                        name="Split"
+                        unit="s"
+                        domain={['auto', 'auto']}
+                        reversed={true}
+                        tickFormatter={(val) => formatDuration(val)}
+                      />
+                      <Tooltip
+                        cursor={{ strokeDasharray: '3 3' }}
+                        formatter={(value: any, name: any) => [
+                          name === 'Split' ? formatDuration(value) : value,
+                          name
+                        ]}
+                      />
+                      <Scatter name="Rate vs Split" data={enrichedData} fill="#10b981" fillOpacity={0.6} />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>

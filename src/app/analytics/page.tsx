@@ -14,6 +14,7 @@ import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
 import { CloudInsight } from '@/lib/cloudAI';
+import { chartTheme } from '@/lib/chartUtils';
 
 // Time range options
 type TimeRange = '7days' | '30days' | '90days' | 'all';
@@ -134,7 +135,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   }
@@ -169,9 +170,9 @@ function prepareChartData(sessions: any[]) {
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     .map(session => ({
-      date: new Date(session.timestamp).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      date: new Date(session.timestamp).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
       }),
       distance: session.distance,
       fullDate: session.timestamp
@@ -182,9 +183,9 @@ function prepareChartData(sessions: any[]) {
 const CustomTooltip = ({ active, payload, label, config }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-gray-300 border-2 border-black rounded-lg p-2 shadow-lg">
-        <p className="text-black font-medium text-sm">{label}</p>
-        <p className="text-black text-sm">
+      <div style={chartTheme.tooltip.contentStyle}>
+        <p style={chartTheme.tooltip.labelStyle}>{label}</p>
+        <p style={chartTheme.tooltip.itemStyle}>
           {config.formatter(payload[0].value)} - {config.label}
         </p>
       </div>
@@ -198,21 +199,21 @@ const Analytics = () => {
   const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
-  
+
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
-  
+
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
 
   // AI Insights hook
-  const { 
-    insights, 
-    trends, 
-    trainingLoad, 
-    anomalies, 
-    isAnalyzable, 
-    lastAnalyzed, 
+  const {
+    insights,
+    trends,
+    trainingLoad,
+    anomalies,
+    isAnalyzable,
+    lastAnalyzed,
     refreshInsights,
     archivedInsights,
     archiveInsight,
@@ -230,13 +231,13 @@ const Analytics = () => {
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
       if (timeRange === 'all') return true;
-      
+
       const sessionDate = new Date(session.timestamp);
       const now = new Date();
       const daysAgo = timeRangeOptions.find(option => option.value === timeRange)?.days;
-      
+
       if (!daysAgo) return true;
-      
+
       const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
       return sessionDate >= cutoffDate;
     });
@@ -254,17 +255,17 @@ const Analytics = () => {
     }, { totalDistance: 0, totalTime: 0, totalPower: 0, sessionCount: 0 });
   }, [filteredSessions]);
 
-  const avgPace = filteredStats.sessionCount > 0 && filteredStats.totalDistance > 0 
+  const avgPace = filteredStats.sessionCount > 0 && filteredStats.totalDistance > 0
     ? (filteredStats.totalTime / (filteredStats.totalDistance / 500))
     : 0;
-  const avgPower = filteredStats.sessionCount > 0 
-    ? filteredStats.totalPower / filteredStats.sessionCount 
+  const avgPower = filteredStats.sessionCount > 0
+    ? filteredStats.totalPower / filteredStats.sessionCount
     : 0;
 
   // Check if user has data
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
-  
+
   // Prepare chart data for different metrics
   const prepareChartData = (sessions: any[], metric: ChartMetric) => {
     return sessions.map(session => ({
@@ -292,10 +293,10 @@ const Analytics = () => {
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
     const currentCharts = chartSettings.enabledCharts;
-    const updatedCharts = currentCharts.includes(metric) 
+    const updatedCharts = currentCharts.includes(metric)
       ? currentCharts.filter(m => m !== metric)
       : [...currentCharts, metric];
-    
+
     updateChartSettings({ enabledCharts: updatedCharts });
   };
 
@@ -337,19 +338,21 @@ const Analytics = () => {
       onClick: (data: any) => handleChartClick(data, chartData)
     };
 
+    // ... existing code ...
+
     const commonChartElements = (
       <>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-        <XAxis 
-          dataKey="date" 
+        <XAxis
+          dataKey="date"
           className="text-xs"
-          stroke="#6b7280"
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          stroke={chartTheme.axis.strokeColor}
+          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
         />
-        <YAxis 
+        <YAxis
           className="text-xs"
-          stroke="#6b7280"
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          stroke={chartTheme.axis.strokeColor}
+          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
           tickFormatter={config.yAxisFormatter}
         />
         <Tooltip content={<CustomTooltip config={config} />} />
@@ -361,8 +364,8 @@ const Analytics = () => {
         return (
           <BarChart {...barAreaProps}>
             {commonChartElements}
-            <Bar 
-              dataKey={metric} 
+            <Bar
+              dataKey={metric}
               fill={config.color}
               radius={[4, 4, 0, 0]}
               cursor="pointer"
@@ -373,9 +376,9 @@ const Analytics = () => {
         return (
           <AreaChart {...barAreaProps}>
             {commonChartElements}
-            <Area 
-              type="monotone" 
-              dataKey={metric} 
+            <Area
+              type="monotone"
+              dataKey={metric}
               stroke={config.color}
               fill={config.color}
               fillOpacity={config.fillOpacity}
@@ -388,14 +391,14 @@ const Analytics = () => {
         return (
           <LineChart {...commonProps}>
             {commonChartElements}
-            <Line 
-              type="monotone" 
-              dataKey={metric} 
+            <Line
+              type="monotone"
+              dataKey={metric}
               stroke={config.color}
               strokeWidth={2}
               dot={{ fill: config.color, strokeWidth: 2, r: 4, cursor: 'pointer' }}
-              activeDot={{ 
-                r: 6, 
+              activeDot={{
+                r: 6,
                 cursor: 'pointer',
                 onClick: (e: any, payload: any) => {
                   // For Line charts, payload is the data point, but let's be safe and use index lookup
@@ -419,14 +422,14 @@ const Analytics = () => {
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded w-64 mb-2"></div>
             <div className="h-4 bg-muted rounded w-96 mb-8"></div>
-            
+
             {/* Stats cards skeleton */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="h-32 bg-muted rounded-lg"></div>
               ))}
             </div>
-            
+
             {/* Chart skeleton */}
             <div className="h-8 bg-muted rounded w-48 mb-4"></div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -579,7 +582,7 @@ const Analytics = () => {
                   </p>
                 </div>
               </div>
-              
+
               {/* Chart Selector */}
               <Card className="mb-6">
                 <CardHeader>
@@ -635,7 +638,7 @@ const Analytics = () => {
                     {Object.entries(chartConfigs).map(([metric, config]) => {
                       const Icon = config.icon;
                       const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
-                      
+
                       return (
                         <Button
                           key={metric}
@@ -651,7 +654,7 @@ const Analytics = () => {
                     })}
                   </div>
                   <div className="mt-4 text-sm text-muted-foreground">
-                    {chartSettings.enabledCharts.length === 0 
+                    {chartSettings.enabledCharts.length === 0
                       ? "No charts selected. Select at least one metric to visualize."
                       : `Showing ${chartSettings.enabledCharts.length} chart${chartSettings.enabledCharts.length > 1 ? 's' : ''} as ${chartSettings.chartType} visualization${chartSettings.chartType !== 'line' ? 's' : ''}`
                     }
@@ -667,7 +670,7 @@ const Analytics = () => {
                   const config = chartConfigs[metric];
                   const Icon = config.icon;
                   const chartData = chartDataMap[metric];
-                  
+
                   return (
                     <Card key={metric}>
                       {config.isSpecial && metric === 'splitTime' ? (
@@ -730,7 +733,7 @@ const Analytics = () => {
               </Card>
             )}
 
-            </div>
+          </div>
         )}
       </div>
     </div>
