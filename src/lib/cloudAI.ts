@@ -13,34 +13,34 @@ interface OpenAIConfig {
 interface ApiRequestConfig {
   // Input (string for simple, array for conversations)
   input: string | Array<{ role: string; content: string }>;
-  
+
   // Optional system-level guidance (higher priority than input)
   instructions?: string;
-  
+
   // Model selection per use case
   model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1';
-  
+
   // Reasoning effort per use case
   reasoning: "none" | "low" | "medium" | "high";
-  
+
   // Output verbosity
   verbosity: "low" | "medium" | "high";
-  
+
   // Maximum output tokens
   maxTokens: number;
-  
+
   // Optional conversation chaining
   previousResponseId?: string;
-  
+
   // Optional structured output format
   jsonSchema?: {
     name: string;
     schema: object;
   };
-  
+
   // Optional storage control
   store?: boolean;
-  
+
   // Tools (rarely used in our app)
   tools?: Array<{
     type: "function";
@@ -85,9 +85,9 @@ export class CloudAIService {
   private static instance: CloudAIService;
   private config: OpenAIConfig | null = null;
   private aiSettings: any = null; // Store AI settings for API calls
-  
-  private constructor() {}
-  
+
+  private constructor() { }
+
   static getInstance(): CloudAIService {
     if (!CloudAIService.instance) {
       CloudAIService.instance = new CloudAIService();
@@ -99,26 +99,26 @@ export class CloudAIService {
   initialize(apiKey?: string): boolean {
     // Priority: user-provided key > environment variable
     const key = apiKey || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-    
+
     if (!key) {
       console.warn('OpenAI API key not provided');
       return false;
     }
-    
+
     // Get AI settings for model configuration
     const settings = SettingsService.getInstance().getSettings();
     const aiSettings = settings.aiSettings;
-    
+
     // Always update config (even if already initialized) to pick up settings changes
     this.config = {
       apiKey: key,
       model: 'gpt-5.1', // Default model (per-use-case models are used in actual calls)
       baseUrl: 'https://api.openai.com/v1'
     };
-    
+
     // Always update AI settings for use in API calls
     this.aiSettings = aiSettings;
-    
+
     console.log('CloudAI initialized with settings:', {
       chatReasoning: this.aiSettings.chat.reasoning,
       insightsReasoning: this.aiSettings.insights.reasoning,
@@ -126,7 +126,7 @@ export class CloudAIService {
       maxTokens: this.aiSettings.maxTokens,
       insightsPrompt: this.aiSettings.insightsPrompt?.substring(0, 100) + '...'
     });
-    
+
     return true;
   }
 
@@ -137,7 +137,7 @@ export class CloudAIService {
 
   // Send chat message to AI trainer
   async sendChatMessage(
-    message: string, 
+    message: string,
     conversationHistory: ChatMessage[] = [],
     userSessions?: Session[],
     previousResponseId?: string
@@ -158,12 +158,12 @@ export class CloudAIService {
         previousResponseId,    // Automatic context chaining
         store: true            // Store for future chaining
       };
-      
+
       const response = await this.makeApiCall(config);
-      
-      return { 
-        content: this.parseResponse(response), 
-        responseId: response.id 
+
+      return {
+        content: this.parseResponse(response),
+        responseId: response.id
       };
     } catch (error) {
       console.error('Chat AI failed:', error);
@@ -177,21 +177,21 @@ export class CloudAIService {
       model: config.model, // Use model from config instead of hardcoded
       max_output_tokens: config.maxTokens
     };
-    
+
     // Input (string or array - both work!)
     request.input = config.input;
-    
+
     // Instructions (if provided)
     if (config.instructions) {
       request.instructions = config.instructions;
     }
-    
+
     // Reasoning effort - map model-specific values
     const reasoningMapping: Record<string, Record<string, string>> = {
       'gpt-5-mini': {
         'none': 'minimal', // Map 'none' to 'minimal' for gpt-5-mini
         'low': 'low',
-        'medium': 'medium', 
+        'medium': 'medium',
         'high': 'high'
       },
       'gpt-5-nano': {
@@ -207,13 +207,13 @@ export class CloudAIService {
         'high': 'high'
       }
     };
-    
+
     const mappedReasoning = reasoningMapping[config.model]?.[config.reasoning] || config.reasoning;
     request.reasoning = { effort: mappedReasoning };
-    
+
     // Verbosity and structured outputs
     request.text = { verbosity: config.verbosity };
-    
+
     if (config.jsonSchema) {
       request.text.format = {
         type: "json_schema",
@@ -222,21 +222,21 @@ export class CloudAIService {
         schema: config.jsonSchema.schema
       };
     }
-    
+
     // State management
     if (config.store !== undefined) {
       request.store = config.store;
     }
-    
+
     if (config.previousResponseId) {
       request.previous_response_id = config.previousResponseId;
     }
-    
+
     // Tools (if needed)
     if (config.tools?.length) {
       request.tools = config.tools;
     }
-    
+
     return request;
   }
 
@@ -246,29 +246,29 @@ export class CloudAIService {
     if (data.output_text) {
       return data.output_text;
     }
-    
+
     // Manual parsing (for HTTP responses)
     const messageOutput = data.output?.find(
       (item: any) => item.type === 'message'
     );
-    
+
     if (messageOutput?.content?.length > 0) {
       const textContent = messageOutput.content.find(
         (c: any) => c.type === 'output_text'
       );
-      
+
       if (textContent?.text) {
         return textContent.text;
       }
     }
-    
+
     throw new Error('Unable to extract text from response');
   }
 
   // Make API call to GPT-5.1 Responses API
   private async makeApiCall(config: ApiRequestConfig): Promise<any> {
     const requestBody = this.buildRequest(config);
-    
+
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -287,52 +287,12 @@ export class CloudAIService {
     return data;
   }
 
-  // Convert messages array to input string for Responses API
-  private convertMessagesToInput(messages: any[]): string {
-    return messages.map(msg => {
-      const role = msg.role === 'system' ? 'System' : msg.role === 'user' ? 'User' : 'Assistant';
-      return `${role}: ${msg.content}`;
-    }).join('\n\n');
-  }
 
-  // Build chat message array with system prompt and conversation context
-  private buildChatMessages(
-    userMessage: string, 
-    history: ChatMessage[], 
-    sessions?: Session[]
-  ): any[] {
-    const systemPrompt = this.getChatSystemPrompt(sessions);
-    
-    // Start with system prompt
-    const messages = [
-      {
-        role: 'system',
-        content: systemPrompt
-      }
-    ];
-
-    // Add conversation history (last 10 messages to maintain context)
-    const recentHistory = history.slice(-10);
-    recentHistory.forEach(msg => {
-      messages.push({
-        role: msg.role,
-        content: msg.content
-      });
-    });
-
-    // Add current user message
-    messages.push({
-      role: 'user',
-      content: userMessage
-    });
-
-    return messages;
-  }
 
   // Get system prompt for chat AI trainer
   private getChatSystemPrompt(sessions?: Session[]): string {
     const sessionContext = sessions ? this.getSessionContext(sessions) : '';
-    
+
     return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
 
 YOUR EXPERTISE:
@@ -393,11 +353,11 @@ Use this data to provide personalized coaching and reference their actual perfor
   // Calculate time span of sessions
   private getDaysSpan(sessions: Session[]): number {
     if (sessions.length < 2) return 0;
-    
+
     const dates = sessions.map(s => new Date(s.timestamp));
     const oldest = new Date(Math.min(...dates.map(d => d.getTime())));
     const newest = new Date(Math.max(...dates.map(d => d.getTime())));
-    
+
     return Math.ceil((newest.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24));
   }
 
@@ -414,8 +374,8 @@ Use this data to provide personalized coaching and reference their actual perfor
     }));
   }
 
-  
-  
+
+
   // Generate rowing-specific insights using OpenAI
   async generateInsights(sessions: Session[]): Promise<CloudInsight[]> {
     if (!this.config) {
@@ -430,7 +390,7 @@ Use this data to provide personalized coaching and reference their actual perfor
       const anonymizedData = this.anonymizeSessions(sessions);
       const prompt = this.buildInsightPrompt(anonymizedData);
       const useCaseConfig = this.aiSettings.insights;
-      
+
       const config: ApiRequestConfig = {
         input: `${this.getSystemPrompt()}\n\n${prompt}`,
         model: useCaseConfig.model, // Use model from AI settings
@@ -468,11 +428,11 @@ Use this data to provide personalized coaching and reference their actual perfor
           }
         }
       };
-      
+
       const response = await this.makeApiCall(config);
       const content = this.parseResponse(response);
       const data = JSON.parse(content);
-      
+
       return data.insights;
     } catch (error) {
       console.error('Cloud AI analysis failed:', error);
@@ -507,14 +467,14 @@ Focus on practical advice that helps rowers improve performance while avoiding i
     // Include more sessions for better progress analysis
     const recentSessions = sessions.slice(-20); // Last 20 sessions for better context
     const sessionSummary = this.createSessionSummary(recentSessions);
-    
+
     // Add training summary for progress analysis
     const trainingSummary = this.createTrainingSummary(sessions);
-    
+
     // Get configurable insights prompt from settings
     const settings = SettingsService.getInstance().getSettings();
     const insightsPrompt = settings.aiSettings.insightsPrompt || this.getDefaultInsightsPrompt();
-    
+
     // Restructure prompt to make analysis task clear
     let finalPrompt = `You are an expert rowing coach analyzing training data. The user has a specific request below.
 
@@ -548,7 +508,7 @@ JSON structure:
 ]
 
 CRITICAL: Your response must be ONLY the JSON array of insights. Do not include any explanations, markdown, or the training data itself.`;
-    
+
     return finalPrompt;
   }
 
@@ -593,7 +553,7 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
       const pace = session.pace ? `${this.formatPace(session.pace)}/500m` : 'N/A';
       const power = session.power ? `${Math.round(session.power)}W` : 'N/A';
       const strokeRate = session.strokeRate ? `${Math.round(session.strokeRate)} spm` : 'N/A';
-      
+
       return `Session ${index + 1} (${session.date}):
   - Distance: ${session.distance}m
   - Duration: ${this.formatDuration(session.duration)}
@@ -619,10 +579,10 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
     // Calculate recent vs older comparisons for progress
     const recentSessions = sessions.slice(-5);
     const olderSessions = sessions.slice(-10, -5);
-    
+
     const recentAvgPace = recentSessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / recentSessions.filter(s => s.pace).length || 0;
     const olderAvgPace = olderSessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / olderSessions.filter(s => s.pace).length || 0;
-    
+
     const paceTrend = recentAvgPace < olderAvgPace ? 'improving (faster)' : recentAvgPace > olderAvgPace ? 'declining (slower)' : 'stable';
 
     // Date range
@@ -652,10 +612,10 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
   private parseInsightResponse(response: string): CloudInsight[] {
     try {
       console.log('Raw AI response:', response); // Debug logging
-      
+
       // Multiple attempts to extract JSON from response
       let jsonString = '';
-      
+
       // Try 1: Look for JSON array with markdown code blocks
       const markdownMatch = response.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
       if (markdownMatch) {
@@ -682,20 +642,20 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
           }
         }
       }
-      
+
       // Clean up the JSON string
       jsonString = jsonString
         .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
         .replace(/\\n/g, '\\\\n') // Fix escaped newlines
         .trim();
-      
+
       console.log('Extracted JSON:', jsonString); // Debug logging
-      
+
       const insightsData = JSON.parse(jsonString);
-      
+
       // Ensure we have an array
       const insightsArray = Array.isArray(insightsData) ? insightsData : [insightsData];
-      
+
       return insightsArray.map((insight: any, index: number) => ({
         id: `cloud-insight-${Date.now()}-${index}`,
         type: insight.type || 'recommendation',
@@ -710,7 +670,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
     } catch (error) {
       console.error('Failed to parse AI response:', error);
       console.error('Response content:', response);
-      
+
       // Return fallback insight instead of throwing
       return [{
         id: `cloud-insight-fallback-${Date.now()}`,
@@ -740,7 +700,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
 
     try {
       const prompt = this.buildPlanGenerationPrompt(goals, level, focus, duration, userSessions);
-      
+
       const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanGenerationSystemPrompt()}\n\n${prompt}`,
@@ -791,11 +751,11 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
           }
         }
       };
-      
+
       const response = await this.makeApiCall(config);
       const content = this.parseResponse(response);
       const planData = JSON.parse(content);
-      
+
       return this.createTrainingPlanFromAI(planData, goals, level, focus, duration);
     } catch (error) {
       console.error('Training plan generation failed:', error);
@@ -815,7 +775,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
 
     try {
       const prompt = this.buildPlanModificationPrompt(plan, modificationRequest, userSessions);
-      
+
       const useCaseConfig = this.aiSettings.trainingPlans;
       const config: ApiRequestConfig = {
         input: `${this.getPlanModificationSystemPrompt()}\n\n${prompt}`,
@@ -866,10 +826,10 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
           }
         }
       };
-      
+
       const response = await this.makeApiCall(config);
       const modifications = JSON.parse(this.parseResponse(response));
-      
+
       return this.applyPlanModifications(plan, modifications);
     } catch (error) {
       console.error('Plan modification failed:', error);
@@ -889,7 +849,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
     try {
       const prompt = this.buildAdherenceAnalysisPrompt(plan, userSessions);
       const useCaseConfig = this.aiSettings.insights;
-      
+
       const config: ApiRequestConfig = {
         input: `${this.getAdherenceAnalysisSystemPrompt()}\n\n${prompt}`,
         model: useCaseConfig.model, // Use model from AI settings
@@ -897,7 +857,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         verbosity: useCaseConfig.verbosity,
         maxTokens: 1000
       };
-      
+
       const response = await this.makeApiCall(config);
       return this.parseResponse(response);
     } catch (error) {
@@ -915,7 +875,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
     userSessions?: Session[]
   ): string {
     const userContext = userSessions ? this.getUserContextForPlanning(userSessions) : '';
-    
+
     return `Generate a ${duration}-week training plan for a ${level} rower focusing on ${focus}.
 
 GOALS: ${goals.join(', ')}
@@ -940,7 +900,7 @@ Create exactly ${duration} weeks with 3-6 sessions per week.`;
   ): string {
     const planSummary = this.summarizePlan(plan);
     const userContext = userSessions ? this.getUserContextForPlanning(userSessions) : '';
-    
+
     return `Modify the following training plan based on the user's request:
 
 CURRENT PLAN:
@@ -977,7 +937,7 @@ Only modify what's necessary to address the user's request.`;
   // Build prompt for adherence analysis
   private buildAdherenceAnalysisPrompt(plan: TrainingPlan, userSessions: Session[]): string {
     const adherenceData = this.calculateAdherenceMetrics(plan, userSessions);
-    
+
     return `Analyze the training plan adherence and provide recommendations:
 
 PLAN ADHERENCE DATA:
@@ -1053,7 +1013,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
       console.log('- Raw response length:', response.length);
       console.log('- Raw response preview (first 200 chars):', response.substring(0, 200));
       console.log('- Raw response preview (last 200 chars):', response.substring(response.length - 200));
-      
+
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.log('❌ No JSON found in response - checking for markdown wrapping');
@@ -1061,41 +1021,41 @@ Maintain a supportive, motivational tone while being honest about adherence patt
         console.log('- Contains "json":', response.includes('json'));
         throw new Error('No JSON found in AI response');
       }
-      
+
       let extractedJson = jsonMatch[0];
       console.log('✅ JSON extracted with regex');
       console.log('- Extracted JSON length:', extractedJson.length);
       console.log('- JSON starts with:', extractedJson.substring(0, 100));
       console.log('- JSON ends with:', extractedJson.substring(extractedJson.length - 100));
-      
+
       // Check for common JSON issues around position 8500
       if (extractedJson.length > 8500) {
         const errorContext = extractedJson.substring(8450, 8550);
         console.log('🎯 Context around error position 8500:', errorContext);
-        
+
         // Check for trailing commas
         const trailingCommaMatches = extractedJson.match(/,\s*[}\]]/g);
         if (trailingCommaMatches) {
           console.log('⚠️ Found trailing commas in JSON:', trailingCommaMatches.length, 'instances');
         }
-        
+
         // Check for incomplete arrays/objects
         const openBraces = (extractedJson.match(/\{/g) || []).length;
         const closeBraces = (extractedJson.match(/\}/g) || []).length;
         const openBrackets = (extractedJson.match(/\[/g) || []).length;
         const closeBrackets = (extractedJson.match(/\]/g) || []).length;
-        
+
         console.log('📊 Brace/Bracket balance:');
         console.log('- Open braces {:', openBraces, 'Close braces }:', closeBraces);
         console.log('- Open brackets [:', openBrackets, 'Close brackets ]:', closeBrackets);
-        
+
         if (openBraces !== closeBraces || openBrackets !== closeBrackets) {
           console.log('❌ Unbalanced braces/brackets - attempting JSON repair...');
           extractedJson = this.repairIncompleteJSON(extractedJson, openBraces, closeBraces, openBrackets, closeBrackets);
           console.log('🔧 JSON repaired, new length:', extractedJson.length);
         }
       }
-      
+
       const parsed = JSON.parse(extractedJson);
       console.log('✅ JSON parsed successfully');
       return parsed;
@@ -1116,28 +1076,28 @@ Maintain a supportive, motivational tone while being honest about adherence patt
 
   private repairIncompleteJSON(json: string, openBraces: number, closeBraces: number, openBrackets: number, closeBrackets: number): string {
     let repaired = json;
-    
+
     // Remove trailing commas that might be causing the issue
     repaired = repaired.replace(/,\s*([}\]])/g, '$1');
-    
+
     // Add missing closing brackets and braces
     const missingBraces = openBraces - closeBraces;
     const missingBrackets = openBrackets - closeBrackets;
-    
+
     // Add missing closing brackets first (inner structures)
     for (let i = 0; i < missingBrackets; i++) {
       repaired += ']';
     }
-    
+
     // Add missing closing braces (outer structures)
     for (let i = 0; i < missingBraces; i++) {
       repaired += '}';
     }
-    
+
     console.log('🔧 JSON repair applied:');
     console.log('- Added', missingBrackets, 'closing brackets');
     console.log('- Added', missingBraces, 'closing braces');
-    
+
     return repaired;
   }
 
@@ -1206,15 +1166,15 @@ Maintain a supportive, motivational tone while being honest about adherence patt
   private applyPlanModifications(plan: TrainingPlan, modifications: any): TrainingPlan {
     // Apply modifications to the plan
     const updatedPlan = { ...plan };
-    
+
     if (modifications.title) {
       updatedPlan.title = modifications.title;
     }
-    
+
     if (modifications.description) {
       updatedPlan.description = modifications.description;
     }
-    
+
     if (modifications.weekModifications) {
       modifications.weekModifications.forEach((weekMod: any) => {
         const weekIndex = updatedPlan.weeks.findIndex(w => w.weekNumber === weekMod.weekNumber);
@@ -1222,7 +1182,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
           if (weekMod.focus) {
             updatedPlan.weeks[weekIndex].focus = weekMod.focus;
           }
-          
+
           if (weekMod.sessionChanges) {
             weekMod.sessionChanges.forEach((change: any) => {
               if (change.action === 'add') {
@@ -1252,7 +1212,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
         }
       });
     }
-    
+
     updatedPlan.updatedAt = new Date();
     return updatedPlan;
   }
@@ -1315,7 +1275,7 @@ Use this data to create an appropriate plan that matches their current fitness a
 
   private calculateWeeklyFrequency(sessions: Session[]): number {
     if (sessions.length < 7) return sessions.length;
-    
+
     const recentSessions = sessions.slice(-28); // Last 4 weeks
     const weeksSpan = this.getDaysSpan(recentSessions) / 7 || 1;
     return recentSessions.length / weeksSpan;
@@ -1332,7 +1292,7 @@ Use this data to create an appropriate plan that matches their current fitness a
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m ${secs}s`;
     } else if (minutes > 0) {
@@ -1352,14 +1312,14 @@ Use this data to create an appropriate plan that matches their current fitness a
   // Test API connection
   async testConnection(): Promise<boolean> {
     if (!this.config) return false;
-    
+
     try {
       const response = await fetch(`${this.config.baseUrl}/models`, {
         headers: {
           'Authorization': `Bearer ${this.config.apiKey}`,
         }
       });
-      
+
       return response.ok;
     } catch (error) {
       console.error('API connection test failed:', error);
