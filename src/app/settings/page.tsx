@@ -10,12 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
-import { 
-  Settings as SettingsIcon, 
-  User, 
-  Database, 
-  Target, 
-  Bell, 
+import {
+  Settings as SettingsIcon,
+  User,
+  Database,
+  Target,
+  Bell,
   Shield,
   Brain,
   Download,
@@ -42,28 +42,28 @@ export default function SettingsPage() {
   // Toast component for overlay notifications
   const Toast = ({ message, type, onExit }: { message: string; type: 'success' | 'error'; onExit: () => void }) => {
     const [isVisible, setIsVisible] = useState(false);
-    
+
     useEffect(() => {
       // Trigger fade-in animation on mount
       setIsVisible(true);
     }, []);
-    
+
     const handleExit = () => {
       setIsVisible(false);
       setTimeout(onExit, 300); // Wait for slide-out animation
     };
-    
+
     useEffect(() => {
       // Auto-dismiss and trigger exit animation
       const exitTimer = setTimeout(handleExit, type === 'success' ? 3000 : 5000);
       return () => clearTimeout(exitTimer);
     }, [type, onExit]);
-    
+
     return (
       <div
         className={`
           fixed bottom-4 right-4 z-50 max-w-sm transform transition-all duration-300 ease-in-out
-          ${isVisible 
+          ${isVisible
             ? 'translate-x-0 opacity-100 scale-100'  // Fade in (visible)
             : 'translate-x-0 opacity-0 scale-100'    // Start faded out (no slide)
           }
@@ -72,8 +72,8 @@ export default function SettingsPage() {
         <div
           className={`
             rounded-lg border p-4 shadow-lg flex items-center gap-3
-            ${type === 'success' 
-              ? 'bg-green-700 text-white border-green-800' 
+            ${type === 'success'
+              ? 'bg-green-700 text-white border-green-800'
               : 'border-red-200 text-red-800 bg-red-50'
             }
           `}
@@ -88,11 +88,11 @@ export default function SettingsPage() {
       </div>
     );
   };
-  
+
   // AI Settings state moved to component level (React Rules of Hooks)
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  
+
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
     if (connectionStatus === 'success' || connectionStatus === 'error') {
@@ -195,6 +195,13 @@ export default function SettingsPage() {
   const clearDataCategory = (category: 'sessions' | 'chatHistory' | 'trainingPlans') => {
     if (confirm(`Are you sure you want to clear all ${category}? This cannot be undone.`)) {
       settings.clearDataCategory(category);
+
+      // Also clear from Zustand store if clearing sessions
+      if (category === 'sessions') {
+        const { useRowingStore } = require('@/lib/store');
+        useRowingStore.getState().clearSessions();
+      }
+
       setSuccessMessage(`${category} cleared successfully`);
     }
   };
@@ -317,7 +324,7 @@ export default function SettingsPage() {
 
   const renderDataManagement = () => {
     const storageUsage = settings.calculateStorageUsage();
-    
+
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -359,7 +366,7 @@ export default function SettingsPage() {
                 />
                 <Label>Enable Auto Save</Label>
               </div>
-              
+
               {settingsData.dataManagement.autoSave && (
                 <div>
                   <Label htmlFor="autoSaveInterval">Save Interval (minutes)</Label>
@@ -389,7 +396,7 @@ export default function SettingsPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Export Settings
               </Button>
-              
+
               <Button variant="outline" asChild>
                 <label className="cursor-pointer flex items-center">
                   <Upload className="h-4 w-4 mr-2" />
@@ -421,7 +428,7 @@ export default function SettingsPage() {
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear Sessions
               </Button>
-              
+
               <Button
                 variant="outline"
                 onClick={() => clearDataCategory('chatHistory')}
@@ -430,7 +437,7 @@ export default function SettingsPage() {
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear Chat History
               </Button>
-              
+
               <Button
                 variant="outline"
                 onClick={() => clearDataCategory('trainingPlans')}
@@ -509,7 +516,7 @@ export default function SettingsPage() {
                 <option value="duration">Duration (minutes)</option>
               </select>
             </div>
-            
+
             <div>
               <Label htmlFor="goalTarget">Target</Label>
               <Input
@@ -534,7 +541,7 @@ export default function SettingsPage() {
           />
           <Label>Rest Day Alerts</Label>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <Switch
             checked={settingsData.trainingSettings.adaptationEnabled}
@@ -561,7 +568,7 @@ export default function SettingsPage() {
               />
               <Label>Session Reminders</Label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Switch
                 checked={settingsData.notificationSettings.weeklyProgress}
@@ -569,7 +576,7 @@ export default function SettingsPage() {
               />
               <Label>Weekly Progress Reports</Label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Switch
                 checked={settingsData.notificationSettings.achievementAlerts}
@@ -577,7 +584,7 @@ export default function SettingsPage() {
               />
               <Label>Achievement Alerts</Label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Switch
                 checked={settingsData.notificationSettings.planReminders}
@@ -585,7 +592,7 @@ export default function SettingsPage() {
               />
               <Label>Training Plan Reminders</Label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Switch
                 checked={settingsData.notificationSettings.adherenceAlerts}
@@ -610,7 +617,7 @@ export default function SettingsPage() {
               />
               <Label>Enable Email Notifications</Label>
             </div>
-            
+
             {settingsData.notificationSettings.emailNotifications.enabled && (
               <>
                 <div>
@@ -625,7 +632,7 @@ export default function SettingsPage() {
                     className="mt-1"
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="emailFrequency">Frequency</Label>
                   <select
@@ -664,7 +671,7 @@ export default function SettingsPage() {
             />
             <Label>Share anonymous usage data</Label>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Switch
               checked={settingsData.privacySettings.analyticsEnabled}
@@ -672,7 +679,7 @@ export default function SettingsPage() {
             />
             <Label>Enable analytics</Label>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Switch
               checked={settingsData.privacySettings.crashReports}
@@ -680,7 +687,7 @@ export default function SettingsPage() {
             />
             <Label>Send crash reports</Label>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Switch
               checked={settingsData.privacySettings.localStorageOnly}
@@ -710,7 +717,7 @@ export default function SettingsPage() {
                 className="mt-1"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="chatRetention">Chat History Retention (days)</Label>
               <Input
@@ -748,12 +755,12 @@ export default function SettingsPage() {
     const testConnection = async () => {
       setIsTestingConnection(true);
       setConnectionStatus('testing');
-      
+
       try {
         // Configure cloudAI with current settings
         if (settingsData.aiSettings.openaiApiKey) {
           cloudAI.initialize(settingsData.aiSettings.openaiApiKey);
-          
+
           const success = await cloudAI.testConnection();
           setConnectionStatus(success ? 'success' : 'error');
         } else {
@@ -770,7 +777,7 @@ export default function SettingsPage() {
       switch (connectionStatus) {
         case 'testing':
           return (
-            <span 
+            <span
               className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
               style={{
                 color: '#1e40af',
@@ -784,7 +791,7 @@ export default function SettingsPage() {
           );
         case 'success':
           return (
-            <span 
+            <span
               className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
               style={{
                 color: '#166534',
@@ -798,7 +805,7 @@ export default function SettingsPage() {
           );
         case 'error':
           return (
-            <span 
+            <span
               className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
               style={{
                 color: '#dc2626',
@@ -812,7 +819,7 @@ export default function SettingsPage() {
           );
         default:
           return (
-            <span 
+            <span
               className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1"
               style={{
                 color: '#6b7280',
@@ -826,9 +833,9 @@ export default function SettingsPage() {
       }
     };
 
-    const isConfigured = settingsData.aiSettings.cloudAIEnabled && 
-                        settingsData.aiSettings.openaiApiKey && 
-                        connectionStatus === 'success';
+    const isConfigured = settingsData.aiSettings.cloudAIEnabled &&
+      settingsData.aiSettings.openaiApiKey &&
+      connectionStatus === 'success';
 
     return (
       <div className="space-y-6">
@@ -876,9 +883,9 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">
                     Your API key is stored locally and never shared with third parties.
                     Get your key from{' '}
-                    <a 
-                      href="https://platform.openai.com/api-keys" 
-                      target="_blank" 
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:underline"
                     >
@@ -918,7 +925,7 @@ export default function SettingsPage() {
                       <h3 className="text-lg font-semibold">AI Configuration per Use Case</h3>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Configure reasoning levels and verbosity for each AI feature. 
+                      Configure reasoning levels and verbosity for each AI feature.
                       All features use GPT-5.1 for optimal performance and quality.
                     </p>
                   </div>
@@ -939,7 +946,7 @@ export default function SettingsPage() {
                         <Label>Reasoning Effort</Label>
                         <select
                           value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -954,7 +961,7 @@ export default function SettingsPage() {
                         <Label>Response Verbosity</Label>
                         <select
                           value={settingsData.aiSettings.chat?.verbosity || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             chat: { ...settingsData.aiSettings.chat, verbosity: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -968,7 +975,7 @@ export default function SettingsPage() {
                         <Label>AI Model</Label>
                         <select
                           value={settingsData.aiSettings.chat?.model || 'gpt-5-mini'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1000,7 +1007,7 @@ export default function SettingsPage() {
                         <Label>Reasoning Effort</Label>
                         <select
                           value={settingsData.aiSettings.insights?.reasoning || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1015,7 +1022,7 @@ export default function SettingsPage() {
                         <Label>Response Verbosity</Label>
                         <select
                           value={settingsData.aiSettings.insights?.verbosity || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             insights: { ...settingsData.aiSettings.insights, verbosity: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1029,7 +1036,7 @@ export default function SettingsPage() {
                         <Label>AI Model</Label>
                         <select
                           value={settingsData.aiSettings.insights?.model || 'gpt-5-mini'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1061,7 +1068,7 @@ export default function SettingsPage() {
                         <Label>Reasoning Effort</Label>
                         <select
                           value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1076,7 +1083,7 @@ export default function SettingsPage() {
                         <Label>Response Verbosity</Label>
                         <select
                           value={settingsData.aiSettings.trainingPlans?.verbosity || 'high'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             trainingPlans: { ...settingsData.aiSettings.trainingPlans, verbosity: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1090,7 +1097,7 @@ export default function SettingsPage() {
                         <Label>AI Model</Label>
                         <select
                           value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.1'}
-                          onChange={(e) => saveSettings('aiSettings', { 
+                          onChange={(e) => saveSettings('aiSettings', {
                             trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
@@ -1130,7 +1137,7 @@ export default function SettingsPage() {
                 <Alert>
                   <Shield className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Privacy & Data:</strong> Your workout data is anonymized before sending to AI services. 
+                    <strong>Privacy & Data:</strong> Your workout data is anonymized before sending to AI services.
                     Only metrics like pace, power, and distance are shared - no personal information is transmitted.
                   </AlertDescription>
                 </Alert>
@@ -1140,8 +1147,8 @@ export default function SettingsPage() {
                   <Alert className="border-green-200 bg-green-50">
                     <Brain className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      <strong>AI Coach is ready!</strong> You'll now receive advanced AI-powered insights 
-                      based on your training data. These insights will appear alongside local analysis 
+                      <strong>AI Coach is ready!</strong> You'll now receive advanced AI-powered insights
+                      based on your training data. These insights will appear alongside local analysis
                       in your dashboard and chat.
                     </AlertDescription>
                   </Alert>
@@ -1154,7 +1161,7 @@ export default function SettingsPage() {
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Local Analysis Only:</strong> You'll receive insights based on statistical 
+                  <strong>Local Analysis Only:</strong> You'll receive insights based on statistical
                   analysis of your training data. Enable Cloud AI for more advanced, personalized recommendations.
                 </AlertDescription>
               </Alert>
@@ -1226,7 +1233,7 @@ export default function SettingsPage() {
                   placeholder="Configure the prompt used for generating AI insights in the dashboard..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  This prompt controls how the AI analyzes your rowing data and generates insights. 
+                  This prompt controls how the AI analyzes your rowing data and generates insights.
                   Use {`{sessionData}`} as a placeholder for the actual session data.
                 </p>
               </div>
@@ -1268,7 +1275,7 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -1282,17 +1289,17 @@ export default function SettingsPage() {
 
       {/* Toast Overlays */}
       {successMessage && (
-        <Toast 
-          message={successMessage} 
-          type="success" 
-          onExit={() => setSuccessMessage(null)} 
+        <Toast
+          message={successMessage}
+          type="success"
+          onExit={() => setSuccessMessage(null)}
         />
       )}
       {errorMessage && (
-        <Toast 
-          message={errorMessage} 
-          type="error" 
-          onExit={() => setErrorMessage(null)} 
+        <Toast
+          message={errorMessage}
+          type="error"
+          onExit={() => setErrorMessage(null)}
         />
       )}
 
@@ -1311,11 +1318,10 @@ export default function SettingsPage() {
                     <button
                       key={category.id}
                       onClick={() => setActiveCategory(category.id as SettingsCategory)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${
-                        activeCategory === category.id
+                      className={`w-full text-left p-3 rounded-lg transition-colors ${activeCategory === category.id
                           ? 'bg-primary text-primary-foreground'
                           : 'hover:bg-muted'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <Icon className="h-4 w-4" />

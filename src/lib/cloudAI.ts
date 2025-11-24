@@ -610,6 +610,11 @@ FORMATTING GUIDELINES:
 - ALWAYS use markdown formatting in your responses
 - Use ## for main sections and ### for subsections
 - When presenting session data, statistics, or comparisons: USE MARKDOWN TABLES (not bullet points!)
+- When displaying tables of session data:
+  * Show a MAXIMUM of 10 rows by default
+  * If you fetched more sessions, mention how many total sessions exist
+  * Only show more than 10 rows if the user explicitly requests it
+  * Example: "Here are your 10 most recent sessions (you have 45 total):"
 - Use proper markdown table syntax with pipes (|) and hyphens (-)
 - Use **bold** for emphasis and *italic* for subtle emphasis
 - Use bullet points ONLY for recommendations, tips, or non-tabular lists
