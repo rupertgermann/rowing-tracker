@@ -216,7 +216,7 @@ export class CloudAIService {
           model: useCaseConfig.model,
           reasoning: useCaseConfig.reasoning,
           verbosity: useCaseConfig.verbosity,
-          maxTokens: 1000,
+          maxTokens: this.aiSettings.maxTokens,
           previousResponseId: currentPreviousResponseId,
           store: true,
           tools: tools,
@@ -1155,7 +1155,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         model: useCaseConfig.model, // Use model from AI settings
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
-        maxTokens: 1000
+        maxTokens: this.aiSettings.maxTokens
       };
 
       const response = await this.makeApiCall(config);
