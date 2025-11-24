@@ -493,6 +493,14 @@ export class CloudAIService {
 
       // Construct final response object
       finalResponse.output = Object.values(activeItems);
+
+      // Safeguard: if output is empty, this is an error
+      if (!finalResponse.output || finalResponse.output.length === 0) {
+        console.error('Streaming completed but no output items were captured');
+        console.error('Final response:', finalResponse);
+        throw new Error('Streaming response had no output. This may indicate an API error or unsupported response format.');
+      }
+
       console.log('Final Streaming Response Constructed:', finalResponse);
       return finalResponse;
     }
@@ -533,7 +541,7 @@ export class CloudAIService {
       // Sort by date desc
       filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-      const limit = Math.min(args.limit || 5, 20);
+      const limit = args.limit || 5;
       return this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
     }
 
@@ -585,7 +593,17 @@ YOUR PERSONALITY:
 TOOLS AVAILABLE:
 - get_sessions: Use this to retrieve the user's rowing history. You can filter by date or get specific sessions.
   - ALWAYS use this tool if the user asks about their past performance, specific sessions, or progress.
-  - Set 'includeDetails' to true ONLY if the user asks for detailed stroke analysis, consistency check, or specific workout details.
+  - When the user asks for "all sessions" or requests more than 20 sessions:
+    * Set limit to 999 (to get all available sessions)
+    * Set includeDetails to FALSE (summaries only, no detailed stroke data)
+  - When the user asks for a specific number of sessions (20 or fewer):
+    * Set limit to the requested number
+    * Set includeDetails to FALSE (unless they specifically ask for detailed analysis)
+  - Set 'includeDetails' to TRUE ONLY when the user explicitly asks for:
+    * Detailed stroke analysis
+    * Stroke-by-stroke data
+    * Consistency checks
+    * Specific workout details or technique analysis
   - Do NOT assume you know the user's data unless you have called this tool.
 
 FORMATTING GUIDELINES:
