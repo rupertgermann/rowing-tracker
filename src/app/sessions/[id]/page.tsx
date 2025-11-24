@@ -12,14 +12,14 @@ import { Label } from '@/components/ui/label';
 import { parseStrokeCsv } from '@/lib/strokeParser';
 import { StrokeData } from '@/types/session';
 import { SessionAnalysis } from '@/components/SessionAnalysis';
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  Calendar, 
-  TrendingUp, 
-  Clock, 
-  Zap, 
-  Target, 
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  TrendingUp,
+  Clock,
+  Zap,
+  Target,
   Activity,
   Flame,
   Gauge,
@@ -38,7 +38,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   }
@@ -68,11 +68,40 @@ export default function SessionDetailPage() {
   const router = useRouter();
   const { getSessions, updateSession } = useRowingStore();
   const sessions = getSessions();
-  
+
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [strokeData, setStrokeData] = useState<StrokeData[] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+
+  // Find previous and next sessions for navigation
+  // We calculate this early so we can use it in the effect hook
+  const sortedSessions = [...sessions].sort((a, b) =>
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Use the ID from params to find current index, even if session state isn't set yet
+  const currentSessionId = params.id as string;
+  const currentIndex = sortedSessions.findIndex(s => s.id === currentSessionId);
+  const previousSession = currentIndex > 0 ? sortedSessions[currentIndex - 1] : null;
+  const nextSession = currentIndex < sortedSessions.length - 1 ? sortedSessions[currentIndex + 1] : null;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only navigate if we are not loading and have a session (or at least valid params)
+      // But mainly we just need the previous/next session to exist
+      if (loading) return;
+
+      if (e.key === 'ArrowLeft' && previousSession) {
+        router.push(`/sessions/${previousSession.id}`);
+      } else if (e.key === 'ArrowRight' && nextSession) {
+        router.push(`/sessions/${nextSession.id}`);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previousSession, nextSession, router, loading]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,7 +142,7 @@ export default function SessionDetailPage() {
   useEffect(() => {
     const sessionId = params.id as string;
     const foundSession = sessions.find(s => s.id === sessionId);
-    
+
     if (foundSession) {
       setSession(foundSession);
       if (foundSession.strokeData) {
@@ -164,15 +193,6 @@ export default function SessionDetailPage() {
     );
   }
 
-  // Find previous and next sessions for navigation
-  const sortedSessions = [...sessions].sort((a, b) => 
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-  
-  const currentIndex = sortedSessions.findIndex(s => s.id === session.id);
-  const previousSession = currentIndex > 0 ? sortedSessions[currentIndex - 1] : null;
-  const nextSession = currentIndex < sortedSessions.length - 1 ? sortedSessions[currentIndex + 1] : null;
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -193,7 +213,7 @@ export default function SessionDetailPage() {
               {formatDate(session.timestamp)}
             </p>
           </div>
-          
+
           {/* Previous/Next Navigation */}
           <div className="flex items-center gap-2">
             {previousSession && (
@@ -402,7 +422,7 @@ export default function SessionDetailPage() {
             <Activity className="h-6 w-6" />
             Stroke Analysis
           </h2>
-          
+
           {!strokeData ? (
             <Card>
               <CardContent className="pt-6">
@@ -418,11 +438,11 @@ export default function SessionDetailPage() {
                   </div>
                   <div className="w-full max-w-xs">
                     <Label htmlFor="csv-upload" className="sr-only">Upload CSV</Label>
-                    <Input 
-                      id="csv-upload" 
-                      type="file" 
-                      accept=".csv" 
-                      onChange={handleFileUpload} 
+                    <Input
+                      id="csv-upload"
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
                       disabled={analyzing}
                     />
                   </div>
@@ -432,12 +452,12 @@ export default function SessionDetailPage() {
             </Card>
           ) : (
             <div className="space-y-6">
-               <div className="flex justify-end">
-                  <Button variant="outline" onClick={handleClearAnalysis} size="sm">
-                    Clear Analysis
-                  </Button>
-               </div>
-               <SessionAnalysis data={strokeData} />
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={handleClearAnalysis} size="sm">
+                  Clear Analysis
+                </Button>
+              </div>
+              <SessionAnalysis data={strokeData} />
             </div>
           )}
         </div>
