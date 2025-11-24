@@ -428,63 +428,55 @@ export class CloudAIService {
 
               try {
                 const event = JSON.parse(dataStr);
+                console.log('Event:', event.type, event);
 
                 // Capture Response ID
                 if (event.response_id && !finalResponse.id) {
                   finalResponse.id = event.response_id;
                 }
 
-                // Handle Event Types
-                switch (event.type) {
-                  case 'response.output_item.added': {
-                    const index = event.output_index;
-                    activeItems[index] = event.item;
-                    // Initialize content if it's a message
-                    if (event.item.type === 'message' && !activeItems[index].content) {
-                      activeItems[index].content = [];
+                // Handle Event Types based on documented API
+                if (event.type === 'response.output_text.delta') {
+                  // Simple text delta - just call the callback
+                  if (event.delta) {
+                    config.onToken(event.delta);
+                  }
+                } else if (event.type === 'response.completed') {
+                  // Stream is complete - the event contains the full response
+                  if (event.response) {
+                    finalResponse = event.response;
+                  }
+                } else if (event.type === 'response.output_item.added') {
+                  const index = event.output_index;
+                  activeItems[index] = event.item;
+                  if (event.item.type === 'message' && !activeItems[index].content) {
+                    activeItems[index].content = [];
+                  }
+                } else if (event.type === 'response.content_part.added') {
+                  const index = event.output_index;
+                  const partIndex = event.content_index || 0;
+                  if (activeItems[index] && activeItems[index].type === 'message') {
+                    if (!activeItems[index].content[partIndex]) {
+                      activeItems[index].content[partIndex] = event.part;
                     }
-                    break;
                   }
-
-                  case 'response.content_part.added': {
-                    const index = event.output_index;
-                    const partIndex = event.content_index || 0;
-                    if (activeItems[index] && activeItems[index].type === 'message') {
-                      if (!activeItems[index].content[partIndex]) {
-                        activeItems[index].content[partIndex] = event.part;
-                      }
+                } else if (event.type === 'response.content_part.delta') {
+                  const index = event.output_index;
+                  const partIndex = event.content_index || 0;
+                  if (event.delta) {
+                    if (activeItems[index] && activeItems[index].content && activeItems[index].content[partIndex]) {
+                      activeItems[index].content[partIndex].text += event.delta;
                     }
-                    break;
+                    config.onToken(event.delta);
                   }
-
-                  case 'response.content_part.delta': {
-                    const index = event.output_index;
-                    const partIndex = event.content_index || 0;
-                    if (event.delta) {
-                      // Update local state
-                      if (activeItems[index] && activeItems[index].content && activeItems[index].content[partIndex]) {
-                        activeItems[index].content[partIndex].text += event.delta;
-                      }
-
-                      // Call callback
-                      config.onToken(event.delta);
-                    }
-                    break;
+                } else if (event.type === 'response.function_call_arguments.delta') {
+                  const index = event.output_index;
+                  if (activeItems[index] && activeItems[index].type === 'function_call') {
+                    activeItems[index].arguments += event.delta;
                   }
-
-                  case 'response.function_call_arguments.delta': {
-                    const index = event.output_index;
-                    if (activeItems[index] && activeItems[index].type === 'function_call') {
-                      activeItems[index].arguments += event.delta;
-                    }
-                    break;
-                  }
-
-                  case 'response.output_item.done': {
-                    const index = event.output_index;
-                    activeItems[index] = event.item; // Finalize item
-                    break;
-                  }
+                } else if (event.type === 'response.output_item.done') {
+                  const index = event.output_index;
+                  activeItems[index] = event.item;
                 }
 
               } catch (e) {
