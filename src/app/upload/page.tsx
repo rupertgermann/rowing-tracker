@@ -142,9 +142,9 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 py-4">
           <h1 className="text-4xl font-bold text-foreground">Upload SmartRow Data</h1>
           <p className="text-muted-foreground text-lg">
             Upload your CSV export or ZIP archive to visualize your rowing performance
@@ -156,8 +156,8 @@ export default function UploadPage() {
           <Card className="border-2 border-dashed transition-colors">
             <CardContent
               className={`p-12 text-center cursor-pointer transition-colors ${uploadState === 'dragging'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
+                ? 'border-primary bg-primary/5'
+                : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
                 }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -351,7 +351,7 @@ export default function UploadPage() {
 
         {/* Instructions */}
         {uploadState === 'idle' && (
-          <Card>
+          <Card className="my-4">
             <CardHeader>
               <CardTitle className="text-lg">How to Export from SmartRow</CardTitle>
               <CardDescription>
