@@ -73,7 +73,7 @@ export interface AISettings {
   cloudAIEnabled: boolean;
   openaiApiKey: string;
   maxTokens: number;
-  
+
   // Per-use-case configuration
   chat: UseCaseConfig;
   insights: UseCaseConfig;
@@ -99,7 +99,7 @@ export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
   private readonly CURRENT_VERSION = '1.1.0'; // Bumped to fix model field migration
-  
+
   private defaultSettings: Settings = {
     userPreferences: {
       theme: 'system',
@@ -164,7 +164,7 @@ export class SettingsService {
       openaiApiKey: '',
       cloudAIEnabled: false,
       maxTokens: 1500,
-      
+
       // Per-use-case configurations with smart defaults
       chat: {
         reasoning: 'minimal',      // Ultra-fast responses (compatible with all models)
@@ -216,8 +216,8 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
     updatedAt: new Date()
   };
 
-  private constructor() {}
-  
+  private constructor() { }
+
   static getInstance(): SettingsService {
     if (!SettingsService.instance) {
       SettingsService.instance = new SettingsService();
@@ -232,12 +232,12 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
       if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
         return { ...this.defaultSettings };
       }
-      
+
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) {
         return { ...this.defaultSettings };
       }
-      
+
       const settings = JSON.parse(stored);
       const migrated = this.migrateSettings(settings);
       this.saveSettings(migrated);
@@ -341,7 +341,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
   importSettings(settingsJson: string): { success: boolean; error?: string } {
     try {
       const importedSettings = JSON.parse(settingsJson);
-      
+
       // Validate settings structure
       if (!this.validateSettings(importedSettings)) {
         return { success: false, error: 'Invalid settings format' };
@@ -349,7 +349,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
       const migrated = this.migrateSettings(importedSettings);
       this.saveSettings(migrated);
-      
+
       return { success: true };
     } catch (error) {
       return { success: false, error: 'Failed to import settings' };
@@ -368,7 +368,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           total: 0
         };
       }
-      
+
       const sessions = localStorage.getItem('rowing_sessions');
       const chatHistory = localStorage.getItem('rowing_ai_chat_sessions');
       const trainingPlans = localStorage.getItem('rowing_training_plans');
@@ -381,8 +381,8 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
         total: 0
       };
 
-      usage.total = usage.sessions + usage.chatHistory + usage.trainingPlans + 
-                   (settings ? new Blob([settings]).size : 0);
+      usage.total = usage.sessions + usage.chatHistory + usage.trainingPlans +
+        (settings ? new Blob([settings]).size : 0);
 
       return usage;
     } catch (error) {
@@ -402,7 +402,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return;
     }
-    
+
     switch (category) {
       case 'sessions':
         localStorage.removeItem('rowing_sessions');
@@ -423,7 +423,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return;
     }
-    
+
     // Clear all app-specific localStorage items
     const keysToRemove = [
       'rowing_sessions',
@@ -452,15 +452,15 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
   private migrateSettings(settings: any): Settings {
     let migratedSettings = { ...settings };
-    
+
     // Handle AI settings migration from old flat structure to new nested structure
     if (settings.aiSettings) {
       const oldAiSettings = settings.aiSettings;
-      
+
       // Check if this is the old format (has flat model/temperature properties)
       if (oldAiSettings.model || oldAiSettings.temperature !== undefined) {
         console.log('Migrating AI settings from old format to new GPT-5.1 only structure');
-        
+
         // Transform old flat settings to new nested structure (GPT-5.1 only)
         migratedSettings.aiSettings = {
           ...this.defaultSettings.aiSettings,
@@ -472,16 +472,13 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           chatSystemPrompt: oldAiSettings.chatSystemPrompt ?? this.defaultSettings.aiSettings.chatSystemPrompt,
           planGenerationPrompt: oldAiSettings.planGenerationPrompt ?? this.defaultSettings.aiSettings.planGenerationPrompt,
           insightsPrompt: oldAiSettings.insightsPrompt ?? this.defaultSettings.aiSettings.insightsPrompt,
-          
+
           // New nested structure without model fields (hardcoded to GPT-5.1)
           chat: this.defaultSettings.aiSettings.chat,
           insights: this.defaultSettings.aiSettings.insights,
           trainingPlans: this.defaultSettings.aiSettings.trainingPlans
         };
       } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model) {
-        // This is already the new nested format with model fields - preserve it
-        console.log('Preserving existing AI settings with model fields');
-        
         migratedSettings.aiSettings = {
           ...this.defaultSettings.aiSettings,
           ...oldAiSettings,
@@ -504,16 +501,16 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
       // No AI settings exist - use defaults
       migratedSettings.aiSettings = { ...this.defaultSettings.aiSettings };
     }
-    
+
     // Handle version migration and ensure all properties exist
     if (!settings.version || settings.version !== this.CURRENT_VERSION) {
       // Additional migration: ensure model fields exist in nested configs (v1.1.0 fix)
       if (migratedSettings.aiSettings) {
-        const needsModelMigration = 
+        const needsModelMigration =
           !migratedSettings.aiSettings.chat?.model ||
           !migratedSettings.aiSettings.insights?.model ||
           !migratedSettings.aiSettings.trainingPlans?.model;
-        
+
         if (needsModelMigration) {
           console.log('Adding missing model fields to AI settings');
           migratedSettings.aiSettings = {
@@ -533,7 +530,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           };
         }
       }
-      
+
       return {
         ...migratedSettings,
         version: this.CURRENT_VERSION,
@@ -547,9 +544,9 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
   private validateSettings(settings: any): boolean {
     try {
       // Basic structure validation
-      const requiredKeys = ['userPreferences', 'dataManagement', 'trainingSettings', 
-                           'notificationSettings', 'privacySettings', 'aiSettings'];
-      
+      const requiredKeys = ['userPreferences', 'dataManagement', 'trainingSettings',
+        'notificationSettings', 'privacySettings', 'aiSettings'];
+
       return requiredKeys.every(key => key in settings);
     } catch (error) {
       return false;
@@ -559,11 +556,11 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
   // Utility methods
   formatBytes(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
