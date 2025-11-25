@@ -659,9 +659,6 @@ CRITICAL FORMATTING RULES - READ CAREFULLY:
 1. STRUCTURE YOUR RESPONSES WITH HEADERS:
 Use markdown headers (##, ###) to organize your responses into clear sections. You may use emojis to make the headers more engaging.
 
-### Recommendations
-[Actionable advice]
-
 2. USE TABLES FOR SESSION DATA:
 When the user asks for session data, comparisons, or any tabular information, you MUST format it as a markdown table.
 
