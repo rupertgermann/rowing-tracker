@@ -62,13 +62,6 @@ export default function ChatPage() {
   // Memory hook for document count badge
   const { documents: memoryDocuments } = useMemory();
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (currentSession?.messages?.length) {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }
-  }, [currentSession?.messages?.length]);
-
   // Convert our ChatMessage format to the kit's Message format
   const chatMessages: Message[] = useMemo(() => {
     if (!currentSession?.messages) return [];
@@ -182,7 +175,6 @@ export default function ChatPage() {
   // Prompt suggestions for empty chat
   const promptSuggestions = [
     "How can I improve my rowing technique?",
-    "Read your memory and rate my progress",
     "Analyze my recent training sessions",
     "Create a 4-week training plan for me",
     "What's my average pace trend?",
@@ -460,7 +452,7 @@ export default function ChatPage() {
         </Card>
 
         {/* Chat Area */}
-        <Card className="flex-1 flex flex-col overflow-hidden border-0 shadow-none">
+        <Card className="flex-1 flex flex-col overflow-hidden">
           {currentSession ? (
             <>
               <CardHeader className="pb-3 border-b flex-shrink-0">
@@ -480,7 +472,7 @@ export default function ChatPage() {
                 </div>
               </CardHeader>
 
-              <div className="flex-1">
+              <div className="flex-1 overflow-hidden">
                 <Chat
                   messages={chatMessages}
                   input={messageInput}
@@ -489,6 +481,7 @@ export default function ChatPage() {
                   isGenerating={isLoading}
                   append={handleAppend}
                   suggestions={promptSuggestions}
+                  className="h-full"
                 />
               </div>
 
