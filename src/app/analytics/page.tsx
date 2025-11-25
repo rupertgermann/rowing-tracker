@@ -486,13 +486,15 @@ const Analytics = () => {
                 )}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-blue-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Distance</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-blue-500/10 rounded-full">
+                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {formatDistance(filteredStats.totalDistance)}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -501,13 +503,15 @@ const Analytics = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-violet-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Time</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-violet-500/10 rounded-full">
+                      <Clock className="h-4 w-4 text-violet-500" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                       {formatDuration(filteredStats.totalTime)}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -516,13 +520,15 @@ const Analytics = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-emerald-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Average Pace</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-emerald-500/10 rounded-full">
+                      <Target className="h-4 w-4 text-emerald-500" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                       {formatPace(avgPace)}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -531,13 +537,15 @@ const Analytics = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1">
+                <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 border-l-4 border-l-amber-500">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Average Power</CardTitle>
-                    <Zap className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                    <div className="p-2 bg-amber-500/10 rounded-full">
+                      <Zap className="h-4 w-4 text-amber-500" />
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary transition-colors duration-200 group-hover:text-primary/80">
+                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                       {avgPower > 0 ? `${Math.round(avgPower)}W` : '--'}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -567,12 +575,12 @@ const Analytics = () => {
               </div>
 
               {/* Chart Selector */}
-              <Card className="mb-6">
+              <Card className="mb-6 border-t-4 border-t-indigo-500">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-lg flex items-center gap-2">
-                        <Gauge className="h-5 w-5 text-primary" />
+                        <Gauge className="h-5 w-5 text-indigo-500" />
                         Select Charts to Display
                       </CardTitle>
                       <CardDescription>
@@ -655,15 +663,17 @@ const Analytics = () => {
                   const chartData = chartDataMap[metric];
 
                   return (
-                    <Card key={metric}>
+                    <Card key={metric} className="border-l-4" style={{ borderLeftColor: config.color }}>
                       {config.isSpecial && metric === 'splitTime' ? (
                         <SplitTimeChart sessions={filteredSessions} />
                       ) : (
                         <>
                           <CardHeader>
                             <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-md bg-primary/10">
-                                <Icon className="h-5 w-5 text-primary" />
+                              <div className="p-2 rounded-md" style={{ backgroundColor: `${config.color}15` }}>
+                                <span style={{ color: config.color }}>
+                                  <Icon className="h-5 w-5" />
+                                </span>
                               </div>
                               <div>
                                 <CardTitle className="text-lg">

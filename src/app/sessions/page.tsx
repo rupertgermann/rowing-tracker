@@ -293,7 +293,7 @@ export default function SessionsPage() {
                               className="h-auto p-0 font-semibold hover:bg-transparent"
                             >
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
+                                <Calendar className="h-4 w-4 text-slate-500" />
                                 Date
                                 {getSortIcon('date')}
                               </div>
@@ -306,7 +306,7 @@ export default function SessionsPage() {
                               className="h-auto p-0 font-semibold hover:bg-transparent ml-auto"
                             >
                               <div className="flex items-center gap-2">
-                                <TrendingUp className="h-4 w-4" />
+                                <TrendingUp className="h-4 w-4 text-blue-500" />
                                 Distance
                                 {getSortIcon('distance')}
                               </div>
@@ -314,7 +314,7 @@ export default function SessionsPage() {
                           </TableHead>
                           <TableHead className="text-right">
                             <div className="flex items-center justify-end gap-2 text-muted-foreground">
-                              <Clock className="h-4 w-4" />
+                              <Clock className="h-4 w-4 text-violet-500" />
                               Time
                             </div>
                           </TableHead>
@@ -325,7 +325,7 @@ export default function SessionsPage() {
                               className="h-auto p-0 font-semibold hover:bg-transparent ml-auto"
                             >
                               <div className="flex items-center gap-2">
-                                <Target className="h-4 w-4" />
+                                <Target className="h-4 w-4 text-emerald-500" />
                                 Avg Pace
                                 {getSortIcon('pace')}
                               </div>
@@ -338,7 +338,7 @@ export default function SessionsPage() {
                               className="h-auto p-0 font-semibold hover:bg-transparent ml-auto"
                             >
                               <div className="flex items-center gap-2">
-                                <Zap className="h-4 w-4" />
+                                <Zap className="h-4 w-4 text-amber-500" />
                                 Avg Power
                                 {getSortIcon('power')}
                               </div>
@@ -346,13 +346,13 @@ export default function SessionsPage() {
                           </TableHead>
                           <TableHead className="text-right">
                             <div className="flex items-center justify-end gap-2 text-muted-foreground">
-                              <ArrowUpDown className="h-4 w-4" />
+                              <ArrowUpDown className="h-4 w-4 text-rose-500" />
                               Stroke Rate
                             </div>
                           </TableHead>
                           <TableHead className="text-right">
                             <div className="flex items-center justify-end gap-2 text-muted-foreground">
-                              <Sparkles className="h-4 w-4" />
+                              <Sparkles className="h-4 w-4 text-cyan-500" />
                               Stroke Data
                             </div>
                           </TableHead>
@@ -396,20 +396,20 @@ export default function SessionsPage() {
                                 </div>
                               </TableCell>
                             <TableCell className="text-right">
-                              <Badge variant="secondary">
+                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">
                                 {formatDistance(session.distance)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right text-sm">
+                            <TableCell className="text-right text-sm text-violet-600 dark:text-violet-400">
                               {formatDuration(session.duration)}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-mono">
+                            <TableCell className="text-right text-sm font-mono text-emerald-600 dark:text-emerald-400">
                               {formatPace(session.avgSplit)}
                             </TableCell>
-                            <TableCell className="text-right text-sm">
+                            <TableCell className="text-right text-sm text-amber-600 dark:text-amber-400">
                               {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
                             </TableCell>
-                            <TableCell className="text-right text-sm">
+                            <TableCell className="text-right text-sm text-rose-600 dark:text-rose-400">
                               {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
                             </TableCell>
                             <TableCell className="text-right text-sm">

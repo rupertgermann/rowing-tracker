@@ -227,49 +227,57 @@ export default function SessionDetailPage() {
 
         {/* Primary Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Distance</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 bg-blue-500/10 rounded-full">
+                <TrendingUp className="h-4 w-4 text-blue-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {formatDistance(session.distance)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-violet-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Duration</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 bg-violet-500/10 rounded-full">
+                <Clock className="h-4 w-4 text-violet-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                 {formatDuration(session.duration)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-emerald-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Pace</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 bg-emerald-500/10 rounded-full">
+                <Target className="h-4 w-4 text-emerald-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary font-mono">
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                 {formatPace(session.avgSplit)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-amber-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Power</CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 bg-amber-500/10 rounded-full">
+                <Zap className="h-4 w-4 text-amber-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
               </div>
             </CardContent>
@@ -279,10 +287,10 @@ export default function SessionDetailPage() {
         {/* Detailed Statistics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Pace & Power */}
-          <Card>
+          <Card className="border-t-4 border-t-emerald-500">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Gauge className="h-5 w-5 text-primary" />
+                <Gauge className="h-5 w-5 text-emerald-500" />
                 Pace & Power
               </CardTitle>
               <CardDescription>
@@ -320,10 +328,10 @@ export default function SessionDetailPage() {
           </Card>
 
           {/* Stroke Rate & Energy */}
-          <Card>
+          <Card className="border-t-4 border-t-rose-500">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
+                <Activity className="h-5 w-5 text-rose-500" />
                 Stroke Rate & Energy
               </CardTitle>
               <CardDescription>
@@ -363,12 +371,15 @@ export default function SessionDetailPage() {
 
         {/* Additional Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
+          <Card className="border-l-4 border-l-cyan-500">
             <CardHeader>
-              <CardTitle className="text-lg">Stroke Count</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="h-4 w-4 text-cyan-500" />
+                Stroke Count
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
                 {session.strokeCount.toLocaleString()}
               </div>
               <p className="text-sm text-muted-foreground">
@@ -377,12 +388,15 @@ export default function SessionDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-indigo-500">
             <CardHeader>
-              <CardTitle className="text-lg">Stroke Length</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-indigo-500" />
+                Stroke Length
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                 {session.avgStrokeLength > 0 ? `${session.avgStrokeLength.toFixed(2)}m` : '--'}
               </div>
               <p className="text-sm text-muted-foreground">
@@ -391,12 +405,15 @@ export default function SessionDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-orange-500">
             <CardHeader>
-              <CardTitle className="text-lg">Power per KG</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Flame className="h-4 w-4 text-orange-500" />
+                Power per KG
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {session.wattPerKg > 0 ? `${session.wattPerKg.toFixed(1)} W/kg` : '--'}
               </div>
               <p className="text-sm text-muted-foreground">
