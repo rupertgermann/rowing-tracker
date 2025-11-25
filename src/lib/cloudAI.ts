@@ -214,6 +214,31 @@ export class CloudAIService {
             additionalProperties: false
           },
           strict: true
+        },
+        {
+          type: "function" as const,
+          name: "get_achievements",
+          description: "Get the user's personal records (PRs) and earned awards/achievements. Use this to understand the user's best performances and milestones.",
+          parameters: {
+            type: "object",
+            properties: {
+              includePersonalRecords: {
+                type: ["boolean", "null"],
+                description: "Include personal records for standard distances (100m, 500m, 1000m, 2000m, 5000m). Default: true"
+              },
+              includeAwards: {
+                type: ["boolean", "null"],
+                description: "Include earned awards/achievements. Default: true"
+              },
+              includeNextAwards: {
+                type: ["boolean", "null"],
+                description: "Include upcoming awards the user is close to earning. Default: false"
+              }
+            },
+            required: ["includePersonalRecords", "includeAwards", "includeNextAwards"],
+            additionalProperties: false
+          },
+          strict: true
         }
       ];
 
@@ -602,6 +627,77 @@ export class CloudAIService {
       return result;
     }
 
+    if (name === 'get_achievements') {
+      const { useRowingStore } = await import('@/lib/store');
+      const { AWARDS } = await import('@/lib/awards');
+      const store = useRowingStore.getState();
+      
+      const result: any = {};
+      
+      // Personal Records
+      if (args.includePersonalRecords !== false) {
+        const prs = store.personalRecords;
+        result.personalRecords = prs.map(pr => ({
+          distance: pr.distance,
+          bestTime: pr.bestTime,
+          bestPace: this.formatPace(pr.bestPace),
+          avgPower: pr.avgPower ? `${pr.avgPower.toFixed(1)}W` : null,
+          date: new Date(pr.date).toISOString().split('T')[0]
+        }));
+        
+        if (prs.length === 0) {
+          result.personalRecords = "No personal records yet. The user needs to complete sessions at standard distances (100m, 500m, 1000m, 2000m, 5000m).";
+        }
+      }
+      
+      // Earned Awards
+      if (args.includeAwards !== false) {
+        const earnedAwards = store.earnedAwards;
+        result.earnedAwards = earnedAwards.map(ea => {
+          const award = AWARDS.find(a => a.id === ea.awardId);
+          return {
+            id: ea.awardId,
+            title: award?.title || ea.awardId,
+            description: award?.description || '',
+            earnedAt: new Date(ea.earnedAt).toISOString().split('T')[0]
+          };
+        });
+        
+        result.totalAwardsEarned = earnedAwards.length;
+        result.totalAwardsAvailable = AWARDS.length;
+      }
+      
+      // Next Awards (upcoming achievements user is close to)
+      if (args.includeNextAwards === true) {
+        const sessions = store.sessions;
+        const stats = store.getStats();
+        const earnedIds = new Set(store.earnedAwards.map(a => a.awardId));
+        
+        const unearnedAwards = AWARDS.filter(a => !earnedIds.has(a.id));
+        
+        // Calculate progress for key metrics
+        const totalDistance = sessions.reduce((acc, s) => acc + s.distance, 0);
+        const totalDuration = sessions.reduce((acc, s) => acc + s.duration, 0);
+        const sessionCount = sessions.length;
+        const bestStreak = stats.bestStreak;
+        
+        result.nextAwards = unearnedAwards.slice(0, 5).map(award => ({
+          id: award.id,
+          title: award.title,
+          description: award.description
+        }));
+        
+        result.currentProgress = {
+          totalSessions: sessionCount,
+          totalDistance: `${(totalDistance / 1000).toFixed(1)}km`,
+          totalDuration: `${(totalDuration / 3600).toFixed(1)}h`,
+          bestStreak: `${bestStreak} days`
+        };
+      }
+      
+      return result;
+    }
+
     return { error: `Unknown tool: ${name}` };
   }
 
@@ -681,6 +777,26 @@ TOOLS AVAILABLE:
     * source: 'user' for uploads, 'system' for generated content
     * activeOnly: true to get only the active training plan
     * includeContent: true to get full text content (use sparingly)
+
+- get_achievements: Retrieve the user's personal records (PRs) and earned awards/achievements.
+  - PERSONAL RECORDS:
+    * Best times for standard distances: 100m, 500m, 1000m, 2000m, 5000m
+    * Includes pace, power, and date achieved
+    * Use to celebrate PRs, set goals, and track improvement
+  - AWARDS/ACHIEVEMENTS:
+    * Gamification milestones the user has unlocked (e.g., "First Splash", "Century Club", "Million Meter Club")
+    * Categories: Session counts, duration, streaks, distance, power, speed, improvement
+    * Use to celebrate accomplishments and motivate toward next goals
+  - WHEN TO USE:
+    * User asks about their personal records or best times → includePersonalRecords: true
+    * User asks about achievements, awards, or badges → includeAwards: true
+    * User wants to know what awards they're close to earning → includeNextAwards: true
+    * User asks "what should I work toward?" → includeNextAwards: true
+    * When celebrating progress or setting goals
+  - PARAMETERS:
+    * includePersonalRecords: true to get PR data (default: true)
+    * includeAwards: true to get earned awards (default: true)
+    * includeNextAwards: true to get upcoming/next awards to earn (default: false)
 
 FORMATTING GUIDELINES:
 - ALWAYS use markdown formatting in your responses
