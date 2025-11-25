@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown } from 'lucide-react';
 import { AwardsList } from '@/components/AwardsList';
+import { formatDateOnly } from '@/lib/dateTimeUtils';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -35,13 +36,6 @@ function formatPace(secondsPer500m: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
-}
 
 export default function PRsPage() {
   const { getPersonalRecords, getSessions } = useRowingStore();
@@ -174,7 +168,7 @@ export default function PRsPage() {
                         
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4 text-gold-500" />
-                          <span>Achieved: {formatDate(record.date)}</span>
+                          <span>Achieved: {formatDateOnly(record.date)}</span>
                         </div>
                         
                         {record.sessionId && (
@@ -227,7 +221,7 @@ export default function PRsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4 text-yellow-500" />
-                      <span>Session: {formatDate(bestPower.timestamp)}</span>
+                      <span>Session: {formatDateOnly(bestPower.timestamp)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -246,7 +240,7 @@ export default function PRsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4 text-yellow-500" />
-                      <span>Session: {formatDate(bestStrokeRate.timestamp)}</span>
+                      <span>Session: {formatDateOnly(bestStrokeRate.timestamp)}</span>
                     </div>
                   </CardContent>
                 </Card>

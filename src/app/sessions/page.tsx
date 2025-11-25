@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles } from 'lucide-react';
+import { formatSessionDate } from '@/lib/dateTimeUtils';
 
 // Filter options
 interface FilterConfig {
@@ -63,16 +64,6 @@ function formatPace(secondsPer500m: number): string {
   const minutes = Math.floor(secondsPer500m / 60);
   const seconds = Math.floor(secondsPer500m % 60);
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
 }
 
 // Sort configuration
@@ -410,7 +401,7 @@ export default function SessionsPage() {
                                     href={`/sessions/${session.id}`}
                                     className="text-sm font-medium hover:underline"
                                   >
-                                    {formatDate(session.timestamp)}
+                                    {formatSessionDate(session.timestamp)}
                                   </Link>
                                   {prInfo.isPR && (
                                     <Badge 

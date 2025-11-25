@@ -25,6 +25,7 @@ import {
   Gauge,
   Upload
 } from 'lucide-react';
+import { formatSessionDetailDate } from '@/lib/dateTimeUtils';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -50,17 +51,6 @@ function formatPace(secondsPer500m: number): string {
   const minutes = Math.floor(secondsPer500m / 60);
   const seconds = Math.floor(secondsPer500m % 60);
   return `${minutes}:${seconds.toString().padStart(2, '0')} / 500m`;
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
 }
 
 export default function SessionDetailPage() {
@@ -210,7 +200,7 @@ export default function SessionDetailPage() {
             </h1>
             <p className="text-muted-foreground flex items-center gap-2 mt-2">
               <Calendar className="h-4 w-4" />
-              {formatDate(session.timestamp)}
+              {formatSessionDetailDate(session.timestamp)}
             </p>
           </div>
 
