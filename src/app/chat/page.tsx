@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { MemoryManager } from '@/components/MemoryManager';
 import { useMemory } from '@/hooks/useMemory';
+import { MemoryDocument } from '@/lib/memoryStorage';
 
 export default function ChatPage() {
   const {
@@ -62,12 +63,13 @@ export default function ChatPage() {
   const [editingTitle, setEditingTitle] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Memory hook for document count badge
-  const { documents: memoryDocuments } = useMemory();
+  // Memory hook for document count badge and blob access
+  const { documents: memoryDocuments, getDocumentBlob } = useMemory();
 
   // Auto-resize textarea based on content
   const adjustTextareaHeight = () => {
@@ -83,12 +85,43 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentSession?.messages]);
 
-  // Handle sending message
-  const handleSendMessage = () => {
-    if (messageInput.trim() && currentSession && !isLoading) {
-      sendMessage(messageInput.trim());
-      setMessageInput('');
+  // Handle attaching document from memory
+  const handleAttachDocument = (doc: MemoryDocument) => {
+    // Don't add duplicates
+    if (!attachedDocs.find(d => d.id === doc.id)) {
+      setAttachedDocs(prev => [...prev, doc]);
     }
+    setShowMemory(false);
+  };
+
+  // Remove attached document
+  const removeAttachedDoc = (docId: string) => {
+    setAttachedDocs(prev => prev.filter(d => d.id !== docId));
+  };
+
+  // Handle sending message
+  const handleSendMessage = async () => {
+    if ((!messageInput.trim() && attachedDocs.length === 0) || !currentSession || isLoading) return;
+
+    // Build message with attachments
+    let fullMessage = messageInput.trim();
+    
+    if (attachedDocs.length > 0) {
+      const attachmentInfo = attachedDocs.map(doc => {
+        const textContent = doc.extractedText || doc.description || '';
+        return `[Attached: ${doc.name}]${textContent ? `\n${textContent}` : ''}`;
+      }).join('\n\n');
+      
+      if (fullMessage) {
+        fullMessage = `${fullMessage}\n\n---\n${attachmentInfo}`;
+      } else {
+        fullMessage = attachmentInfo;
+      }
+    }
+
+    sendMessage(fullMessage);
+    setMessageInput('');
+    setAttachedDocs([]);
   };
 
   // Handle Enter key in message input
@@ -295,7 +328,10 @@ export default function ChatPage() {
           />
           {/* Panel */}
           <div className="relative w-full max-w-md h-full bg-background shadow-xl animate-in slide-in-from-right duration-300">
-            <MemoryManager onClose={() => setShowMemory(false)} />
+            <MemoryManager 
+              onClose={() => setShowMemory(false)} 
+              onAttachToChat={handleAttachDocument}
+            />
           </div>
         </div>
       )}
@@ -533,6 +569,26 @@ export default function ChatPage() {
               </CardContent>
 
               <div className="p-4 border-t">
+                {/* Attached Documents */}
+                {attachedDocs.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {attachedDocs.map(doc => (
+                      <div 
+                        key={doc.id}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full text-sm"
+                      >
+                        <Paperclip className="h-3 w-3 text-primary" />
+                        <span className="max-w-[150px] truncate">{doc.name}</span>
+                        <button
+                          onClick={() => removeAttachedDoc(doc.id)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-2 items-end">
                   <Textarea
                     ref={textareaRef}
@@ -558,7 +614,7 @@ export default function ChatPage() {
                   />
                   <Button
                     onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || !isAIConfigured || isLoading}
+                    disabled={(!messageInput.trim() && attachedDocs.length === 0) || !isAIConfigured || isLoading}
                     className="h-[44px]"
                   >
                     {isLoading ? (

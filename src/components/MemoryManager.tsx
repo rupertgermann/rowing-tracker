@@ -25,6 +25,7 @@ import {
   Eye,
   Calendar,
   FileSearch,
+  Paperclip,
 } from 'lucide-react';
 
 // ============================================================================
@@ -68,9 +69,10 @@ interface DocumentCardProps {
   onDelete: (id: string) => void;
   onView: (id: string) => void;
   onViewText: (doc: MemoryDocument) => void;
+  onAttach?: (doc: MemoryDocument) => void;
 }
 
-function DocumentCard({ document, onDelete, onView, onViewText }: DocumentCardProps) {
+function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: DocumentCardProps) {
   const config = documentTypeConfig[document.type];
   const Icon = config.icon;
 
@@ -124,6 +126,17 @@ function DocumentCard({ document, onDelete, onView, onViewText }: DocumentCardPr
 
       {/* Actions */}
       <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onAttach && document.source === 'user' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-primary hover:text-primary"
+            onClick={() => onAttach(document)}
+            title="Attach to chat"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+        )}
         {(document.extractedText || document.description) && (
           <Button
             variant="ghost"
@@ -303,9 +316,10 @@ function UploadDropzone({ onUpload, isUploading, progress }: UploadDropzoneProps
 
 interface MemoryManagerProps {
   onClose?: () => void;
+  onAttachToChat?: (doc: MemoryDocument) => void;
 }
 
-export function MemoryManager({ onClose }: MemoryManagerProps) {
+export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
   const {
     documents,
     isLoading,
@@ -482,6 +496,7 @@ export function MemoryManager({ onClose }: MemoryManagerProps) {
                 onDelete={handleDelete}
                 onView={handleView}
                 onViewText={handleViewText}
+                onAttach={onAttachToChat}
               />
             ))
           )}
