@@ -378,9 +378,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       // Auto-archive old insights
       const { updatedInsights, newlyArchived } = autoArchiveOldInsights(insights.slice(0, 5));
       
-      if (newlyArchived.length > 0) {
-        console.log(`Auto-archived ${newlyArchived.length} old insights`);
-      }
+      // Auto-archive old insights silently
 
       return {
         insights: updatedInsights,
@@ -580,7 +578,6 @@ export function useInsightFeedback() {
       
       // In a real implementation, this would send feedback to a server
       // for improving the AI recommendation algorithms
-      console.log('Insight feedback recorded:', feedbackData);
     }
   };
 

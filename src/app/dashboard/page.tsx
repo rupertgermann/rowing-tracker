@@ -711,8 +711,8 @@ const Dashboard = () => {
                       <InsightCard
                         key={insight.id || `local-${insight.type}-${index}`}
                         insight={insight}
-                        onFeedback={(insightId, feedback) => {
-                          console.log(`Insight ${insightId} received feedback: ${feedback}`);
+                        onFeedback={() => {
+                          // Feedback recorded
                         }}
                         isArchived={isArchivedView}
                         onArchive={isArchivedView ? unarchiveInsight : archiveInsight}

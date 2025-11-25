@@ -122,14 +122,6 @@ export class CloudAIService {
     // Always update AI settings for use in API calls
     this.aiSettings = aiSettings;
 
-    console.log('CloudAI initialized with settings:', {
-      chatReasoning: this.aiSettings.chat.reasoning,
-      insightsReasoning: this.aiSettings.insights.reasoning,
-      trainingPlansReasoning: this.aiSettings.trainingPlans.reasoning,
-      maxTokens: this.aiSettings.maxTokens,
-      insightsPrompt: this.aiSettings.insightsPrompt?.substring(0, 100) + '...'
-    });
-
     return true;
   }
 
@@ -235,9 +227,6 @@ export class CloudAIService {
         { role: 'user', content: message }
       ];
 
-      console.group('Chat Turn Debug');
-      console.log('Initial Messages:', messages);
-
       let currentInput: any = messages;
       let currentPreviousResponseId = previousResponseId;
       let finalContent = '';
@@ -245,7 +234,6 @@ export class CloudAIService {
 
       // Tool loop - handle up to 5 turns of tool calls
       for (let turn = 0; turn < 5; turn++) {
-        console.group(`Turn ${turn + 1}`);
         const config: ApiRequestConfig = {
           input: currentInput,
           model: useCaseConfig.model,
@@ -258,10 +246,7 @@ export class CloudAIService {
           onToken: onToken // Pass streaming callback
         };
 
-        console.log('API Request Config:', config);
-
         const response = await this.makeApiCall(config);
-        console.log('API Response:', response);
 
         finalResponseId = response.id;
 
@@ -269,15 +254,12 @@ export class CloudAIService {
         const toolCalls = response.output?.filter((item: any) => item.type === 'function_call');
 
         if (toolCalls && toolCalls.length > 0) {
-          console.log('Tool Calls Detected:', toolCalls);
           // Execute tools and prepare next input
           const toolOutputs = [];
 
           for (const toolCall of toolCalls) {
             const args = JSON.parse(toolCall.arguments);
-            console.log(`Executing Tool: ${toolCall.name}`, args);
             const result = await this.executeTool(toolCall.name, args);
-            console.log(`Tool Result:`, result);
 
             toolOutputs.push({
               type: "function_call_output",
@@ -289,18 +271,12 @@ export class CloudAIService {
           // Feed tool outputs back to model
           currentInput = toolOutputs;
           currentPreviousResponseId = response.id;
-          console.log('Next Input (Tool Outputs):', currentInput);
         } else {
           // No tool calls, just get the text response
           finalContent = this.parseResponse(response);
-          console.log('Final Text Content:', finalContent);
-          console.groupEnd(); // End Turn group
           break;
         }
-        console.groupEnd(); // End Turn group
       }
-
-      console.groupEnd(); // End Chat Turn Debug group
 
       return {
         content: finalContent,
@@ -431,7 +407,6 @@ export class CloudAIService {
 
     // Handle streaming response
     if (config.onToken && response.body) {
-      console.log('Starting streaming response processing...');
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -443,13 +418,9 @@ export class CloudAIService {
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) {
-            console.log('Streaming complete');
-            break;
-          }
+          if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          console.log('Received chunk (length):', chunk.length);
           buffer += chunk;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -457,13 +428,11 @@ export class CloudAIService {
           for (const line of lines) {
             if (line.trim() === '') continue;
             if (line.startsWith('data: ')) {
-              console.log('Parsed line:', line);
               const dataStr = line.slice(6);
               if (dataStr === '[DONE]') continue;
 
               try {
                 const event = JSON.parse(dataStr);
-                console.log('Event:', event.type, event);
 
                 // Capture Response ID
                 if (event.response_id && !finalResponse.id) {
@@ -514,8 +483,8 @@ export class CloudAIService {
                   activeItems[index] = event.item;
                 }
 
-              } catch (e) {
-                console.warn('Error parsing SSE chunk:', e, line);
+              } catch {
+                // Ignore malformed SSE chunks
               }
             }
           }
@@ -531,12 +500,10 @@ export class CloudAIService {
 
       // Safeguard: if output is empty, this is an error
       if (!finalResponse.output || finalResponse.output.length === 0) {
-        console.error('Streaming completed but no output items were captured');
-        console.error('Final response:', finalResponse);
+        console.error('Streaming response had no output');
         throw new Error('Streaming response had no output. This may indicate an API error or unsupported response format.');
       }
 
-      console.log('Final Streaming Response Constructed:', finalResponse);
       return finalResponse;
     }
 
@@ -553,9 +520,6 @@ export class CloudAIService {
       const { useRowingStore } = await import('@/lib/store');
       const store = useRowingStore.getState();
       const sessions = store.sessions;
-
-      console.log(`[get_sessions] Total sessions in store: ${sessions.length}`);
-      console.log(`[get_sessions] Args:`, args);
 
       const includeDetails = args.includeDetails === true;
 
@@ -580,17 +544,11 @@ export class CloudAIService {
       filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       const limit = args.limit || 5;
-      const result = this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
-
-      console.log(`[get_sessions] Returning ${result.length} sessions (limit: ${limit}, filtered: ${filtered.length})`);
-
-      return result;
+      return this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
     }
 
     if (name === 'get_memory_documents') {
       const { memoryStorage } = await import('@/lib/memoryStorage');
-      
-      console.log(`[get_memory_documents] Args:`, args);
       
       let docs = await memoryStorage.getAllDocuments();
       
@@ -640,8 +598,6 @@ export class CloudAIService {
         // For system documents, include the structured content
         content: args.includeContent ? doc.content : undefined,
       }));
-      
-      console.log(`[get_memory_documents] Returning ${result.length} documents`);
       
       return result;
     }
@@ -1036,8 +992,6 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
   // Parse AI response into structured insights
   private parseInsightResponse(response: string): CloudInsight[] {
     try {
-      console.log('Raw AI response:', response); // Debug logging
-
       // Multiple attempts to extract JSON from response
       let jsonString = '';
 
@@ -1073,8 +1027,6 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
         .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
         .replace(/\\n/g, '\\\\n') // Fix escaped newlines
         .trim();
-
-      console.log('Extracted JSON:', jsonString); // Debug logging
 
       const insightsData = JSON.parse(jsonString);
 
@@ -1433,68 +1385,28 @@ Maintain a supportive, motivational tone while being honest about adherence patt
   // Helper methods for plan generation
   private parsePlanResponse(response: string): any {
     try {
-      // Log raw response details
-      console.log('🔍 AI Response Analysis:');
-      console.log('- Raw response length:', response.length);
-      console.log('- Raw response preview (first 200 chars):', response.substring(0, 200));
-      console.log('- Raw response preview (last 200 chars):', response.substring(response.length - 200));
-
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        console.log('❌ No JSON found in response - checking for markdown wrapping');
-        console.log('- Contains markdown code blocks:', response.includes('```'));
-        console.log('- Contains "json":', response.includes('json'));
         throw new Error('No JSON found in AI response');
       }
 
       let extractedJson = jsonMatch[0];
-      console.log('✅ JSON extracted with regex');
-      console.log('- Extracted JSON length:', extractedJson.length);
-      console.log('- JSON starts with:', extractedJson.substring(0, 100));
-      console.log('- JSON ends with:', extractedJson.substring(extractedJson.length - 100));
 
-      // Check for common JSON issues around position 8500
+      // Check for common JSON issues (unbalanced braces/brackets)
       if (extractedJson.length > 8500) {
-        const errorContext = extractedJson.substring(8450, 8550);
-        console.log('🎯 Context around error position 8500:', errorContext);
-
-        // Check for trailing commas
-        const trailingCommaMatches = extractedJson.match(/,\s*[}\]]/g);
-        if (trailingCommaMatches) {
-          console.log('⚠️ Found trailing commas in JSON:', trailingCommaMatches.length, 'instances');
-        }
-
-        // Check for incomplete arrays/objects
         const openBraces = (extractedJson.match(/\{/g) || []).length;
         const closeBraces = (extractedJson.match(/\}/g) || []).length;
         const openBrackets = (extractedJson.match(/\[/g) || []).length;
         const closeBrackets = (extractedJson.match(/\]/g) || []).length;
 
-        console.log('📊 Brace/Bracket balance:');
-        console.log('- Open braces {:', openBraces, 'Close braces }:', closeBraces);
-        console.log('- Open brackets [:', openBrackets, 'Close brackets ]:', closeBrackets);
-
         if (openBraces !== closeBraces || openBrackets !== closeBrackets) {
-          console.log('❌ Unbalanced braces/brackets - attempting JSON repair...');
           extractedJson = this.repairIncompleteJSON(extractedJson, openBraces, closeBraces, openBrackets, closeBrackets);
-          console.log('🔧 JSON repaired, new length:', extractedJson.length);
         }
       }
 
-      const parsed = JSON.parse(extractedJson);
-      console.log('✅ JSON parsed successfully');
-      return parsed;
+      return JSON.parse(extractedJson);
     } catch (error) {
-      console.error('❌ Failed to parse plan response:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-      } else {
-        console.error('Non-Error thrown:', error);
-      }
+      console.error('Failed to parse plan response:', error);
       throw new Error('Invalid plan format from AI');
     }
   }
@@ -1518,10 +1430,6 @@ Maintain a supportive, motivational tone while being honest about adherence patt
     for (let i = 0; i < missingBraces; i++) {
       repaired += '}';
     }
-
-    console.log('🔧 JSON repair applied:');
-    console.log('- Added', missingBrackets, 'closing brackets');
-    console.log('- Added', missingBraces, 'closing braces');
 
     return repaired;
   }

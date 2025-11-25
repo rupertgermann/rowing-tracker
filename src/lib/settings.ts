@@ -475,7 +475,6 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
       // Check if this is the old format (has flat model/temperature properties)
       if (oldAiSettings.model || oldAiSettings.temperature !== undefined) {
-        console.log('Migrating AI settings from old format to new GPT-5.1 only structure');
 
         // Transform old flat settings to new nested structure (GPT-5.1 only)
         migratedSettings.aiSettings = {
@@ -528,7 +527,6 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           !migratedSettings.aiSettings.trainingPlans?.model;
 
         if (needsModelMigration) {
-          console.log('Adding missing model fields to AI settings');
           migratedSettings.aiSettings = {
             ...migratedSettings.aiSettings,
             chat: {
