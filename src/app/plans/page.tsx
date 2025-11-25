@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { trainingPlans, TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
 import { cloudAI } from '@/lib/cloudAI';
 import { useRowingStore } from '@/lib/store';
+import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { 
   Calendar, 
   Play, 
@@ -585,7 +586,7 @@ export default function PlansPage() {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span>{plan.duration} weeks</span>
                       <span>{plan.progress.totalSessions} sessions</span>
-                      <span>Created {plan.createdAt.toLocaleDateString()}</span>
+                      <span>Created {formatDateOnly(plan.createdAt)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {plan.id !== activePlan?.id && (

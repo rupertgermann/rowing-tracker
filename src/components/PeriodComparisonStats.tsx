@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, Calendar, TrendingUp, Zap, Timer } from 'lucide-react';
+import { formatMonthYear } from '@/lib/dateTimeUtils';
 
 interface MonthlyStats {
   distance: number;
@@ -41,7 +42,7 @@ export function PeriodComparisonStats() {
     if (!yyyymm) return '';
     const [year, month] = yyyymm.split('-');
     const d = new Date(parseInt(year), parseInt(month) - 1);
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return formatMonthYear(d);
   };
 
   // Calculate stats for a given month

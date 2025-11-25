@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Insight } from '@/lib/aiAnalysis';
+import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { useInsightFeedback } from '@/hooks/useAIInsights';
 import { 
@@ -23,27 +24,12 @@ import {
 // Helper function to safely format dates from insights
 const formatInsightDate = (dateGenerated: Date | string): string => {
   try {
-    // If it's already a Date object, use it directly
-    if (dateGenerated instanceof Date) {
-      return dateGenerated.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-    
     // If it's a string, try to parse it
-    const parsedDate = new Date(dateGenerated);
-    if (isNaN(parsedDate.getTime())) {
-      // If parsing fails, return a fallback
+    const d = dateGenerated instanceof Date ? dateGenerated : new Date(dateGenerated);
+    if (isNaN(d.getTime())) {
       return 'Recent';
     }
-    
-    return parsedDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    return formatDateOnly(d);
   } catch (error) {
     console.warn('Failed to format insight date:', error);
     return 'Recent';

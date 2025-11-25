@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useChat } from '@/hooks/useChat';
+import { formatChartDate, formatTime as formatTimeUtil } from '@/lib/dateTimeUtils';
 import {
   MessageCircle,
   Send,
@@ -132,13 +133,8 @@ export default function ChatPage() {
     }
   };
 
-  // Format timestamp
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Format timestamp - uses user preferences from dateTimeUtils
+  const formatTime = (date: Date) => formatTimeUtil(date);
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -150,10 +146,7 @@ export default function ChatPage() {
     } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Yesterday';
     } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
+      return formatChartDate(date);
     }
   };
 

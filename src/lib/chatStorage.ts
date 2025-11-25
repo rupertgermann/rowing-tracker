@@ -1,4 +1,5 @@
 import { ChatMessage, ChatSession } from '@/lib/cloudAI';
+import { formatSessionDate } from '@/lib/dateTimeUtils';
 
 export class ChatStorageService {
   private static instance: ChatStorageService;
@@ -235,14 +236,7 @@ export class ChatStorageService {
   }
 
   private generateSessionTitle(): string {
-    const date = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      month: 'short', 
-      day: 'numeric', 
-      hour: 'numeric', 
-      minute: '2-digit' 
-    };
-    return `Chat ${date.toLocaleDateString('en-US', options)}`;
+    return `Chat ${formatSessionDate(new Date())}`;
   }
 }
 

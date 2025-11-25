@@ -4,6 +4,7 @@ import { useRowingStore } from '@/lib/store';
 import { AWARDS } from '@/lib/awards';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils'; // Assuming cn exists in utils, typical shadcn setup
+import { formatDateOnly } from '@/lib/dateTimeUtils';
 
 export function AwardsList() {
   const { earnedAwards } = useRowingStore();
@@ -40,7 +41,7 @@ export function AwardsList() {
               </div>
               {isEarned && (
                 <span className="text-[10px] text-muted-foreground font-mono bg-background px-1.5 py-0.5 rounded border">
-                  {new Date(earnedInfo!.earnedAt).toLocaleDateString()}
+                  {formatDateOnly(new Date(earnedInfo!.earnedAt))}
                 </span>
               )}
             </CardHeader>

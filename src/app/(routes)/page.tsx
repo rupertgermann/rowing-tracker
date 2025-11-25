@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, TrendingUp, Clock, Zap, Target } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatChartDate } from '@/lib/dateTimeUtils';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -45,10 +46,7 @@ function prepareChartData(sessions: any[]) {
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     .map(session => ({
-      date: new Date(session.timestamp).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
-      }),
+      date: formatChartDate(new Date(session.timestamp)),
       distance: session.distance,
       fullDate: session.timestamp
     }));

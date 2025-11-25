@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Target } from 'lucide-react';
 import { chartTheme } from '@/lib/chartUtils';
+import { formatChartDate } from '@/lib/dateTimeUtils';
 
 interface Session {
   id: string;
@@ -109,10 +110,7 @@ export const SplitTimeChart = ({ sessions }: SplitTimeChartProps) => {
 
     // Format for chart
     return withMovingAvg.map(session => ({
-      date: new Date(session.timestamp).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      }),
+      date: formatChartDate(new Date(session.timestamp)),
       avgSplit: session.avgSplit,
       movingAvg: session.movingAvg,
       avgStrokeRate: session.avgStrokeRate,

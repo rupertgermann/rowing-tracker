@@ -156,3 +156,29 @@ export function formatChartDate(date: Date | string): string {
 export function formatDateOnly(date: Date | string): string {
   return formatDate(date, { includeTime: true, shortMonth: true });
 }
+
+/**
+ * Format month and year (for period comparison labels)
+ * @param date - Date to format
+ * @param shortMonth - Use short month name (default: false)
+ * @returns Formatted month/year string
+ */
+export function formatMonthYear(date: Date | string, shortMonth: boolean = false): string {
+  const d = date instanceof Date ? date : new Date(date);
+  const { dateFormat, timeZone } = getPreferences();
+  
+  const monthName = d.toLocaleDateString('en-US', { 
+    month: shortMonth ? 'short' : 'long', 
+    timeZone 
+  });
+  const year = d.getFullYear();
+  
+  switch (dateFormat) {
+    case 'DD/MM/YYYY':
+    case 'YYYY-MM-DD':
+      return `${monthName} ${year}`;
+    case 'MM/DD/YYYY':
+    default:
+      return `${monthName} ${year}`;
+  }
+}

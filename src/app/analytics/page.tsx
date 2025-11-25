@@ -14,6 +14,7 @@ import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
+import { formatChartDate } from '@/lib/dateTimeUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { chartTheme } from '@/lib/chartUtils';
 
@@ -165,15 +166,6 @@ function formatPower(watts: number): string {
   return `${Math.round(watts)}W`;
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
 
 // Prepare chart data for distance over time
 function prepareChartData(sessions: any[]) {
@@ -181,10 +173,7 @@ function prepareChartData(sessions: any[]) {
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     .map(session => ({
-      date: new Date(session.timestamp).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      }),
+      date: formatChartDate(new Date(session.timestamp)),
       distance: session.distance,
       fullDate: session.timestamp
     }));
@@ -281,7 +270,7 @@ const Analytics = () => {
   const prepareChartData = (sessions: any[], metric: ChartMetric) => {
     return sessions
       .map(session => ({
-        date: formatDate(new Date(session.timestamp)),
+        date: formatChartDate(new Date(session.timestamp)),
         [metric]: getMetricValue(session, metric),
         fullDate: session.timestamp,
         sessionId: session.id

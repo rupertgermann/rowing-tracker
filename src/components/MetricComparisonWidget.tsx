@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
 import { TrendingUp, Clock, Zap, Activity, Flame, Target, Calendar, BarChart3, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from 'lucide-react';
+import { formatMonthYear } from '@/lib/dateTimeUtils';
 
 type Period = 'week' | 'month' | 'quarter' | 'year';
 type Metric = 'distance' | 'duration' | 'energy' | 'power' | 'pace' | 'strokeRate';
@@ -83,7 +84,7 @@ export function MetricComparisonWidget() {
         key = `W${week} ${year}`;
         sortKey = `${year}-${week.toString().padStart(2, '0')}`;
       } else if (period === 'month') {
-        key = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        key = formatMonthYear(d, true);
         sortKey = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
       } else if (period === 'quarter') {
         const q = getQuarter(d);
