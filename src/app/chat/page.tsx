@@ -27,8 +27,12 @@ import {
   User,
   Clock,
   Settings,
-  Loader2
+  Loader2,
+  Brain,
+  Paperclip
 } from 'lucide-react';
+import { MemoryManager } from '@/components/MemoryManager';
+import { useMemory } from '@/hooks/useMemory';
 
 export default function ChatPage() {
   const {
@@ -57,9 +61,13 @@ export default function ChatPage() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Memory hook for document count badge
+  const { documents: memoryDocuments } = useMemory();
 
   // Auto-resize textarea based on content
   const adjustTextareaHeight = () => {
@@ -176,6 +184,20 @@ export default function ChatPage() {
 
         <div className="flex items-center gap-2">
           <Button
+            variant={showMemory ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowMemory(!showMemory)}
+            className="relative"
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            Memory
+            {memoryDocuments.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                {memoryDocuments.length > 9 ? '9+' : memoryDocuments.length}
+              </span>
+            )}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={() => setShowSearch(!showSearch)}
@@ -261,6 +283,21 @@ export default function ChatPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Memory Panel Slide-out */}
+      {showMemory && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50" 
+            onClick={() => setShowMemory(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-md h-full bg-background shadow-xl animate-in slide-in-from-right duration-300">
+            <MemoryManager onClose={() => setShowMemory(false)} />
+          </div>
+        </div>
       )}
 
       <div className="flex gap-4 flex-1 min-h-0">

@@ -187,6 +187,41 @@ export class CloudAIService {
             additionalProperties: false
           },
           strict: true
+        },
+        {
+          type: "function" as const,
+          name: "get_memory_documents",
+          description: "Retrieve documents from the user's coaching memory. Includes user uploads (PDFs, images) AND system-generated content like training plans and insights.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: ["string", "null"],
+                description: "Search query to filter documents by name, description, or extracted text"
+              },
+              type: {
+                type: ["string", "null"],
+                enum: ["image", "pdf", "training_plan", "insight", "note", null],
+                description: "Filter by document type"
+              },
+              source: {
+                type: ["string", "null"],
+                enum: ["user", "system", null],
+                description: "Filter by source (user uploads vs system-generated)"
+              },
+              activeOnly: {
+                type: ["boolean", "null"],
+                description: "For training plans: only return active plan (default: false)"
+              },
+              includeContent: {
+                type: ["boolean", "null"],
+                description: "Include full extracted text content (default: false, only summaries)"
+              }
+            },
+            required: ["query", "type", "source", "activeOnly", "includeContent"],
+            additionalProperties: false
+          },
+          strict: true
         }
       ];
 
@@ -552,6 +587,65 @@ export class CloudAIService {
       return result;
     }
 
+    if (name === 'get_memory_documents') {
+      const { memoryStorage } = await import('@/lib/memoryStorage');
+      
+      console.log(`[get_memory_documents] Args:`, args);
+      
+      let docs = await memoryStorage.getAllDocuments();
+      
+      // Filter by type
+      if (args.type) {
+        docs = docs.filter(d => d.type === args.type);
+      }
+      
+      // Filter by source
+      if (args.source) {
+        docs = docs.filter(d => d.source === args.source);
+      }
+      
+      // Filter active training plans only
+      if (args.activeOnly && args.type === 'training_plan') {
+        docs = docs.filter(d => d.status === 'active');
+      }
+      
+      // Search by query
+      if (args.query) {
+        const query = args.query.toLowerCase();
+        docs = docs.filter(d => 
+          d.name.toLowerCase().includes(query) ||
+          d.description?.toLowerCase().includes(query) ||
+          d.extractedText?.toLowerCase().includes(query) ||
+          d.tags?.some(tag => tag.toLowerCase().includes(query))
+        );
+      }
+      
+      // Sort by date desc
+      docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+      
+      // Return formatted results
+      const result = docs.map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        type: doc.type,
+        source: doc.source,
+        description: doc.description,
+        uploadedAt: doc.uploadedAt,
+        status: doc.status,
+        tags: doc.tags,
+        // Include content based on flag
+        text: args.includeContent 
+          ? doc.extractedText 
+          : doc.extractedText?.slice(0, 300) + (doc.extractedText && doc.extractedText.length > 300 ? '...' : ''),
+        // For system documents, include the structured content
+        content: args.includeContent ? doc.content : undefined,
+      }));
+      
+      console.log(`[get_memory_documents] Returning ${result.length} documents`);
+      
+      return result;
+    }
+
     return { error: `Unknown tool: ${name}` };
   }
 
@@ -616,6 +710,24 @@ TOOLS AVAILABLE:
     * Consistency checks
     * Specific workout details or technique analysis
   - Do NOT assume you know the user's data unless you have called this tool.
+
+- get_memory_documents: Access the user's coaching memory containing uploaded documents and system-generated content.
+  - MEMORY CONTENTS:
+    * User uploads: PDFs (training guides, articles), images (technique screenshots, form photos)
+    * Training Plans: Active and archived training plans you've created
+    * Insights: AI-generated insights from the dashboard
+    * Notes: User-saved notes and reminders
+  - WHEN TO USE:
+    * User asks about their training plan → type: 'training_plan', activeOnly: true
+    * User references an uploaded document → query: [search term]
+    * User asks about recent insights/recommendations → type: 'insight'
+    * User mentions something they uploaded → source: 'user'
+  - PARAMETERS:
+    * query: Search by name, description, or extracted text content
+    * type: Filter by 'image', 'pdf', 'training_plan', 'insight', or 'note'
+    * source: 'user' for uploads, 'system' for generated content
+    * activeOnly: true to get only the active training plan
+    * includeContent: true to get full text content (use sparingly)
 
 FORMATTING GUIDELINES:
 - ALWAYS use markdown formatting in your responses

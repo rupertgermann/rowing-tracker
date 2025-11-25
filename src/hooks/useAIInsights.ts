@@ -4,6 +4,7 @@ import { Session } from '@/types/session';
 import { aiAnalysis, Insight, TrendData, TrainingLoadData, AnomalyData } from '@/lib/aiAnalysis';
 import { cloudAI, CloudInsight } from '@/lib/cloudAI';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
+import { memoryStorage } from '@/lib/memoryStorage';
 
 export interface AIInsightData {
   insights: (Insight | CloudInsight)[];
@@ -97,8 +98,42 @@ const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AI
     };
     
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    
+    // Sync insights to memory for AI coach access
+    syncInsightsToMemory(data.insights, usingCloudAI);
   } catch (error) {
     console.warn('Failed to cache insights:', error);
+  }
+};
+
+// Sync insights to memory storage for AI coach access
+const syncInsightsToMemory = async (insights: (Insight | CloudInsight)[], usingCloudAI: boolean): Promise<void> => {
+  if (insights.length === 0) return;
+  
+  try {
+    await memoryStorage.addSystemDocument(
+      'insight',
+      `AI Insights - ${new Date().toLocaleDateString()}`,
+      {
+        generatedAt: new Date().toISOString(),
+        source: usingCloudAI ? 'cloud-ai' : 'local-analysis',
+        insightCount: insights.length,
+        insights: insights.map(insight => ({
+          id: insight.id,
+          type: insight.type,
+          title: insight.title,
+          description: insight.description,
+          priority: insight.priority,
+          category: 'category' in insight ? insight.category : undefined,
+          dateGenerated: insight.dateGenerated,
+        }))
+      },
+      {
+        description: `${insights.length} insights from ${usingCloudAI ? 'AI analysis' : 'local analysis'}`
+      }
+    );
+  } catch (error) {
+    console.warn('Failed to sync insights to memory:', error);
   }
 };
 

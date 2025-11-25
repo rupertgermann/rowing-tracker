@@ -12,6 +12,7 @@ import { trainingPlans, TrainingPlan, TrainingWeek, TrainingSession } from '@/li
 import { cloudAI } from '@/lib/cloudAI';
 import { useRowingStore } from '@/lib/store';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
+import { memoryStorage } from '@/lib/memoryStorage';
 import { 
   Calendar, 
   Play, 
@@ -143,7 +144,7 @@ export default function PlansPage() {
     }
   };
 
-  const handleActivatePlan = (planId: string) => {
+  const handleActivatePlan = async (planId: string) => {
     try {
       trainingPlans.setActivePlan(planId);
       const plan = trainingPlans.getPlan(planId);
@@ -153,6 +154,38 @@ export default function PlansPage() {
           status: 'active',
           startDate: new Date()
         });
+        
+        // Sync to memory for AI coach access
+        await memoryStorage.addSystemDocument(
+          'training_plan',
+          `Training Plan: ${plan.title}`,
+          {
+            id: plan.id,
+            title: plan.title,
+            description: plan.description,
+            goals: plan.goals,
+            level: plan.level,
+            focus: plan.focus,
+            duration: plan.duration,
+            startDate: new Date().toISOString(),
+            weeklyStructure: plan.weeks.map(w => ({
+              weekNumber: w.weekNumber,
+              focus: w.focus,
+              totalVolume: w.totalVolume,
+              sessions: w.sessions.map(s => ({
+                day: s.day,
+                type: s.type,
+                title: s.title,
+                duration: s.duration,
+                intensity: s.intensity,
+              }))
+            }))
+          },
+          {
+            description: `${plan.duration}-week ${plan.level} ${plan.focus} plan`,
+            status: 'active'
+          }
+        );
         
         // Reload plans from localStorage to ensure state synchronization
         loadPlans();
