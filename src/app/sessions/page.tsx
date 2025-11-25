@@ -400,16 +400,16 @@ export default function SessionsPage() {
                                 {formatDistance(session.distance)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right text-sm text-violet-600 dark:text-violet-400">
+                            <TableCell className="text-right text-sm">
                               {formatDuration(session.duration)}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-mono text-emerald-600 dark:text-emerald-400">
+                            <TableCell className="text-right text-sm font-mono">
                               {formatPace(session.avgSplit)}
                             </TableCell>
-                            <TableCell className="text-right text-sm text-amber-600 dark:text-amber-400">
+                            <TableCell className="text-right text-sm">
                               {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
                             </TableCell>
-                            <TableCell className="text-right text-sm text-rose-600 dark:text-rose-400">
+                            <TableCell className="text-right text-sm">
                               {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
                             </TableCell>
                             <TableCell className="text-right text-sm">
