@@ -175,9 +175,12 @@ export default function ChatPage() {
   // Prompt suggestions for empty chat
   const promptSuggestions = [
     "How can I improve my rowing technique?",
+    "What's next on the training plan?",
+    "Read your memory and rate my progress",
     "Analyze my recent training sessions",
     "Create a 4-week training plan for me",
     "What's my average pace trend?",
+    "Show me my training history",
   ];
 
   const formatDate = (date: Date) => {
