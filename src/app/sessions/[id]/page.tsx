@@ -459,11 +459,6 @@ export default function SessionDetailPage() {
             </Card>
           ) : (
             <div className="space-y-6">
-              <div className="flex justify-end">
-                <Button variant="outline" onClick={handleClearAnalysis} size="sm">
-                  Clear Analysis
-                </Button>
-              </div>
               <SessionAnalysis data={strokeData} />
             </div>
           )}
