@@ -4,7 +4,7 @@ import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/s
 import { AWARDS, EarnedAward } from '@/lib/awards';
 
 // Chart configuration types
-export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime';
+export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
 type ChartType = 'line' | 'bar' | 'area';
 
 // Dashboard Persistence Types

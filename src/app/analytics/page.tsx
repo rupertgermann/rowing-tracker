@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
+import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { chartTheme } from '@/lib/chartUtils';
 
@@ -120,6 +121,16 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     yAxisFormatter: (value: number) => formatPace(value),
     unit: 'time per 500m',
     isSpecial: true
+  },
+  consistencyScore: {
+    metric: 'consistencyScore',
+    label: 'Consistency Score',
+    icon: BarChart3,
+    color: '#14b8a6', // Teal-500
+    fillOpacity: 0.3,
+    formatter: (value: number) => `${Math.round(value)}/100`,
+    yAxisFormatter: (value: number) => `${Math.round(value)}`,
+    unit: 'score (0-100)'
   }
 };
 
@@ -268,12 +279,15 @@ const Analytics = () => {
 
   // Prepare chart data for different metrics
   const prepareChartData = (sessions: any[], metric: ChartMetric) => {
-    return sessions.map(session => ({
-      date: formatDate(new Date(session.timestamp)),
-      [metric]: getMetricValue(session, metric),
-      fullDate: session.timestamp,
-      sessionId: session.id
-    }));
+    return sessions
+      .map(session => ({
+        date: formatDate(new Date(session.timestamp)),
+        [metric]: getMetricValue(session, metric),
+        fullDate: session.timestamp,
+        sessionId: session.id
+      }))
+      // Filter out sessions without data (e.g., consistency score requires strokeData)
+      .filter(dataPoint => dataPoint[metric] !== -1);
   };
 
   // Get metric value from session based on metric type
@@ -286,6 +300,14 @@ const Analytics = () => {
       case 'energy': return session.energy;
       case 'duration': return session.duration;
       case 'splitTime': return session.avgSplit; // For compatibility, though splitTime uses special rendering
+      case 'consistencyScore': {
+        // Calculate consistency score from stroke data if available
+        if (session.strokeData && session.strokeData.length > 0) {
+          const stats = calculateAdvancedStats(session.strokeData);
+          return stats.consistencyScore;
+        }
+        return -1; // Return -1 to indicate no data available
+      }
       default: return 0;
     }
   };
