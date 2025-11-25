@@ -212,6 +212,23 @@ export default function SessionsPage() {
         ) : (
           // Sessions content
           <div className="space-y-6">
+            {/* Module Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground mb-2">
+                  Sessions
+                </h2>
+                <p className="text-muted-foreground">
+                  View and filter your workout history
+                </p>
+              </div>
+              <TimeRangeSelector
+                value={filters.dateRange}
+                onChange={(value) => updateSessionsViewSettings({ dateRange: value })}
+                showLabel
+              />
+            </div>
+
             {/* Filter Controls */}
             <Card>
               <CardHeader>
@@ -229,31 +246,20 @@ export default function SessionsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Distance Range Filter */}
-                  <div>
-                    <label className="text-sm font-medium mb-3 block">Distance</label>
-                    <div className="flex flex-wrap gap-2">
-                      {distanceRangeOptions.map((option) => (
-                        <Button
-                          key={option.value}
-                          variant={filters.distanceRange === option.value ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => updateSessionsViewSettings({ distanceRange: option.value as any })}
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Date Range Filter */}
-                  <div>
-                    <label className="text-sm font-medium mb-3 block">Date Range</label>
-                    <TimeRangeSelector
-                      value={filters.dateRange}
-                      onChange={(value) => updateSessionsViewSettings({ dateRange: value })}
-                    />
+                {/* Distance Range Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-3 block">Distance</label>
+                  <div className="flex flex-wrap gap-2">
+                    {distanceRangeOptions.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={filters.distanceRange === option.value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updateSessionsViewSettings({ distanceRange: option.value as any })}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
               </CardContent>
