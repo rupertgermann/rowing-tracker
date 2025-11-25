@@ -1,22 +1,19 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Chat } from '@/components/ui/chat';
+import { type Message } from '@/components/ui/chat-message';
 import { useChat } from '@/hooks/useChat';
-import { formatChartDate, formatTime as formatTimeUtil } from '@/lib/dateTimeUtils';
+import { formatChartDate } from '@/lib/dateTimeUtils';
 import {
   MessageCircle,
-  Send,
   Search,
   Plus,
-  MoreHorizontal,
   Trash2,
   Download,
   Upload,
@@ -24,12 +21,8 @@ import {
   Check,
   X,
   Bot,
-  User,
   Clock,
-  Settings,
-  Loader2,
   Brain,
-  Paperclip
 } from 'lucide-react';
 import { MemoryManager } from '@/components/MemoryManager';
 import { useMemory } from '@/hooks/useMemory';
@@ -64,44 +57,32 @@ export default function ChatPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Memory hook for document count badge and blob access
-  const { documents: memoryDocuments, getDocumentBlob } = useMemory();
+  // Memory hook for document count badge
+  const { documents: memoryDocuments } = useMemory();
 
-  // Auto-resize textarea based on content
-  const adjustTextareaHeight = () => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-    }
-  };
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Convert our ChatMessage format to the kit's Message format
+  const chatMessages: Message[] = useMemo(() => {
+    if (!currentSession?.messages) return [];
+    return currentSession.messages.map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      createdAt: new Date(msg.timestamp),
+    }));
   }, [currentSession?.messages]);
 
-  // Handle attaching document from memory
-  const handleAttachDocument = (doc: MemoryDocument) => {
-    // Don't add duplicates
-    if (!attachedDocs.find(d => d.id === doc.id)) {
-      setAttachedDocs(prev => [...prev, doc]);
-    }
-    setShowMemory(false);
-  };
+  // Handle input change for the Chat component
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessageInput(e.target.value);
+  }, []);
 
-  // Remove attached document
-  const removeAttachedDoc = (docId: string) => {
-    setAttachedDocs(prev => prev.filter(d => d.id !== docId));
-  };
-
-  // Handle sending message
-  const handleSendMessage = async () => {
-    if ((!messageInput.trim() && attachedDocs.length === 0) || !currentSession || isLoading) return;
+  // Handle form submit for the Chat component
+  const handleSubmit = useCallback((e?: { preventDefault?: () => void }) => {
+    e?.preventDefault?.();
+    if (!messageInput.trim() && attachedDocs.length === 0) return;
+    if (!currentSession || isLoading) return;
 
     // Build message with attachments
     let fullMessage = messageInput.trim();
@@ -122,14 +103,20 @@ export default function ChatPage() {
     sendMessage(fullMessage);
     setMessageInput('');
     setAttachedDocs([]);
-  };
+  }, [messageInput, attachedDocs, currentSession, isLoading, sendMessage]);
 
-  // Handle Enter key in message input
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  // Handle append for prompt suggestions
+  const handleAppend = useCallback((message: { role: 'user'; content: string }) => {
+    if (!currentSession) return;
+    sendMessage(message.content);
+  }, [currentSession, sendMessage]);
+
+  // Handle attaching document from memory
+  const handleAttachDocument = (doc: MemoryDocument) => {
+    if (!attachedDocs.find(d => d.id === doc.id)) {
+      setAttachedDocs(prev => [...prev, doc]);
     }
+    setShowMemory(false);
   };
 
   // Start editing session title
@@ -185,8 +172,13 @@ export default function ChatPage() {
     }
   };
 
-  // Format timestamp - uses user preferences from dateTimeUtils
-  const formatTime = (date: Date) => formatTimeUtil(date);
+  // Prompt suggestions for empty chat
+  const promptSuggestions = [
+    "How can I improve my rowing technique?",
+    "Analyze my recent training sessions",
+    "Create a 4-week training plan for me",
+    "What's my average pace trend?",
+  ];
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -460,10 +452,10 @@ export default function ChatPage() {
         </Card>
 
         {/* Chat Area */}
-        <Card className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col overflow-hidden">
           {currentSession ? (
             <>
-              <CardHeader className="pb-3 border-b">
+              <CardHeader className="pb-3 border-b flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-lg">{currentSession.title}</CardTitle>
@@ -480,156 +472,26 @@ export default function ChatPage() {
                 </div>
               </CardHeader>
 
-              <CardContent className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-4">
-                  {currentSession.messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'
-                        }`}
-                    >
-                      {message.role === 'assistant' && (
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                          <Bot className="h-4 w-4 text-blue-600" />
-                        </div>
-                      )}
-                      <div
-                        className={`max-w-[70%] rounded-lg p-3 ${message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                          }`}
-                      >
-                        <div className="text-sm">
-                          {message.role === 'assistant' ? (
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={{
-                                  // Custom styling for common markdown elements
-                                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                  ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                                  li: ({ children }) => <li className="mb-1">{children}</li>,
-                                  code: ({ className, children }) => {
-                                    const isInline = !className;
-                                    return isInline
-                                      ? <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>
-                                      : <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2"><code>{children}</code></pre>;
-                                  },
-                                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                                  em: ({ children }) => <em className="italic">{children}</em>,
-                                  h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                                  h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                                  h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
-                                  blockquote: ({ children }) => <blockquote className="border-l-4 border-muted-foreground pl-3 italic">{children}</blockquote>,
-                                  table: ({ children }) => <div className="overflow-x-auto mb-4"><table className="min-w-full divide-y divide-border border rounded-md">{children}</table></div>,
-                                  thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
-                                  tbody: ({ children }) => <tbody className="divide-y divide-border bg-card">{children}</tbody>,
-                                  tr: ({ children }) => <tr className="hover:bg-muted/50 transition-colors">{children}</tr>,
-                                  th: ({ children }) => <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{children}</th>,
-                                  td: ({ children }) => <td className="px-3 py-2 whitespace-nowrap text-sm">{children}</td>,
-                                }}
-                                disallowedElements={['script', 'iframe', 'object', 'embed']}
-                              >
-                                {message.content}
-                              </ReactMarkdown>
-                            </div>
-                          ) : (
-                            <div className="whitespace-pre-wrap">{message.content}</div>
-                          )}
-                        </div>
-                        <div className="text-xs opacity-70 mt-1">
-                          {formatTime(message.timestamp)}
-                        </div>
-                      </div>
-                      {message.role === 'user' && (
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <User className="h-4 w-4 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              <div className="flex-1 overflow-hidden">
+                <Chat
+                  messages={chatMessages}
+                  input={messageInput}
+                  handleInputChange={handleInputChange}
+                  handleSubmit={handleSubmit}
+                  isGenerating={isLoading}
+                  append={handleAppend}
+                  suggestions={promptSuggestions}
+                  className="h-full"
+                />
+              </div>
 
-                  {/* Loading indicator */}
-                  {isLoading && (
-                    <div className="flex gap-3 justify-start">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                      </div>
-                      <div className="bg-muted rounded-lg p-3">
-                        <div className="text-sm text-muted-foreground">
-                          AI coach is thinking...
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
-              </CardContent>
-
-              <div className="p-4 border-t">
-                {/* Attached Documents */}
-                {attachedDocs.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {attachedDocs.map(doc => (
-                      <div 
-                        key={doc.id}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full text-sm"
-                      >
-                        <Paperclip className="h-3 w-3 text-primary" />
-                        <span className="max-w-[150px] truncate">{doc.name}</span>
-                        <button
-                          onClick={() => removeAttachedDoc(doc.id)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-2 items-end">
-                  <Textarea
-                    ref={textareaRef}
-                    placeholder="Ask your AI rowing coach anything... (Shift+Enter for new line)"
-                    value={messageInput}
-                    onChange={(e) => {
-                      setMessageInput(e.target.value);
-                      adjustTextareaHeight();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                        // Reset height after sending
-                        if (textareaRef.current) {
-                          textareaRef.current.style.height = 'auto';
-                        }
-                      }
-                    }}
-                    disabled={!isAIConfigured || isLoading}
-                    className="flex-1 min-h-[44px] max-h-[200px] resize-none overflow-y-auto"
-                    rows={1}
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={(!messageInput.trim() && attachedDocs.length === 0) || !isAIConfigured || isLoading}
-                    className="h-[44px]"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                {!isAIConfigured && (
-                  <p className="text-xs text-muted-foreground mt-2">
+              {!isAIConfigured && (
+                <div className="p-4 border-t">
+                  <p className="text-xs text-muted-foreground text-center">
                     Configure your OpenAI API key to start chatting
                   </p>
-                )}
-              </div>
+                </div>
+              )}
             </>
           ) : (
             <CardContent className="flex-1 flex items-center justify-center">
