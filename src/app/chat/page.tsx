@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useChat } from '@/hooks/useChat';
@@ -485,18 +486,25 @@ export default function ChatPage() {
               </CardContent>
 
               <div className="p-4 border-t">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ask your AI rowing coach anything..."
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    placeholder="Ask your AI rowing coach anything... (Shift+Enter for new line)"
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
                     disabled={!isAIConfigured || isLoading}
-                    className="flex-1"
+                    className="flex-1 min-h-[44px] max-h-[200px] resize-y"
+                    rows={1}
                   />
                   <Button
                     onClick={handleSendMessage}
                     disabled={!messageInput.trim() || !isAIConfigured || isLoading}
+                    className="h-[44px]"
                   >
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
