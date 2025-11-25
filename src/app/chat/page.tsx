@@ -59,6 +59,16 @@ export default function ChatPage() {
   const [showSearch, setShowSearch] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea based on content
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  };
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -488,17 +498,25 @@ export default function ChatPage() {
               <div className="p-4 border-t">
                 <div className="flex gap-2 items-end">
                   <Textarea
+                    ref={textareaRef}
                     placeholder="Ask your AI rowing coach anything... (Shift+Enter for new line)"
                     value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
+                    onChange={(e) => {
+                      setMessageInput(e.target.value);
+                      adjustTextareaHeight();
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage();
+                        // Reset height after sending
+                        if (textareaRef.current) {
+                          textareaRef.current.style.height = 'auto';
+                        }
                       }
                     }}
                     disabled={!isAIConfigured || isLoading}
-                    className="flex-1 min-h-[44px] max-h-[200px] resize-y"
+                    className="flex-1 min-h-[44px] max-h-[200px] resize-none overflow-y-auto"
                     rows={1}
                   />
                   <Button
