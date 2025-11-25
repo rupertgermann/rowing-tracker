@@ -24,6 +24,7 @@ import {
   Loader2,
   Eye,
   Calendar,
+  FileSearch,
 } from 'lucide-react';
 
 // ============================================================================
@@ -66,9 +67,10 @@ interface DocumentCardProps {
   document: MemoryDocument;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
+  onViewText: (doc: MemoryDocument) => void;
 }
 
-function DocumentCard({ document, onDelete, onView }: DocumentCardProps) {
+function DocumentCard({ document, onDelete, onView, onViewText }: DocumentCardProps) {
   const config = documentTypeConfig[document.type];
   const Icon = config.icon;
 
@@ -122,12 +124,24 @@ function DocumentCard({ document, onDelete, onView }: DocumentCardProps) {
 
       {/* Actions */}
       <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {(document.extractedText || document.description) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onViewText(document)}
+            title="View extracted text"
+          >
+            <FileSearch className="h-4 w-4" />
+          </Button>
+        )}
         {document.source === 'user' && (
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8"
             onClick={() => onView(document.id)}
+            title="Preview document"
           >
             <Eye className="h-4 w-4" />
           </Button>
@@ -137,6 +151,7 @@ function DocumentCard({ document, onDelete, onView }: DocumentCardProps) {
           size="icon"
           className="h-8 w-8 text-destructive hover:text-destructive"
           onClick={() => onDelete(document.id)}
+          title="Delete document"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -308,6 +323,7 @@ export function MemoryManager({ onClose }: MemoryManagerProps) {
   const [typeFilter, setTypeFilter] = useState<MemoryDocumentType | 'all'>('all');
   const [viewingDocId, setViewingDocId] = useState<string | null>(null);
   const [viewingUrl, setViewingUrl] = useState<string | null>(null);
+  const [viewingTextDoc, setViewingTextDoc] = useState<MemoryDocument | null>(null);
 
   // Filter documents
   const filteredDocuments = documents.filter(doc => {
@@ -348,6 +364,16 @@ export function MemoryManager({ onClose }: MemoryManagerProps) {
     }
     setViewingDocId(null);
     setViewingUrl(null);
+  };
+
+  // Handle view extracted text
+  const handleViewText = (doc: MemoryDocument) => {
+    setViewingTextDoc(doc);
+  };
+
+  // Close text preview
+  const closeTextPreview = () => {
+    setViewingTextDoc(null);
   };
 
   // Handle export
@@ -455,6 +481,7 @@ export function MemoryManager({ onClose }: MemoryManagerProps) {
                 document={doc}
                 onDelete={handleDelete}
                 onView={handleView}
+                onViewText={handleViewText}
               />
             ))
           )}
@@ -496,6 +523,73 @@ export function MemoryManager({ onClose }: MemoryManagerProps) {
                 title="Document Preview"
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Extracted Text Modal */}
+      {viewingTextDoc && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="relative max-w-3xl max-h-[90vh] w-full bg-background rounded-lg overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${documentTypeConfig[viewingTextDoc.type].color}`}>
+                  <FileSearch className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Extracted Text</h3>
+                  <p className="text-sm text-muted-foreground">{viewingTextDoc.name}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={closeTextPreview}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {viewingTextDoc.description && (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                  <p className="text-sm bg-muted/50 p-3 rounded-lg">
+                    {viewingTextDoc.description}
+                  </p>
+                </div>
+              )}
+              {viewingTextDoc.extractedText ? (
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Extracted Text</h4>
+                  <pre className="whitespace-pre-wrap font-mono text-sm bg-muted/50 p-4 rounded-lg">
+                    {viewingTextDoc.extractedText}
+                  </pre>
+                </div>
+              ) : !viewingTextDoc.description && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileSearch className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No text was extracted from this document.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between p-4 border-t bg-muted/30">
+              <span className="text-sm text-muted-foreground">
+                {(viewingTextDoc.extractedText?.length || 0) + (viewingTextDoc.description?.length || 0)} characters
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const text = [viewingTextDoc.description, viewingTextDoc.extractedText].filter(Boolean).join('\n\n');
+                  if (text) {
+                    navigator.clipboard.writeText(text);
+                  }
+                }}
+              >
+                Copy to Clipboard
+              </Button>
+            </div>
           </div>
         </div>
       )}

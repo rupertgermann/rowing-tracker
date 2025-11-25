@@ -5,7 +5,7 @@ import {
   MemoryDocumentType,
   MEMORY_CONFIG 
 } from '@/lib/memoryStorage';
-import { processDocument, processPDF } from '@/lib/documentProcessor';
+import { processDocument, processPDF, processImage } from '@/lib/documentProcessor';
 
 export interface MemoryState {
   documents: MemoryDocument[];
@@ -73,12 +73,16 @@ export function useMemory() {
 
       setState(prev => ({ ...prev, uploadProgress: 20 }));
 
-      // Process the document (resize images, extract PDF text)
+      // Process the document (resize images, extract text)
       let extractedText: string | undefined;
       
       if (file.type === 'application/pdf') {
         setState(prev => ({ ...prev, uploadProgress: 40 }));
         const processed = await processPDF(file);
+        extractedText = processed.extractedText;
+      } else if (file.type.startsWith('image/')) {
+        setState(prev => ({ ...prev, uploadProgress: 40 }));
+        const processed = await processImage(file);
         extractedText = processed.extractedText;
       }
 
