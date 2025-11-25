@@ -99,7 +99,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
       return data;
     }
 
-    console.log('Calculating stroke lengths on the fly for visualization...');
+    // Calculate stroke lengths on the fly for visualization
     // Sort by index to ensure correct delta calculation
     const sorted = [...data].sort((a, b) => a.strokeIndex - b.strokeIndex);
 

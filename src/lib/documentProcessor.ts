@@ -50,8 +50,8 @@ export async function processImage(file: File): Promise<ProcessedImage> {
         let extractedText: string | undefined;
         try {
           extractedText = await extractTextFromImage(file);
-        } catch (e) {
-          console.warn('[Image] Text extraction failed:', e);
+        } catch {
+          // Text extraction failed, continue without it
         }
 
         resolve({ resizedBlob, thumbnail, metadata, extractedText });
@@ -93,7 +93,6 @@ async function extractTextFromImage(file: File): Promise<string> {
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
-    console.log(`[LLM] Extracting text from image (${(file.size / 1024).toFixed(1)}KB)...`);
 
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -125,7 +124,6 @@ async function extractTextFromImage(file: File): Promise<string> {
     });
 
     if (!response.ok) {
-      console.error('[LLM] Image API error:', await response.text());
       return '';
     }
 
@@ -136,17 +134,13 @@ async function extractTextFromImage(file: File): Promise<string> {
     if (messageOutput?.content?.length > 0) {
       const textContent = messageOutput.content.find((c: { type: string }) => c.type === 'output_text');
       if (textContent?.text) {
-        console.log(`[LLM] Extracted ${textContent.text.length} characters from image`);
         return textContent.text;
       }
     }
 
     // Fallback to direct output_text
-    const text = data.output_text || '';
-    console.log(`[LLM] Extracted ${text.length} characters from image`);
-    return text;
-  } catch (error) {
-    console.error('[LLM] Image text extraction failed:', error);
+    return data.output_text || '';
+  } catch {
     return '';
   }
 }
@@ -262,7 +256,6 @@ export async function processPDF(file: File): Promise<ProcessedPDF> {
     const hasText = extractedText.length > 50; // Arbitrary threshold for "meaningful" text
 
     if (hasText) {
-      console.log(`[PDF] Text-native PDF detected, extracted ${extractedText.length} characters`);
       return {
         extractedText,
         metadata,
@@ -270,7 +263,6 @@ export async function processPDF(file: File): Promise<ProcessedPDF> {
     }
 
     // No text found - this is likely a scanned PDF, use LLM vision
-    console.log('[PDF] No embedded text found, attempting LLM vision extraction...');
     const llmText = await extractTextWithLLM(file);
     
     return {
@@ -292,7 +284,6 @@ async function extractTextWithLLM(file: File): Promise<string> {
     // Check if AI is available
     initializeCloudAIFromSettings();
     if (!isAIAvailable()) {
-      console.warn('[LLM] AI not configured, cannot extract text from scanned PDF');
       return '';
     }
 
@@ -301,7 +292,6 @@ async function extractTextWithLLM(file: File): Promise<string> {
     const aiSettings = settings.getAISettings();
     
     if (!aiSettings.openaiApiKey) {
-      console.warn('[LLM] No API key configured');
       return '';
     }
 
@@ -311,7 +301,6 @@ async function extractTextWithLLM(file: File): Promise<string> {
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
     
-    console.log(`[LLM] Sending PDF (${(file.size / 1024).toFixed(1)}KB) to OpenAI for text extraction...`);
 
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -344,8 +333,6 @@ async function extractTextWithLLM(file: File): Promise<string> {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[LLM] API error:', errorText);
       return '';
     }
 
@@ -356,16 +343,12 @@ async function extractTextWithLLM(file: File): Promise<string> {
     if (messageOutput?.content?.length > 0) {
       const textContent = messageOutput.content.find((c: { type: string }) => c.type === 'output_text');
       if (textContent?.text) {
-        console.log(`[LLM] Extracted ${textContent.text.length} characters from PDF`);
         return textContent.text;
       }
     }
 
-    const outputText = data.output_text || '';
-    console.log(`[LLM] Extracted ${outputText.length} characters from PDF`);
-    return outputText;
-  } catch (error) {
-    console.error('[LLM] PDF text extraction failed:', error);
+    return data.output_text || '';
+  } catch {
     return '';
   }
 }
@@ -378,8 +361,7 @@ export async function extractPDFText(arrayBuffer: ArrayBuffer): Promise<string> 
     const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer));
     const { text } = await extractText(pdf, { mergePages: true });
     return text as string;
-  } catch (error) {
-    console.error('PDF text extraction failed:', error);
+  } catch {
     return '';
   }
 }
