@@ -17,19 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles } from 'lucide-react';
 import { formatSessionDate } from '@/lib/dateTimeUtils';
-
-// Filter options
-interface FilterConfig {
-  dateRange: 'all' | '7days' | '30days' | '90days';
-  distanceRange: 'all' | '100' | '500' | '1000' | '2000' | '5000+';
-}
-
-const dateRangeOptions = [
-  { value: 'all', label: 'All Time' },
-  { value: '7days', label: 'Last 7 Days' },
-  { value: '30days', label: 'Last 30 Days' },
-  { value: '90days', label: 'Last 90 Days' }
-];
+import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 
 const distanceRangeOptions = [
   { value: 'all', label: 'All Distances' },
@@ -242,23 +230,6 @@ export default function SessionsPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Date Range Filter */}
-                  <div>
-                    <label className="text-sm font-medium mb-3 block">Date Range</label>
-                    <div className="flex flex-wrap gap-2">
-                      {dateRangeOptions.map((option) => (
-                        <Button
-                          key={option.value}
-                          variant={filters.dateRange === option.value ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => updateSessionsViewSettings({ dateRange: option.value as any })}
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* Distance Range Filter */}
                   <div>
                     <label className="text-sm font-medium mb-3 block">Distance</label>
@@ -274,6 +245,15 @@ export default function SessionsPage() {
                         </Button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-3 block">Date Range</label>
+                    <TimeRangeSelector
+                      value={filters.dateRange}
+                      onChange={(value) => updateSessionsViewSettings({ dateRange: value })}
+                    />
                   </div>
                 </div>
               </CardContent>

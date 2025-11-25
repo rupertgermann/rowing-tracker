@@ -19,25 +19,10 @@ import { CloudInsight } from '@/lib/cloudAI';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
-
-// Time range options
-type TimeRange = '7days' | '30days' | '90days' | 'all';
+import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area';
-
-interface TimeRangeOption {
-  value: TimeRange;
-  label: string;
-  days?: number;
-}
-
-const timeRangeOptions: TimeRangeOption[] = [
-  { value: '7days', label: '7 Days', days: 7 },
-  { value: '30days', label: '30 Days', days: 30 },
-  { value: '90days', label: '90 Days', days: 90 },
-  { value: 'all', label: 'All Time' }
-];
 
 // Chart configuration options
 
@@ -236,7 +221,7 @@ const Dashboard = () => {
       
       const sessionDate = new Date(session.timestamp);
       const now = new Date();
-      const daysAgo = timeRangeOptions.find(option => option.value === timeRange)?.days;
+      const daysAgo = defaultTimeRangeOptions.find(option => option.value === timeRange)?.days;
       
       if (!daysAgo) return true;
       
@@ -476,24 +461,11 @@ const Dashboard = () => {
                   Track your rowing performance and progress
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground mr-2">Time Range:</span>
-                <div className="flex gap-1">
-                  {timeRangeOptions.map((option) => (
-                    <Button
-                      key={option.value}
-                      variant={timeRange === option.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTimeRange(option.value)}
-                      className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                      aria-label={`Filter to ${option.label}`}
-                      aria-pressed={timeRange === option.value}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <TimeRangeSelector
+                value={timeRange}
+                onChange={setTimeRange}
+                showLabel
+              />
             </div>
 
             {/* Key Metrics */}
@@ -503,7 +475,7 @@ const Dashboard = () => {
                 Key Metrics
                 {timeRange !== 'all' && (
                   <span className="text-lg font-normal text-muted-foreground ml-2">
-                    ({timeRangeOptions.find(opt => opt.value === timeRange)?.label})
+                    ({defaultTimeRangeOptions.find(opt => opt.value === timeRange)?.label})
                   </span>
                 )}
               </h2>

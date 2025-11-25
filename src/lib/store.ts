@@ -7,14 +7,17 @@ import { AWARDS, EarnedAward } from '@/lib/awards';
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
 type ChartType = 'line' | 'bar' | 'area';
 
+// Unified Time Range Type - used across Dashboard, Analytics, and Sessions
+export type TimeRange = '7days' | '30days' | '90days' | 'all';
+
 // Dashboard Persistence Types
-export type DashboardTimeRange = '7days' | '30days' | '90days' | 'all';
+export type DashboardTimeRange = TimeRange; // Alias for backward compatibility
 export type ComparisonMetric = 'distance' | 'duration' | 'energy' | 'power' | 'pace' | 'strokeRate';
 export type ComparisonPeriod = 'week' | 'month' | 'quarter' | 'year';
 export type ComparisonChartType = 'bar' | 'line' | 'area';
 
 export interface DashboardSettings {
-  timeRange: DashboardTimeRange;
+  timeRange: TimeRange;
   comparisonWidget: {
     metric: ComparisonMetric;
     period: ComparisonPeriod;
@@ -27,12 +30,12 @@ export interface DashboardSettings {
 }
 
 // Sessions View Persistence Types
-export type SessionsDateFilter = 'all' | '7days' | '30days' | '90days';
+export type SessionsDateFilter = TimeRange; // Unified with Dashboard/Analytics
 export type SessionsDistanceFilter = 'all' | '100' | '500' | '1000' | '2000' | '5000+';
 
 export interface SessionsViewSettings {
   filters: {
-    dateRange: SessionsDateFilter;
+    dateRange: TimeRange;
     distanceRange: SessionsDistanceFilter;
   };
   sortConfig: {
