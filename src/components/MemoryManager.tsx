@@ -86,7 +86,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
       {/* Content */}
       <div className="flex-1 min-w-0 pr-20">
         <div className="flex items-center gap-2">
-          <h4 className="font-medium text-sm truncate">{document.name}</h4>
+          <h4 className="font-medium text-sm truncate max-w-[165px] sm:max-w-[220px] ">{document.name}</h4>
           {document.status === 'active' && (
             <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/20">
               Active
@@ -125,7 +125,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
       </div>
 
       {/* Actions */}
-      <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute right-0 top-2 flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
         {onAttach && document.source === 'user' && (
           <Button
             variant="ghost"
