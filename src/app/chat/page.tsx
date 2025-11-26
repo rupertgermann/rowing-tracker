@@ -485,7 +485,7 @@ export default function ChatPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
+          <CardContent className="flex-1 overflow-y-auto scrollbar-none">
             {!isAIConfigured ? (
               <div className="text-center py-8">
                 <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

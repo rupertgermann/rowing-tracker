@@ -16,7 +16,7 @@ export function PromptSuggestions({
   return (
     <div className="space-y-6">
       <h2 className="text-center text-2xl font-bold">{label}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm max-w-5xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm max-w-5xl mx-auto">
         {suggestions.map((suggestion) => (
           <div
             key={suggestion}
@@ -26,7 +26,7 @@ export function PromptSuggestions({
               onClick={() => append({ role: "user", content: suggestion })}
               className="w-full h-full p-4 pr-10 text-center flex items-center justify-center"
             >
-              <p className="line-clamp-2">{suggestion}</p>
+              <p className="line-clamp-4">{suggestion}</p>
             </button>
             {onEditSuggestion && (
               <button
