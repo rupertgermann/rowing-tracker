@@ -13,13 +13,13 @@ import { cloudAI } from '@/lib/cloudAI';
 import { useRowingStore } from '@/lib/store';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { memoryStorage } from '@/lib/memoryStorage';
-import { 
-  Calendar, 
-  Play, 
-  Pause, 
-  CheckCircle, 
-  Circle, 
-  Plus, 
+import {
+  Calendar,
+  Play,
+  Pause,
+  CheckCircle,
+  Circle,
+  Plus,
   Edit2,
   Trash2,
   Target,
@@ -87,7 +87,7 @@ export default function PlansPage() {
         // AI-generated plan
         const goals = planForm.goals.split(',').map(g => g.trim()).filter(g => g);
         const userSessions = getSessions();
-        
+
         newPlan = await cloudAI.generateTrainingPlan(
           goals,
           planForm.level,
@@ -95,7 +95,7 @@ export default function PlansPage() {
           planForm.duration,
           userSessions
         );
-        
+
         // Save AI-generated plan to localStorage
         trainingPlans.createPlan({
           title: newPlan.title,
@@ -111,7 +111,7 @@ export default function PlansPage() {
         // Template-based plan
         const templates = trainingPlans.getTemplates();
         const template = templates.find(t => t.level === planForm.level && t.focus === planForm.focus);
-        
+
         if (!template) {
           throw new Error('No template found for selected level and focus');
         }
@@ -154,7 +154,7 @@ export default function PlansPage() {
           status: 'active',
           startDate: new Date()
         });
-        
+
         // Sync to memory for AI coach access
         await memoryStorage.addSystemDocument(
           'training_plan',
@@ -186,7 +186,7 @@ export default function PlansPage() {
             status: 'active'
           }
         );
-        
+
         // Reload plans from localStorage to ensure state synchronization
         loadPlans();
       }
@@ -200,7 +200,7 @@ export default function PlansPage() {
       const userSessions = getSessions();
       // Find the most recent session that might match this planned session
       const recentSession = userSessions[0]; // Assuming sessions are sorted by date
-      
+
       trainingPlans.completeSession(planId, weekId, sessionId, recentSession);
       loadPlans(); // Reload to get updated progress
     } catch (err) {
@@ -299,7 +299,7 @@ export default function PlansPage() {
             </p>
           </div>
         </div>
-        
+
         <Button onClick={() => setShowCreateForm(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Create Plan
@@ -308,7 +308,7 @@ export default function PlansPage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert className="mb-4 border-red-200 bg-red-50">
+        <Alert className="mb-4 border-red-200 bg-red-50 text-red-900 dark:bg-red-900/20 dark:border-red-900 dark:text-red-200">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
             <span>{error}</span>
@@ -351,7 +351,7 @@ export default function PlansPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <Label htmlFor="description">Description</Label>
               <Input
@@ -361,7 +361,7 @@ export default function PlansPage() {
                 placeholder="Brief description of your training plan"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="goals">Goals *</Label>
               <Input
@@ -374,7 +374,7 @@ export default function PlansPage() {
                 Separate multiple goals with commas
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="level">Experience Level</Label>
@@ -405,7 +405,7 @@ export default function PlansPage() {
                 </select>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => handleCreatePlan(false)}
@@ -502,7 +502,7 @@ export default function PlansPage() {
                   (Week {selectedWeek?.weekNumber || 1})
                 </span>
               </div>
-              
+
               <div className="flex gap-2 flex-wrap">
                 {activePlan.weeks.map((week) => (
                   <Button
@@ -526,14 +526,13 @@ export default function PlansPage() {
                       {selectedWeek.sessions.filter(s => s.completed).length}/{selectedWeek.sessions.length} Complete
                     </Badge>
                   </div>
-                  
+
                   <div className="grid gap-2">
                     {selectedWeek.sessions.map((session) => (
                       <div
                         key={session.id}
-                        className={`p-3 border rounded-lg flex items-center justify-between ${
-                          session.completed ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-card dark:bg-card'
-                        }`}
+                        className={`p-3 border rounded-lg flex items-center justify-between ${session.completed ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-card dark:bg-card'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-full ${getIntensityColor(session.intensity)}`}>
