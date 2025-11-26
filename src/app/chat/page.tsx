@@ -61,8 +61,8 @@ export default function ChatPage() {
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Memory hook for document count badge
-  const { documents: memoryDocuments } = useMemory();
+  // Memory hook for document count badge and uploading attachments
+  const { documents: memoryDocuments, uploadDocument } = useMemory();
 
   // Convert our ChatMessage format to the kit's Message format
   const chatMessages: Message[] = useMemo(() => {
@@ -157,6 +157,13 @@ export default function ChatPage() {
         try {
           const attachment = await fileToAttachment(file);
           fileAttachments.push(attachment);
+          
+          // Save to memory in the background (don't block sending)
+          uploadDocument(file, { 
+            description: `Attached in chat on ${new Date().toLocaleDateString()}` 
+          }).catch(err => {
+            console.warn('Failed to save attachment to memory:', err);
+          });
         } catch (error) {
           console.error('Failed to process file attachment:', error);
         }
@@ -190,7 +197,7 @@ export default function ChatPage() {
     sendMessage(fullMessage, fileAttachments.length > 0 ? fileAttachments : undefined);
     setMessageInput('');
     setAttachedDocs([]);
-  }, [messageInput, attachedDocs, currentSession, isLoading, sendMessage, fileToAttachment, memoryDocToAttachment]);
+  }, [messageInput, attachedDocs, currentSession, isLoading, sendMessage, fileToAttachment, memoryDocToAttachment, uploadDocument]);
 
   // Handle append for prompt suggestions
   const handleAppend = useCallback((message: { role: 'user'; content: string }) => {
