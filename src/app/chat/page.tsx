@@ -29,6 +29,7 @@ import { useMemory } from '@/hooks/useMemory';
 import { MemoryDocument, memoryStorage } from '@/lib/memoryStorage';
 import { FileAttachment } from '@/lib/cloudAI';
 import { blobToDataUrl } from '@/lib/documentProcessor';
+import { settings } from '@/lib/settings';
 
 export default function ChatPage() {
   const {
@@ -60,9 +61,23 @@ export default function ChatPage() {
   const [showMemory, setShowMemory] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
 
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
+
+  // Load prompt suggestions setting from settings
+  useEffect(() => {
+    setShowPromptSuggestions(settings.getUserPreferences().showPromptSuggestions);
+  }, []);
+
+  // Check if there are any suggestions to show (custom prompts always count, default prompts depend on toggle)
+  const hasAnySuggestions = useMemo(() => {
+    const userPreferences = settings.getUserPreferences();
+    const hasCustomPrompts = userPreferences.customPrompts.length > 0;
+    const showDefaultPrompts = userPreferences.showPromptSuggestions;
+    return hasCustomPrompts || showDefaultPrompts;
+  }, [settings]);
 
   // Convert our ChatMessage format to the kit's Message format
   const chatMessages: Message[] = useMemo(() => {
@@ -282,17 +297,29 @@ export default function ChatPage() {
     }
   };
 
-  // Prompt suggestions for empty chat
-  const promptSuggestions = [
-    "How can I improve my rowing technique?",
-    "What's next on the training plan?",
-    "Read your memory and rate my progress",
-    "Analyze my recent training sessions",
-    "Create a 4-week training plan for me",
-    "What's my average pace trend?",
-    "Show me my training history",
-    "give me the Detailed stroke analysis for my latest session.",
-  ];
+  // Prompt suggestions for empty chat - custom prompts always shown, default prompts controlled by toggle
+  const promptSuggestions = useMemo(() => {
+    const defaultPrompts = [
+      "How can I improve my rowing technique?",
+      "What's next on the training plan?",
+      "Read your memory and rate my progress",
+      "Analyze my recent training sessions",
+      "Create a 4-week training plan for me",
+      "What's my average pace trend?",
+      "Show me my training history",
+      "give me the Detailed stroke analysis for my latest session.",
+    ];
+    
+    const userPreferences = settings.getUserPreferences();
+    const customPrompts = userPreferences.customPrompts;
+    
+    // Always show custom prompts, default prompts only if toggle is enabled
+    const suggestions = userPreferences.showPromptSuggestions 
+      ? [...defaultPrompts, ...customPrompts]
+      : customPrompts;
+    
+    return suggestions;
+  }, [settings]);
 
   const formatDate = (date: Date) => {
     const today = new Date();
@@ -587,18 +614,30 @@ export default function ChatPage() {
               </CardHeader>
 
               <div className="flex-1 overflow-hidden">
-                <Chat
-                  messages={chatMessages}
-                  input={messageInput}
-                  handleInputChange={handleInputChange}
-                  handleSubmit={handleSubmit}
-                  isGenerating={isLoading}
-                  append={handleAppend}
-                  suggestions={promptSuggestions}
-                  className="h-full"
-                  externalAttachments={attachedFiles}
-                  onEditSuggestion={handleEditSuggestion}
-                />
+                {hasAnySuggestions ? (
+                  <Chat
+                    messages={chatMessages}
+                    input={messageInput}
+                    handleInputChange={handleInputChange}
+                    handleSubmit={handleSubmit}
+                    isGenerating={isLoading}
+                    append={handleAppend}
+                    suggestions={promptSuggestions}
+                    className="h-full"
+                    externalAttachments={attachedFiles}
+                    onEditSuggestion={handleEditSuggestion}
+                  />
+                ) : (
+                  <Chat
+                    messages={chatMessages}
+                    input={messageInput}
+                    handleInputChange={handleInputChange}
+                    handleSubmit={handleSubmit}
+                    isGenerating={isLoading}
+                    className="h-full"
+                    externalAttachments={attachedFiles}
+                  />
+                )}
               </div>
 
               {!isAIConfigured && (

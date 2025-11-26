@@ -8,6 +8,8 @@ export interface UserPreferences {
   timeZone: string;
   defaultChartType: 'line' | 'bar' | 'area';
   animationsEnabled: boolean;
+  showPromptSuggestions: boolean;
+  customPrompts: string[];
 }
 
 export interface DataManagement {
@@ -109,7 +111,9 @@ export class SettingsService {
       language: 'en',
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       defaultChartType: 'line',
-      animationsEnabled: true
+      animationsEnabled: true,
+      showPromptSuggestions: true,
+      customPrompts: []
     },
     dataManagement: {
       autoSave: true,
@@ -468,6 +472,15 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
   private migrateSettings(settings: any): Settings {
     let migratedSettings = { ...settings };
+
+    // Ensure UserPreferences has customPrompts field
+    if (!migratedSettings.userPreferences?.customPrompts) {
+      migratedSettings.userPreferences = {
+        ...this.defaultSettings.userPreferences,
+        ...migratedSettings.userPreferences,
+        customPrompts: migratedSettings.userPreferences?.customPrompts || []
+      };
+    }
 
     // Handle AI settings migration from old flat structure to new nested structure
     if (settings.aiSettings) {

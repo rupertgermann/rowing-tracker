@@ -319,6 +319,37 @@ export default function SettingsPage() {
         />
         <Label>Enable Animations</Label>
       </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          checked={settingsData.userPreferences.showPromptSuggestions}
+          onCheckedChange={(checked) => saveSettings('userPreferences', { showPromptSuggestions: checked })}
+        />
+        <Label>Show Default Prompt Suggestions</Label>
+      </div>
+
+      <div>
+        <Label htmlFor="customPrompts">Custom Prompts</Label>
+        <div className="mt-1">
+          <textarea
+            id="customPrompts"
+            value={settingsData.userPreferences.customPrompts.join('\n')}
+            onChange={(e) => {
+              const prompts = e.target.value
+                .split('\n')
+                .map(prompt => prompt.trim())
+                .filter(prompt => prompt.length > 0);
+              saveSettings('userPreferences', { customPrompts: prompts });
+            }}
+            placeholder="Enter your custom prompts, one per line..."
+            className="w-full p-2 border rounded-md min-h-[100px] resize-y"
+            rows={6}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Add your own custom prompts, one per line. These will always be visible in the chat interface.
+          </p>
+        </div>
+      </div>
     </div>
   );
 
