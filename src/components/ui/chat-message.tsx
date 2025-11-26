@@ -6,13 +6,15 @@ import { motion } from "framer-motion"
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { formatTime } from "@/lib/dateTimeUtils"
+import { FilePreview } from "@/components/ui/file-preview"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { FilePreview } from "@/components/ui/file-preview"
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -161,10 +163,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
   const isUser = role === "user"
 
-  const formattedTime = createdAt?.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  const formattedTime = createdAt ? formatTime(createdAt) : undefined
 
   if (isUser) {
     return (
