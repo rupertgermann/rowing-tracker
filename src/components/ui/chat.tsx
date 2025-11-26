@@ -38,6 +38,7 @@ interface ChatPropsBase {
   setMessages?: (messages: any[]) => void
   transcribeAudio?: (blob: Blob) => Promise<string>
   externalAttachments?: File[]
+  onEditSuggestion?: (suggestion: string) => void
 }
 
 interface ChatPropsWithoutSuggestions extends ChatPropsBase {
@@ -48,6 +49,7 @@ interface ChatPropsWithoutSuggestions extends ChatPropsBase {
 interface ChatPropsWithSuggestions extends ChatPropsBase {
   append: (message: { role: "user"; content: string }) => void
   suggestions: string[]
+  onEditSuggestion?: (suggestion: string) => void
 }
 
 type ChatProps = ChatPropsWithoutSuggestions | ChatPropsWithSuggestions
@@ -66,6 +68,7 @@ export function Chat({
   setMessages,
   transcribeAudio,
   externalAttachments,
+  onEditSuggestion,
 }: ChatProps) {
   const lastMessage = messages.at(-1)
   const isEmpty = messages.length === 0
@@ -202,6 +205,7 @@ export function Chat({
           label="Try these prompts ✨"
           append={append}
           suggestions={suggestions}
+          onEditSuggestion={onEditSuggestion}
         />
       ) : null}
 

@@ -205,6 +205,11 @@ export default function ChatPage() {
     sendMessage(message.content);
   }, [currentSession, sendMessage]);
 
+  // Handle editing a suggestion (populate input without sending)
+  const handleEditSuggestion = useCallback((suggestion: string) => {
+    setMessageInput(suggestion);
+  }, []);
+
   // Handle attaching document from memory
   const handleAttachDocument = (doc: MemoryDocument) => {
     if (!attachedDocs.find(d => d.id === doc.id)) {
@@ -592,6 +597,7 @@ export default function ChatPage() {
                   suggestions={promptSuggestions}
                   className="h-full"
                   externalAttachments={attachedFiles}
+                  onEditSuggestion={handleEditSuggestion}
                 />
               </div>
 
