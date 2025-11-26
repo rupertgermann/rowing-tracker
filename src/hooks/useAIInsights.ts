@@ -40,12 +40,12 @@ const AUTO_ARCHIVE_DAYS = 30; // Archive insights older than 30 days
 // Generate cache key based on session data
 const generateCacheKey = (sessions: Session[], usingCloudAI: boolean): string => {
   if (!sessions || sessions.length === 0) return 'no-sessions';
-  
+
   const sessionCount = sessions.length;
   const lastSessionTimestamp = sessions
     .map(s => new Date(s.timestamp).getTime())
     .sort((a, b) => b - a)[0] || 0;
-  
+
   return `${sessionCount}-${lastSessionTimestamp}-${usingCloudAI}`;
 };
 
@@ -55,18 +55,18 @@ const getCachedInsights = (sessions: Session[], usingCloudAI: boolean): AIInsigh
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return null;
   }
-  
+
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (!cached) return null;
-    
+
     const cache: InsightCache = JSON.parse(cached);
     const currentCacheKey = generateCacheKey(sessions, usingCloudAI);
-    
+
     // Check if cache is still valid
     const isExpired = Date.now() - cache.timestamp > CACHE_EXPIRY_MS;
     const isKeyMatch = cache.cacheKey === currentCacheKey;
-    
+
     if (!isExpired && isKeyMatch) {
       // Convert timestamp back to Date object
       return {
@@ -79,7 +79,7 @@ const getCachedInsights = (sessions: Session[], usingCloudAI: boolean): AIInsigh
     // Clear corrupted cache
     localStorage.removeItem(CACHE_KEY);
   }
-  
+
   return null;
 };
 
@@ -89,16 +89,16 @@ const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AI
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return;
   }
-  
+
   try {
     const cache: InsightCache = {
       data,
       cacheKey: generateCacheKey(sessions, usingCloudAI),
       timestamp: Date.now()
     };
-    
+
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    
+
     // Sync insights to memory for AI coach access
     syncInsightsToMemory(data.insights, usingCloudAI);
   } catch (error) {
@@ -109,7 +109,7 @@ const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AI
 // Sync insights to memory storage for AI coach access
 const syncInsightsToMemory = async (insights: (Insight | CloudInsight)[], usingCloudAI: boolean): Promise<void> => {
   if (insights.length === 0) return;
-  
+
   try {
     await memoryStorage.addSystemDocument(
       'insight',
@@ -143,7 +143,7 @@ const clearCachedInsights = (): void => {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return;
   }
-  
+
   localStorage.removeItem(CACHE_KEY);
 };
 
@@ -153,17 +153,24 @@ const getArchivedInsights = (): (Insight | CloudInsight)[] => {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return [];
   }
-  
+
   try {
     const archived = localStorage.getItem(ARCHIVE_KEY);
     if (!archived) return [];
-    
+
     const parsed = JSON.parse(archived);
     // Convert date strings back to Date objects
-    return parsed.map((insight: any) => ({
-      ...insight,
-      dateGenerated: new Date(insight.dateGenerated)
-    }));
+    return parsed.map((insight: any) => {
+      let date = new Date(insight.dateGenerated);
+      // Fix for 1970 dates (null/undefined in storage)
+      if (isNaN(date.getTime()) || date.getFullYear() === 1970) {
+        date = new Date();
+      }
+      return {
+        ...insight,
+        dateGenerated: date
+      };
+    });
   } catch (error) {
     console.warn('Failed to read archived insights:', error);
     return [];
@@ -175,7 +182,7 @@ const saveArchivedInsights = (archivedInsights: (Insight | CloudInsight)[]): voi
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return;
   }
-  
+
   try {
     localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archivedInsights));
   } catch (error) {
@@ -191,11 +198,11 @@ const archiveInsight = (insightId: string, currentInsights: (Insight | CloudInsi
   if (!insightToArchive) {
     return { updatedInsights: currentInsights, archivedInsights: getArchivedInsights() };
   }
-  
+
   const updatedInsights = currentInsights.filter(insight => insight.id !== insightId);
   const existingArchived = getArchivedInsights();
   const newArchivedInsights = [...existingArchived, insightToArchive];
-  
+
   saveArchivedInsights(newArchivedInsights);
   return { updatedInsights, archivedInsights: newArchivedInsights };
 };
@@ -203,14 +210,14 @@ const archiveInsight = (insightId: string, currentInsights: (Insight | CloudInsi
 const unarchiveInsight = (insightId: string): (Insight | CloudInsight) => {
   const archivedInsights = getArchivedInsights();
   const insightToUnarchive = archivedInsights.find(insight => insight.id === insightId);
-  
+
   if (!insightToUnarchive) {
     throw new Error('Insight not found in archive');
   }
-  
+
   const updatedArchived = archivedInsights.filter(insight => insight.id !== insightId);
   saveArchivedInsights(updatedArchived);
-  
+
   return insightToUnarchive;
 };
 
@@ -228,23 +235,23 @@ const autoArchiveOldInsights = (insights: (Insight | CloudInsight)[]): {
 } => {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - AUTO_ARCHIVE_DAYS);
-  
+
   const oldInsights = insights.filter(insight => {
     const insightDate = new Date(insight.dateGenerated);
     return insightDate < cutoffDate;
   });
-  
+
   const updatedInsights = insights.filter(insight => {
     const insightDate = new Date(insight.dateGenerated);
     return insightDate >= cutoffDate;
   });
-  
+
   if (oldInsights.length > 0) {
     const existingArchived = getArchivedInsights();
     const newArchived = [...existingArchived, ...oldInsights];
     saveArchivedInsights(newArchived);
   }
-  
+
   return {
     updatedInsights,
     newlyArchived: oldInsights
@@ -258,7 +265,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isArchivedView, setIsArchivedView] = useState(false);
-  
+
   // State for analysis results
   const [data, setData] = useState<AIInsightData>({
     insights: [],
@@ -301,7 +308,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         const existingArchived = getArchivedInsights();
         const newArchived = [...existingArchived, ...prevData.insights];
         saveArchivedInsights(newArchived);
-        
+
         return {
           ...prevData,
           insights: [],
@@ -310,7 +317,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       }
       return prevData;
     });
-    
+
     clearCachedInsights();
     setRefreshTrigger(prev => prev + 1);
   }, []);
@@ -377,7 +384,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
       // Auto-archive old insights
       const { updatedInsights, newlyArchived } = autoArchiveOldInsights(insights.slice(0, 5));
-      
+
       // Auto-archive old insights silently
 
       return {
@@ -433,10 +440,10 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       try {
         // Initialize cloud AI with latest settings
         initializeCloudAI();
-        
+
         // Generate insights using cloud AI
         const cloudInsights = await cloudAI.generateInsights(sessions);
-        
+
         // Generate local trends and other data (cloud AI only handles insights)
         const trends = [
           aiAnalysis.analyzeTrend(sessions, 'avgSplit'),
@@ -467,7 +474,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         setIsAnalyzing(false);
         const errorMessage = error instanceof Error ? error.message : 'Cloud AI error';
         setCloudAIError(errorMessage);
-        
+
         // Fallback to local analysis
         return getLocalAnalysis(sessions);
       }
@@ -480,7 +487,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   // Run analysis when sessions change or refresh is triggered
   useEffect(() => {
     let isMounted = true;
-    
+
     const runAnalysis = async () => {
       try {
         // Check cache first (unless force refresh)
@@ -488,7 +495,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           const isCloudAIConfigured = initializeCloudAI();
           const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
           const usingCloudAI = isAIAvailableForUse;
-          
+
           const cachedData = getCachedInsights(sessions, usingCloudAI);
           if (cachedData) {
             if (isMounted) {
@@ -497,7 +504,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
             return;
           }
         }
-        
+
         // Generate new insights
         const result = await performAnalysis();
         if (isMounted) {
@@ -529,8 +536,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     };
   }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI]);
 
-  return { 
-    ...data, 
+  return {
+    ...data,
     refreshInsights,
     archiveInsight: archiveInsightCallback,
     unarchiveInsight: unarchiveInsightCallback,
@@ -545,7 +552,7 @@ export async function getCloudInsights(sessions: Session[]): Promise<CloudInsigh
     if (!cloudAI.isConfigured()) {
       throw new Error('Cloud AI not configured');
     }
-    
+
     const insights = await cloudAI.generateInsights(sessions);
     return insights;
   } catch (error) {
@@ -561,11 +568,11 @@ export function useInsightFeedback() {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return;
     }
-    
+
     // Store feedback in localStorage for future ML improvements
     const feedbackKey = `insight_feedback_${insightId}`;
     const existingFeedback = localStorage.getItem(feedbackKey);
-    
+
     if (!existingFeedback) {
       const feedbackData = {
         insightId,
@@ -573,9 +580,9 @@ export function useInsightFeedback() {
         timestamp: new Date().toISOString(),
         source: insightId.startsWith('cloud-') ? 'cloud-ai' : 'local-analysis'
       };
-      
+
       localStorage.setItem(feedbackKey, JSON.stringify(feedbackData));
-      
+
       // In a real implementation, this would send feedback to a server
       // for improving the AI recommendation algorithms
     }
@@ -586,10 +593,10 @@ export function useInsightFeedback() {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return null;
     }
-    
+
     const feedbackKey = `insight_feedback_${insightId}`;
     const feedbackData = localStorage.getItem(feedbackKey);
-    
+
     return feedbackData ? JSON.parse(feedbackData) : null;
   };
 

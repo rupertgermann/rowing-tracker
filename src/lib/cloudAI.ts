@@ -574,38 +574,38 @@ export class CloudAIService {
 
     if (name === 'get_memory_documents') {
       const { memoryStorage } = await import('@/lib/memoryStorage');
-      
+
       let docs = await memoryStorage.getAllDocuments();
-      
+
       // Filter by type
       if (args.type) {
         docs = docs.filter(d => d.type === args.type);
       }
-      
+
       // Filter by source
       if (args.source) {
         docs = docs.filter(d => d.source === args.source);
       }
-      
+
       // Filter active training plans only
       if (args.activeOnly && args.type === 'training_plan') {
         docs = docs.filter(d => d.status === 'active');
       }
-      
+
       // Search by query
       if (args.query) {
         const query = args.query.toLowerCase();
-        docs = docs.filter(d => 
+        docs = docs.filter(d =>
           d.name.toLowerCase().includes(query) ||
           d.description?.toLowerCase().includes(query) ||
           d.extractedText?.toLowerCase().includes(query) ||
           d.tags?.some(tag => tag.toLowerCase().includes(query))
         );
       }
-      
+
       // Sort by date desc
       docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
-      
+
       // Return formatted results
       const result = docs.map(doc => ({
         id: doc.id,
@@ -617,13 +617,13 @@ export class CloudAIService {
         status: doc.status,
         tags: doc.tags,
         // Include content based on flag
-        text: args.includeContent 
-          ? doc.extractedText 
+        text: args.includeContent
+          ? doc.extractedText
           : doc.extractedText?.slice(0, 300) + (doc.extractedText && doc.extractedText.length > 300 ? '...' : ''),
         // For system documents, include the structured content
         content: args.includeContent ? doc.content : undefined,
       }));
-      
+
       return result;
     }
 
@@ -631,9 +631,9 @@ export class CloudAIService {
       const { useRowingStore } = await import('@/lib/store');
       const { AWARDS } = await import('@/lib/awards');
       const store = useRowingStore.getState();
-      
+
       const result: any = {};
-      
+
       // Personal Records
       if (args.includePersonalRecords !== false) {
         const prs = store.personalRecords;
@@ -644,12 +644,12 @@ export class CloudAIService {
           avgPower: pr.avgPower ? `${pr.avgPower.toFixed(1)}W` : null,
           date: new Date(pr.date).toISOString().split('T')[0]
         }));
-        
+
         if (prs.length === 0) {
           result.personalRecords = "No personal records yet. The user needs to complete sessions at standard distances (100m, 500m, 1000m, 2000m, 5000m).";
         }
       }
-      
+
       // Earned Awards
       if (args.includeAwards !== false) {
         const earnedAwards = store.earnedAwards;
@@ -662,31 +662,31 @@ export class CloudAIService {
             earnedAt: new Date(ea.earnedAt).toISOString().split('T')[0]
           };
         });
-        
+
         result.totalAwardsEarned = earnedAwards.length;
         result.totalAwardsAvailable = AWARDS.length;
       }
-      
+
       // Next Awards (upcoming achievements user is close to)
       if (args.includeNextAwards === true) {
         const sessions = store.sessions;
         const stats = store.getStats();
         const earnedIds = new Set(store.earnedAwards.map(a => a.awardId));
-        
+
         const unearnedAwards = AWARDS.filter(a => !earnedIds.has(a.id));
-        
+
         // Calculate progress for key metrics
         const totalDistance = sessions.reduce((acc, s) => acc + s.distance, 0);
         const totalDuration = sessions.reduce((acc, s) => acc + s.duration, 0);
         const sessionCount = sessions.length;
         const bestStreak = stats.bestStreak;
-        
+
         result.nextAwards = unearnedAwards.slice(0, 5).map(award => ({
           id: award.id,
           title: award.title,
           description: award.description
         }));
-        
+
         result.currentProgress = {
           totalSessions: sessionCount,
           totalDistance: `${(totalDistance / 1000).toFixed(1)}km`,
@@ -694,7 +694,7 @@ export class CloudAIService {
           bestStreak: `${bestStreak} days`
         };
       }
-      
+
       return result;
     }
 
@@ -928,9 +928,8 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
       const response = await this.makeApiCall(config);
       const content = this.parseResponse(response);
-      const data = JSON.parse(content);
 
-      return data.insights;
+      return this.parseInsightResponse(content);
     } catch (error) {
       console.error('Cloud AI analysis failed:', error);
       throw error;
