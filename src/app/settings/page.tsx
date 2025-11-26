@@ -850,6 +850,17 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Configuration Status - Moved to top */}
+            {isConfigured && (
+              <Alert className="border-green-200 bg-green-50">
+                <Brain className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <strong>AI Coach is ready!</strong> You'll now receive advanced AI-powered insights
+                  based on your training data. These insights will appear alongside local analysis
+                  in your dashboard and chat.
+                </AlertDescription>
+              </Alert>
+            )}
             {/* Cloud AI Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -1142,17 +1153,7 @@ export default function SettingsPage() {
                   </AlertDescription>
                 </Alert>
 
-                {/* Configuration Status */}
-                {isConfigured && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <Brain className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      <strong>AI Coach is ready!</strong> You'll now receive advanced AI-powered insights
-                      based on your training data. These insights will appear alongside local analysis
-                      in your dashboard and chat.
-                    </AlertDescription>
-                  </Alert>
-                )}
+
               </>
             )}
 
@@ -1319,8 +1320,8 @@ export default function SettingsPage() {
                       key={category.id}
                       onClick={() => setActiveCategory(category.id as SettingsCategory)}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${activeCategory === category.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-muted'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-muted'
                         }`}
                     >
                       <div className="flex items-center gap-3">
