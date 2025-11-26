@@ -26,7 +26,9 @@ import {
 } from 'lucide-react';
 import { MemoryManager } from '@/components/MemoryManager';
 import { useMemory } from '@/hooks/useMemory';
-import { MemoryDocument } from '@/lib/memoryStorage';
+import { MemoryDocument, memoryStorage } from '@/lib/memoryStorage';
+import { FileAttachment } from '@/lib/cloudAI';
+import { blobToDataUrl } from '@/lib/documentProcessor';
 
 export default function ChatPage() {
   const {
@@ -78,32 +80,97 @@ export default function ChatPage() {
     setMessageInput(e.target.value);
   }, []);
 
+  // Helper function to convert a File to FileAttachment
+  const fileToAttachment = useCallback(async (file: File): Promise<FileAttachment> => {
+    const dataUrl = await blobToDataUrl(file);
+    return {
+      name: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      data: dataUrl
+    };
+  }, []);
+
+  // Helper function to convert a MemoryDocument to FileAttachment (for images/PDFs with binary data)
+  const memoryDocToAttachment = useCallback(async (doc: MemoryDocument): Promise<FileAttachment | null> => {
+    // Only convert image/PDF documents that have binary data stored
+    if (doc.type === 'image' || doc.type === 'pdf') {
+      try {
+        const arrayBuffer = await memoryStorage.getDocumentBlob(doc.id);
+        if (arrayBuffer) {
+          // Convert ArrayBuffer to Blob
+          const blob = new Blob([arrayBuffer], { type: doc.mimeType });
+          const dataUrl = await blobToDataUrl(blob);
+          return {
+            name: doc.name,
+            mimeType: doc.mimeType,
+            data: dataUrl
+          };
+        }
+      } catch (error) {
+        console.error('Failed to get document blob:', error);
+      }
+    }
+    return null;
+  }, []);
+
   // Handle form submit for the Chat component
-  const handleSubmit = useCallback((e?: { preventDefault?: () => void }) => {
+  const handleSubmit = useCallback(async (
+    e?: { preventDefault?: () => void },
+    options?: { experimental_attachments?: FileList }
+  ) => {
     e?.preventDefault?.();
-    if (!messageInput.trim() && attachedDocs.length === 0) return;
+    
+    const hasDirectAttachments = options?.experimental_attachments && options.experimental_attachments.length > 0;
+    const hasMemoryDocs = attachedDocs.length > 0;
+    
+    if (!messageInput.trim() && !hasDirectAttachments && !hasMemoryDocs) return;
     if (!currentSession || isLoading) return;
 
-    // Build message with attachments
-    let fullMessage = messageInput.trim();
+    // Collect all file attachments
+    const fileAttachments: FileAttachment[] = [];
+    let textContext = '';
 
-    if (attachedDocs.length > 0) {
-      const attachmentInfo = attachedDocs.map(doc => {
-        const textContent = doc.extractedText || doc.description || '';
-        return `[Attached: ${doc.name}]${textContent ? `\n${textContent}` : ''}`;
-      }).join('\n\n');
-
-      if (fullMessage) {
-        fullMessage = `${fullMessage}\n\n---\n${attachmentInfo}`;
-      } else {
-        fullMessage = attachmentInfo;
+    // Process direct file attachments (from paperclip button)
+    if (hasDirectAttachments) {
+      const files = Array.from(options!.experimental_attachments!);
+      for (const file of files) {
+        try {
+          const attachment = await fileToAttachment(file);
+          fileAttachments.push(attachment);
+        } catch (error) {
+          console.error('Failed to process file attachment:', error);
+        }
       }
     }
 
-    sendMessage(fullMessage);
+    // Process memory documents
+    if (hasMemoryDocs) {
+      for (const doc of attachedDocs) {
+        // Try to get binary data for images/PDFs
+        const attachment = await memoryDocToAttachment(doc);
+        if (attachment) {
+          fileAttachments.push(attachment);
+        } else {
+          // For text-based documents or if binary not available, include as text context
+          const textContent = doc.extractedText || doc.description || '';
+          if (textContent) {
+            textContext += `\n\n[Attached: ${doc.name}]\n${textContent}`;
+          }
+        }
+      }
+    }
+
+    // Build final message
+    let fullMessage = messageInput.trim();
+    if (textContext) {
+      fullMessage = fullMessage ? `${fullMessage}\n\n---${textContext}` : textContext.trim();
+    }
+
+    // Send message with attachments
+    sendMessage(fullMessage, fileAttachments.length > 0 ? fileAttachments : undefined);
     setMessageInput('');
     setAttachedDocs([]);
-  }, [messageInput, attachedDocs, currentSession, isLoading, sendMessage]);
+  }, [messageInput, attachedDocs, currentSession, isLoading, sendMessage, fileToAttachment, memoryDocToAttachment]);
 
   // Handle append for prompt suggestions
   const handleAppend = useCallback((message: { role: 'user'; content: string }) => {

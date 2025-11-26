@@ -53,6 +53,13 @@ interface ApiRequestConfig {
   onToken?: (token: string) => void;
 }
 
+// File attachment for chat messages
+export interface FileAttachment {
+  name: string;
+  mimeType: string;
+  data: string; // base64 data URL (e.g., "data:image/png;base64,...")
+}
+
 // Chat message types
 export interface ChatMessage {
   id: string;
@@ -136,7 +143,8 @@ export class CloudAIService {
     conversationHistory: ChatMessage[] = [],
     userSessions?: Session[],
     previousResponseId?: string,
-    onToken?: (token: string) => void
+    onToken?: (token: string) => void,
+    attachments?: FileAttachment[]
   ): Promise<{ content: string; responseId: string }> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
@@ -243,14 +251,63 @@ export class CloudAIService {
       ];
 
       // Prepare initial input messages
-      const messages = [
+      const messages: any[] = [
         { role: 'system', content: this.getChatSystemPrompt() },
         ...conversationHistory.slice(-10).map(msg => ({
           role: msg.role,
           content: msg.content
         })),
-        { role: 'user', content: message }
       ];
+
+      // Build user message with optional file attachments
+      if (attachments && attachments.length > 0) {
+        // Multi-part content with files and text
+        const userContent: any[] = [];
+
+        // Add file attachments first
+        for (const attachment of attachments) {
+          if (attachment.mimeType.startsWith('image/')) {
+            // Image attachment - use input_image
+            userContent.push({
+              type: 'input_image',
+              image_url: attachment.data
+            });
+          } else if (attachment.mimeType === 'application/pdf') {
+            // PDF attachment - use input_file
+            userContent.push({
+              type: 'input_file',
+              filename: attachment.name,
+              file_data: attachment.data
+            });
+          } else {
+            // Other file types - try as input_file
+            userContent.push({
+              type: 'input_file',
+              filename: attachment.name,
+              file_data: attachment.data
+            });
+          }
+        }
+
+        // Add text message
+        if (message.trim()) {
+          userContent.push({
+            type: 'input_text',
+            text: message
+          });
+        } else {
+          // If no text, add a default prompt
+          userContent.push({
+            type: 'input_text',
+            text: 'Please analyze the attached file(s).'
+          });
+        }
+
+        messages.push({ role: 'user', content: userContent });
+      } else {
+        // Simple text-only message
+        messages.push({ role: 'user', content: message });
+      }
 
       let currentInput: any = messages;
       let currentPreviousResponseId = previousResponseId;

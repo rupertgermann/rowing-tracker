@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
-import { cloudAI, ChatMessage, ChatSession } from '@/lib/cloudAI';
+import { cloudAI, ChatMessage, ChatSession, FileAttachment } from '@/lib/cloudAI';
 import { chatStorage } from '@/lib/chatStorage';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 
@@ -93,8 +93,8 @@ export function useChat() {
   }, []);
 
   // Send message to AI
-  const sendMessage = useCallback(async (content: string) => {
-    if (!state.currentSession || !content.trim()) return;
+  const sendMessage = useCallback(async (content: string, attachments?: FileAttachment[]) => {
+    if (!state.currentSession || (!content.trim() && (!attachments || attachments.length === 0))) return;
 
     // Ensure AI is configured before sending
     if (!isAIAvailable()) {
@@ -179,7 +179,8 @@ export function useChat() {
               }
             };
           });
-        }
+        },
+        attachments
       );
 
       // Add AI response (only if not empty)
