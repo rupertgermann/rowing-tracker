@@ -97,12 +97,32 @@ export default function ChatPage() {
       try {
         const arrayBuffer = await memoryStorage.getDocumentBlob(doc.id);
         if (arrayBuffer) {
-          // Convert ArrayBuffer to Blob
-          const blob = new Blob([arrayBuffer], { type: doc.mimeType });
+          // Determine the correct MIME type
+          // If mimeType is missing or generic, try to infer from document type
+          let mimeType = doc.mimeType;
+          if (!mimeType || mimeType === 'application/octet-stream') {
+            if (doc.type === 'image') {
+              // Try to infer from file extension
+              const ext = doc.name.split('.').pop()?.toLowerCase();
+              const imageTypes: Record<string, string> = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'gif': 'image/gif',
+                'webp': 'image/webp',
+              };
+              mimeType = imageTypes[ext || ''] || 'image/jpeg'; // Default to jpeg for images
+            } else if (doc.type === 'pdf') {
+              mimeType = 'application/pdf';
+            }
+          }
+          
+          // Convert ArrayBuffer to Blob with correct MIME type
+          const blob = new Blob([arrayBuffer], { type: mimeType });
           const dataUrl = await blobToDataUrl(blob);
           return {
             name: doc.name,
-            mimeType: doc.mimeType,
+            mimeType: mimeType,
             data: dataUrl
           };
         }

@@ -263,10 +263,16 @@ export class CloudAIService {
       if (attachments && attachments.length > 0) {
         // Multi-part content with files and text
         const userContent: any[] = [];
+        
+        // Supported MIME types for OpenAI file inputs
+        const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        const supportedFileTypes = ['application/pdf'];
 
         // Add file attachments first
         for (const attachment of attachments) {
-          if (attachment.mimeType.startsWith('image/')) {
+          // Check if it's a supported image type
+          if (supportedImageTypes.some(type => attachment.mimeType.startsWith(type.split('/')[0]) && attachment.mimeType.includes(type.split('/')[1])) || 
+              attachment.mimeType.startsWith('image/')) {
             // Image attachment - use input_image
             userContent.push({
               type: 'input_image',
@@ -279,13 +285,17 @@ export class CloudAIService {
               filename: attachment.name,
               file_data: attachment.data
             });
-          } else {
-            // Other file types - try as input_file
+          } else if (supportedFileTypes.includes(attachment.mimeType)) {
+            // Other supported file types
             userContent.push({
               type: 'input_file',
               filename: attachment.name,
               file_data: attachment.data
             });
+          } else {
+            // Unsupported file type - log warning and skip
+            console.warn(`Skipping unsupported file type: ${attachment.mimeType} for file: ${attachment.name}`);
+            // Don't add to userContent - will be handled as text context if available
           }
         }
 
