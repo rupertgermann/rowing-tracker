@@ -1,6 +1,8 @@
+![Rowing Tracker Header](docs/images/rowing-tracker_header.png)
+
 # Rowing Tracker
 
-A stunning web application to visualize SmartRow CSV exports with beautiful analytics, trends, and personal records.
+A stunning web application to visualize SmartRow CSV exports with beautiful analytics, trends, and personal records. This app was completely written by AI
 
 ## Overview
 
