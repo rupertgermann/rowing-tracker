@@ -10,6 +10,10 @@ Rowing Tracker is a modern, responsive web app built specifically for rowers who
 
 - **CSV Import**: Simple drag-and-drop upload for SmartRow CSV files
 - **Dashboard**: Key metrics, volume charts, and trend analysis
+- **AI Coaching**: Chat with an intelligent coach that understands your rowing data
+- **Training Plans**: Generate personalized AI training plans or use structured templates
+- **Memory System**: Upload PDFs and images for the AI to analyze and reference
+- **Advanced Analytics**: Detailed breakdown of performance, split trends, and adherence
 - **Sessions List**: Browse, filter, and sort all your rowing sessions
 - **Session Details**: Deep dive into individual workout metrics
 - **Personal Records**: Track your best times and performances across distances
@@ -24,9 +28,12 @@ Rowing Tracker is a modern, responsive web app built specifically for rowers who
 - **Styling**: TailwindCSS
 - **Components**: shadcn/ui
 - **Charts**: Recharts
+- **AI Integration**: OpenAI API
 - **State Management**: Zustand with persist middleware
+- **Storage**: 
+  - `localStorage` for sessions and settings
+  - `IndexedDB` (via idb) for large files and documents
 - **CSV Parsing**: papaparse
-- **Data Storage**: Browser localStorage
 
 ## Quick Start
 
@@ -34,6 +41,7 @@ Rowing Tracker is a modern, responsive web app built specifically for rowers who
 
 - Node.js 18+ 
 - npm or yarn
+- OpenAI API Key (optional, for AI features)
 
 ### Installation
 
@@ -55,6 +63,10 @@ Rowing Tracker is a modern, responsive web app built specifically for rowers who
 
 4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+5. **Configure AI (Optional)**
+   - Go to Settings
+   - Enter your OpenAI API Key to enable Chat and Training Plans
 
 ## SmartRow CSV Export Guide
 
@@ -109,15 +121,20 @@ rowing-tracker/
 │   │   ├── page.tsx       # Dashboard
 │   │   ├── sessions/      # Sessions pages
 │   │   ├── prs/           # Personal records
-│   │   └── upload/        # CSV upload
+│   │   ├── upload/        # CSV upload
+│   │   ├── analytics/     # Advanced analytics
+│   │   ├── chat/          # AI Coach chat
+│   │   ├── plans/         # Training plans
+│   │   └── settings/      # App settings
 │   ├── layout.tsx         # Root layout
 │   └── globals.css        # Global styles
 ├── components/            # Reusable UI components
 ├── lib/                   # Utility functions
 │   ├── csvParser.ts       # CSV parsing logic
 │   ├── store.ts           # Zustand state management
-│   ├── validation.ts      # Data validation
-│   └── chartTheme.ts      # Chart theming
+│   ├── memoryStorage.ts   # IndexedDB storage wrapper
+│   ├── cloudAI.ts         # OpenAI integration
+│   └── trainingPlans.ts   # Plan generation logic
 ├── types/                 # TypeScript type definitions
 │   └── session.ts         # Session interface
 └── docs/                  # Documentation
@@ -128,9 +145,12 @@ rowing-tracker/
 ### Data Flow
 
 1. **Upload**: User drops CSV file → papaparse processes → validation
-2. **Storage**: Validated data → Zustand store → localStorage persistence
+2. **Storage**: 
+   - Sessions/Settings → Zustand store → localStorage persistence
+   - Documents/Images → MemoryService → IndexedDB
 3. **Display**: Components read from store → calculate metrics → render charts
 4. **Analysis**: Real-time PR calculations, trend analysis, aggregations
+5. **AI Features**: Context retrieved from Store/Memory → sent to OpenAI → response streamed
 
 ## Development
 
