@@ -134,7 +134,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   }
@@ -186,21 +186,21 @@ const Dashboard = () => {
   const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
-  
+
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
-  
+
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
 
   // AI Insights hook
-  const { 
-    insights, 
-    trends, 
-    trainingLoad, 
-    anomalies, 
-    isAnalyzable, 
-    lastAnalyzed, 
+  const {
+    insights,
+    trends,
+    trainingLoad,
+    anomalies,
+    isAnalyzable,
+    lastAnalyzed,
     refreshInsights,
     archivedInsights,
     archiveInsight,
@@ -218,13 +218,13 @@ const Dashboard = () => {
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
       if (timeRange === 'all') return true;
-      
+
       const sessionDate = new Date(session.timestamp);
       const now = new Date();
       const daysAgo = defaultTimeRangeOptions.find(option => option.value === timeRange)?.days;
-      
+
       if (!daysAgo) return true;
-      
+
       const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
       return sessionDate >= cutoffDate;
     });
@@ -242,17 +242,17 @@ const Dashboard = () => {
     }, { totalDistance: 0, totalTime: 0, totalPower: 0, sessionCount: 0 });
   }, [filteredSessions]);
 
-  const avgPace = filteredStats.sessionCount > 0 && filteredStats.totalDistance > 0 
+  const avgPace = filteredStats.sessionCount > 0 && filteredStats.totalDistance > 0
     ? (filteredStats.totalTime / (filteredStats.totalDistance / 500))
     : 0;
-  const avgPower = filteredStats.sessionCount > 0 
-    ? filteredStats.totalPower / filteredStats.sessionCount 
+  const avgPower = filteredStats.sessionCount > 0
+    ? filteredStats.totalPower / filteredStats.sessionCount
     : 0;
 
   // Check if user has data
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
-  
+
   // Prepare chart data for different metrics
   const prepareChartData = (sessions: any[], metric: ChartMetric) => {
     return sessions
@@ -291,10 +291,10 @@ const Dashboard = () => {
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
     const currentCharts = chartSettings.enabledCharts;
-    const updatedCharts = currentCharts.includes(metric) 
+    const updatedCharts = currentCharts.includes(metric)
       ? currentCharts.filter(m => m !== metric)
       : [...currentCharts, metric];
-    
+
     updateChartSettings({ enabledCharts: updatedCharts });
   };
 
@@ -334,13 +334,13 @@ const Dashboard = () => {
     const commonChartElements = (
       <>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-        <XAxis 
-          dataKey="date" 
+        <XAxis
+          dataKey="date"
           className="text-xs"
           stroke="#6b7280"
           tick={{ fill: '#6b7280', fontSize: 10 }}
         />
-        <YAxis 
+        <YAxis
           className="text-xs"
           stroke="#6b7280"
           tick={{ fill: '#6b7280', fontSize: 10 }}
@@ -355,8 +355,8 @@ const Dashboard = () => {
         return (
           <BarChart {...barAreaProps}>
             {commonChartElements}
-            <Bar 
-              dataKey={metric} 
+            <Bar
+              dataKey={metric}
               fill={config.color}
               radius={[4, 4, 0, 0]}
               cursor="pointer"
@@ -367,9 +367,9 @@ const Dashboard = () => {
         return (
           <AreaChart {...barAreaProps}>
             {commonChartElements}
-            <Area 
-              type="monotone" 
-              dataKey={metric} 
+            <Area
+              type="monotone"
+              dataKey={metric}
               stroke={config.color}
               fill={config.color}
               fillOpacity={config.fillOpacity}
@@ -382,14 +382,14 @@ const Dashboard = () => {
         return (
           <LineChart {...commonProps}>
             {commonChartElements}
-            <Line 
-              type="monotone" 
-              dataKey={metric} 
+            <Line
+              type="monotone"
+              dataKey={metric}
               stroke={config.color}
               strokeWidth={2}
               dot={{ fill: config.color, strokeWidth: 2, r: 4, cursor: 'pointer' }}
-              activeDot={{ 
-                r: 6, 
+              activeDot={{
+                r: 6,
                 cursor: 'pointer',
                 onClick: (e: any, payload: any) => {
                   // For Line charts, payload is the data point, but let's be safe and use index lookup
@@ -413,14 +413,14 @@ const Dashboard = () => {
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded w-64 mb-2"></div>
             <div className="h-4 bg-muted rounded w-96 mb-8"></div>
-            
+
             {/* Stats cards skeleton */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="h-32 bg-muted rounded-lg"></div>
               ))}
             </div>
-            
+
             {/* Chart skeleton */}
             <div className="h-8 bg-muted rounded w-48 mb-4"></div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -671,7 +671,7 @@ const Dashboard = () => {
                     </Button>
                     {lastAnalyzed && (
                       <div className="text-xs text-muted-foreground">
-                        Last analyzed: {formatDateOnly(lastAnalyzed)} at {formatTime(lastAnalyzed)}
+                        Last analyzed: {formatDateOnly(lastAnalyzed)}
                       </div>
                     )}
                   </div>
@@ -703,7 +703,7 @@ const Dashboard = () => {
                           {isArchivedView ? 'No Archived Insights' : 'Analyzing Your Data'}
                         </h3>
                         <p className="text-muted-foreground mb-4">
-                          {isArchivedView 
+                          {isArchivedView
                             ? 'Archive insights you want to save for later reference.'
                             : 'AI is processing your training patterns to generate personalized insights.'
                           }

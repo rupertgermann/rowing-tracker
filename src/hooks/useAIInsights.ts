@@ -147,6 +147,13 @@ const clearCachedInsights = (): void => {
   localStorage.removeItem(CACHE_KEY);
 };
 
+// Helper to add items to archive with deduplication
+const addToArchive = (existing: (Insight | CloudInsight)[], newItems: (Insight | CloudInsight)[]): (Insight | CloudInsight)[] => {
+  const existingIds = new Set(existing.map(i => i.id));
+  const uniqueNewItems = newItems.filter(i => !existingIds.has(i.id));
+  return [...existing, ...uniqueNewItems];
+};
+
 // Archive helper functions
 const getArchivedInsights = (): (Insight | CloudInsight)[] => {
   // Guard against SSR/non-browser environments
@@ -159,18 +166,31 @@ const getArchivedInsights = (): (Insight | CloudInsight)[] => {
     if (!archived) return [];
 
     const parsed = JSON.parse(archived);
-    // Convert date strings back to Date objects
-    return parsed.map((insight: any) => {
+
+    // Deduplicate on read (self-healing)
+    const uniqueMap = new Map();
+
+    // Convert date strings back to Date objects and deduplicate
+    parsed.forEach((insight: any) => {
       let date = new Date(insight.dateGenerated);
       // Fix for 1970 dates (null/undefined in storage)
       if (isNaN(date.getTime()) || date.getFullYear() === 1970) {
         date = new Date();
       }
-      return {
+
+      const processedInsight = {
         ...insight,
         dateGenerated: date
       };
+
+      // Use ID as key to ensure uniqueness. Later items overwrite earlier ones (or keep first? usually keep first is safer for archive)
+      // Let's keep the first occurrence to preserve original order if possible, or use Map to keep unique by ID
+      if (!uniqueMap.has(insight.id)) {
+        uniqueMap.set(insight.id, processedInsight);
+      }
     });
+
+    return Array.from(uniqueMap.values());
   } catch (error) {
     console.warn('Failed to read archived insights:', error);
     return [];
@@ -201,7 +221,7 @@ const archiveInsight = (insightId: string, currentInsights: (Insight | CloudInsi
 
   const updatedInsights = currentInsights.filter(insight => insight.id !== insightId);
   const existingArchived = getArchivedInsights();
-  const newArchivedInsights = [...existingArchived, insightToArchive];
+  const newArchivedInsights = addToArchive(existingArchived, [insightToArchive]);
 
   saveArchivedInsights(newArchivedInsights);
   return { updatedInsights, archivedInsights: newArchivedInsights };
@@ -248,7 +268,7 @@ const autoArchiveOldInsights = (insights: (Insight | CloudInsight)[]): {
 
   if (oldInsights.length > 0) {
     const existingArchived = getArchivedInsights();
-    const newArchived = [...existingArchived, ...oldInsights];
+    const newArchived = addToArchive(existingArchived, oldInsights);
     saveArchivedInsights(newArchived);
   }
 
@@ -306,7 +326,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     setData(prevData => {
       if (prevData.insights.length > 0) {
         const existingArchived = getArchivedInsights();
-        const newArchived = [...existingArchived, ...prevData.insights];
+        const newArchived = addToArchive(existingArchived, prevData.insights);
         saveArchivedInsights(newArchived);
 
         return {
