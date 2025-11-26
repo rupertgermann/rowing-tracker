@@ -475,7 +475,7 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
         </div>
 
         {/* Document List */}
-        <div className="flex-1 overflow-y-auto space-y-2">
+        <div className="flex-1 overflow-y-auto space-y-2 scrollbar-none">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
