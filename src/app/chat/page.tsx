@@ -286,6 +286,7 @@ export default function ChatPage() {
     "Create a 4-week training plan for me",
     "What's my average pace trend?",
     "Show me my training history",
+    "give me the Detailed stroke analysis for my latest session.",
   ];
 
   const formatDate = (date: Date) => {
