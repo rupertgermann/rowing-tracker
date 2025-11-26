@@ -86,13 +86,13 @@ export default function ChatPage() {
 
     // Build message with attachments
     let fullMessage = messageInput.trim();
-    
+
     if (attachedDocs.length > 0) {
       const attachmentInfo = attachedDocs.map(doc => {
         const textContent = doc.extractedText || doc.description || '';
         return `[Attached: ${doc.name}]${textContent ? `\n${textContent}` : ''}`;
       }).join('\n\n');
-      
+
       if (fullMessage) {
         fullMessage = `${fullMessage}\n\n---\n${attachmentInfo}`;
       } else {
@@ -118,6 +118,17 @@ export default function ChatPage() {
     }
     setShowMemory(false);
   };
+
+  // Convert MemoryDocument to File for Chat component
+  const attachedFiles = useMemo(() => {
+    return attachedDocs.map(doc => {
+      // Create a dummy file object that mimics the File interface
+      // This is enough for the Chat component to display it
+      const file = new File([""], doc.name, { type: 'application/octet-stream' });
+      // We can attach extra metadata if needed, but for now name is enough
+      return file;
+    });
+  }, [attachedDocs]);
 
   // Start editing session title
   const startEditingTitle = (session: any) => {
@@ -317,14 +328,14 @@ export default function ChatPage() {
       {showMemory && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/50" 
+          <div
+            className="absolute inset-0 bg-black/50"
             onClick={() => setShowMemory(false)}
           />
           {/* Panel */}
           <div className="relative w-full max-w-md h-full bg-background shadow-xl animate-in slide-in-from-right duration-300">
-            <MemoryManager 
-              onClose={() => setShowMemory(false)} 
+            <MemoryManager
+              onClose={() => setShowMemory(false)}
               onAttachToChat={handleAttachDocument}
             />
           </div>
@@ -485,6 +496,7 @@ export default function ChatPage() {
                   append={handleAppend}
                   suggestions={promptSuggestions}
                   className="h-full"
+                  externalAttachments={attachedFiles}
                 />
               </div>
 

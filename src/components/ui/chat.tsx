@@ -5,8 +5,10 @@ import {
   useCallback,
   useRef,
   useState,
+  useEffect,
   type ReactElement,
 } from "react"
+import React from "react"
 import { ArrowDown, ThumbsDown, ThumbsUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -35,6 +37,7 @@ interface ChatPropsBase {
   ) => void
   setMessages?: (messages: any[]) => void
   transcribeAudio?: (blob: Blob) => Promise<string>
+  externalAttachments?: File[]
 }
 
 interface ChatPropsWithoutSuggestions extends ChatPropsBase {
@@ -62,6 +65,7 @@ export function Chat({
   onRateResponse,
   setMessages,
   transcribeAudio,
+  externalAttachments,
 }: ChatProps) {
   const lastMessage = messages.at(-1)
   const isEmpty = messages.length === 0
@@ -215,6 +219,7 @@ export function Chat({
         className="mt-auto"
         isPending={isGenerating || isTyping}
         handleSubmit={handleSubmit}
+        externalAttachments={externalAttachments}
       >
         {({ files, setFiles }) => (
           <MessageInput
@@ -302,11 +307,28 @@ interface ChatFormProps {
     files: File[] | null
     setFiles: React.Dispatch<React.SetStateAction<File[] | null>>
   }) => ReactElement
+  externalAttachments?: File[]
 }
 
 export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
-  ({ children, handleSubmit, isPending, className }, ref) => {
+  ({ children, handleSubmit, isPending, className, externalAttachments }, ref) => {
     const [files, setFiles] = useState<File[] | null>(null)
+
+    // Sync external attachments to local state
+    React.useEffect(() => {
+      if (externalAttachments && externalAttachments.length > 0) {
+        setFiles(prev => {
+          const newFiles = [...(prev || []), ...externalAttachments];
+          // Deduplicate by name and size
+          const uniqueFiles = newFiles.filter((file, index, self) =>
+            index === self.findIndex((f) => (
+              f.name === file.name && f.size === file.size
+            ))
+          );
+          return uniqueFiles;
+        });
+      }
+    }, [externalAttachments]);
 
     const onSubmit = (event: React.FormEvent) => {
       if (!files) {
