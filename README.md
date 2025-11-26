@@ -2,26 +2,39 @@
 
 # Rowing Tracker
 
-A stunning web application to visualize SmartRow CSV exports with beautiful analytics, trends, and personal records. This app was completely written by AI
+A stunning web application to visualize SmartRow CSV exports with beautiful analytics, trends, and personal records. This app was completely written by AI.
 
 ## Overview
 
-Rowing Tracker is a modern, responsive web app built specifically for rowers who use SmartRow equipment. Upload your CSV exports and get instant access to comprehensive analytics, personal records tracking, and detailed session insights.
+Rowing Tracker is a modern, AI-powered web app built specifically for rowers who use SmartRow equipment. Upload your CSV exports and unlock the power of artificial intelligence to analyze your performance, generate personalized training plans, and receive expert coaching insights—all while maintaining complete privacy with local data storage.
 
 ## Features
 
+### 🤖 AI-Powered Intelligence
+
+- **AI Coach with Memory**: Chat with an intelligent rowing coach that remembers your conversation history, analyzes your training data, and references uploaded documents (PDFs, images) to provide personalized advice
+- **AI Training Plans**: Generate fully personalized, multi-week training programs based on your fitness level, goals, and rowing history—or choose from proven templates
+- **AI Performance Insights**: Receive automated, data-driven insights about your workouts, trends, and areas for improvement directly in your dashboard
+
+### 📊 Analytics & Tracking
+
+- **Dashboard**: Comprehensive overview with key metrics, volume charts, and trend analysis
+- **Advanced Analytics**: Detailed breakdown of performance, split trends, stroke rate, and training adherence
+- **Sessions List**: Browse, filter, and sort all your rowing sessions with advanced search
+- **Session Details**: Deep dive into individual workout metrics with interactive charts
+- **Personal Records**: Automatic tracking of your best times and performances across all distances
+
+### 💾 Data & Privacy
+
 - **CSV Import**: Simple drag-and-drop upload for SmartRow CSV files
-- **Dashboard**: Key metrics, volume charts, and trend analysis
-- **AI Coaching**: Chat with an intelligent coach that understands your rowing data
-- **Training Plans**: Generate personalized AI training plans or use structured templates
-- **Memory System**: Upload PDFs and images for the AI to analyze and reference
-- **Advanced Analytics**: Detailed breakdown of performance, split trends, and adherence
-- **Sessions List**: Browse, filter, and sort all your rowing sessions
-- **Session Details**: Deep dive into individual workout metrics
-- **Personal Records**: Track your best times and performances across distances
+- **Local Storage**: Your data stays private and is stored locally in your browser
+- **Memory System**: Upload and store PDFs and images in IndexedDB for AI analysis
+
+### 🎨 User Experience
+
 - **Dark Theme**: Modern, easy-on-the-eyes interface
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
-- **Local Storage**: Your data stays private and is stored locally in your browser
+- **Offline-First**: All features work offline except AI-powered capabilities
 
 ## Tech Stack
 
@@ -49,7 +62,7 @@ Rowing Tracker is a modern, responsive web app built specifically for rowers who
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/rupertgermann/rowing-tracker
    cd rowing-tracker
    ```
 
