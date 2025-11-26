@@ -84,7 +84,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pr-20">
         <div className="flex items-center gap-2">
           <h4 className="font-medium text-sm truncate">{document.name}</h4>
           {document.status === 'active' && (
@@ -125,12 +125,12 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
       </div>
 
       {/* Actions */}
-      <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {onAttach && document.source === 'user' && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-primary hover:text-primary"
+            className="h-7 w-7 text-primary hover:text-primary"
             onClick={() => onAttach(document)}
             title="Attach to chat"
           >
@@ -141,7 +141,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             onClick={() => onViewText(document)}
             title="View extracted text"
           >
@@ -152,7 +152,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             onClick={() => onView(document.id)}
             title="Preview document"
           >
@@ -162,7 +162,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-destructive hover:text-destructive"
+          className="h-7 w-7 text-destructive hover:text-destructive"
           onClick={() => onDelete(document.id)}
           title="Delete document"
         >
