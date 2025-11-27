@@ -11,6 +11,13 @@ export function AwardNotification() {
   const { newlyEarnedAward, dismissNewAward } = useRowingStore();
   const [visible, setVisible] = useState(false);
 
+  const handleDismiss = () => {
+    setVisible(false);
+    setTimeout(() => {
+      dismissNewAward();
+    }, 300); // Wait for exit animation
+  };
+
   useEffect(() => {
     if (newlyEarnedAward) {
       setVisible(true);
@@ -26,13 +33,6 @@ export function AwardNotification() {
 
   const awardDef = AWARDS.find(a => a.id === newlyEarnedAward.awardId);
   if (!awardDef) return null;
-
-  const handleDismiss = () => {
-    setVisible(false);
-    setTimeout(() => {
-      dismissNewAward();
-    }, 300); // Wait for exit animation
-  };
 
   const Icon = awardDef.icon;
 
