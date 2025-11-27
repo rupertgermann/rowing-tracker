@@ -338,7 +338,7 @@ const Analytics = () => {
 
     const commonChartElements = (
       <>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+        <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
         <XAxis
           dataKey="date"
           className="text-xs"

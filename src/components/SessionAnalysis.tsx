@@ -332,7 +332,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis
                       dataKey="distance"
                       label={{ value: 'Distance (m)', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
@@ -384,7 +384,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis
                       dataKey="distance"
                       tickFormatter={(val) => `${val}m`}
@@ -432,7 +432,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <YAxis label={{ value: 'Work (J)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
@@ -462,7 +462,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
@@ -493,7 +493,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis dataKey="time" tickFormatter={formatDuration} label={{ value: 'Time', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <YAxis domain={['dataMin - 10', 'dataMax + 10']} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip content={<CustomTooltip />} />
@@ -555,7 +555,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={segments} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis
                       dataKey="segmentNumber"
                       label={{ value: 'Segment', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
@@ -611,7 +611,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis
                         dataKey="strokeIndex"
                         label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
@@ -667,7 +667,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis
                         dataKey="strokeIndex"
                         label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }}
@@ -775,7 +775,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={distributions.power} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} vertical={false} opacity={chartTheme.grid.opacity} />
                       <XAxis dataKey="range" angle={-45} textAnchor="end" height={60} interval={0} fontSize={chartTheme.axis.fontSize} tick={{ fill: chartTheme.axis.tickColor }} stroke={chartTheme.axis.strokeColor} />
                       <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
@@ -796,7 +796,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={distributions.spm} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} vertical={false} opacity={chartTheme.grid.opacity} />
                       <XAxis dataKey="rate" tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
@@ -817,7 +817,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
                       <YAxis type="number" dataKey="power" name="Power" unit="W" domain={['auto', 'auto']} />
                       <Tooltip cursor={{ strokeDasharray: '3 3' }} />
@@ -838,7 +838,7 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
                       <YAxis
                         type="number"

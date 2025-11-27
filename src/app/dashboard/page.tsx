@@ -15,6 +15,7 @@ import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { formatChartDate, formatSessionDate, formatDateOnly, formatTime } from '@/lib/dateTimeUtils';
+import { chartTheme } from '@/lib/chartUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
@@ -170,9 +171,9 @@ function prepareChartData(sessions: any[]) {
 const CustomTooltip = ({ active, payload, label, config }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-gray-300 border-2 border-black rounded-lg p-2 shadow-lg">
-        <p className="text-black font-medium text-sm">{label}</p>
-        <p className="text-black text-sm">
+      <div style={chartTheme.tooltip.contentStyle}>
+        <p style={chartTheme.tooltip.labelStyle}>{label}</p>
+        <p style={chartTheme.tooltip.itemStyle}>
           {config.formatter(payload[0].value)} - {config.label}
         </p>
       </div>
@@ -333,17 +334,15 @@ const Dashboard = () => {
 
     const commonChartElements = (
       <>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+        <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
         <XAxis
           dataKey="date"
-          className="text-xs"
-          stroke="#6b7280"
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          stroke={chartTheme.axis.strokeColor}
+          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
         />
         <YAxis
-          className="text-xs"
-          stroke="#6b7280"
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          stroke={chartTheme.axis.strokeColor}
+          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
           tickFormatter={config.yAxisFormatter}
         />
         <Tooltip content={<CustomTooltip config={config} />} />

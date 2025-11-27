@@ -178,24 +178,22 @@ export const SplitTimeChart = ({ sessions }: SplitTimeChartProps) => {
                 data={chartData}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                 <XAxis
                   dataKey="date"
-                  className="text-xs"
-                  stroke="#6b7280"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  stroke={chartTheme.axis.strokeColor}
+                  tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                 />
                 <YAxis
-                  className="text-xs"
-                  stroke="#6b7280"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  stroke={chartTheme.axis.strokeColor}
+                  tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                   domain={yDomain}
                   reversed={true}
                   label={{
                     value: 'Average Split (s)',
                     angle: -90,
                     position: 'insideLeft',
-                    style: { fill: '#6b7280', fontSize: 12 }
+                    style: chartTheme.axis.labelStyle
                   }}
                 />
                 <Tooltip content={<CustomTooltip />} />

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
 import { TrendingUp, Clock, Zap, Activity, Flame, Target, Calendar, BarChart3, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from 'lucide-react';
 import { formatMonthYear } from '@/lib/dateTimeUtils';
+import { chartTheme } from '@/lib/chartUtils';
 
 type Period = 'week' | 'month' | 'quarter' | 'year';
 type Metric = 'distance' | 'duration' | 'energy' | 'power' | 'pace' | 'strokeRate';
@@ -171,29 +172,29 @@ export function MetricComparisonWidget() {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
-          <p className="font-medium mb-1">{label}</p>
-          <p className="text-primary font-bold text-lg">
+        <div style={chartTheme.tooltip.contentStyle}>
+          <p style={chartTheme.tooltip.labelStyle}>{label}</p>
+          <p style={{ ...chartTheme.tooltip.itemStyle, fontWeight: 'bold' }}>
              {metric === 'pace' ? formatPace(data.value) : 
               metric === 'duration' ? formatDuration(data.value * 60) :
               Math.round(data.value).toLocaleString()}
-             <span className="text-xs font-normal text-muted-foreground ml-1">{activeMetric.unit}</span>
+             <span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.25rem' }}>{activeMetric.unit}</span>
           </p>
-          <div className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50">
-            <div className="flex justify-between gap-4">
+          <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
               <span>Sessions:</span>
-              <span className="font-medium">{data.count}</span>
+              <span style={{ fontWeight: 500 }}>{data.count}</span>
             </div>
             {metric !== 'distance' && (
-              <div className="flex justify-between gap-4">
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
                 <span>Total Distance:</span>
-                <span className="font-medium">{Math.round(data.totalDist).toLocaleString()} m</span>
+                <span style={{ fontWeight: 500 }}>{Math.round(data.totalDist).toLocaleString()} m</span>
               </div>
             )}
             {metric !== 'duration' && (
-              <div className="flex justify-between gap-4">
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
                 <span>Total Duration:</span>
-                <span className="font-medium">{formatDuration(data.totalDur)}</span>
+                <span style={{ fontWeight: 500 }}>{formatDuration(data.totalDur)}</span>
               </div>
             )}
           </div>
@@ -221,17 +222,17 @@ export function MetricComparisonWidget() {
     return (
       <ResponsiveContainer width="100%" height={350}>
         <ChartComponent data={aggregatedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
+          <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
           <XAxis 
             dataKey="label" 
-            stroke="#6b7280" 
-            fontSize={12} 
+            stroke={chartTheme.axis.strokeColor}
+            tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
             tickLine={false} 
             axisLine={false}
           />
           <YAxis 
-            stroke="#6b7280" 
-            fontSize={12} 
+            stroke={chartTheme.axis.strokeColor}
+            tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
             tickLine={false} 
             axisLine={false} 
             tickFormatter={formatYAxis}

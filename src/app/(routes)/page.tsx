@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Upload, TrendingUp, Clock, Zap, Target } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatChartDate } from '@/lib/dateTimeUtils';
+import { chartTheme } from '@/lib/chartUtils';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -245,16 +246,16 @@ export default function DashboardPage() {
                 <CardContent className="pt-6">
                   <div className="h-80 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <LineChart data={chartData} margin={chartTheme.margin.default}>
+                        <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                         <XAxis 
                           dataKey="date" 
-                          tick={{ fontSize: 12 }}
-                          tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+                          stroke={chartTheme.axis.strokeColor}
+                          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                         />
                         <YAxis 
-                          tick={{ fontSize: 12 }}
-                          tickLine={{ stroke: 'hsl(var(--muted-foreground))' }}
+                          stroke={chartTheme.axis.strokeColor}
+                          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                           tickFormatter={(value) => {
                             if (value >= 1000) {
                               return `${(value / 1000).toFixed(0)}k`;
@@ -263,20 +264,18 @@ export default function DashboardPage() {
                           }}
                         />
                         <Tooltip 
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '6px'
-                          }}
+                          contentStyle={chartTheme.tooltip.contentStyle}
+                          labelStyle={chartTheme.tooltip.labelStyle}
+                          itemStyle={chartTheme.tooltip.itemStyle}
                           formatter={(value: number) => [formatDistance(value), 'Distance']}
                         />
                         <Line 
                           type="monotone" 
                           dataKey="distance" 
                           stroke="hsl(var(--primary))" 
-                          strokeWidth={2}
-                          dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6 }}
+                          strokeWidth={chartTheme.line.strokeWidth}
+                          dot={{ fill: 'hsl(var(--primary))', strokeWidth: chartTheme.line.dot.strokeWidth, r: chartTheme.line.dot.r }}
+                          activeDot={{ r: chartTheme.line.activeDot.r }}
                         />
                       </LineChart>
                     </ResponsiveContainer>

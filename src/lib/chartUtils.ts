@@ -1,4 +1,3 @@
-
 export const chartTheme = {
     axis: {
         fontSize: 12,
@@ -8,6 +7,11 @@ export const chartTheme = {
             fill: '#6b7280',
             fontSize: 14,
         },
+    },
+    grid: {
+        strokeDasharray: '3 3',
+        stroke: '#374151', // gray-700
+        opacity: 0.3,
     },
     tooltip: {
         contentStyle: {
@@ -31,6 +35,23 @@ export const chartTheme = {
     legend: {
         wrapperStyle: {
             paddingTop: '1rem',
+        },
+    },
+    margin: {
+        default: { top: 5, right: 30, left: 20, bottom: 5 },
+        scatter: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    bar: {
+        radius: [4, 4, 0, 0] as [number, number, number, number],
+    },
+    line: {
+        strokeWidth: 2,
+        dot: {
+            strokeWidth: 2,
+            r: 4,
+        },
+        activeDot: {
+            r: 6,
         },
     },
 };
