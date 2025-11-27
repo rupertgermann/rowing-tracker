@@ -5,7 +5,8 @@ import { useRowingStore } from '@/lib/store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
-import { TrendingUp, Clock, Zap, Activity, Flame, Target, Calendar, BarChart3, LineChart as LineChartIcon, AreaChart as AreaChartIcon } from 'lucide-react';
+import { TrendingUp, Clock, Zap, Activity, Flame, Target, Calendar, BarChart3 } from 'lucide-react';
+import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
 import { formatMonthYear } from '@/lib/dateTimeUtils';
 import { chartTheme } from '@/lib/chartUtils';
 
@@ -271,29 +272,7 @@ export function MetricComparisonWidget() {
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Chart Type Toggles */}
-            <div className="flex bg-muted p-1 rounded-md mr-2">
-              <button
-                onClick={() => setChartType('bar')}
-                className={`p-1.5 rounded-sm transition-all ${chartType === 'bar' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
-                title="Bar Chart"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setChartType('line')}
-                className={`p-1.5 rounded-sm transition-all ${chartType === 'line' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
-                title="Line Chart"
-              >
-                <LineChartIcon className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setChartType('area')}
-                className={`p-1.5 rounded-sm transition-all ${chartType === 'area' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
-                title="Area Chart"
-              >
-                <AreaChartIcon className="h-4 w-4" />
-              </button>
-            </div>
+            <ChartTypeSelector value={chartType} onChange={setChartType} />
 
             {/* Period Select - Using Buttons for quick access */}
              <div className="flex bg-muted p-1 rounded-md">

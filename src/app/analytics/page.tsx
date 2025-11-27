@@ -18,6 +18,7 @@ import { formatChartDate } from '@/lib/dateTimeUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { chartTheme } from '@/lib/chartUtils';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
+import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area';
@@ -587,41 +588,10 @@ const Analytics = () => {
                         Choose which metrics to track over time
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground mr-2">Chart Type:</span>
-                      <div className="flex gap-1">
-                        <Button
-                          variant={chartSettings.chartType === 'line' ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => updateChartSettings({ chartType: 'line' })}
-                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                          aria-label="Switch to line chart"
-                          aria-pressed={chartSettings.chartType === 'line'}
-                        >
-                          Line
-                        </Button>
-                        <Button
-                          variant={chartSettings.chartType === 'bar' ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => updateChartSettings({ chartType: 'bar' })}
-                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                          aria-label="Switch to bar chart"
-                          aria-pressed={chartSettings.chartType === 'bar'}
-                        >
-                          Bar
-                        </Button>
-                        <Button
-                          variant={chartSettings.chartType === 'area' ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => updateChartSettings({ chartType: 'area' })}
-                          className="text-xs transition-all duration-200 focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                          aria-label="Switch to area chart"
-                          aria-pressed={chartSettings.chartType === 'area'}
-                        >
-                          Area
-                        </Button>
-                      </div>
-                    </div>
+                    <ChartTypeSelector
+                      value={chartSettings.chartType}
+                      onChange={(type) => updateChartSettings({ chartType: type })}
+                    />
                   </div>
                 </CardHeader>
                 <CardContent>
