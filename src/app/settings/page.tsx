@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
+import { memoryStorage, MemoryDocument } from '@/lib/memoryStorage';
 import {
   Settings as SettingsIcon,
   User,
@@ -100,6 +101,8 @@ export default function SettingsPage() {
   // Personal Context state
   const [isCondensingProfile, setIsCondensingProfile] = useState(false);
   const [profileRawInput, setProfileRawInput] = useState('');
+  const [memoryDocuments, setMemoryDocuments] = useState<MemoryDocument[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
@@ -119,6 +122,23 @@ export default function SettingsPage() {
       setProfileRawInput(settingsData.aiSettings.userProfileRawInput);
     }
   }, [settingsData?.aiSettings?.userProfileRawInput]);
+
+  // Load memory documents
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const docs = await memoryStorage.getAllDocuments();
+        // Filter to only user-uploaded documents (PDFs and text notes)
+        const userDocs = docs.filter(doc => 
+          doc.source === 'user' || doc.type === 'note'
+        );
+        setMemoryDocuments(userDocs);
+      } catch (error) {
+        console.error('Failed to load memory documents:', error);
+      }
+    };
+    loadDocuments();
+  }, []);
 
   const loadSettings = () => {
     try {
@@ -1266,42 +1286,74 @@ You can also paste content from medical documents or training notes."
                 </p>
               </div>
 
-              {/* File Upload */}
-              <div>
-                <Label className="flex items-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Upload Document (Optional)
-                </Label>
-                <div className="mt-1">
-                  <label className="cursor-pointer">
-                    <div className="border-2 border-dashed rounded-md p-4 text-center hover:border-primary transition-colors">
-                      <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        Click to upload a text file (.txt)
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Content will be added to your personal context
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".txt"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const content = event.target?.result as string;
-                            setProfileRawInput(prev => prev ? `${prev}\n\n--- Uploaded from ${file.name} ---\n${content}` : content);
-                          };
-                          reader.readAsText(file);
-                        }
-                      }}
-                    />
-                  </label>
+              {/* Document Selector from Memory */}
+              {memoryDocuments.length > 0 && (
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Select Documents from Memory (Optional)
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1 mb-2">
+                    Choose documents from your memory to include in your personal context
+                  </p>
+                  <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                    {memoryDocuments.map(doc => (
+                      <label
+                        key={doc.id}
+                        className="flex items-start gap-3 p-2 rounded hover:bg-muted cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedDocIds.includes(doc.id)}
+                          onChange={async (e) => {
+                            const isChecked = e.target.checked;
+                            if (isChecked) {
+                              setSelectedDocIds(prev => [...prev, doc.id]);
+                              // Add document content to input
+                              const content = doc.extractedText || doc.description || '';
+                              if (content) {
+                                setProfileRawInput(prev => 
+                                  prev 
+                                    ? `${prev}\n\n--- From ${doc.name} ---\n${content}` 
+                                    : `--- From ${doc.name} ---\n${content}`
+                                );
+                              }
+                            } else {
+                              setSelectedDocIds(prev => prev.filter(id => id !== doc.id));
+                              // Remove document content from input (simplified approach)
+                              setProfileRawInput(prev => {
+                                const marker = `--- From ${doc.name} ---`;
+                                const startIdx = prev.indexOf(marker);
+                                if (startIdx === -1) return prev;
+                                
+                                // Find the next document marker or end of string
+                                const nextMarkerIdx = prev.indexOf('--- From ', startIdx + marker.length);
+                                const endIdx = nextMarkerIdx === -1 ? prev.length : nextMarkerIdx;
+                                
+                                return (prev.slice(0, startIdx) + prev.slice(endIdx)).trim();
+                              });
+                            }
+                          }}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium truncate">{doc.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {doc.type}
+                            </Badge>
+                          </div>
+                          {doc.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                              {doc.description}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Generate/Condense Button */}
               <div className="flex items-center gap-4">
@@ -1342,6 +1394,7 @@ You can also paste content from medical documents or training notes."
                     variant="outline"
                     onClick={() => {
                       setProfileRawInput('');
+                      setSelectedDocIds([]);
                       saveSettings('aiSettings', { 
                         userProfileContext: '',
                         userProfileRawInput: '' 

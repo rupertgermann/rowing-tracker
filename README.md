@@ -15,7 +15,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **AI Coach with Memory**: Chat with an intelligent rowing coach that remembers your conversation history, analyzes your training data, and references uploaded documents (PDFs, images) to provide personalized advice
 - **AI Training Plans**: Generate fully personalized, multi-week training programs based on your fitness level, goals, and rowing history—or choose from proven templates
 - **AI Performance Insights**: Receive automated, data-driven insights about your workouts, trends, and areas for improvement directly in your dashboard
-- **AI Personal Context**: Upload medical notes or write a personal description to automatically create a system prompt addition that keeps your health considerations and goals in mind across the AI Coach, training plans, and insights
+- **AI Personal Context**: Write a personal description or select documents from your memory to automatically create a system prompt addition that keeps your health considerations, limitations, and goals in mind across the AI Coach, training plans, and insights
 
 ### 📊 Analytics & Tracking
 
@@ -81,9 +81,13 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 5. **Configure AI (Optional)**
-   - Go to Settings
+   - Go to Settings → AI Coach
    - Enter your OpenAI API Key to enable Chat and Training Plans
-   - (New) Add your Personal Context to inform the AI about medical conditions, preferences, or goals. Paste text or upload a .txt file, then click “Generate AI Context” to inject it into all AI features.
+   - (New) Add your Personal Context to inform the AI about medical conditions, preferences, or goals:
+     - Write or paste information directly in the text area
+     - Select documents from your memory (PDFs, notes you've uploaded to the AI Coach)
+     - Click "Generate AI Context" to condense it into coaching instructions
+     - The generated context is automatically injected into all AI features
 
 ## SmartRow CSV Export Guide
 
