@@ -16,6 +16,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **AI Training Plans**: Generate fully personalized, multi-week training programs based on your fitness level, goals, and rowing history—or choose from proven templates
 - **AI Performance Insights**: Receive automated, data-driven insights about your workouts, trends, and areas for improvement directly in your dashboard
 - **AI Personal Context**: Write a personal description or select documents from your memory to automatically create a system prompt addition that keeps your health considerations, limitations, and goals in mind across the AI Coach, training plans, and insights
+- **Configurable AI System Prompts**: Fine-tune the base system prompt, chat prompt, training plan prompt, and insights prompt from the Settings → Advanced Configuration panel with one-click “reset to default” controls
 
 ### 📊 Analytics & Tracking
 
@@ -23,6 +24,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Advanced Analytics**: Detailed breakdown of performance, split trends, stroke rate, and training adherence
 - **Sessions List**: Browse, filter, and sort all your rowing sessions with advanced search
 - **Session Details**: Deep dive into individual workout metrics with interactive charts
+- **Stroke-by-Stroke Analysis**: Upload SmartRow stroke exports to unlock power/rhythm distributions, stroke-length consistency, and technique maps for every stroke
 - **Personal Records**: Automatic tracking of your best times and performances across all distances
 
 ### 💾 Data & Privacy
@@ -36,6 +38,13 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Dark Theme**: Modern, easy-on-the-eyes interface
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
 - **Offline-First**: All features work offline except AI-powered capabilities
+
+### 🏅 Gamification & Motivation
+
+- **Dynamic Awards System**: Earn achievements for session milestones, total distance, streaks, duration, power output, pace improvements, and more
+- **Improvement Awards**: Track percentage gains in power and pace compared to your baseline to unlock higher-tier awards
+- **Streak Milestones**: Stay consistent with notifications for 7-, 14-, 21-, 45-, 60-, and 100-day streaks
+- **Live Award Notifications**: Celebrate wins instantly with animated overlays whenever you unlock something new
 
 ## Tech Stack
 
@@ -88,6 +97,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
      - Select documents from your memory (PDFs, notes you've uploaded to the AI Coach)
      - Click "Generate AI Context" to condense it into coaching instructions
      - The generated context is automatically injected into all AI features
+   - Customize the AI prompts used for chat, insights, and training plans in the Advanced Configuration section (each prompt has a reset-to-default button)
 
 ## SmartRow CSV Export Guide
 
