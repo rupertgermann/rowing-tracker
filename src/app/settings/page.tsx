@@ -1465,7 +1465,7 @@ You can also paste content from medical documents or training notes."
                   rows={4}
                   value={settingsData.aiSettings.systemPrompt}
                   onChange={(e) => saveSettings('aiSettings', { systemPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
                   placeholder="Configure the base system prompt for AI interactions..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1489,7 +1489,7 @@ You can also paste content from medical documents or training notes."
                   rows={4}
                   value={settingsData.aiSettings.chatSystemPrompt}
                   onChange={(e) => saveSettings('aiSettings', { chatSystemPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
                   placeholder="Configure the chat-specific system prompt for AI coach conversations..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1513,7 +1513,7 @@ You can also paste content from medical documents or training notes."
                   rows={4}
                   value={settingsData.aiSettings.planGenerationPrompt}
                   onChange={(e) => saveSettings('aiSettings', { planGenerationPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
                   placeholder="Configure the prompt used for generating training plans..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1537,7 +1537,7 @@ You can also paste content from medical documents or training notes."
                   rows={8}
                   value={settingsData.aiSettings.insightsPrompt}
                   onChange={(e) => saveSettings('aiSettings', { insightsPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-none font-mono text-sm"
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
                   placeholder="Configure the prompt used for generating AI insights in the dashboard..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">
