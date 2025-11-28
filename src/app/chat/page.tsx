@@ -155,26 +155,13 @@ export default function ChatPage() {
       
       // If the last message is from the assistant and we're not loading, save the explanation
       if (lastMessage.role === 'assistant' && !isLoading && lastMessage.content) {
-        // Try to extract the TOOLTIP SUMMARY section first
-        let summary = '';
-        // Match various markdown formats: **TOOLTIP SUMMARY**, ## TOOLTIP SUMMARY, etc.
-        const tooltipMatch = lastMessage.content.match(/(?:\*\*|##?\s*)TOOLTIP SUMMARY(?:\*\*)?[^:]*:?\s*\n?([\s\S]*?)(?=\n\n(?:\*\*|##)|$)/i);
-        if (tooltipMatch && tooltipMatch[1]) {
-          // Clean up the extracted text - remove markdown formatting
-          summary = tooltipMatch[1]
-            .trim()
-            .replace(/^\[|\]$/g, '')  // Remove surrounding brackets
-            .replace(/\*\*/g, '')      // Remove bold markers
-            .replace(/^#+\s*/gm, '')   // Remove heading markers
-            .slice(0, 200);
-        } else {
-          // Fallback: first paragraph or 200 chars, cleaned of markdown
-          const firstPara = lastMessage.content.split('\n\n')[0];
-          summary = firstPara
-            .replace(/\*\*/g, '')
-            .replace(/^#+\s*/gm, '')
-            .slice(0, 200) + (firstPara.length > 200 ? '...' : '');
-        }
+        // Extract summary from first paragraph (the key insight)
+        const firstPara = lastMessage.content.split('\n\n')[0];
+        const summary = firstPara
+          .replace(/\*\*/g, '')       // Remove bold markers
+          .replace(/^#+\s*/gm, '')    // Remove heading markers
+          .trim()
+          .slice(0, 200) + (firstPara.length > 200 ? '...' : '');
         
         setChartExplanation(pendingChartExplanation.chartId, {
           summary,

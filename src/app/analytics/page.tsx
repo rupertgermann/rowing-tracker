@@ -889,15 +889,19 @@ ${explainChartPrompt}`;
                                           <MessageCircle className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto pointer-events-auto">
-                                        <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                      <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+                                          <Brain className="h-4 w-4 text-primary" />
+                                          <span className="font-semibold text-sm">AI Analysis</span>
+                                        </div>
+                                        <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                           <ReactMarkdown>
                                             {chartExplanations[`metric-${metric}`].fullResponse || chartExplanations[`metric-${metric}`].summary}
                                           </ReactMarkdown>
                                         </div>
-                                        <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                        <div className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border flex items-center gap-1">
                                           <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                        </p>
+                                        </div>
                                       </TooltipContent>
                                     </UITooltip>
                                   </TooltipProvider>
@@ -1013,15 +1017,19 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
-                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                    <Brain className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">AI Analysis</span>
+                                  </div>
+                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                     <ReactMarkdown>
                                       {chartExplanations['scatter-power-pace'].fullResponse || chartExplanations['scatter-power-pace'].summary}
                                     </ReactMarkdown>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </p>
+                                  </div>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1115,15 +1123,19 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
-                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                    <Brain className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">AI Analysis</span>
+                                  </div>
+                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                     <ReactMarkdown>
                                       {chartExplanations['scatter-rate-pace'].fullResponse || chartExplanations['scatter-rate-pace'].summary}
                                     </ReactMarkdown>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </p>
+                                  </div>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1217,15 +1229,19 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
-                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                    <Brain className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">AI Analysis</span>
+                                  </div>
+                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                     <ReactMarkdown>
                                       {chartExplanations['scatter-duration-distance'].fullResponse || chartExplanations['scatter-duration-distance'].summary}
                                     </ReactMarkdown>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </p>
+                                  </div>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1319,15 +1335,19 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
-                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                    <Brain className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">AI Analysis</span>
+                                  </div>
+                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                     <ReactMarkdown>
                                       {chartExplanations['scatter-energy-duration'].fullResponse || chartExplanations['scatter-energy-duration'].summary}
                                     </ReactMarkdown>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </p>
+                                  </div>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1420,15 +1440,19 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
-                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                    <Brain className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">AI Analysis</span>
+                                  </div>
+                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                     <ReactMarkdown>
                                       {chartExplanations['scatter-power-rate'].fullResponse || chartExplanations['scatter-power-rate'].summary}
                                     </ReactMarkdown>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </p>
+                                  </div>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1521,15 +1545,19 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
-                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                    <Brain className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">AI Analysis</span>
+                                  </div>
+                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                                     <ReactMarkdown>
                                       {chartExplanations['scatter-distance-power'].fullResponse || chartExplanations['scatter-distance-power'].summary}
                                     </ReactMarkdown>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
                                     <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </p>
+                                  </div>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>

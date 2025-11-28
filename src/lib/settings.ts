@@ -221,18 +221,23 @@ Return a JSON array of insights with this structure:
 
 Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`,
 
-      explainChartPrompt: `Keep your response concise and actionable. Structure your answer as follows:
+      explainChartPrompt: `Provide a clear, well-formatted analysis. Structure your response as follows:
 
-**TOOLTIP SUMMARY** (1-2 sentences max, suitable for display in a small tooltip):
-[Write a brief key takeaway here]
+Start with a brief 1-2 sentence summary of the key insight from this chart.
 
-**ANALYSIS** (3-5 bullet points):
-- Key patterns and what they mean
-- Areas of strength or concern
-- Comparison to typical benchmarks
+## Key Patterns
+- What trends or patterns do you see?
+- How do the data points relate to each other?
+- Any notable outliers or clusters?
 
-**ACTION** (1-2 specific recommendations):
-What to focus on in your next session.`,
+## Performance Context
+- How does this compare to typical benchmarks?
+- What does this tell us about training effectiveness?
+
+## Recommendations
+Provide 1-2 specific, actionable suggestions for improvement.
+
+Keep the response concise but informative. Use clear formatting with headers and bullet points.`,
 
       // Personal context defaults
       userProfileContext: '',
