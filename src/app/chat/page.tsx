@@ -780,7 +780,14 @@ export default function ChatPage() {
                           // Session charts have format: session-{sessionId}-{chartType}
                           // Chart types: power-rate, pace, work, stroke-length, heart-rate
                           if (chartId.startsWith('session-')) {
-                            const chartTypes = ['-power-rate', '-pace', '-work', '-stroke-length', '-heart-rate'];
+                            const chartTypes = [
+                              // Overview & Performance Graphs tabs
+                              '-power-rate', '-pace', '-work', '-stroke-length', '-heart-rate',
+                              // Segments tab
+                              '-segments', '-rolling-power', '-rolling-split',
+                              // Deep Analysis tab
+                              '-power-distribution', '-rhythm-distribution', '-rate-vs-power', '-rate-vs-split'
+                            ];
                             let sessionId = chartId.substring('session-'.length);
                             for (const suffix of chartTypes) {
                               if (sessionId.endsWith(suffix)) {

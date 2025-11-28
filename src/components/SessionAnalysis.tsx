@@ -229,6 +229,33 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
       const hrData = enrichedData.filter(d => d.heartRate);
       const avgHR = hrData.reduce((sum, d) => sum + (d.heartRate || 0), 0) / hrData.length;
       context += `\n- Average heart rate: ${avgHR.toFixed(0)} bpm`;
+    } else if (chartType === 'segments') {
+      context += `\n- Segment size: ${segmentSize}m
+- Number of segments: ${segments.length}
+- Best segment power: ${Math.max(...segments.map(s => s.avgPower)).toFixed(0)}W
+- Worst segment power: ${Math.min(...segments.map(s => s.avgPower)).toFixed(0)}W`;
+    } else if (chartType === 'rolling-power') {
+      context += `\n- Rolling averages: 5-stroke and 10-stroke windows
+- Shows power consistency over time`;
+    } else if (chartType === 'rolling-split') {
+      context += `\n- Rolling averages: 5-stroke and 10-stroke windows
+- Shows pace consistency over time`;
+    } else if (chartType === 'power-distribution') {
+      const powerZones = distributions.power;
+      const mostCommonZone = powerZones.reduce((a, b) => a.count > b.count ? a : b, powerZones[0]);
+      context += `\n- Power zones: ${powerZones.length} zones (25W buckets)
+- Most common zone: ${mostCommonZone?.range || 'N/A'} with ${mostCommonZone?.count || 0} strokes`;
+    } else if (chartType === 'rhythm-distribution') {
+      const spmZones = distributions.spm;
+      const mostCommonSPM = spmZones.reduce((a, b) => a.count > b.count ? a : b, spmZones[0]);
+      context += `\n- SPM range: ${Math.min(...spmZones.map(s => s.rate))} to ${Math.max(...spmZones.map(s => s.rate))}
+- Most common SPM: ${mostCommonSPM?.rate || 'N/A'} with ${mostCommonSPM?.count || 0} strokes`;
+    } else if (chartType === 'rate-vs-power') {
+      context += `\n- Scatter plot showing correlation between stroke rate and power
+- Helps identify optimal stroke rate for maximum power output`;
+    } else if (chartType === 'rate-vs-split') {
+      context += `\n- Scatter plot showing correlation between stroke rate and split time
+- Helps identify efficiency: faster rate should yield faster splits`;
     }
     
     return context;
@@ -653,10 +680,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
           </div>
 
           {/* Segment Analysis */}
-          <Card>
+          <Card id={`session-${sessionId}-segments`}>
             <CardHeader>
-              <CardTitle>{segmentSize}m Segment Analysis</CardTitle>
-              <CardDescription>Average power, split, and stroke rate for each {segmentSize}m segment</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>{segmentSize}m Segment Analysis</CardTitle>
+                  <CardDescription>Average power, split, and stroke rate for each {segmentSize}m segment</CardDescription>
+                </div>
+                <ExplainChartButton
+                  chartId={`session-${sessionId}-segments`}
+                  chartTitle={`${segmentSize}m Segment Analysis`}
+                  chartDescription={`This chart shows my average power, split, and stroke rate for each ${segmentSize}m segment.`}
+                  dataContext={getChartDataContext('segments')}
+                  fullData={segments}
+                  variant="compact"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-[350px] w-full">
@@ -709,10 +748,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
 
           {/* Rolling Averages */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            <Card id={`session-${sessionId}-rolling-power`}>
               <CardHeader>
-                <CardTitle>Rolling Power Average</CardTitle>
-                <CardDescription>5-stroke vs 10-stroke rolling average power</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Rolling Power Average</CardTitle>
+                    <CardDescription>5-stroke vs 10-stroke rolling average power</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-rolling-power`}
+                    chartTitle="Rolling Power Average"
+                    chartDescription="This chart shows my 5-stroke and 10-stroke rolling average power throughout the session."
+                    dataContext={getChartDataContext('rolling-power')}
+                    fullData={rollingData}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -765,10 +816,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card id={`session-${sessionId}-rolling-split`}>
               <CardHeader>
-                <CardTitle>Rolling Split Average</CardTitle>
-                <CardDescription>5-stroke vs 10-stroke rolling average split time</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Rolling Split Average</CardTitle>
+                    <CardDescription>5-stroke vs 10-stroke rolling average split time</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-rolling-split`}
+                    chartTitle="Rolling Split Average"
+                    chartDescription="This chart shows my 5-stroke and 10-stroke rolling average split time throughout the session."
+                    dataContext={getChartDataContext('rolling-split')}
+                    fullData={rollingData}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -873,10 +936,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
         <TabsContent value="analysis" className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Power Distribution */}
-            <Card>
+            <Card id={`session-${sessionId}-power-distribution`}>
               <CardHeader>
-                <CardTitle>Power Distribution</CardTitle>
-                <CardDescription>Strokes per power zone</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Power Distribution</CardTitle>
+                    <CardDescription>Strokes per power zone</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-power-distribution`}
+                    chartTitle="Power Distribution"
+                    chartDescription="This histogram shows how many strokes I performed in each power zone (25W buckets)."
+                    dataContext={getChartDataContext('power-distribution')}
+                    fullData={distributions.power}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -894,10 +969,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
             </Card>
 
             {/* SPM Distribution */}
-            <Card>
+            <Card id={`session-${sessionId}-rhythm-distribution`}>
               <CardHeader>
-                <CardTitle>Rhythm Distribution</CardTitle>
-                <CardDescription>Strokes per Stroke Rate (SPM)</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Rhythm Distribution</CardTitle>
+                    <CardDescription>Strokes per Stroke Rate (SPM)</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-rhythm-distribution`}
+                    chartTitle="Rhythm Distribution"
+                    chartDescription="This histogram shows how many strokes I performed at each stroke rate (SPM)."
+                    dataContext={getChartDataContext('rhythm-distribution')}
+                    fullData={distributions.spm}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -915,10 +1002,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
             </Card>
 
             {/* Technique Map: Rate vs Power */}
-            <Card>
+            <Card id={`session-${sessionId}-rate-vs-power`}>
               <CardHeader>
-                <CardTitle>Rate vs Power</CardTitle>
-                <CardDescription>Do higher rates yield more power?</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Rate vs Power</CardTitle>
+                    <CardDescription>Do higher rates yield more power?</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-rate-vs-power`}
+                    chartTitle="Rate vs Power"
+                    chartDescription="This scatter plot shows the relationship between stroke rate and power output."
+                    dataContext={getChartDataContext('rate-vs-power')}
+                    fullData={enrichedData}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -936,10 +1035,22 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
             </Card>
 
             {/* Rate vs Split Efficiency */}
-            <Card>
+            <Card id={`session-${sessionId}-rate-vs-split`}>
               <CardHeader>
-                <CardTitle>Rate vs Split</CardTitle>
-                <CardDescription>Efficiency check: Faster rate should equal faster split</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Rate vs Split</CardTitle>
+                    <CardDescription>Efficiency check: Faster rate should equal faster split</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-rate-vs-split`}
+                    chartTitle="Rate vs Split"
+                    chartDescription="This scatter plot shows the relationship between stroke rate and split time to analyze efficiency."
+                    dataContext={getChartDataContext('rate-vs-split')}
+                    fullData={enrichedData}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
