@@ -26,9 +26,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ComposedChart } from 'recharts';
 import { useRowingStore } from '@/lib/store';
 import { chartTheme } from '@/lib/chartUtils';
+import { ExplainChartButton } from '@/components/ExplainChartButton';
 
 interface SessionAnalysisProps {
   data: StrokeData[];
+  sessionId: string;
 }
 
 const formatDuration = (seconds: number) => {
@@ -74,8 +76,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export function SessionAnalysis({ data }: SessionAnalysisProps) {
+export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
   const { sessionAnalysisSettings, updateSessionAnalysisSettings } = useRowingStore();
+  
+  // Handle hash scrolling on mount
+  React.useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        const element = document.getElementById(hash.substring(1));
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, []);
   const activeTab = sessionAnalysisSettings?.activeTab ?? 'overview';
   const segmentSize = sessionAnalysisSettings?.segmentSize ?? 500;
 
@@ -186,6 +202,37 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
   const formatBPM = (bpm: number) => `${Math.round(bpm)} bpm`;
   const formatMeters = (meters: number) => `${meters.toFixed(1)} m`;
   const formatKilojoules = (kj: number) => `${kj.toFixed(1)} kJ`;
+
+  // Helper to generate data context for chart explanations
+  const getChartDataContext = (chartType: string) => {
+    const totalStrokes = enrichedData.length;
+    const totalDistance = enrichedData[enrichedData.length - 1]?.distance || 0;
+    const powers = enrichedData.map(d => d.power).filter(p => p > 0);
+    const rates = enrichedData.map(d => d.strokeRate).filter(r => r > 0);
+    const avgPower = powers.length > 0 ? powers.reduce((a, b) => a + b, 0) / powers.length : 0;
+    const avgRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
+    const minPower = powers.length > 0 ? Math.min(...powers) : 0;
+    const maxPower = powers.length > 0 ? Math.max(...powers) : 0;
+    
+    let context = `- Total strokes: ${totalStrokes}
+- Total distance: ${totalDistance}m
+- Average power: ${avgPower.toFixed(1)}W
+- Average stroke rate: ${avgRate.toFixed(1)} spm
+- Consistency score: ${stats.consistencyScore.toFixed(0)}/100`;
+
+    if (chartType === 'power-rate') {
+      context += `\n- Power range: ${minPower.toFixed(0)}W to ${maxPower.toFixed(0)}W`;
+    } else if (chartType === 'pace') {
+      context += `\n- Best 500m split: ${formatSplit(performanceSummary.best500mSplit)}
+- Worst 500m split: ${formatSplit(performanceSummary.worst500mSplit)}`;
+    } else if (chartType === 'heart-rate' && enrichedData.some(d => d.heartRate)) {
+      const hrData = enrichedData.filter(d => d.heartRate);
+      const avgHR = hrData.reduce((sum, d) => sum + (d.heartRate || 0), 0) / hrData.length;
+      context += `\n- Average heart rate: ${avgHR.toFixed(0)} bpm`;
+    }
+    
+    return context;
+  };
 
   return (
     <div className="space-y-8">
@@ -323,10 +370,22 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
           </div>
 
           {/* Primary Chart: Power & Rate */}
-          <Card>
+          <Card id={`session-${sessionId}-power-rate`}>
             <CardHeader>
-              <CardTitle>Power & Stroke Rate</CardTitle>
-              <CardDescription>Power output (Watts) and Stroke Rate (SPM) over the session</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Power & Stroke Rate</CardTitle>
+                  <CardDescription>Power output (Watts) and Stroke Rate (SPM) over the session</CardDescription>
+                </div>
+                <ExplainChartButton
+                  chartId={`session-${sessionId}-power-rate`}
+                  chartTitle="Power & Stroke Rate"
+                  chartDescription="This chart shows my power output (Watts) and stroke rate (SPM) throughout this rowing session."
+                  dataContext={getChartDataContext('power-rate')}
+                  fullData={enrichedData}
+                  variant="compact"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-[400px] w-full">
@@ -375,10 +434,22 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
         {/* TAB: GRAPHS */}
         <TabsContent value="charts" className="space-y-8">
           {/* Pace Analysis */}
-          <Card>
+          <Card id={`session-${sessionId}-pace`}>
             <CardHeader>
-              <CardTitle>Pace Analysis</CardTitle>
-              <CardDescription>Actual vs Average Split (/500m)</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Pace Analysis</CardTitle>
+                  <CardDescription>Actual vs Average Split (/500m)</CardDescription>
+                </div>
+                <ExplainChartButton
+                  chartId={`session-${sessionId}-pace`}
+                  chartTitle="Pace Analysis"
+                  chartDescription="This chart shows my actual split time vs average split (per 500m) throughout this rowing session."
+                  dataContext={getChartDataContext('pace')}
+                  fullData={enrichedData}
+                  variant="compact"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
@@ -423,10 +494,22 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
           </Card>
 
           {/* Work per Stroke */}
-          <Card>
+          <Card id={`session-${sessionId}-work`}>
             <CardHeader>
-              <CardTitle>Work per Stroke</CardTitle>
-              <CardDescription>Energy expenditure (Joules) per stroke</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Work per Stroke</CardTitle>
+                  <CardDescription>Energy expenditure (Joules) per stroke</CardDescription>
+                </div>
+                <ExplainChartButton
+                  chartId={`session-${sessionId}-work`}
+                  chartTitle="Work per Stroke"
+                  chartDescription="This chart shows the energy expenditure (Joules) per stroke throughout this rowing session."
+                  dataContext={getChartDataContext('work')}
+                  fullData={enrichedData}
+                  variant="compact"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
@@ -453,10 +536,22 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
           </Card>
 
           {/* Stroke Length */}
-          <Card>
+          <Card id={`session-${sessionId}-stroke-length`}>
             <CardHeader>
-              <CardTitle>Stroke Length Consistency</CardTitle>
-              <CardDescription>Distance covered per stroke (meters)</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Stroke Length Consistency</CardTitle>
+                  <CardDescription>Distance covered per stroke (meters)</CardDescription>
+                </div>
+                <ExplainChartButton
+                  chartId={`session-${sessionId}-stroke-length`}
+                  chartTitle="Stroke Length Consistency"
+                  chartDescription="This chart shows the distance covered per stroke (meters) throughout this rowing session."
+                  dataContext={getChartDataContext('stroke-length')}
+                  fullData={enrichedData}
+                  variant="compact"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full">
@@ -484,10 +579,22 @@ export function SessionAnalysis({ data }: SessionAnalysisProps) {
 
           {/* Heart Rate (if available) */}
           {enrichedData.some(d => d.heartRate) && (
-            <Card>
+            <Card id={`session-${sessionId}-heart-rate`}>
               <CardHeader>
-                <CardTitle>Heart Rate Response</CardTitle>
-                <CardDescription>Heart Rate (BPM) over session</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Heart Rate Response</CardTitle>
+                    <CardDescription>Heart Rate (BPM) over session</CardDescription>
+                  </div>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-heart-rate`}
+                    chartTitle="Heart Rate Response"
+                    chartDescription="This chart shows my heart rate (BPM) response throughout this rowing session."
+                    dataContext={getChartDataContext('heart-rate')}
+                    fullData={enrichedData}
+                    variant="compact"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">

@@ -775,7 +775,25 @@ export default function ChatPage() {
                         variant="link"
                         size="sm"
                         className="h-auto p-0 mt-1 text-xs"
-                        onClick={() => router.push(`/analytics#${currentSession.chartId}`)}
+                        onClick={() => {
+                          const chartId = currentSession.chartId!;
+                          // Session charts have format: session-{sessionId}-{chartType}
+                          // Chart types: power-rate, pace, work, stroke-length, heart-rate
+                          if (chartId.startsWith('session-')) {
+                            const chartTypes = ['-power-rate', '-pace', '-work', '-stroke-length', '-heart-rate'];
+                            let sessionId = chartId.substring('session-'.length);
+                            for (const suffix of chartTypes) {
+                              if (sessionId.endsWith(suffix)) {
+                                sessionId = sessionId.slice(0, -suffix.length);
+                                break;
+                              }
+                            }
+                            // Include hash to scroll to the specific chart
+                            router.push(`/sessions/${sessionId}#${chartId}`);
+                          } else {
+                            router.push(`/analytics#${chartId}`);
+                          }
+                        }}
                       >
                         <ArrowLeft className="h-3 w-3 mr-1" />
                         Back to chart

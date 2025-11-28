@@ -459,7 +459,7 @@ export default function SessionDetailPage() {
             </Card>
           ) : (
             <div className="space-y-6">
-              <SessionAnalysis data={strokeData} />
+              <SessionAnalysis data={strokeData} sessionId={session.id} />
             </div>
           )}
         </div>
