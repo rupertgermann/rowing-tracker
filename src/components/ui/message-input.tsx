@@ -175,7 +175,8 @@ export function MessageInput({
     ref: textAreaRef,
     maxHeight: 240,
     borderWidth: 1,
-    dependencies: [props.value, showFileList],
+    dependencies: [showFileList],
+    value: props.value,
   })
 
   return (

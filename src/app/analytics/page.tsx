@@ -863,14 +863,14 @@ ${explainChartPrompt}`;
                                           <MessageCircle className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                      <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto pointer-events-auto">
                                         <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
                                           <ReactMarkdown>
                                             {chartExplanations[`metric-${metric}`].fullResponse || chartExplanations[`metric-${metric}`].summary}
                                           </ReactMarkdown>
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                          <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                          <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                         </p>
                                       </TooltipContent>
                                     </UITooltip>
@@ -994,7 +994,7 @@ ${explainChartPrompt}`;
                                     </ReactMarkdown>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                   </p>
                                 </TooltipContent>
                               </UITooltip>
@@ -1096,7 +1096,7 @@ ${explainChartPrompt}`;
                                     </ReactMarkdown>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                   </p>
                                 </TooltipContent>
                               </UITooltip>
@@ -1198,7 +1198,7 @@ ${explainChartPrompt}`;
                                     </ReactMarkdown>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                   </p>
                                 </TooltipContent>
                               </UITooltip>
@@ -1300,7 +1300,7 @@ ${explainChartPrompt}`;
                                     </ReactMarkdown>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                   </p>
                                 </TooltipContent>
                               </UITooltip>
@@ -1401,7 +1401,7 @@ ${explainChartPrompt}`;
                                     </ReactMarkdown>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                   </p>
                                 </TooltipContent>
                               </UITooltip>
@@ -1502,7 +1502,7 @@ ${explainChartPrompt}`;
                                     </ReactMarkdown>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
                                   </p>
                                 </TooltipContent>
                               </UITooltip>

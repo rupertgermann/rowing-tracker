@@ -5,6 +5,7 @@ interface UseAutosizeTextAreaProps {
   maxHeight?: number
   borderWidth?: number
   dependencies: React.DependencyList
+  value?: string // Pass the controlled value directly
 }
 
 export function useAutosizeTextArea({
@@ -12,6 +13,7 @@ export function useAutosizeTextArea({
   maxHeight = Number.MAX_SAFE_INTEGER,
   borderWidth = 0,
   dependencies,
+  value,
 }: UseAutosizeTextAreaProps) {
   const originalHeight = useRef<number | null>(null)
 
@@ -23,18 +25,23 @@ export function useAutosizeTextArea({
 
     // Capture original height on first render
     if (originalHeight.current === null) {
-      originalHeight.current = currentRef.scrollHeight - borderAdjustment
+      // Force a reflow to get accurate initial height
+      currentRef.style.height = 'auto'
+      originalHeight.current = Math.max(currentRef.scrollHeight - borderAdjustment, 40)
+    }
+
+    // Check if empty using the passed value (more reliable than DOM value)
+    const isEmpty = value !== undefined ? value === '' : currentRef.value === ''
+    
+    // If textarea is empty, reset to original height
+    if (isEmpty) {
+      currentRef.style.height = `${originalHeight.current + borderAdjustment}px`
+      return
     }
 
     // Reset height to auto to get correct scrollHeight
     currentRef.style.height = 'auto'
     const scrollHeight = currentRef.scrollHeight
-
-    // If textarea is empty, reset to original height
-    if (currentRef.value === '') {
-      currentRef.style.height = `${originalHeight.current + borderAdjustment}px`
-      return
-    }
 
     // Make sure we don't go over maxHeight
     const clampedToMax = Math.min(scrollHeight, maxHeight)
@@ -43,5 +50,5 @@ export function useAutosizeTextArea({
 
     currentRef.style.height = `${clampedToMin + borderAdjustment}px`
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxHeight, ref, ...dependencies])
+  }, [maxHeight, ref, value, ...dependencies])
 }
