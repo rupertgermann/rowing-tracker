@@ -1024,7 +1024,7 @@ export default function SettingsPage() {
                         Real-time conversation with your AI coach
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
@@ -1054,7 +1054,7 @@ export default function SettingsPage() {
                           <option value="high">High (Detailed)</option>
                         </select>
                       </div>
-                      <div>
+                      <div className="md:col-span-1">
                         <Label>AI Model</Label>
                         <select
                           value={settingsData.aiSettings.chat?.model || 'gpt-5-mini'}
@@ -1085,7 +1085,7 @@ export default function SettingsPage() {
                         Analysis of your workout data and trends
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
@@ -1146,7 +1146,7 @@ export default function SettingsPage() {
                         Personalized training plan generation and modification
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
