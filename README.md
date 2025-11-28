@@ -25,10 +25,15 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Dashboard**: Comprehensive overview with key metrics, volume charts, and trend analysis
 - **Advanced Analytics**: Detailed breakdown of performance, split trends, stroke rate, and training adherence
 - **Interactive Chart Explanations**: Click "Explain" on any chart (analytics page AND session details) to get AI-powered analysis—explanations are saved in tooltips for quick reference with "Back to chart" navigation
+- **Time-Range Aware Explanations**: Analytics chart explanations are cached per time range—switching between "Last 7 days" and "Last 30 days" generates separate, context-appropriate AI analyses
 - **Structured AI Explanations**: Chart explanations follow a clear format: "Why This Chart Matters" (practical value), "What I See In Your Data" (patterns/trends), and "What This Means For You" (actionable insights)
 - **Performance Correlations**: Explore scatter plots showing relationships between power/pace, stroke rate/pace, duration/distance, energy/duration, and more
 - **Sessions List**: Browse, filter, and sort all your rowing sessions with advanced search
-- **Session Details**: Deep dive into individual workout metrics with interactive charts and AI explanations for Power & Stroke Rate, Pace Analysis, Work per Stroke, Stroke Length, and Heart Rate
+- **Session Details**: Deep dive into individual workout metrics with interactive charts and AI explanations across all analysis modules:
+  - *Overview*: Power & Stroke Rate
+  - *Performance Graphs*: Pace Analysis, Work per Stroke, Stroke Length, Heart Rate
+  - *Segments*: Segment Analysis (100m/500m), Rolling Power Average, Rolling Split Average
+  - *Deep Analysis*: Power Distribution, Rhythm Distribution, Rate vs Power, Rate vs Split
 - **Stroke-by-Stroke Analysis**: Upload SmartRow stroke exports to unlock power/rhythm distributions, stroke-length consistency, and technique maps for every stroke
 - **Personal Records**: Automatic tracking of your best times and performances across all distances
 
