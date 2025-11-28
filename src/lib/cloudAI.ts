@@ -82,6 +82,8 @@ export interface ChatSession {
   messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
+  category?: 'chat' | 'explanation'; // Category for filtering
+  chartId?: string; // Chart ID for explanation sessions to link back to analytics
 }
 
 // Insight types from cloud AI

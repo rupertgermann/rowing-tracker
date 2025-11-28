@@ -67,13 +67,15 @@ export class ChatStorageService {
   }
 
   // Create new session
-  createSession(title?: string): ChatSession {
+  createSession(title?: string, category?: 'chat' | 'explanation', chartId?: string): ChatSession {
     const newSession: ChatSession = {
       id: this.generateId(),
       title: title || this.generateSessionTitle(),
       messages: [],
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      category: category || 'chat',
+      chartId
     };
 
     const sessions = this.getSessions();

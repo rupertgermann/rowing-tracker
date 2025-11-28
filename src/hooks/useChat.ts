@@ -53,9 +53,9 @@ export function useChat() {
   }, []);
 
   // Create new session
-  const createSession = useCallback((title?: string) => {
+  const createSession = useCallback((title?: string, category?: 'chat' | 'explanation', chartId?: string) => {
     try {
-      const newSession = chatStorage.createSession(title);
+      const newSession = chatStorage.createSession(title, category, chartId);
       setState(prev => ({
         ...prev,
         sessions: [newSession, ...prev.sessions],

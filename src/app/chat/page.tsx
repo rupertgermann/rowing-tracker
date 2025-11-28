@@ -25,6 +25,8 @@ import {
   Bot,
   Clock,
   Brain,
+  BarChart3,
+  ArrowLeft,
 } from 'lucide-react';
 import { MemoryManager } from '@/components/MemoryManager';
 import { useMemory } from '@/hooks/useMemory';
@@ -66,6 +68,7 @@ export default function ChatPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
   const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string } | null>(null);
@@ -87,9 +90,9 @@ export default function ChatPage() {
       if (pendingData) {
         initialPromptProcessedRef.current = true;
         
-        // Create a new session with the chart title
+        // Create a new session with the chart title, explanation category, and chartId
         const sessionTitle = `Explain: ${pendingData.chartTitle}`;
-        const newSession = createSession(sessionTitle);
+        const newSession = createSession(sessionTitle, 'explanation', pendingData.chartId);
         
         if (newSession) {
           // Store pending chart explanation context for tracking AI response
@@ -387,6 +390,12 @@ export default function ChatPage() {
     setEditingTitle('');
   };
 
+  // Filter sessions by category
+  const filteredSessions = sessions.filter(session => {
+    if (categoryFilter === 'all') return true;
+    return (session.category || 'chat') === categoryFilter;
+  });
+
   // Handle search
   const handleSearch = (query: string) => {
     searchMessages(query);
@@ -595,7 +604,7 @@ export default function ChatPage() {
         {/* Sessions Sidebar */}
         <Card className="w-80 flex flex-col">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <CardTitle className="text-lg">Conversations</CardTitle>
               <Button
                 size="sm"
@@ -605,6 +614,39 @@ export default function ChatPage() {
                 <Plus className="h-4 w-4 mr-2" />
                 New Chat
               </Button>
+            </div>
+            {/* Category Filter */}
+            <div className="flex gap-1 p-1 bg-muted rounded-lg">
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                  categoryFilter === 'all'
+                    ? 'bg-background shadow-sm'
+                    : 'hover:bg-background/50'
+                }`}
+              >
+                All ({sessions.length})
+              </button>
+              <button
+                onClick={() => setCategoryFilter('chat')}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                  categoryFilter === 'chat'
+                    ? 'bg-background shadow-sm'
+                    : 'hover:bg-background/50'
+                }`}
+              >
+                Chats ({sessions.filter(s => (s.category || 'chat') === 'chat').length})
+              </button>
+              <button
+                onClick={() => setCategoryFilter('explanation')}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                  categoryFilter === 'explanation'
+                    ? 'bg-background shadow-sm'
+                    : 'hover:bg-background/50'
+                }`}
+              >
+                Explains ({sessions.filter(s => s.category === 'explanation').length})
+              </button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto scrollbar-none">
@@ -627,9 +669,19 @@ export default function ChatPage() {
                   Start your first chat with your AI rowing coach.
                 </p>
               </div>
+            ) : filteredSessions.length === 0 ? (
+              <div className="text-center py-8">
+                <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-medium mb-2">No {categoryFilter === 'explanation' ? 'Explanations' : 'Chats'} Yet</h3>
+                <p className="text-sm text-muted-foreground">
+                  {categoryFilter === 'explanation' 
+                    ? 'Click "Explain" on any chart to create an explanation.'
+                    : 'Start a new chat with your AI rowing coach.'}
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
-                {sessions.map((session) => (
+                {filteredSessions.map((session) => (
                   <div
                     key={session.id}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${currentSession?.id === session.id
@@ -675,7 +727,10 @@ export default function ChatPage() {
                       ) : (
                         <>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate">
+                            <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                              {session.category === 'explanation' && (
+                                <BarChart3 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                              )}
                               {session.title}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -720,12 +775,24 @@ export default function ChatPage() {
             <>
               <CardHeader className="pb-3 border-b flex-shrink-0">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <CardTitle className="text-lg">{currentSession.title}</CardTitle>
                     <CardDescription className="flex items-center gap-2">
                       <Clock className="h-3 w-3" />
                       Created {formatDate(currentSession.createdAt)}
                     </CardDescription>
+                    {/* Link back to chart for explanation sessions */}
+                    {currentSession.category === 'explanation' && currentSession.chartId && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 mt-1 text-xs"
+                        onClick={() => router.push(`/analytics#${currentSession.chartId}`)}
+                      >
+                        <ArrowLeft className="h-3 w-3 mr-1" />
+                        Back to chart
+                      </Button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={isAIConfigured ? "default" : "secondary"}>

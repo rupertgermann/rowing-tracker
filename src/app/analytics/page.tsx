@@ -197,6 +197,31 @@ const Analytics = () => {
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
 
+  // Handle anchor links to scroll to specific charts
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1); // Remove the #
+      if (hash && chartRefs.current[hash]) {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+          chartRefs.current[hash]?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }, 100);
+      }
+    };
+
+    // Check on mount
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [mounted]);
+
   // Helper function to capture chart screenshot and navigate to chat
   const handleExplainChart = useCallback(async (
     chartId: string, 
@@ -822,7 +847,8 @@ ${explainChartPrompt}`;
 
                   return (
                     <Card 
-                      key={metric} 
+                      key={metric}
+                      id={`metric-${metric}`}
                       className="border-l-4" 
                       style={{ borderLeftColor: config.color }}
                       ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
@@ -964,7 +990,7 @@ ${explainChartPrompt}`;
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Power vs Pace */}
-                  <Card className="border-l-4 border-l-amber-500" ref={(el) => { chartRefs.current['scatter-power-pace'] = el; }}>
+                  <Card id="scatter-power-pace" className="border-l-4 border-l-amber-500" ref={(el) => { chartRefs.current['scatter-power-pace'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1066,7 +1092,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Stroke Rate vs Pace */}
-                  <Card className="border-l-4 border-l-violet-500" ref={(el) => { chartRefs.current['scatter-rate-pace'] = el; }}>
+                  <Card className="border-l-4 border-l-violet-500" id="scatter-rate-pace" ref={(el) => { chartRefs.current['scatter-rate-pace'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1168,7 +1194,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Duration vs Distance */}
-                  <Card className="border-l-4 border-l-blue-500" ref={(el) => { chartRefs.current['scatter-duration-distance'] = el; }}>
+                  <Card className="border-l-4 border-l-blue-500" id="scatter-duration-distance" ref={(el) => { chartRefs.current['scatter-duration-distance'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1270,7 +1296,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Energy vs Duration */}
-                  <Card className="border-l-4 border-l-red-500" ref={(el) => { chartRefs.current['scatter-energy-duration'] = el; }}>
+                  <Card className="border-l-4 border-l-red-500" id="scatter-energy-duration" ref={(el) => { chartRefs.current['scatter-energy-duration'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1371,7 +1397,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Power vs Stroke Rate */}
-                  <Card className="border-l-4 border-l-emerald-500" ref={(el) => { chartRefs.current['scatter-power-rate'] = el; }}>
+                  <Card className="border-l-4 border-l-emerald-500" id="scatter-power-rate" ref={(el) => { chartRefs.current['scatter-power-rate'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1472,7 +1498,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Distance vs Power */}
-                  <Card className="border-l-4 border-l-cyan-500" ref={(el) => { chartRefs.current['scatter-distance-power'] = el; }}>
+                  <Card className="border-l-4 border-l-cyan-500" id="scatter-distance-power" ref={(el) => { chartRefs.current['scatter-distance-power'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
