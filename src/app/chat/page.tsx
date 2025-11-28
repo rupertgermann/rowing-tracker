@@ -71,7 +71,7 @@ export default function ChatPage() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
-  const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string } | null>(null);
+  const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string; chartTitle: string } | null>(null);
   const [chartAttachments, setChartAttachments] = useState<FileAttachment[]>([]);
   const initialPromptProcessedRef = useRef(false);
 
@@ -96,7 +96,7 @@ export default function ChatPage() {
         
         if (newSession) {
           // Store pending chart explanation context for tracking AI response
-          setPendingChartExplanation({ chartId: pendingData.chartId, prompt: pendingData.prompt });
+          setPendingChartExplanation({ chartId: pendingData.chartId, prompt: pendingData.prompt, chartTitle: pendingData.chartTitle });
           
           // Prepare attachments (screenshot only - data goes in prompt)
           const attachments: FileAttachment[] = [];
@@ -167,6 +167,7 @@ export default function ChatPage() {
           summary,
           fullResponse: lastMessage.content,
           chatSessionId: currentSession.id,
+          chartTitle: pendingChartExplanation.chartTitle,
           generatedAt: new Date()
         });
         

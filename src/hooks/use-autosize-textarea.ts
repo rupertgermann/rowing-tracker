@@ -23,19 +23,22 @@ export function useAutosizeTextArea({
     const currentRef = ref.current
     const borderAdjustment = borderWidth * 2
 
-    // Capture original height on first render
-    if (originalHeight.current === null) {
-      // Force a reflow to get accurate initial height
+    // Check if empty using the passed value (more reliable than DOM value)
+    const isEmpty = value !== undefined ? value === '' : currentRef.value === ''
+
+    // Capture original height only when textarea is empty
+    // This ensures we get the correct minimum height, not an expanded height
+    if (originalHeight.current === null && isEmpty) {
       currentRef.style.height = 'auto'
       originalHeight.current = Math.max(currentRef.scrollHeight - borderAdjustment, 40)
     }
-
-    // Check if empty using the passed value (more reliable than DOM value)
-    const isEmpty = value !== undefined ? value === '' : currentRef.value === ''
     
-    // If textarea is empty, reset to original height
+    // Use a sensible default if originalHeight wasn't captured yet
+    const minHeight = originalHeight.current ?? 40
+    
+    // If textarea is empty, reset to original/minimum height
     if (isEmpty) {
-      currentRef.style.height = `${originalHeight.current + borderAdjustment}px`
+      currentRef.style.height = `${minHeight + borderAdjustment}px`
       return
     }
 
@@ -46,7 +49,7 @@ export function useAutosizeTextArea({
     // Make sure we don't go over maxHeight
     const clampedToMax = Math.min(scrollHeight, maxHeight)
     // Make sure we don't go less than the original height
-    const clampedToMin = Math.max(clampedToMax, originalHeight.current)
+    const clampedToMin = Math.max(clampedToMax, minHeight)
 
     currentRef.style.height = `${clampedToMin + borderAdjustment}px`
     // eslint-disable-next-line react-hooks/exhaustive-deps

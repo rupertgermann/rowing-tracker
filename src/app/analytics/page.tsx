@@ -21,6 +21,7 @@ import { chartTheme } from '@/lib/chartUtils';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
 import ReactMarkdown from 'react-markdown';
+import { chatStorage } from '@/lib/chatStorage';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area';
@@ -184,7 +185,21 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 
 const Analytics = () => {
   const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations, setPendingChartExplanation } = useRowingStore();
+  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
+
+  // Helper to check if a chart explanation is valid (its chat session still exists)
+  const isExplanationValid = useCallback((chartId: string) => {
+    const explanation = chartExplanations[chartId];
+    if (!explanation) return false;
+    // Verify the linked chat session still exists
+    const session = chatStorage.getSession(explanation.chatSessionId);
+    if (!session) {
+      // Clean up orphaned explanation
+      removeChartExplanationsBySessionId(explanation.chatSessionId);
+      return false;
+    }
+    return true;
+  }, [chartExplanations, removeChartExplanationsBySessionId]);
   const sessions = getSessions();
   const stats = getStats();
 
@@ -876,7 +891,7 @@ ${explainChartPrompt}`;
                               </div>
                               <div className="flex items-center gap-2">
                                 {/* Show saved explanation indicator */}
-                                {chartExplanations[`metric-${metric}`] && (
+                                {isExplanationValid(`metric-${metric}`) && (
                                   <TooltipProvider>
                                     <UITooltip>
                                       <TooltipTrigger asChild>
@@ -1009,7 +1024,7 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {chartExplanations['scatter-power-pace'] && (
+                          {isExplanationValid('scatter-power-pace') && (
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
@@ -1115,7 +1130,7 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {chartExplanations['scatter-rate-pace'] && (
+                          {isExplanationValid('scatter-rate-pace') && (
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
@@ -1221,7 +1236,7 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {chartExplanations['scatter-duration-distance'] && (
+                          {isExplanationValid('scatter-duration-distance') && (
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
@@ -1327,7 +1342,7 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {chartExplanations['scatter-energy-duration'] && (
+                          {isExplanationValid('scatter-energy-duration') && (
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
@@ -1432,7 +1447,7 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {chartExplanations['scatter-power-rate'] && (
+                          {isExplanationValid('scatter-power-rate') && (
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
@@ -1537,7 +1552,7 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {chartExplanations['scatter-distance-power'] && (
+                          {isExplanationValid('scatter-distance-power') && (
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>

@@ -54,6 +54,7 @@ export interface ChartExplanation {
   summary: string;
   fullResponse: string; // Complete AI response for tooltip display
   chatSessionId: string;
+  chartTitle: string;
   generatedAt: Date;
 }
 
@@ -101,6 +102,8 @@ interface RowingStore {
   updateSessionAnalysisSettings: (settings: Partial<SessionAnalysisSettings>) => void;
   setChartExplanation: (chartId: string, explanation: ChartExplanation) => void;
   getChartExplanation: (chartId: string) => ChartExplanation | undefined;
+  removeChartExplanationsBySessionId: (sessionId: string) => void;
+  clearAllChartExplanations: () => void;
   setPendingChartExplanation: (data: PendingChartExplanation | null) => void;
   getPendingChartExplanation: () => PendingChartExplanation | null;
   
@@ -545,6 +548,22 @@ export const useRowingStore = create<RowingStore>()(
 
       getChartExplanation: (chartId) => {
         return get().chartExplanations[chartId];
+      },
+
+      removeChartExplanationsBySessionId: (sessionId) => {
+        set((state) => {
+          const newExplanations = { ...state.chartExplanations };
+          for (const [chartId, explanation] of Object.entries(newExplanations)) {
+            if (explanation.chatSessionId === sessionId) {
+              delete newExplanations[chartId];
+            }
+          }
+          return { chartExplanations: newExplanations };
+        });
+      },
+
+      clearAllChartExplanations: () => {
+        set({ chartExplanations: {} });
       },
 
       setPendingChartExplanation: (data) => {

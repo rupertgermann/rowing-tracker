@@ -223,7 +223,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
       explainChartPrompt: `Provide a clear, well-formatted analysis. Structure your response as follows:
 
-Start with a brief 1-2 sentence summary of the key insight from this chart.
+Start with a single sentence that clearly states what this chart is showing and why that information is helpful for understanding your rowing performance.
 
 ## Key Patterns
 - What trends or patterns do you see?

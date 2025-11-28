@@ -15,7 +15,7 @@ export interface ChatState {
 }
 
 export function useChat() {
-  const { getSessions } = useRowingStore();
+  const { getSessions, removeChartExplanationsBySessionId, clearAllChartExplanations } = useRowingStore();
   const [state, setState] = useState<ChatState>({
     currentSession: null,
     sessions: [],
@@ -249,6 +249,8 @@ export function useChat() {
   const deleteSession = useCallback((sessionId: string) => {
     try {
       chatStorage.deleteSession(sessionId);
+      // Clean up any chart explanations that reference this session
+      removeChartExplanationsBySessionId(sessionId);
       setState(prev => {
         const newSessions = prev.sessions.filter(s => s.id !== sessionId);
         const newCurrentSession = prev.currentSession?.id === sessionId ? null : prev.currentSession;
@@ -265,7 +267,7 @@ export function useChat() {
         error: 'Failed to delete session'
       }));
     }
-  }, []);
+  }, [removeChartExplanationsBySessionId]);
 
   // Search messages
   const searchMessages = useCallback((query: string) => {
@@ -303,6 +305,8 @@ export function useChat() {
   const clearAllSessions = useCallback(() => {
     try {
       chatStorage.clearAllSessions();
+      // Also clear all chart explanations since their linked sessions are gone
+      clearAllChartExplanations();
       setState(prev => ({
         ...prev,
         sessions: [],
@@ -315,7 +319,7 @@ export function useChat() {
         error: 'Failed to clear sessions'
       }));
     }
-  }, []);
+  }, [clearAllChartExplanations]);
 
   // Export sessions
   const exportSessions = useCallback(() => {
