@@ -889,7 +889,7 @@ ${explainChartPrompt}`;
                                           <MessageCircle className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                      <TooltipContent side="left" className="max-w-lg xl:max-w-2xl max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
                                         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
                                           <Brain className="h-4 w-4 text-primary" />
                                           <span className="font-semibold text-sm">AI Analysis</span>
@@ -1017,7 +1017,7 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                <TooltipContent side="left" className="max-w-lg xl:max-w-2xl max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
                                   <div className="flex items-center gap-2 mb-3 pb-2 border-b">
                                     <Brain className="h-4 w-4 text-primary" />
                                     <span className="font-semibold text-sm">AI Analysis</span>
@@ -1123,7 +1123,7 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                <TooltipContent side="left" className="max-w-lg xl:max-w-2xl max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
                                   <div className="flex items-center gap-2 mb-3 pb-2 border-b">
                                     <Brain className="h-4 w-4 text-primary" />
                                     <span className="font-semibold text-sm">AI Analysis</span>
@@ -1229,7 +1229,7 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                <TooltipContent side="left" className="max-w-lg xl:max-w-2xl max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
                                   <div className="flex items-center gap-2 mb-3 pb-2 border-b">
                                     <Brain className="h-4 w-4 text-primary" />
                                     <span className="font-semibold text-sm">AI Analysis</span>
@@ -1335,7 +1335,7 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                <TooltipContent side="left" className="max-w-lg xl:max-w-2xl max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
                                   <div className="flex items-center gap-2 mb-3 pb-2 border-b">
                                     <Brain className="h-4 w-4 text-primary" />
                                     <span className="font-semibold text-sm">AI Analysis</span>
@@ -1440,7 +1440,7 @@ ${explainChartPrompt}`;
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
+                                <TooltipContent side="left" className="max-w-lg xl:max-w-2xl max-h-[28rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
                                   <div className="flex items-center gap-2 mb-3 pb-2 border-b">
                                     <Brain className="h-4 w-4 text-primary" />
                                     <span className="font-semibold text-sm">AI Analysis</span>
