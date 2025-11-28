@@ -105,7 +105,7 @@ export interface Settings {
 export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
-  private readonly CURRENT_VERSION = '1.1.0'; // Bumped to fix model field migration
+  private readonly CURRENT_VERSION = '1.3.0'; // Force update explainChartPrompt with "Why This Chart Matters" format
 
   private defaultSettings: Settings = {
     userPreferences: {
@@ -223,21 +223,21 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
 
       explainChartPrompt: `Provide a clear, well-formatted analysis. Structure your response as follows:
 
-Start with a single sentence that clearly states what this chart is showing and why that information is helpful for understanding your rowing performance.
+## Why This Chart Matters
+Start with 2-3 sentences explaining what this type of chart shows and WHY it's useful for a rower. What question does it answer? What can you learn from it that you couldn't see otherwise? Help me understand the practical value before diving into the data.
 
-## Key Patterns
-- What trends or patterns do you see?
-- How do the data points relate to each other?
-- Any notable outliers or clusters?
+## What I See In Your Data
+Analyze MY specific data:
+- What patterns or trends stand out?
+- Any notable improvements, declines, or plateaus?
+- Outliers or unusual data points worth noting?
 
-## Performance Context
+## What This Means For You
 - How does this compare to typical benchmarks?
-- What does this tell us about training effectiveness?
+- What does this tell you about your training?
+- 1-2 specific, actionable suggestions based on the data.
 
-## Recommendations
-Provide 1-2 specific, actionable suggestions for improvement.
-
-Keep the response concise but informative. Use clear formatting with headers and bullet points.`,
+Keep each section brief but insightful. Use clear formatting.`,
 
       // Personal context defaults
       userProfileContext: '',
@@ -527,7 +527,8 @@ Keep the response concise but informative. Use clear formatting with headers and
           chatSystemPrompt: oldAiSettings.chatSystemPrompt ?? this.defaultSettings.aiSettings.chatSystemPrompt,
           planGenerationPrompt: oldAiSettings.planGenerationPrompt ?? this.defaultSettings.aiSettings.planGenerationPrompt,
           insightsPrompt: oldAiSettings.insightsPrompt ?? this.defaultSettings.aiSettings.insightsPrompt,
-          explainChartPrompt: oldAiSettings.explainChartPrompt ?? this.defaultSettings.aiSettings.explainChartPrompt,
+          // Always use new default explainChartPrompt - improved format with "Why This Chart Matters" section
+          explainChartPrompt: this.defaultSettings.aiSettings.explainChartPrompt,
 
           // New nested structure without model fields (hardcoded to GPT-5.1)
           chat: this.defaultSettings.aiSettings.chat,
@@ -584,6 +585,9 @@ Keep the response concise but informative. Use clear formatting with headers and
             }
           };
         }
+        
+        // v1.2.0: Force update explainChartPrompt to new "Why This Chart Matters" format
+        migratedSettings.aiSettings.explainChartPrompt = this.defaultSettings.aiSettings.explainChartPrompt;
       }
 
       return {
