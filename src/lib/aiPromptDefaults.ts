@@ -130,20 +130,15 @@ Return a JSON array of insights with this structure:
 
 Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`;
 
-export const DEFAULT_EXPLAIN_CHART_PROMPT = `Provide a clear, well-formatted analysis. Structure your response as follows:
+export const DEFAULT_EXPLAIN_CHART_PROMPT = `Structure your response as follows:
 
 ## Why This Chart Matters
-Start with 2-3 sentences explaining what this type of chart shows and WHY it's useful for a rower. What question does it answer? What can you learn from it that you couldn't see otherwise? Help me understand the practical value before diving into the data.
+2-3 sentences: What does this chart type show and WHY is it useful? What question does it answer?
 
-## What I See In Your Data
-Analyze MY specific data:
-- What patterns or trends stand out?
-- Any notable improvements, declines, or plateaus?
-- Outliers or unusual data points worth noting?
+## What I See In Your Data 🔍
+Max 6 lines. Key patterns, trends, improvements or concerns in MY data. Be specific and concise.
 
-## What This Means For You
-- How does this compare to typical benchmarks?
-- What does this tell you about your training?
-- 1-2 specific, actionable suggestions based on the data.
+## What This Means For You 🎯
+Max 6 lines. Benchmarks comparison + 1-2 actionable suggestions.
 
-Keep each section brief but insightful. Use clear formatting.`;
+Be brief and direct. No fluff.`;
