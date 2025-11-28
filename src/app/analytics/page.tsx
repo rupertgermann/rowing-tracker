@@ -874,10 +874,10 @@ ${explainChartPrompt}`;
                           sessions={filteredSessions}
                           headerActions={
                             <>
-                              {isExplanationValid('metric-splitTime') && (
+                              {isExplanationValid(`metric-splitTime-${timeRange}`) && (
                                 <ExplanationTooltip
-                                  chatSessionId={chartExplanations['metric-splitTime'].chatSessionId}
-                                  content={chartExplanations['metric-splitTime'].fullResponse || chartExplanations['metric-splitTime'].summary}
+                                  chatSessionId={chartExplanations[`metric-splitTime-${timeRange}`].chatSessionId}
+                                  content={chartExplanations[`metric-splitTime-${timeRange}`].fullResponse || chartExplanations[`metric-splitTime-${timeRange}`].summary}
                                 />
                               )}
                               <TooltipProvider>
@@ -887,7 +887,7 @@ ${explainChartPrompt}`;
                                       variant="outline"
                                       size="sm"
                                       onClick={() => handleExplainChart(
-                                        'metric-splitTime',
+                                        `metric-splitTime-${timeRange}`,
                                         'Pace Analysis',
                                         'This chart shows my split times (pace per 500m) over time, with dots colored by stroke rate and a 3-session moving average trend line.',
                                         getMetricDataContext('splitTime', chartData),
@@ -927,10 +927,10 @@ ${explainChartPrompt}`;
                               </div>
                               <div className="flex items-center gap-2">
                                 {/* Show saved explanation indicator */}
-                                {isExplanationValid(`metric-${metric}`) && (
+                                {isExplanationValid(`metric-${metric}-${timeRange}`) && (
                                   <ExplanationTooltip
-                                    chatSessionId={chartExplanations[`metric-${metric}`].chatSessionId}
-                                    content={chartExplanations[`metric-${metric}`].fullResponse || chartExplanations[`metric-${metric}`].summary}
+                                    chatSessionId={chartExplanations[`metric-${metric}-${timeRange}`].chatSessionId}
+                                    content={chartExplanations[`metric-${metric}-${timeRange}`].fullResponse || chartExplanations[`metric-${metric}-${timeRange}`].summary}
                                   />
                                 )}
                                 {/* Explain button */}
@@ -941,7 +941,7 @@ ${explainChartPrompt}`;
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleExplainChart(
-                                          `metric-${metric}`,
+                                          `metric-${metric}-${timeRange}`,
                                           `${config.label} Over Time`,
                                           `This chart shows how my ${config.label.toLowerCase()} (${config.unit}) has changed over time.`,
                                           getMetricDataContext(metric, chartData),
@@ -1036,10 +1036,10 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isExplanationValid('scatter-power-pace') && (
+                          {isExplanationValid(`scatter-power-pace-${timeRange}`) && (
                             <ExplanationTooltip
-                              chatSessionId={chartExplanations['scatter-power-pace'].chatSessionId}
-                              content={chartExplanations['scatter-power-pace'].fullResponse || chartExplanations['scatter-power-pace'].summary}
+                              chatSessionId={chartExplanations[`scatter-power-pace-${timeRange}`].chatSessionId}
+                              content={chartExplanations[`scatter-power-pace-${timeRange}`].fullResponse || chartExplanations[`scatter-power-pace-${timeRange}`].summary}
                             />
                           )}
                           <TooltipProvider>
@@ -1049,7 +1049,7 @@ ${explainChartPrompt}`;
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleExplainChart(
-                                    'scatter-power-pace',
+                                    `scatter-power-pace-${timeRange}`,
                                     'Power vs Pace',
                                     'This scatter plot shows the relationship between average power output (watts) and pace (time per 500m) across my sessions.',
                                     getScatterDataContext('Power (W)', 'Pace (s/500m)', scatterPlotData, 'power', 'pace'),
@@ -1123,10 +1123,10 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isExplanationValid('scatter-rate-pace') && (
+                          {isExplanationValid(`scatter-rate-pace-${timeRange}`) && (
                             <ExplanationTooltip
-                              chatSessionId={chartExplanations['scatter-rate-pace'].chatSessionId}
-                              content={chartExplanations['scatter-rate-pace'].fullResponse || chartExplanations['scatter-rate-pace'].summary}
+                              chatSessionId={chartExplanations[`scatter-rate-pace-${timeRange}`].chatSessionId}
+                              content={chartExplanations[`scatter-rate-pace-${timeRange}`].fullResponse || chartExplanations[`scatter-rate-pace-${timeRange}`].summary}
                             />
                           )}
                           <TooltipProvider>
@@ -1136,7 +1136,7 @@ ${explainChartPrompt}`;
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleExplainChart(
-                                    'scatter-rate-pace',
+                                    `scatter-rate-pace-${timeRange}`,
                                     'Stroke Rate vs Pace',
                                     'This scatter plot shows the relationship between stroke rate (SPM) and pace across my sessions to analyze efficiency.',
                                     getScatterDataContext('Stroke Rate (SPM)', 'Pace (s/500m)', scatterPlotData, 'strokeRate', 'pace'),
@@ -1210,10 +1210,10 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isExplanationValid('scatter-duration-distance') && (
+                          {isExplanationValid(`scatter-duration-distance-${timeRange}`) && (
                             <ExplanationTooltip
-                              chatSessionId={chartExplanations['scatter-duration-distance'].chatSessionId}
-                              content={chartExplanations['scatter-duration-distance'].fullResponse || chartExplanations['scatter-duration-distance'].summary}
+                              chatSessionId={chartExplanations[`scatter-duration-distance-${timeRange}`].chatSessionId}
+                              content={chartExplanations[`scatter-duration-distance-${timeRange}`].fullResponse || chartExplanations[`scatter-duration-distance-${timeRange}`].summary}
                             />
                           )}
                           <TooltipProvider>
@@ -1223,7 +1223,7 @@ ${explainChartPrompt}`;
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleExplainChart(
-                                    'scatter-duration-distance',
+                                    `scatter-duration-distance-${timeRange}`,
                                     'Duration vs Distance',
                                     'This scatter plot shows the relationship between session duration (minutes) and distance covered (meters).',
                                     getScatterDataContext('Duration (min)', 'Distance (m)', scatterPlotData, 'durationMinutes', 'distance'),
@@ -1297,10 +1297,10 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isExplanationValid('scatter-energy-duration') && (
+                          {isExplanationValid(`scatter-energy-duration-${timeRange}`) && (
                             <ExplanationTooltip
-                              chatSessionId={chartExplanations['scatter-energy-duration'].chatSessionId}
-                              content={chartExplanations['scatter-energy-duration'].fullResponse || chartExplanations['scatter-energy-duration'].summary}
+                              chatSessionId={chartExplanations[`scatter-energy-duration-${timeRange}`].chatSessionId}
+                              content={chartExplanations[`scatter-energy-duration-${timeRange}`].fullResponse || chartExplanations[`scatter-energy-duration-${timeRange}`].summary}
                             />
                           )}
                           <TooltipProvider>
@@ -1310,7 +1310,7 @@ ${explainChartPrompt}`;
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleExplainChart(
-                                    'scatter-energy-duration',
+                                    `scatter-energy-duration-${timeRange}`,
                                     'Energy vs Duration',
                                     'This scatter plot shows the relationship between session duration (minutes) and calories burned (kCal).',
                                     getScatterDataContext('Duration (min)', 'Energy (kCal)', scatterPlotData, 'durationMinutes', 'energy'),
@@ -1383,10 +1383,10 @@ ${explainChartPrompt}`;
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isExplanationValid('scatter-power-rate') && (
+                          {isExplanationValid(`scatter-power-rate-${timeRange}`) && (
                             <ExplanationTooltip
-                              chatSessionId={chartExplanations['scatter-power-rate'].chatSessionId}
-                              content={chartExplanations['scatter-power-rate'].fullResponse || chartExplanations['scatter-power-rate'].summary}
+                              chatSessionId={chartExplanations[`scatter-power-rate-${timeRange}`].chatSessionId}
+                              content={chartExplanations[`scatter-power-rate-${timeRange}`].fullResponse || chartExplanations[`scatter-power-rate-${timeRange}`].summary}
                             />
                           )}
                           <TooltipProvider>
@@ -1396,7 +1396,7 @@ ${explainChartPrompt}`;
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleExplainChart(
-                                    'scatter-power-rate',
+                                    `scatter-power-rate-${timeRange}`,
                                     'Power vs Stroke Rate',
                                     'This scatter plot shows the relationship between stroke rate (SPM) and power output (watts).',
                                     getScatterDataContext('Stroke Rate (SPM)', 'Power (W)', scatterPlotData, 'strokeRate', 'power'),

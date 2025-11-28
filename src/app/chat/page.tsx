@@ -798,7 +798,17 @@ export default function ChatPage() {
                             // Include hash to scroll to the specific chart
                             router.push(`/sessions/${sessionId}#${chartId}`);
                           } else {
-                            router.push(`/analytics#${chartId}`);
+                            // Analytics charts have format: {type}-{name}-{timeRange}
+                            // We need to strip the timeRange suffix for the hash since card IDs don't include it
+                            const timeRanges = ['-7', '-14', '-30', '-90', '-365', '-all'];
+                            let hashId = chartId;
+                            for (const suffix of timeRanges) {
+                              if (hashId.endsWith(suffix)) {
+                                hashId = hashId.slice(0, -suffix.length);
+                                break;
+                              }
+                            }
+                            router.push(`/analytics#${hashId}`);
                           }
                         }}
                       >
