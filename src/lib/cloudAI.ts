@@ -1,6 +1,12 @@
 import { Session } from '@/types/session';
 import { TrainingPlan, TrainingSession, TrainingWeek, PlanTemplate } from '@/lib/trainingPlans';
 import { SettingsService } from '@/lib/settings';
+import {
+  DEFAULT_CHAT_SYSTEM_PROMPT,
+  DEFAULT_PLAN_GENERATION_PROMPT,
+  DEFAULT_SYSTEM_PROMPT,
+  DEFAULT_INSIGHTS_PROMPT
+} from '@/lib/aiPromptDefaults';
 
 // OpenAI API configuration
 interface OpenAIConfig {
@@ -1022,25 +1028,10 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   // Get system prompt for rowing performance analysis
   private getSystemPrompt(): string {
     const userContext = this.getUserProfileContext();
-    
-    return `You are an expert rowing coach and sports data analyst specializing in indoor rowing performance analysis. 
-You analyze rowing workout data to provide actionable insights, trend analysis, and personalized recommendations.
+    const customPrompt = this.aiSettings?.systemPrompt?.trim();
+    const basePrompt = customPrompt || DEFAULT_SYSTEM_PROMPT;
 
-Your expertise includes:
-- Rowing physiology and training principles
-- Performance metrics (pace, power, stroke rate, distance)
-- Training load management and recovery
-- Technique improvement and efficiency
-- Goal setting and progression planning
-
-Always provide:
-1. Evidence-based insights
-2. Actionable recommendations
-3. Priority levels (high/medium/low)
-4. Confidence scores based on data quality
-5. Clear explanations of findings
-
-Focus on practical advice that helps rowers improve performance while avoiding injury and overtraining.${userContext}`;
+    return `${basePrompt}${userContext}`;
   }
 
   // Build user prompt with session data using configurable prompt
@@ -1535,25 +1526,10 @@ Keep the response encouraging and actionable.`;
   // System prompts
   private getPlanGenerationSystemPrompt(): string {
     const userContext = this.getUserProfileContext();
-    
-    return `You are an expert rowing coach and sports scientist specializing in training plan design. 
-You create personalized, progressive training plans for rowers of all levels.
+    const customPrompt = this.aiSettings?.planGenerationPrompt?.trim();
+    const basePrompt = customPrompt || DEFAULT_PLAN_GENERATION_PROMPT;
 
-Your expertise includes:
-- Exercise physiology and training principles
-- Periodization and progressive overload
-- Rowing-specific training methodologies
-- Injury prevention and recovery management
-- Goal-oriented program design
-
-Always create plans that are:
-- Scientifically sound and progressive
-- Realistic and achievable for the target level
-- Varied to maintain engagement and prevent plateaus
-- Appropriate for the stated goals and focus area
-- Include proper recovery and adaptation periods
-
-Ensure the plan structure follows proper training principles with appropriate volume and intensity progression.${userContext}`;
+    return `${basePrompt}${userContext}`;
   }
 
   private getPlanModificationSystemPrompt(): string {

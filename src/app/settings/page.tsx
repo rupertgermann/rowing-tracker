@@ -10,6 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  DEFAULT_CHAT_SYSTEM_PROMPT,
+  DEFAULT_PLAN_GENERATION_PROMPT,
+  DEFAULT_INSIGHTS_PROMPT
+} from '@/lib/aiPromptDefaults';
 import { memoryStorage, MemoryDocument } from '@/lib/memoryStorage';
 import {
   Settings as SettingsIcon,
@@ -147,6 +153,14 @@ export default function SettingsPage() {
     } catch (error) {
       setErrorMessage('Failed to load settings');
     }
+  };
+
+  const handleResetPrompt = async (
+    promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt',
+    defaultValue: string
+  ) => {
+    await saveSettings('aiSettings', { [promptKey]: defaultValue });
+    setSuccessMessage('Prompt reset to default');
   };
 
   const saveSettings = async (category: SettingsCategory, updates: any) => {
@@ -906,15 +920,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              AI Coach Settings
-            </CardTitle>
-            <CardDescription>
-              Configure AI-powered insights and analysis
-            </CardDescription>
-          </CardHeader>
+
           <CardContent className="space-y-6">
             {/* Configuration Status - Moved to top */}
             {isConfigured && (
@@ -1444,7 +1450,16 @@ You can also paste content from medical documents or training notes."
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="systemPrompt">System Prompt</Label>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="systemPrompt">System Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResetPrompt('systemPrompt', DEFAULT_SYSTEM_PROMPT)}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
                 <textarea
                   id="systemPrompt"
                   rows={4}
@@ -1459,7 +1474,16 @@ You can also paste content from medical documents or training notes."
               </div>
 
               <div>
-                <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResetPrompt('chatSystemPrompt', DEFAULT_CHAT_SYSTEM_PROMPT)}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
                 <textarea
                   id="chatSystemPrompt"
                   rows={4}
@@ -1474,7 +1498,16 @@ You can also paste content from medical documents or training notes."
               </div>
 
               <div>
-                <Label htmlFor="planGenerationPrompt">Training Plan Generation Prompt</Label>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="planGenerationPrompt">Training Plan Generation Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResetPrompt('planGenerationPrompt', DEFAULT_PLAN_GENERATION_PROMPT)}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
                 <textarea
                   id="planGenerationPrompt"
                   rows={4}
@@ -1489,7 +1522,16 @@ You can also paste content from medical documents or training notes."
               </div>
 
               <div>
-                <Label htmlFor="insightsPrompt">AI Insights Prompt</Label>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="insightsPrompt">AI Insights Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResetPrompt('insightsPrompt', DEFAULT_INSIGHTS_PROMPT)}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
                 <textarea
                   id="insightsPrompt"
                   rows={8}
