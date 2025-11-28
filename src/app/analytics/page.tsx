@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
@@ -313,6 +313,56 @@ const Analytics = () => {
         router.push(`/sessions/${dataPoint.sessionId}`);
       }
     }
+  };
+
+  // Prepare scatter plot data for correlations
+  const scatterPlotData = useMemo(() => {
+    return filteredSessions.map(session => ({
+      sessionId: session.id,
+      date: formatChartDate(new Date(session.timestamp)),
+      distance: session.distance,
+      duration: session.duration,
+      durationMinutes: Math.round(session.duration / 60),
+      power: session.avgPower,
+      pace: session.avgSplit,
+      strokeRate: session.avgStrokeRate,
+      energy: session.energy,
+      strokeLength: session.avgStrokeLength,
+    }));
+  }, [filteredSessions]);
+
+  // Custom scatter tooltip component
+  const ScatterTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div style={chartTheme.tooltip.contentStyle}>
+          <p style={chartTheme.tooltip.labelStyle}>{data.date}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} style={chartTheme.tooltip.itemStyle}>
+              {entry.name}: {
+                entry.dataKey === 'pace' 
+                  ? formatPace(entry.value)
+                  : entry.dataKey === 'durationMinutes'
+                    ? `${entry.value} min`
+                    : entry.dataKey === 'distance'
+                      ? `${entry.value}m`
+                      : entry.dataKey === 'power'
+                        ? `${Math.round(entry.value)}W`
+                        : entry.dataKey === 'energy'
+                          ? `${Math.round(entry.value)} kCal`
+                          : entry.dataKey === 'strokeRate'
+                            ? `${Math.round(entry.value)} SPM`
+                            : entry.dataKey === 'strokeLength'
+                              ? `${entry.value.toFixed(2)}m`
+                              : entry.value
+              }
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   // Render chart based on selected type
@@ -694,6 +744,362 @@ const Analytics = () => {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Correlations Section - Scatter Plots */}
+            {scatterPlotData.length >= 2 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-3">
+                    <Waypoints className="h-6 w-6 text-purple-500" />
+                    Performance Correlations
+                    {timeRange !== 'all' && (
+                      <span className="text-lg font-normal text-muted-foreground">
+                        ({defaultTimeRangeOptions.find(opt => opt.value === timeRange)?.label})
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Explore relationships between different performance metrics
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Power vs Pace */}
+                  <Card className="border-l-4 border-l-amber-500">
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-amber-500/10">
+                          <Zap className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Power vs Pace</CardTitle>
+                          <CardDescription>
+                            Does more power lead to faster splits?
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={chartTheme.margin.scatter}>
+                            <CartesianGrid 
+                              strokeDasharray={chartTheme.grid.strokeDasharray} 
+                              stroke={chartTheme.grid.stroke} 
+                              opacity={chartTheme.grid.opacity} 
+                            />
+                            <XAxis 
+                              type="number" 
+                              dataKey="power" 
+                              name="Power" 
+                              unit="W"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="pace" 
+                              name="Pace" 
+                              domain={['auto', 'auto']}
+                              reversed={true}
+                              tickFormatter={(val) => formatPace(val)}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                            <Scatter 
+                              name="Sessions" 
+                              data={scatterPlotData} 
+                              fill="#f59e0b" 
+                              fillOpacity={0.7}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Stroke Rate vs Pace */}
+                  <Card className="border-l-4 border-l-violet-500">
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-violet-500/10">
+                          <Activity className="h-5 w-5 text-violet-500" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Stroke Rate vs Pace</CardTitle>
+                          <CardDescription>
+                            Efficiency check: Does higher rate mean faster splits?
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={chartTheme.margin.scatter}>
+                            <CartesianGrid 
+                              strokeDasharray={chartTheme.grid.strokeDasharray} 
+                              stroke={chartTheme.grid.stroke} 
+                              opacity={chartTheme.grid.opacity} 
+                            />
+                            <XAxis 
+                              type="number" 
+                              dataKey="strokeRate" 
+                              name="Stroke Rate" 
+                              unit=" SPM"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="pace" 
+                              name="Pace" 
+                              domain={['auto', 'auto']}
+                              reversed={true}
+                              tickFormatter={(val) => formatPace(val)}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                            <Scatter 
+                              name="Sessions" 
+                              data={scatterPlotData} 
+                              fill="#8b5cf6" 
+                              fillOpacity={0.7}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Duration vs Distance */}
+                  <Card className="border-l-4 border-l-blue-500">
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-blue-500/10">
+                          <Clock className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Duration vs Distance</CardTitle>
+                          <CardDescription>
+                            Session length patterns and consistency
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={chartTheme.margin.scatter}>
+                            <CartesianGrid 
+                              strokeDasharray={chartTheme.grid.strokeDasharray} 
+                              stroke={chartTheme.grid.stroke} 
+                              opacity={chartTheme.grid.opacity} 
+                            />
+                            <XAxis 
+                              type="number" 
+                              dataKey="durationMinutes" 
+                              name="Duration" 
+                              unit=" min"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="distance" 
+                              name="Distance" 
+                              unit="m"
+                              domain={['auto', 'auto']}
+                              tickFormatter={(val) => formatDistance(val)}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                            <Scatter 
+                              name="Sessions" 
+                              data={scatterPlotData} 
+                              fill="#3b82f6" 
+                              fillOpacity={0.7}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Energy vs Duration */}
+                  <Card className="border-l-4 border-l-red-500">
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-red-500/10">
+                          <Flame className="h-5 w-5 text-red-500" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Energy vs Duration</CardTitle>
+                          <CardDescription>
+                            Calorie burn rate across different session lengths
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={chartTheme.margin.scatter}>
+                            <CartesianGrid 
+                              strokeDasharray={chartTheme.grid.strokeDasharray} 
+                              stroke={chartTheme.grid.stroke} 
+                              opacity={chartTheme.grid.opacity} 
+                            />
+                            <XAxis 
+                              type="number" 
+                              dataKey="durationMinutes" 
+                              name="Duration" 
+                              unit=" min"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="energy" 
+                              name="Energy" 
+                              unit=" kCal"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                            <Scatter 
+                              name="Sessions" 
+                              data={scatterPlotData} 
+                              fill="#ef4444" 
+                              fillOpacity={0.7}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Power vs Stroke Rate */}
+                  <Card className="border-l-4 border-l-emerald-500">
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-emerald-500/10">
+                          <Target className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Power vs Stroke Rate</CardTitle>
+                          <CardDescription>
+                            Do you generate more power at higher stroke rates?
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={chartTheme.margin.scatter}>
+                            <CartesianGrid 
+                              strokeDasharray={chartTheme.grid.strokeDasharray} 
+                              stroke={chartTheme.grid.stroke} 
+                              opacity={chartTheme.grid.opacity} 
+                            />
+                            <XAxis 
+                              type="number" 
+                              dataKey="strokeRate" 
+                              name="Stroke Rate" 
+                              unit=" SPM"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="power" 
+                              name="Power" 
+                              unit="W"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                            <Scatter 
+                              name="Sessions" 
+                              data={scatterPlotData} 
+                              fill="#10b981" 
+                              fillOpacity={0.7}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Distance vs Power */}
+                  <Card className="border-l-4 border-l-cyan-500">
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-cyan-500/10">
+                          <TrendingUp className="h-5 w-5 text-cyan-500" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Distance vs Power</CardTitle>
+                          <CardDescription>
+                            Power output at different session distances
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={chartTheme.margin.scatter}>
+                            <CartesianGrid 
+                              strokeDasharray={chartTheme.grid.strokeDasharray} 
+                              stroke={chartTheme.grid.stroke} 
+                              opacity={chartTheme.grid.opacity} 
+                            />
+                            <XAxis 
+                              type="number" 
+                              dataKey="distance" 
+                              name="Distance" 
+                              unit="m"
+                              domain={['auto', 'auto']}
+                              tickFormatter={(val) => formatDistance(val)}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="power" 
+                              name="Power" 
+                              unit="W"
+                              domain={['auto', 'auto']}
+                              stroke={chartTheme.axis.strokeColor}
+                              tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+                            />
+                            <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                            <Scatter 
+                              name="Sessions" 
+                              data={scatterPlotData} 
+                              fill="#06b6d4" 
+                              fillOpacity={0.7}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             )}
 
           </div>
