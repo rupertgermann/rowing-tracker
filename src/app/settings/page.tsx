@@ -27,7 +27,11 @@ import {
   CheckCircle,
   Info,
   Key,
-  TestTube
+  TestTube,
+  FileText,
+  Sparkles,
+  Heart,
+  Loader2
 } from 'lucide-react';
 
 type SettingsCategory = 'userPreferences' | 'dataManagement' | 'trainingSettings' | 'notificationSettings' | 'privacySettings' | 'aiSettings';
@@ -92,6 +96,10 @@ export default function SettingsPage() {
   // AI Settings state moved to component level (React Rules of Hooks)
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  
+  // Personal Context state
+  const [isCondensingProfile, setIsCondensingProfile] = useState(false);
+  const [profileRawInput, setProfileRawInput] = useState('');
 
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
@@ -104,6 +112,13 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Sync profileRawInput with settings when loaded
+  useEffect(() => {
+    if (settingsData?.aiSettings?.userProfileRawInput) {
+      setProfileRawInput(settingsData.aiSettings.userProfileRawInput);
+    }
+  }, [settingsData?.aiSettings?.userProfileRawInput]);
 
   const loadSettings = () => {
     try {
@@ -1200,6 +1215,170 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Personal Context */}
+        {settingsData.aiSettings.cloudAIEnabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-red-500" />
+                Personal Context
+              </CardTitle>
+              <CardDescription>
+                Share information about yourself to personalize AI advice (medical conditions, goals, preferences)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-blue-200 bg-blue-50">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Why add personal context?</strong> If you have medical conditions, injuries, or specific needs, 
+                  sharing this information helps the AI coach provide safer and more appropriate recommendations.
+                  Your data stays private and is only used locally.
+                </AlertDescription>
+              </Alert>
+
+              {/* Raw Input Area */}
+              <div>
+                <Label htmlFor="profileRawInput" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Your Information
+                </Label>
+                <textarea
+                  id="profileRawInput"
+                  rows={6}
+                  value={profileRawInput}
+                  onChange={(e) => setProfileRawInput(e.target.value)}
+                  className="w-full mt-1 p-3 border rounded-md resize-y text-sm"
+                  placeholder="Describe any relevant information about yourself, for example:
+
+• Medical conditions (e.g., 'I have a heart condition and need to keep HR below 150')
+• Injuries or limitations (e.g., 'Recovering from a knee injury, avoid high-impact')
+• Age and fitness level (e.g., '45 years old, returning to exercise after 5 years')
+• Goals (e.g., 'Training for a charity 2K race in 3 months')
+• Preferences (e.g., 'I prefer shorter, more intense workouts')
+• Availability (e.g., 'Can only train 3 times per week for 30 minutes')
+
+You can also paste content from medical documents or training notes."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Write freely or paste from documents. The AI will condense this into actionable coaching context.
+                </p>
+              </div>
+
+              {/* File Upload */}
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload Document (Optional)
+                </Label>
+                <div className="mt-1">
+                  <label className="cursor-pointer">
+                    <div className="border-2 border-dashed rounded-md p-4 text-center hover:border-primary transition-colors">
+                      <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Click to upload a text file (.txt)
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Content will be added to your personal context
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".txt"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            setProfileRawInput(prev => prev ? `${prev}\n\n--- Uploaded from ${file.name} ---\n${content}` : content);
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Generate/Condense Button */}
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={async () => {
+                    if (!profileRawInput.trim()) {
+                      setErrorMessage('Please enter some information first');
+                      return;
+                    }
+                    
+                    setIsCondensingProfile(true);
+                    try {
+                      const condensed = await cloudAI.condenseUserProfile(profileRawInput);
+                      saveSettings('aiSettings', { 
+                        userProfileContext: condensed,
+                        userProfileRawInput: profileRawInput 
+                      });
+                      setSuccessMessage('Personal context generated and saved');
+                    } catch (error) {
+                      setErrorMessage('Failed to generate context. Please check your API key.');
+                    } finally {
+                      setIsCondensingProfile(false);
+                    }
+                  }}
+                  disabled={isCondensingProfile || !profileRawInput.trim()}
+                  className="flex items-center gap-2"
+                >
+                  {isCondensingProfile ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {isCondensingProfile ? 'Generating...' : 'Generate AI Context'}
+                </Button>
+
+                {settingsData.aiSettings.userProfileContext && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setProfileRawInput('');
+                      saveSettings('aiSettings', { 
+                        userProfileContext: '',
+                        userProfileRawInput: '' 
+                      });
+                      setSuccessMessage('Personal context cleared');
+                    }}
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
+              {/* Generated Context (Editable) */}
+              {settingsData.aiSettings.userProfileContext && (
+                <div className="mt-4 pt-4 border-t">
+                  <Label htmlFor="userProfileContext" className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    Generated AI Context (Editable)
+                  </Label>
+                  <textarea
+                    id="userProfileContext"
+                    rows={6}
+                    value={settingsData.aiSettings.userProfileContext}
+                    onChange={(e) => saveSettings('aiSettings', { userProfileContext: e.target.value })}
+                    className="w-full mt-1 p-3 border rounded-md resize-y font-mono text-sm bg-green-50 border-green-200"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This context is automatically injected into AI prompts for chat, insights, and training plans.
+                    You can edit it directly if needed.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Advanced Configuration */}
         {settingsData.aiSettings.cloudAIEnabled && (

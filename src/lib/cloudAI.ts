@@ -887,7 +887,7 @@ COMMUNICATION STYLE:
 - Keep responses focused and practical
 - Structure responses with clear headers for easy scanning
 
-Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.`;
+Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.${this.getUserProfileContext()}`;
   }
 
   // Get user's session context for personalized coaching
@@ -1003,8 +1003,20 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
     }
   }
 
+  // Get user's personal context from settings (medical conditions, preferences, etc.)
+  private getUserProfileContext(): string {
+    const settings = SettingsService.getInstance().getSettings();
+    const context = settings.aiSettings.userProfileContext?.trim();
+    if (context) {
+      return `\n\n${context}\n\nIMPORTANT: Always take the above personal context into account when providing advice. Adjust your recommendations to accommodate any medical conditions, limitations, or preferences mentioned.`;
+    }
+    return '';
+  }
+
   // Get system prompt for rowing performance analysis
   private getSystemPrompt(): string {
+    const userContext = this.getUserProfileContext();
+    
     return `You are an expert rowing coach and sports data analyst specializing in indoor rowing performance analysis. 
 You analyze rowing workout data to provide actionable insights, trend analysis, and personalized recommendations.
 
@@ -1022,7 +1034,7 @@ Always provide:
 4. Confidence scores based on data quality
 5. Clear explanations of findings
 
-Focus on practical advice that helps rowers improve performance while avoiding injury and overtraining.`;
+Focus on practical advice that helps rowers improve performance while avoiding injury and overtraining.${userContext}`;
   }
 
   // Build user prompt with session data using configurable prompt
@@ -1516,6 +1528,8 @@ Keep the response encouraging and actionable.`;
 
   // System prompts
   private getPlanGenerationSystemPrompt(): string {
+    const userContext = this.getUserProfileContext();
+    
     return `You are an expert rowing coach and sports scientist specializing in training plan design. 
 You create personalized, progressive training plans for rowers of all levels.
 
@@ -1533,10 +1547,12 @@ Always create plans that are:
 - Appropriate for the stated goals and focus area
 - Include proper recovery and adaptation periods
 
-Ensure the plan structure follows proper training principles with appropriate volume and intensity progression.`;
+Ensure the plan structure follows proper training principles with appropriate volume and intensity progression.${userContext}`;
   }
 
   private getPlanModificationSystemPrompt(): string {
+    const userContext = this.getUserProfileContext();
+    
     return `You are an expert rowing coach helping athletes modify their training plans. 
 You understand how to adjust programs while maintaining training integrity and progression.
 
@@ -1547,10 +1563,12 @@ When modifying plans:
 - Explain your reasoning for modifications
 - Ensure the plan remains realistic and achievable
 
-Always consider the athlete's current progress and capabilities when suggesting changes.`;
+Always consider the athlete's current progress and capabilities when suggesting changes.${userContext}`;
   }
 
   private getAdherenceAnalysisSystemPrompt(): string {
+    const userContext = this.getUserProfileContext();
+    
     return `You are an expert rowing coach analyzing training plan adherence. 
 You provide constructive, encouraging feedback and practical recommendations.
 
@@ -1561,7 +1579,7 @@ Your analysis should:
 - Consider the athlete's overall training load and life factors
 - Suggest plan adjustments when adherence issues indicate the plan is too difficult or easy
 
-Maintain a supportive, motivational tone while being honest about adherence patterns.`;
+Maintain a supportive, motivational tone while being honest about adherence patterns.${userContext}`;
   }
 
   // Helper methods for plan generation
@@ -1824,6 +1842,61 @@ Use this data to create an appropriate plan that matches their current fitness a
       return `${Math.round(meters)}m`;
     }
   }
+
+  // Condense user profile/documents into a system prompt addition
+  async condenseUserProfile(rawInput: string): Promise<string> {
+    if (!this.config) {
+      throw new Error('Cloud AI service not configured');
+    }
+
+    if (!rawInput.trim()) {
+      return '';
+    }
+
+    try {
+      const prompt = `You are helping a rowing coach AI understand a user's personal context. The user has provided information about themselves that should influence how the AI coach gives advice.
+
+USER'S INFORMATION:
+${rawInput}
+
+YOUR TASK:
+Condense this information into a concise, structured system prompt addition (max 300 words) that will help the AI coach personalize its advice. Focus on:
+
+1. **Health/Medical Considerations**: Any conditions, injuries, or limitations that affect training (e.g., heart conditions, joint issues, medications)
+2. **Physical Profile**: Age, fitness level, experience, physical constraints
+3. **Goals & Preferences**: Training goals, preferred workout types, time availability
+4. **Special Needs**: Any accommodations or modifications needed for safe training
+
+FORMAT YOUR RESPONSE AS:
+A direct system prompt addition that starts with "PERSONAL CONTEXT:" followed by bullet points. This text will be injected directly into AI prompts, so write it as instructions for an AI, not as a summary for the user.
+
+Example format:
+PERSONAL CONTEXT:
+- User has [condition], adjust recommendations to [specific guidance]
+- Avoid suggesting [specific activities] due to [reason]
+- User prefers [preference], incorporate this into plans
+- [Any other relevant coaching considerations]
+
+Be specific and actionable. Only include information relevant to rowing training and coaching.`;
+
+      const config: ApiRequestConfig = {
+        input: prompt,
+        model: 'gpt-5-mini',
+        reasoning: 'medium',
+        verbosity: 'low',
+        maxTokens: 500
+      };
+
+      const response = await this.makeApiCall(config);
+      const content = this.parseResponse(response);
+      
+      return content.trim();
+    } catch (error) {
+      console.error('Failed to condense user profile:', error);
+      throw error;
+    }
+  }
+
   // Test API connection
   async testConnection(): Promise<boolean> {
     if (!this.config) return false;

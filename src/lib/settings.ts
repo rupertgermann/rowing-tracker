@@ -84,6 +84,10 @@ export interface AISettings {
   chatSystemPrompt: string;
   planGenerationPrompt: string;
   insightsPrompt: string;
+
+  // Personal context for AI personalization
+  userProfileContext: string; // Condensed system prompt addition from user docs/self-description
+  userProfileRawInput: string; // Original user input (for editing)
 }
 
 export interface Settings {
@@ -214,7 +218,11 @@ Return a JSON array of insights with this structure:
   }
 ]
 
-Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`
+Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`,
+
+      // Personal context defaults
+      userProfileContext: '',
+      userProfileRawInput: ''
     },
     version: this.CURRENT_VERSION,
     updatedAt: new Date()
