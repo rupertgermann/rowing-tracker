@@ -75,7 +75,7 @@ ${explainChartPrompt}`;
       {/* Backdrop blur overlay when tooltip is open */}
       {isTooltipOpen && (
         <div 
-          className="fixed inset-0 bg-background/40 backdrop-blur-sm z-40 animate-in fade-in-0 duration-200"
+          className="fixed inset-0 bg-background/20 backdrop-blur-sm z-40 animate-in fade-in-0 duration-200"
           onClick={() => setIsTooltipOpen(false)}
         />
       )}
