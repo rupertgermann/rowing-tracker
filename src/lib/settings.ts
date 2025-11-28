@@ -84,6 +84,7 @@ export interface AISettings {
   chatSystemPrompt: string;
   planGenerationPrompt: string;
   insightsPrompt: string;
+  explainChartPrompt: string; // System prompt for chart explanations
 
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description
@@ -219,6 +220,19 @@ Return a JSON array of insights with this structure:
 ]
 
 Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`,
+
+      explainChartPrompt: `Keep your response concise and actionable. Structure your answer as follows:
+
+**TOOLTIP SUMMARY** (1-2 sentences max, suitable for display in a small tooltip):
+[Write a brief key takeaway here]
+
+**ANALYSIS** (3-5 bullet points):
+- Key patterns and what they mean
+- Areas of strength or concern
+- Comparison to typical benchmarks
+
+**ACTION** (1-2 specific recommendations):
+What to focus on in your next session.`,
 
       // Personal context defaults
       userProfileContext: '',
@@ -508,6 +522,7 @@ Limit to 5 most important insights. Focus on actionable advice that will help th
           chatSystemPrompt: oldAiSettings.chatSystemPrompt ?? this.defaultSettings.aiSettings.chatSystemPrompt,
           planGenerationPrompt: oldAiSettings.planGenerationPrompt ?? this.defaultSettings.aiSettings.planGenerationPrompt,
           insightsPrompt: oldAiSettings.insightsPrompt ?? this.defaultSettings.aiSettings.insightsPrompt,
+          explainChartPrompt: oldAiSettings.explainChartPrompt ?? this.defaultSettings.aiSettings.explainChartPrompt,
 
           // New nested structure without model fields (hardcoded to GPT-5.1)
           chat: this.defaultSettings.aiSettings.chat,

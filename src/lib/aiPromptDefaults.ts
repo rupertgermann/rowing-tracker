@@ -129,3 +129,16 @@ Return a JSON array of insights with this structure:
 ]
 
 Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.`;
+
+export const DEFAULT_EXPLAIN_CHART_PROMPT = `Keep your response concise and actionable. Structure your answer as follows:
+
+**TOOLTIP SUMMARY** (1-2 sentences max, suitable for display in a small tooltip):
+[Write a brief key takeaway here]
+
+**ANALYSIS** (3-5 bullet points):
+- Key patterns and what they mean
+- Areas of strength or concern
+- Comparison to typical benchmarks
+
+**ACTION** (1-2 specific recommendations):
+What to focus on in your next session.`;

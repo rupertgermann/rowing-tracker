@@ -195,18 +195,16 @@ const Analytics = () => {
 
   // Helper function to generate chart explanation prompt and navigate to chat
   const handleExplainChart = (chartId: string, chartTitle: string, chartDescription: string, dataContext: string) => {
+    // Get the custom explain chart prompt from settings
+    const aiSettings = SettingsService.getInstance().getAISettings();
+    const explainChartPrompt = aiSettings.explainChartPrompt || '';
+    
     const prompt = `I'm looking at my "${chartTitle}" chart in my rowing analytics. ${chartDescription}
 
 Here's what the data shows:
 ${dataContext}
 
-Please help me understand:
-1. What patterns or trends do you see in this data?
-2. What does this tell me about my rowing performance?
-3. Are there any areas of concern or improvement opportunities?
-4. How does this compare to typical rowing benchmarks?
-
-Give me actionable insights I can use in my next training session.`;
+${explainChartPrompt}`;
 
     // Navigate to chat with the prompt
     const params = new URLSearchParams({

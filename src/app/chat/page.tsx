@@ -69,13 +69,12 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
   const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string } | null>(null);
-  const [pendingInitialMessage, setPendingInitialMessage] = useState<string | null>(null);
   const initialPromptProcessedRef = useRef(false);
 
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
 
-  // Handle chart explanation URL params - create session and queue initial message
+  // Handle chart explanation URL params - create session and pre-fill input
   useEffect(() => {
     if (initialPromptProcessedRef.current) return;
     
@@ -91,24 +90,17 @@ export default function ChatPage() {
       const newSession = createSession(sessionTitle);
       
       if (newSession) {
-        // Store pending chart explanation context and queue the message
+        // Store pending chart explanation context for tracking AI response
         setPendingChartExplanation({ chartId, prompt });
-        setPendingInitialMessage(prompt);
+        
+        // Pre-fill the input field instead of auto-sending
+        setMessageInput(prompt);
         
         // Clear URL params without triggering navigation
         router.replace('/chat', { scroll: false });
       }
     }
   }, [searchParams, isAIConfigured, createSession, router]);
-
-  // Send pending initial message once session is ready
-  useEffect(() => {
-    if (pendingInitialMessage && currentSession && !isLoading) {
-      const messageToSend = pendingInitialMessage;
-      setPendingInitialMessage(null); // Clear immediately to prevent re-sends
-      sendMessage(messageToSend);
-    }
-  }, [pendingInitialMessage, currentSession, isLoading, sendMessage]);
 
   // Monitor for AI response completion to save chart explanation
   useEffect(() => {
@@ -121,9 +113,16 @@ export default function ChatPage() {
       
       // If the last message is from the assistant and we're not loading, save the explanation
       if (lastMessage.role === 'assistant' && !isLoading && lastMessage.content) {
-        // Extract a summary (first 200 chars or first paragraph)
-        const summary = lastMessage.content.split('\n\n')[0].slice(0, 300) + 
-          (lastMessage.content.length > 300 ? '...' : '');
+        // Try to extract the TOOLTIP SUMMARY section first
+        let summary = '';
+        const tooltipMatch = lastMessage.content.match(/\*\*TOOLTIP SUMMARY\*\*[^:]*:?\s*\n?([\s\S]*?)(?=\n\n\*\*|$)/i);
+        if (tooltipMatch && tooltipMatch[1]) {
+          summary = tooltipMatch[1].trim().replace(/^\[|\]$/g, '').slice(0, 200);
+        } else {
+          // Fallback: first paragraph or 200 chars
+          summary = lastMessage.content.split('\n\n')[0].slice(0, 200) + 
+            (lastMessage.content.split('\n\n')[0].length > 200 ? '...' : '');
+        }
         
         setChartExplanation(pendingChartExplanation.chartId, {
           summary,

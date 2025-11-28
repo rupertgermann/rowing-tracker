@@ -14,7 +14,8 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_CHAT_SYSTEM_PROMPT,
   DEFAULT_PLAN_GENERATION_PROMPT,
-  DEFAULT_INSIGHTS_PROMPT
+  DEFAULT_INSIGHTS_PROMPT,
+  DEFAULT_EXPLAIN_CHART_PROMPT
 } from '@/lib/aiPromptDefaults';
 import { memoryStorage, MemoryDocument } from '@/lib/memoryStorage';
 import {
@@ -156,7 +157,7 @@ export default function SettingsPage() {
   };
 
   const handleResetPrompt = async (
-    promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt',
+    promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt' | 'explainChartPrompt',
     defaultValue: string
   ) => {
     await saveSettings('aiSettings', { [promptKey]: defaultValue });
@@ -1543,6 +1544,31 @@ You can also paste content from medical documents or training notes."
                 <p className="text-xs text-muted-foreground mt-1">
                   This prompt controls how the AI analyzes your rowing data and generates insights.
                   Use {`{sessionData}`} as a placeholder for the actual session data.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="explainChartPrompt">Chart Explanation Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResetPrompt('explainChartPrompt', DEFAULT_EXPLAIN_CHART_PROMPT)}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
+                <textarea
+                  id="explainChartPrompt"
+                  rows={6}
+                  value={settingsData.aiSettings.explainChartPrompt || DEFAULT_EXPLAIN_CHART_PROMPT}
+                  onChange={(e) => saveSettings('aiSettings', { explainChartPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
+                  placeholder="Configure how the AI explains charts in analytics..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This prompt is appended to chart explanation requests. Use it to control the response format and length.
+                  Include a &quot;TOOLTIP SUMMARY&quot; section for the info tooltip display.
                 </p>
               </div>
             </CardContent>
