@@ -22,6 +22,7 @@ import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/co
 import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
 import ReactMarkdown from 'react-markdown';
 import { chatStorage } from '@/lib/chatStorage';
+import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area';
@@ -874,34 +875,10 @@ ${explainChartPrompt}`;
                           headerActions={
                             <>
                               {isExplanationValid('metric-splitTime') && (
-                                <TooltipProvider>
-                                  <UITooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-green-500 hover:text-green-600"
-                                        onClick={() => router.push(`/chat?session=${chartExplanations['metric-splitTime'].chatSessionId}`)}
-                                      >
-                                        <MessageCircle className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
-                                        <Brain className="h-4 w-4 text-primary" />
-                                        <span className="font-semibold text-sm">AI Analysis</span>
-                                      </div>
-                                      <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                        <ReactMarkdown>
-                                          {chartExplanations['metric-splitTime'].fullResponse || chartExplanations['metric-splitTime'].summary}
-                                        </ReactMarkdown>
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border flex items-center gap-1">
-                                        <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                      </div>
-                                    </TooltipContent>
-                                  </UITooltip>
-                                </TooltipProvider>
+                                <ExplanationTooltip
+                                  chatSessionId={chartExplanations['metric-splitTime'].chatSessionId}
+                                  content={chartExplanations['metric-splitTime'].fullResponse || chartExplanations['metric-splitTime'].summary}
+                                />
                               )}
                               <TooltipProvider>
                                 <UITooltip>
@@ -951,34 +928,10 @@ ${explainChartPrompt}`;
                               <div className="flex items-center gap-2">
                                 {/* Show saved explanation indicator */}
                                 {isExplanationValid(`metric-${metric}`) && (
-                                  <TooltipProvider>
-                                    <UITooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-green-500 hover:text-green-600"
-                                          onClick={() => router.push(`/chat?session=${chartExplanations[`metric-${metric}`].chatSessionId}`)}
-                                        >
-                                          <MessageCircle className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
-                                          <Brain className="h-4 w-4 text-primary" />
-                                          <span className="font-semibold text-sm">AI Analysis</span>
-                                        </div>
-                                        <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                          <ReactMarkdown>
-                                            {chartExplanations[`metric-${metric}`].fullResponse || chartExplanations[`metric-${metric}`].summary}
-                                          </ReactMarkdown>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border flex items-center gap-1">
-                                          <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                        </div>
-                                      </TooltipContent>
-                                    </UITooltip>
-                                  </TooltipProvider>
+                                  <ExplanationTooltip
+                                    chatSessionId={chartExplanations[`metric-${metric}`].chatSessionId}
+                                    content={chartExplanations[`metric-${metric}`].fullResponse || chartExplanations[`metric-${metric}`].summary}
+                                  />
                                 )}
                                 {/* Explain button */}
                                 <TooltipProvider>
@@ -1084,29 +1037,10 @@ ${explainChartPrompt}`;
                         </div>
                         <div className="flex items-center gap-2">
                           {isExplanationValid('scatter-power-pace') && (
-                            <TooltipProvider>
-                              <UITooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-power-pace'].chatSessionId}`)}>
-                                    <MessageCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">AI Analysis</span>
-                                  </div>
-                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                    <ReactMarkdown>
-                                      {chartExplanations['scatter-power-pace'].fullResponse || chartExplanations['scatter-power-pace'].summary}
-                                    </ReactMarkdown>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </div>
-                                </TooltipContent>
-                              </UITooltip>
-                            </TooltipProvider>
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations['scatter-power-pace'].chatSessionId}
+                              content={chartExplanations['scatter-power-pace'].fullResponse || chartExplanations['scatter-power-pace'].summary}
+                            />
                           )}
                           <TooltipProvider>
                             <UITooltip>
@@ -1190,29 +1124,10 @@ ${explainChartPrompt}`;
                         </div>
                         <div className="flex items-center gap-2">
                           {isExplanationValid('scatter-rate-pace') && (
-                            <TooltipProvider>
-                              <UITooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-rate-pace'].chatSessionId}`)}>
-                                    <MessageCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">AI Analysis</span>
-                                  </div>
-                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                    <ReactMarkdown>
-                                      {chartExplanations['scatter-rate-pace'].fullResponse || chartExplanations['scatter-rate-pace'].summary}
-                                    </ReactMarkdown>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </div>
-                                </TooltipContent>
-                              </UITooltip>
-                            </TooltipProvider>
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations['scatter-rate-pace'].chatSessionId}
+                              content={chartExplanations['scatter-rate-pace'].fullResponse || chartExplanations['scatter-rate-pace'].summary}
+                            />
                           )}
                           <TooltipProvider>
                             <UITooltip>
@@ -1296,29 +1211,10 @@ ${explainChartPrompt}`;
                         </div>
                         <div className="flex items-center gap-2">
                           {isExplanationValid('scatter-duration-distance') && (
-                            <TooltipProvider>
-                              <UITooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-duration-distance'].chatSessionId}`)}>
-                                    <MessageCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">AI Analysis</span>
-                                  </div>
-                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                    <ReactMarkdown>
-                                      {chartExplanations['scatter-duration-distance'].fullResponse || chartExplanations['scatter-duration-distance'].summary}
-                                    </ReactMarkdown>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </div>
-                                </TooltipContent>
-                              </UITooltip>
-                            </TooltipProvider>
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations['scatter-duration-distance'].chatSessionId}
+                              content={chartExplanations['scatter-duration-distance'].fullResponse || chartExplanations['scatter-duration-distance'].summary}
+                            />
                           )}
                           <TooltipProvider>
                             <UITooltip>
@@ -1402,29 +1298,10 @@ ${explainChartPrompt}`;
                         </div>
                         <div className="flex items-center gap-2">
                           {isExplanationValid('scatter-energy-duration') && (
-                            <TooltipProvider>
-                              <UITooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-energy-duration'].chatSessionId}`)}>
-                                    <MessageCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">AI Analysis</span>
-                                  </div>
-                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                    <ReactMarkdown>
-                                      {chartExplanations['scatter-energy-duration'].fullResponse || chartExplanations['scatter-energy-duration'].summary}
-                                    </ReactMarkdown>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </div>
-                                </TooltipContent>
-                              </UITooltip>
-                            </TooltipProvider>
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations['scatter-energy-duration'].chatSessionId}
+                              content={chartExplanations['scatter-energy-duration'].fullResponse || chartExplanations['scatter-energy-duration'].summary}
+                            />
                           )}
                           <TooltipProvider>
                             <UITooltip>
@@ -1507,29 +1384,10 @@ ${explainChartPrompt}`;
                         </div>
                         <div className="flex items-center gap-2">
                           {isExplanationValid('scatter-power-rate') && (
-                            <TooltipProvider>
-                              <UITooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-power-rate'].chatSessionId}`)}>
-                                    <MessageCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">AI Analysis</span>
-                                  </div>
-                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                    <ReactMarkdown>
-                                      {chartExplanations['scatter-power-rate'].fullResponse || chartExplanations['scatter-power-rate'].summary}
-                                    </ReactMarkdown>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </div>
-                                </TooltipContent>
-                              </UITooltip>
-                            </TooltipProvider>
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations['scatter-power-rate'].chatSessionId}
+                              content={chartExplanations['scatter-power-rate'].fullResponse || chartExplanations['scatter-power-rate'].summary}
+                            />
                           )}
                           <TooltipProvider>
                             <UITooltip>
@@ -1612,29 +1470,10 @@ ${explainChartPrompt}`;
                         </div>
                         <div className="flex items-center gap-2">
                           {isExplanationValid('scatter-distance-power') && (
-                            <TooltipProvider>
-                              <UITooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-distance-power'].chatSessionId}`)}>
-                                    <MessageCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg">
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">AI Analysis</span>
-                                  </div>
-                                  <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
-                                    <ReactMarkdown>
-                                      {chartExplanations['scatter-distance-power'].fullResponse || chartExplanations['scatter-distance-power'].summary}
-                                    </ReactMarkdown>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" /> Click the green icon to view full chat
-                                  </div>
-                                </TooltipContent>
-                              </UITooltip>
-                            </TooltipProvider>
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations['scatter-distance-power'].chatSessionId}
+                              content={chartExplanations['scatter-distance-power'].fullResponse || chartExplanations['scatter-distance-power'].summary}
+                            />
                           )}
                           <TooltipProvider>
                             <UITooltip>
