@@ -16,6 +16,7 @@ interface Session {
 
 interface SplitTimeChartProps {
   sessions: Session[];
+  headerActions?: React.ReactNode;
 }
 
 // Color mapping for stroke rate (20-30 SPM)
@@ -95,7 +96,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export const SplitTimeChart = ({ sessions }: SplitTimeChartProps) => {
+export const SplitTimeChart = ({ sessions, headerActions }: SplitTimeChartProps) => {
   // Prepare chart data
   const chartData = useMemo(() => {
     if (!sessions.length) return [];
@@ -135,18 +136,25 @@ export const SplitTimeChart = ({ sessions }: SplitTimeChartProps) => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-md bg-primary/10">
-            <Target className="h-5 w-5 text-primary" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-md bg-primary/10">
+              <Target className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">
+                Split Time Over Date (Lower is Better)
+              </CardTitle>
+              <CardDescription>
+                Track your pace progression with 3-session moving average
+              </CardDescription>
+            </div>
           </div>
-          <div>
-            <CardTitle className="text-lg">
-              Split Time Over Date (Lower is Better)
-            </CardTitle>
-            <CardDescription>
-              Track your pace progression with 3-session moving average
-            </CardDescription>
-          </div>
+          {headerActions && (
+            <div className="flex items-center gap-2">
+              {headerActions}
+            </div>
+          )}
         </div>
 
         {/* Legend for stroke rate colors */}
