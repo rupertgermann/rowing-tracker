@@ -52,8 +52,18 @@ export interface SessionAnalysisSettings {
 // Chart explanation from AI
 export interface ChartExplanation {
   summary: string;
+  fullResponse: string; // Complete AI response for tooltip display
   chatSessionId: string;
   generatedAt: Date;
+}
+
+// Pending chart explanation data (for passing to chat)
+export interface PendingChartExplanation {
+  chartId: string;
+  chartTitle: string;
+  prompt: string;
+  screenshot?: string; // base64 data URL
+  fullData?: string; // JSON stringified data
 }
 
 interface ChartSettings {
@@ -73,6 +83,7 @@ interface RowingStore {
   sessionsViewSettings: SessionsViewSettings;
   sessionAnalysisSettings: SessionAnalysisSettings;
   chartExplanations: Record<string, ChartExplanation>; // keyed by chartId
+  pendingChartExplanation: PendingChartExplanation | null; // temporary storage for chat handoff
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -90,6 +101,8 @@ interface RowingStore {
   updateSessionAnalysisSettings: (settings: Partial<SessionAnalysisSettings>) => void;
   setChartExplanation: (chartId: string, explanation: ChartExplanation) => void;
   getChartExplanation: (chartId: string) => ChartExplanation | undefined;
+  setPendingChartExplanation: (data: PendingChartExplanation | null) => void;
+  getPendingChartExplanation: () => PendingChartExplanation | null;
   
   // Computed getters
   getSessions: () => Session[];
@@ -335,6 +348,7 @@ export const useRowingStore = create<RowingStore>()(
       sessionsViewSettings: defaultSessionsViewSettings,
       sessionAnalysisSettings: defaultSessionAnalysisSettings,
       chartExplanations: {},
+      pendingChartExplanation: null,
 
       // Actions
       addSessions: (newSessions) => {
@@ -531,6 +545,14 @@ export const useRowingStore = create<RowingStore>()(
 
       getChartExplanation: (chartId) => {
         return get().chartExplanations[chartId];
+      },
+
+      setPendingChartExplanation: (data) => {
+        set({ pendingChartExplanation: data });
+      },
+
+      getPendingChartExplanation: () => {
+        return get().pendingChartExplanation;
       },
 
       // Computed getters

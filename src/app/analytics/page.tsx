@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
@@ -20,6 +20,7 @@ import { CloudInsight } from '@/lib/cloudAI';
 import { chartTheme } from '@/lib/chartUtils';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
+import ReactMarkdown from 'react-markdown';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area';
@@ -183,18 +184,27 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 
 const Analytics = () => {
   const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations } = useRowingStore();
+  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations, setPendingChartExplanation } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
 
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
+  
+  // Refs for chart containers (for screenshot capture)
+  const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
 
-  // Helper function to generate chart explanation prompt and navigate to chat
-  const handleExplainChart = (chartId: string, chartTitle: string, chartDescription: string, dataContext: string) => {
+  // Helper function to capture chart screenshot and navigate to chat
+  const handleExplainChart = useCallback(async (
+    chartId: string, 
+    chartTitle: string, 
+    chartDescription: string, 
+    dataContext: string,
+    fullData: any[]
+  ) => {
     // Get the custom explain chart prompt from settings
     const aiSettings = SettingsService.getInstance().getAISettings();
     const explainChartPrompt = aiSettings.explainChartPrompt || '';
@@ -206,14 +216,81 @@ ${dataContext}
 
 ${explainChartPrompt}`;
 
-    // Navigate to chat with the prompt
-    const params = new URLSearchParams({
+    // Try to capture screenshot by converting SVG to PNG (OpenAI only supports png/jpeg/gif/webp)
+    let screenshot: string | undefined;
+    const chartElement = chartRefs.current[chartId];
+    if (chartElement) {
+      try {
+        // Find the SVG element inside the chart (Recharts renders to SVG)
+        const svgElement = chartElement.querySelector('svg');
+        if (svgElement) {
+          // Clone and serialize the SVG
+          const svgClone = svgElement.cloneNode(true) as SVGElement;
+          
+          // Set explicit dimensions
+          const bbox = svgElement.getBoundingClientRect();
+          const width = bbox.width * 2; // 2x scale for quality
+          const height = bbox.height * 2;
+          svgClone.setAttribute('width', String(width));
+          svgClone.setAttribute('height', String(height));
+          
+          // Add white background for visibility
+          const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          bgRect.setAttribute('width', '100%');
+          bgRect.setAttribute('height', '100%');
+          bgRect.setAttribute('fill', '#1f2937'); // Dark background
+          svgClone.insertBefore(bgRect, svgClone.firstChild);
+          
+          // Serialize to string
+          const serializer = new XMLSerializer();
+          const svgString = serializer.serializeToString(svgClone);
+          
+          // Convert SVG to PNG via canvas
+          const img = new Image();
+          const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+          
+          screenshot = await new Promise<string | undefined>((resolve) => {
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.fillStyle = '#1f2937';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+              } else {
+                resolve(undefined);
+              }
+              URL.revokeObjectURL(url);
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(url);
+              resolve(undefined);
+            };
+            img.src = url;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to capture chart screenshot:', err);
+        // Continue without screenshot - the data will still be sent
+      }
+    }
+
+    // Store the pending chart explanation data
+    setPendingChartExplanation({
       chartId,
       chartTitle,
-      prompt
+      prompt,
+      screenshot,
+      fullData: JSON.stringify(fullData, null, 2)
     });
-    router.push(`/chat?${params.toString()}`);
-  };
+
+    // Navigate to chat
+    router.push('/chat?fromChart=true');
+  }, [setPendingChartExplanation, router]);
 
   // Helper to generate data context for metric charts
   const getMetricDataContext = (metric: ChartMetric, chartData: any[]) => {
@@ -744,7 +821,12 @@ ${explainChartPrompt}`;
                   const chartData = chartDataMap[metric];
 
                   return (
-                    <Card key={metric} className="border-l-4" style={{ borderLeftColor: config.color }}>
+                    <Card 
+                      key={metric} 
+                      className="border-l-4" 
+                      style={{ borderLeftColor: config.color }}
+                      ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
+                    >
                       {config.isSpecial && metric === 'splitTime' ? (
                         <SplitTimeChart sessions={filteredSessions} />
                       ) : (
@@ -776,17 +858,18 @@ ${explainChartPrompt}`;
                                           variant="ghost"
                                           size="sm"
                                           className="text-green-500 hover:text-green-600"
-                                          onClick={() => router.push(`/chat`)}
+                                          onClick={() => router.push(`/chat?session=${chartExplanations[`metric-${metric}`].chatSessionId}`)}
                                         >
                                           <MessageCircle className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent side="left" className="max-w-xs">
-                                        <p className="font-medium mb-1">AI Explanation</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {chartExplanations[`metric-${metric}`].summary}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                      <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                        <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                          <ReactMarkdown>
+                                            {chartExplanations[`metric-${metric}`].fullResponse || chartExplanations[`metric-${metric}`].summary}
+                                          </ReactMarkdown>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
                                           <ExternalLink className="h-3 w-3" /> Click to view full chat
                                         </p>
                                       </TooltipContent>
@@ -804,7 +887,8 @@ ${explainChartPrompt}`;
                                           `metric-${metric}`,
                                           `${config.label} Over Time`,
                                           `This chart shows how my ${config.label.toLowerCase()} (${config.unit}) has changed over time.`,
-                                          getMetricDataContext(metric, chartData)
+                                          getMetricDataContext(metric, chartData),
+                                          chartData
                                         )}
                                       >
                                         <HelpCircle className="h-4 w-4 mr-1" />
@@ -880,7 +964,7 @@ ${explainChartPrompt}`;
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Power vs Pace */}
-                  <Card className="border-l-4 border-l-amber-500">
+                  <Card className="border-l-4 border-l-amber-500" ref={(el) => { chartRefs.current['scatter-power-pace'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -899,13 +983,19 @@ ${explainChartPrompt}`;
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-power-pace'].chatSessionId}`)}>
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="font-medium mb-1">AI Explanation</p>
-                                  <p className="text-xs">{chartExplanations['scatter-power-pace'].summary}</p>
+                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                    <ReactMarkdown>
+                                      {chartExplanations['scatter-power-pace'].fullResponse || chartExplanations['scatter-power-pace'].summary}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                  </p>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -920,7 +1010,8 @@ ${explainChartPrompt}`;
                                     'scatter-power-pace',
                                     'Power vs Pace',
                                     'This scatter plot shows the relationship between average power output (watts) and pace (time per 500m) across my sessions.',
-                                    getScatterDataContext('Power (W)', 'Pace (s/500m)', scatterPlotData, 'power', 'pace')
+                                    getScatterDataContext('Power (W)', 'Pace (s/500m)', scatterPlotData, 'power', 'pace'),
+                                    scatterPlotData
                                   )}
                                 >
                                   <HelpCircle className="h-4 w-4 mr-1" />
@@ -975,7 +1066,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Stroke Rate vs Pace */}
-                  <Card className="border-l-4 border-l-violet-500">
+                  <Card className="border-l-4 border-l-violet-500" ref={(el) => { chartRefs.current['scatter-rate-pace'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -994,13 +1085,19 @@ ${explainChartPrompt}`;
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-rate-pace'].chatSessionId}`)}>
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="font-medium mb-1">AI Explanation</p>
-                                  <p className="text-xs">{chartExplanations['scatter-rate-pace'].summary}</p>
+                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                    <ReactMarkdown>
+                                      {chartExplanations['scatter-rate-pace'].fullResponse || chartExplanations['scatter-rate-pace'].summary}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                  </p>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1015,7 +1112,8 @@ ${explainChartPrompt}`;
                                     'scatter-rate-pace',
                                     'Stroke Rate vs Pace',
                                     'This scatter plot shows the relationship between stroke rate (SPM) and pace across my sessions to analyze efficiency.',
-                                    getScatterDataContext('Stroke Rate (SPM)', 'Pace (s/500m)', scatterPlotData, 'strokeRate', 'pace')
+                                    getScatterDataContext('Stroke Rate (SPM)', 'Pace (s/500m)', scatterPlotData, 'strokeRate', 'pace'),
+                                    scatterPlotData
                                   )}
                                 >
                                   <HelpCircle className="h-4 w-4 mr-1" />
@@ -1070,7 +1168,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Duration vs Distance */}
-                  <Card className="border-l-4 border-l-blue-500">
+                  <Card className="border-l-4 border-l-blue-500" ref={(el) => { chartRefs.current['scatter-duration-distance'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1089,13 +1187,19 @@ ${explainChartPrompt}`;
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-duration-distance'].chatSessionId}`)}>
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="font-medium mb-1">AI Explanation</p>
-                                  <p className="text-xs">{chartExplanations['scatter-duration-distance'].summary}</p>
+                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                    <ReactMarkdown>
+                                      {chartExplanations['scatter-duration-distance'].fullResponse || chartExplanations['scatter-duration-distance'].summary}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                  </p>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1110,7 +1214,8 @@ ${explainChartPrompt}`;
                                     'scatter-duration-distance',
                                     'Duration vs Distance',
                                     'This scatter plot shows the relationship between session duration (minutes) and distance covered (meters).',
-                                    getScatterDataContext('Duration (min)', 'Distance (m)', scatterPlotData, 'durationMinutes', 'distance')
+                                    getScatterDataContext('Duration (min)', 'Distance (m)', scatterPlotData, 'durationMinutes', 'distance'),
+                                    scatterPlotData
                                   )}
                                 >
                                   <HelpCircle className="h-4 w-4 mr-1" />
@@ -1165,7 +1270,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Energy vs Duration */}
-                  <Card className="border-l-4 border-l-red-500">
+                  <Card className="border-l-4 border-l-red-500" ref={(el) => { chartRefs.current['scatter-energy-duration'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1184,13 +1289,19 @@ ${explainChartPrompt}`;
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-energy-duration'].chatSessionId}`)}>
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="font-medium mb-1">AI Explanation</p>
-                                  <p className="text-xs">{chartExplanations['scatter-energy-duration'].summary}</p>
+                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                    <ReactMarkdown>
+                                      {chartExplanations['scatter-energy-duration'].fullResponse || chartExplanations['scatter-energy-duration'].summary}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                  </p>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1205,7 +1316,8 @@ ${explainChartPrompt}`;
                                     'scatter-energy-duration',
                                     'Energy vs Duration',
                                     'This scatter plot shows the relationship between session duration (minutes) and calories burned (kCal).',
-                                    getScatterDataContext('Duration (min)', 'Energy (kCal)', scatterPlotData, 'durationMinutes', 'energy')
+                                    getScatterDataContext('Duration (min)', 'Energy (kCal)', scatterPlotData, 'durationMinutes', 'energy'),
+                                    scatterPlotData
                                   )}
                                 >
                                   <HelpCircle className="h-4 w-4 mr-1" />
@@ -1259,7 +1371,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Power vs Stroke Rate */}
-                  <Card className="border-l-4 border-l-emerald-500">
+                  <Card className="border-l-4 border-l-emerald-500" ref={(el) => { chartRefs.current['scatter-power-rate'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1278,13 +1390,19 @@ ${explainChartPrompt}`;
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-power-rate'].chatSessionId}`)}>
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="font-medium mb-1">AI Explanation</p>
-                                  <p className="text-xs">{chartExplanations['scatter-power-rate'].summary}</p>
+                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                    <ReactMarkdown>
+                                      {chartExplanations['scatter-power-rate'].fullResponse || chartExplanations['scatter-power-rate'].summary}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                  </p>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1299,7 +1417,8 @@ ${explainChartPrompt}`;
                                     'scatter-power-rate',
                                     'Power vs Stroke Rate',
                                     'This scatter plot shows the relationship between stroke rate (SPM) and power output (watts).',
-                                    getScatterDataContext('Stroke Rate (SPM)', 'Power (W)', scatterPlotData, 'strokeRate', 'power')
+                                    getScatterDataContext('Stroke Rate (SPM)', 'Power (W)', scatterPlotData, 'strokeRate', 'power'),
+                                    scatterPlotData
                                   )}
                                 >
                                   <HelpCircle className="h-4 w-4 mr-1" />
@@ -1353,7 +1472,7 @@ ${explainChartPrompt}`;
                   </Card>
 
                   {/* Distance vs Power */}
-                  <Card className="border-l-4 border-l-cyan-500">
+                  <Card className="border-l-4 border-l-cyan-500" ref={(el) => { chartRefs.current['scatter-distance-power'] = el; }}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1372,13 +1491,19 @@ ${explainChartPrompt}`;
                             <TooltipProvider>
                               <UITooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push(`/chat?session=${chartExplanations['scatter-distance-power'].chatSessionId}`)}>
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="font-medium mb-1">AI Explanation</p>
-                                  <p className="text-xs">{chartExplanations['scatter-distance-power'].summary}</p>
+                                <TooltipContent side="left" className="max-w-md max-h-96 overflow-y-auto">
+                                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                                    <ReactMarkdown>
+                                      {chartExplanations['scatter-distance-power'].fullResponse || chartExplanations['scatter-distance-power'].summary}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t flex items-center gap-1">
+                                    <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                  </p>
                                 </TooltipContent>
                               </UITooltip>
                             </TooltipProvider>
@@ -1393,7 +1518,8 @@ ${explainChartPrompt}`;
                                     'scatter-distance-power',
                                     'Distance vs Power',
                                     'This scatter plot shows the relationship between session distance (meters) and average power output (watts).',
-                                    getScatterDataContext('Distance (m)', 'Power (W)', scatterPlotData, 'distance', 'power')
+                                    getScatterDataContext('Distance (m)', 'Power (W)', scatterPlotData, 'distance', 'power'),
+                                    scatterPlotData
                                   )}
                                 >
                                   <HelpCircle className="h-4 w-4 mr-1" />

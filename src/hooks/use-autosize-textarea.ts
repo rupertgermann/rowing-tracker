@@ -21,12 +21,20 @@ export function useAutosizeTextArea({
     const currentRef = ref.current
     const borderAdjustment = borderWidth * 2
 
+    // Capture original height on first render
     if (originalHeight.current === null) {
       originalHeight.current = currentRef.scrollHeight - borderAdjustment
     }
 
-    currentRef.style.removeProperty("height")
+    // Reset height to auto to get correct scrollHeight
+    currentRef.style.height = 'auto'
     const scrollHeight = currentRef.scrollHeight
+
+    // If textarea is empty, reset to original height
+    if (currentRef.value === '') {
+      currentRef.style.height = `${originalHeight.current + borderAdjustment}px`
+      return
+    }
 
     // Make sure we don't go over maxHeight
     const clampedToMax = Math.min(scrollHeight, maxHeight)

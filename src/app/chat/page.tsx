@@ -36,7 +36,7 @@ import { settings } from '@/lib/settings';
 export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { setChartExplanation } = useRowingStore();
+  const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation } = useRowingStore();
   
   const {
     currentSession,
@@ -69,38 +69,77 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
   const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string } | null>(null);
+  const [chartAttachments, setChartAttachments] = useState<FileAttachment[]>([]);
   const initialPromptProcessedRef = useRef(false);
 
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
 
-  // Handle chart explanation URL params - create session and pre-fill input
+  // Handle chart explanation from store - create session and pre-fill input with attachments
   useEffect(() => {
     if (initialPromptProcessedRef.current) return;
     
-    const prompt = searchParams.get('prompt');
-    const chartId = searchParams.get('chartId');
-    const chartTitle = searchParams.get('chartTitle');
+    const fromChart = searchParams.get('fromChart');
     
-    if (prompt && chartId && isAIConfigured) {
-      initialPromptProcessedRef.current = true;
+    if (fromChart && isAIConfigured) {
+      const pendingData = getPendingChartExplanation();
       
-      // Create a new session with the chart title
-      const sessionTitle = chartTitle ? `Explain: ${chartTitle}` : 'Chart Explanation';
-      const newSession = createSession(sessionTitle);
-      
-      if (newSession) {
-        // Store pending chart explanation context for tracking AI response
-        setPendingChartExplanation({ chartId, prompt });
+      if (pendingData) {
+        initialPromptProcessedRef.current = true;
         
-        // Pre-fill the input field instead of auto-sending
-        setMessageInput(prompt);
+        // Create a new session with the chart title
+        const sessionTitle = `Explain: ${pendingData.chartTitle}`;
+        const newSession = createSession(sessionTitle);
         
-        // Clear URL params without triggering navigation
+        if (newSession) {
+          // Store pending chart explanation context for tracking AI response
+          setPendingChartExplanation({ chartId: pendingData.chartId, prompt: pendingData.prompt });
+          
+          // Prepare attachments (screenshot only - data goes in prompt)
+          const attachments: FileAttachment[] = [];
+          
+          if (pendingData.screenshot) {
+            attachments.push({
+              name: `${pendingData.chartTitle.replace(/\s+/g, '_')}_chart.png`,
+              mimeType: 'image/png',
+              data: pendingData.screenshot
+            });
+          }
+          
+          setChartAttachments(attachments);
+          
+          // Append full data to the prompt (JSON files aren't supported by OpenAI)
+          let fullPrompt = pendingData.prompt;
+          if (pendingData.fullData) {
+            fullPrompt += `\n\n**Full Chart Data (JSON):**\n\`\`\`json\n${pendingData.fullData}\n\`\`\``;
+          }
+          
+          // Pre-fill the input field with the complete prompt
+          setMessageInput(fullPrompt);
+          
+          // Clear pending data from store
+          clearPendingChartExplanation(null);
+          
+          // Clear URL params without triggering navigation
+          router.replace('/chat', { scroll: false });
+        }
+      }
+    }
+  }, [searchParams, isAIConfigured, createSession, router, getPendingChartExplanation, clearPendingChartExplanation]);
+
+  // Handle session URL parameter - switch to specific chat session
+  useEffect(() => {
+    const sessionId = searchParams.get('session');
+    if (sessionId && sessions.length > 0) {
+      // Check if session exists
+      const sessionExists = sessions.some(s => s.id === sessionId);
+      if (sessionExists) {
+        switchSession(sessionId);
+        // Clear URL param
         router.replace('/chat', { scroll: false });
       }
     }
-  }, [searchParams, isAIConfigured, createSession, router]);
+  }, [searchParams, sessions, switchSession, router]);
 
   // Monitor for AI response completion to save chart explanation
   useEffect(() => {
@@ -115,17 +154,28 @@ export default function ChatPage() {
       if (lastMessage.role === 'assistant' && !isLoading && lastMessage.content) {
         // Try to extract the TOOLTIP SUMMARY section first
         let summary = '';
-        const tooltipMatch = lastMessage.content.match(/\*\*TOOLTIP SUMMARY\*\*[^:]*:?\s*\n?([\s\S]*?)(?=\n\n\*\*|$)/i);
+        // Match various markdown formats: **TOOLTIP SUMMARY**, ## TOOLTIP SUMMARY, etc.
+        const tooltipMatch = lastMessage.content.match(/(?:\*\*|##?\s*)TOOLTIP SUMMARY(?:\*\*)?[^:]*:?\s*\n?([\s\S]*?)(?=\n\n(?:\*\*|##)|$)/i);
         if (tooltipMatch && tooltipMatch[1]) {
-          summary = tooltipMatch[1].trim().replace(/^\[|\]$/g, '').slice(0, 200);
+          // Clean up the extracted text - remove markdown formatting
+          summary = tooltipMatch[1]
+            .trim()
+            .replace(/^\[|\]$/g, '')  // Remove surrounding brackets
+            .replace(/\*\*/g, '')      // Remove bold markers
+            .replace(/^#+\s*/gm, '')   // Remove heading markers
+            .slice(0, 200);
         } else {
-          // Fallback: first paragraph or 200 chars
-          summary = lastMessage.content.split('\n\n')[0].slice(0, 200) + 
-            (lastMessage.content.split('\n\n')[0].length > 200 ? '...' : '');
+          // Fallback: first paragraph or 200 chars, cleaned of markdown
+          const firstPara = lastMessage.content.split('\n\n')[0];
+          summary = firstPara
+            .replace(/\*\*/g, '')
+            .replace(/^#+\s*/gm, '')
+            .slice(0, 200) + (firstPara.length > 200 ? '...' : '');
         }
         
         setChartExplanation(pendingChartExplanation.chartId, {
           summary,
+          fullResponse: lastMessage.content,
           chatSessionId: currentSession.id,
           generatedAt: new Date()
         });
@@ -227,12 +277,13 @@ export default function ChatPage() {
     
     const hasDirectAttachments = options?.experimental_attachments && options.experimental_attachments.length > 0;
     const hasMemoryDocs = attachedDocs.length > 0;
+    const hasChartAttachments = chartAttachments.length > 0;
     
-    if (!messageInput.trim() && !hasDirectAttachments && !hasMemoryDocs) return;
+    if (!messageInput.trim() && !hasDirectAttachments && !hasMemoryDocs && !hasChartAttachments) return;
     if (!currentSession || isLoading) return;
 
-    // Collect all file attachments
-    const fileAttachments: FileAttachment[] = [];
+    // Collect all file attachments - start with chart attachments
+    const fileAttachments: FileAttachment[] = [...chartAttachments];
     let textContext = '';
 
     // Process direct file attachments (from paperclip button)
@@ -282,7 +333,8 @@ export default function ChatPage() {
     sendMessage(fullMessage, fileAttachments.length > 0 ? fileAttachments : undefined);
     setMessageInput('');
     setAttachedDocs([]);
-  }, [messageInput, attachedDocs, currentSession, isLoading, sendMessage, fileToAttachment, memoryDocToAttachment, uploadDocument]);
+    setChartAttachments([]); // Clear chart attachments after sending
+  }, [messageInput, attachedDocs, chartAttachments, currentSession, isLoading, sendMessage, fileToAttachment, memoryDocToAttachment, uploadDocument]);
 
   // Handle append for prompt suggestions
   const handleAppend = useCallback((message: { role: 'user'; content: string }) => {
