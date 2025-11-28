@@ -1373,7 +1373,9 @@ You can also paste content from medical documents or training notes."
                       });
                       setSuccessMessage('Personal context generated and saved');
                     } catch (error) {
-                      setErrorMessage('Failed to generate context. Please check your API key.');
+                      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                      setErrorMessage(`Failed to generate context: ${errorMsg}`);
+                      console.error('Condensation error:', error);
                     } finally {
                       setIsCondensingProfile(false);
                     }
@@ -1421,7 +1423,7 @@ You can also paste content from medical documents or training notes."
                     rows={6}
                     value={settingsData.aiSettings.userProfileContext}
                     onChange={(e) => saveSettings('aiSettings', { userProfileContext: e.target.value })}
-                    className="w-full mt-1 p-3 border rounded-md resize-y font-mono text-sm bg-green-50 border-green-200"
+                    className="w-full mt-1 p-3 border rounded-md resize-y font-mono text-sm bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     This context is automatically injected into AI prompts for chat, insights, and training plans.

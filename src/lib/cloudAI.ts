@@ -456,6 +456,12 @@ export class CloudAIService {
 
   // Parse GPT-5.1 Responses API response
   private parseResponse(data: any): string {
+    // Check for incomplete response
+    if (data.status === 'incomplete') {
+      const reason = data.incomplete_details?.reason || 'unknown';
+      throw new Error(`Response incomplete: ${reason}. Try increasing maxTokens or reducing input length.`);
+    }
+
     // Use SDK helper if available
     if (data.output_text) {
       return data.output_text;
@@ -1882,9 +1888,9 @@ Be specific and actionable. Only include information relevant to rowing training
       const config: ApiRequestConfig = {
         input: prompt,
         model: 'gpt-5-mini',
-        reasoning: 'medium',
+        reasoning: 'low', // Use low reasoning for faster, simpler condensation
         verbosity: 'low',
-        maxTokens: 500
+        maxTokens: 800 // Increase to accommodate reasoning + output tokens
       };
 
       const response = await this.makeApiCall(config);
