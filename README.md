@@ -24,10 +24,11 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 - **Dashboard**: Comprehensive overview with key metrics, volume charts, and trend analysis
 - **Advanced Analytics**: Detailed breakdown of performance, split trends, stroke rate, and training adherence
-- **Interactive Chart Explanations**: Click "Explain" on any chart to get AI-powered analysis with screenshots and full data context—explanations are saved in tooltips for quick reference
+- **Interactive Chart Explanations**: Click "Explain" on any chart (analytics page AND session details) to get AI-powered analysis—explanations are saved in tooltips for quick reference with "Back to chart" navigation
+- **Structured AI Explanations**: Chart explanations follow a clear format: "Why This Chart Matters" (practical value), "What I See In Your Data" (patterns/trends), and "What This Means For You" (actionable insights)
 - **Performance Correlations**: Explore scatter plots showing relationships between power/pace, stroke rate/pace, duration/distance, energy/duration, and more
 - **Sessions List**: Browse, filter, and sort all your rowing sessions with advanced search
-- **Session Details**: Deep dive into individual workout metrics with interactive charts
+- **Session Details**: Deep dive into individual workout metrics with interactive charts and AI explanations for Power & Stroke Rate, Pace Analysis, Work per Stroke, Stroke Length, and Heart Rate
 - **Stroke-by-Stroke Analysis**: Upload SmartRow stroke exports to unlock power/rhythm distributions, stroke-length consistency, and technique maps for every stroke
 - **Personal Records**: Automatic tracking of your best times and performances across all distances
 
@@ -42,6 +43,8 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Dark Theme**: Modern, easy-on-the-eyes interface
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
 - **Offline-First**: All features work offline except AI-powered capabilities
+- **Rich Tooltips**: AI explanations display in beautifully formatted tooltips with markdown rendering, responsive sizing, and smooth scrolling
+- **Smart Navigation**: "Back to chart" links from chat explanations navigate directly to the source chart (both analytics and session detail pages) with automatic scroll-to-view
 
 ### 🏅 Gamification & Motivation
 
