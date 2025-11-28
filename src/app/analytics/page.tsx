@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints, HelpCircle, ExternalLink, MessageCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
@@ -182,7 +183,7 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 
 const Analytics = () => {
   const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
+  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
 
@@ -191,6 +192,68 @@ const Analytics = () => {
 
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
+
+  // Helper function to generate chart explanation prompt and navigate to chat
+  const handleExplainChart = (chartId: string, chartTitle: string, chartDescription: string, dataContext: string) => {
+    const prompt = `I'm looking at my "${chartTitle}" chart in my rowing analytics. ${chartDescription}
+
+Here's what the data shows:
+${dataContext}
+
+Please help me understand:
+1. What patterns or trends do you see in this data?
+2. What does this tell me about my rowing performance?
+3. Are there any areas of concern or improvement opportunities?
+4. How does this compare to typical rowing benchmarks?
+
+Give me actionable insights I can use in my next training session.`;
+
+    // Navigate to chat with the prompt
+    const params = new URLSearchParams({
+      chartId,
+      chartTitle,
+      prompt
+    });
+    router.push(`/chat?${params.toString()}`);
+  };
+
+  // Helper to generate data context for metric charts
+  const getMetricDataContext = (metric: ChartMetric, chartData: any[]) => {
+    if (chartData.length === 0) return 'No data available for this time period.';
+    
+    const values = chartData.map(d => d[metric]).filter(v => v !== undefined && v !== -1);
+    if (values.length === 0) return 'No valid data points available.';
+    
+    const config = chartConfigs[metric];
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const latest = values[values.length - 1];
+    const earliest = values[0];
+    
+    return `- Time period: ${timeRange === 'all' ? 'All time' : defaultTimeRangeOptions.find(o => o.value === timeRange)?.label}
+- Data points: ${values.length} sessions
+- Range: ${config.formatter(min)} to ${config.formatter(max)}
+- Average: ${config.formatter(avg)}
+- Earliest value: ${config.formatter(earliest)}
+- Latest value: ${config.formatter(latest)}
+- Trend: ${latest > earliest ? 'Increasing' : latest < earliest ? 'Decreasing' : 'Stable'}`;
+  };
+
+  // Helper to generate data context for scatter plots
+  const getScatterDataContext = (xLabel: string, yLabel: string, data: any[], xKey: string, yKey: string) => {
+    if (data.length === 0) return 'No data available for this time period.';
+    
+    const xValues = data.map(d => d[xKey]).filter(v => v !== undefined);
+    const yValues = data.map(d => d[yKey]).filter(v => v !== undefined);
+    
+    if (xValues.length === 0) return 'No valid data points available.';
+    
+    return `- Time period: ${timeRange === 'all' ? 'All time' : defaultTimeRangeOptions.find(o => o.value === timeRange)?.label}
+- Data points: ${data.length} sessions
+- ${xLabel} range: ${Math.min(...xValues).toFixed(1)} to ${Math.max(...xValues).toFixed(1)}
+- ${yLabel} range: ${Math.min(...yValues).toFixed(1)} to ${Math.max(...yValues).toFixed(1)}`;
+  };
 
   // AI Insights hook
   const {
@@ -689,19 +752,72 @@ const Analytics = () => {
                       ) : (
                         <>
                           <CardHeader>
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-md" style={{ backgroundColor: `${config.color}15` }}>
-                                <span style={{ color: config.color }}>
-                                  <Icon className="h-5 w-5" />
-                                </span>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-md" style={{ backgroundColor: `${config.color}15` }}>
+                                  <span style={{ color: config.color }}>
+                                    <Icon className="h-5 w-5" />
+                                  </span>
+                                </div>
+                                <div>
+                                  <CardTitle className="text-lg">
+                                    {config.label} Over Time
+                                  </CardTitle>
+                                  <CardDescription>
+                                    {`Track your ${config.label.toLowerCase()} progress`}
+                                  </CardDescription>
+                                </div>
                               </div>
-                              <div>
-                                <CardTitle className="text-lg">
-                                  {config.label} Over Time
-                                </CardTitle>
-                                <CardDescription>
-                                  {`Track your ${config.label.toLowerCase()} progress`}
-                                </CardDescription>
+                              <div className="flex items-center gap-2">
+                                {/* Show saved explanation indicator */}
+                                {chartExplanations[`metric-${metric}`] && (
+                                  <TooltipProvider>
+                                    <UITooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-green-500 hover:text-green-600"
+                                          onClick={() => router.push(`/chat`)}
+                                        >
+                                          <MessageCircle className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="left" className="max-w-xs">
+                                        <p className="font-medium mb-1">AI Explanation</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {chartExplanations[`metric-${metric}`].summary}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                          <ExternalLink className="h-3 w-3" /> Click to view full chat
+                                        </p>
+                                      </TooltipContent>
+                                    </UITooltip>
+                                  </TooltipProvider>
+                                )}
+                                {/* Explain button */}
+                                <TooltipProvider>
+                                  <UITooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleExplainChart(
+                                          `metric-${metric}`,
+                                          `${config.label} Over Time`,
+                                          `This chart shows how my ${config.label.toLowerCase()} (${config.unit}) has changed over time.`,
+                                          getMetricDataContext(metric, chartData)
+                                        )}
+                                      >
+                                        <HelpCircle className="h-4 w-4 mr-1" />
+                                        Explain
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Ask AI to explain this chart</p>
+                                    </TooltipContent>
+                                  </UITooltip>
+                                </TooltipProvider>
                               </div>
                             </div>
                           </CardHeader>
@@ -768,15 +884,54 @@ const Analytics = () => {
                   {/* Power vs Pace */}
                   <Card className="border-l-4 border-l-amber-500">
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-amber-500/10">
-                          <Zap className="h-5 w-5 text-amber-500" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-amber-500/10">
+                            <Zap className="h-5 w-5 text-amber-500" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Power vs Pace</CardTitle>
+                            <CardDescription>
+                              Does more power lead to faster splits?
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Power vs Pace</CardTitle>
-                          <CardDescription>
-                            Does more power lead to faster splits?
-                          </CardDescription>
+                        <div className="flex items-center gap-2">
+                          {chartExplanations['scatter-power-pace'] && (
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="font-medium mb-1">AI Explanation</p>
+                                  <p className="text-xs">{chartExplanations['scatter-power-pace'].summary}</p>
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    'scatter-power-pace',
+                                    'Power vs Pace',
+                                    'This scatter plot shows the relationship between average power output (watts) and pace (time per 500m) across my sessions.',
+                                    getScatterDataContext('Power (W)', 'Pace (s/500m)', scatterPlotData, 'power', 'pace')
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </CardHeader>
@@ -824,15 +979,54 @@ const Analytics = () => {
                   {/* Stroke Rate vs Pace */}
                   <Card className="border-l-4 border-l-violet-500">
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-violet-500/10">
-                          <Activity className="h-5 w-5 text-violet-500" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-violet-500/10">
+                            <Activity className="h-5 w-5 text-violet-500" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Stroke Rate vs Pace</CardTitle>
+                            <CardDescription>
+                              Efficiency check: Does higher rate mean faster splits?
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Stroke Rate vs Pace</CardTitle>
-                          <CardDescription>
-                            Efficiency check: Does higher rate mean faster splits?
-                          </CardDescription>
+                        <div className="flex items-center gap-2">
+                          {chartExplanations['scatter-rate-pace'] && (
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="font-medium mb-1">AI Explanation</p>
+                                  <p className="text-xs">{chartExplanations['scatter-rate-pace'].summary}</p>
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    'scatter-rate-pace',
+                                    'Stroke Rate vs Pace',
+                                    'This scatter plot shows the relationship between stroke rate (SPM) and pace across my sessions to analyze efficiency.',
+                                    getScatterDataContext('Stroke Rate (SPM)', 'Pace (s/500m)', scatterPlotData, 'strokeRate', 'pace')
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </CardHeader>
@@ -880,15 +1074,54 @@ const Analytics = () => {
                   {/* Duration vs Distance */}
                   <Card className="border-l-4 border-l-blue-500">
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-blue-500/10">
-                          <Clock className="h-5 w-5 text-blue-500" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-blue-500/10">
+                            <Clock className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Duration vs Distance</CardTitle>
+                            <CardDescription>
+                              Session length patterns and consistency
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Duration vs Distance</CardTitle>
-                          <CardDescription>
-                            Session length patterns and consistency
-                          </CardDescription>
+                        <div className="flex items-center gap-2">
+                          {chartExplanations['scatter-duration-distance'] && (
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="font-medium mb-1">AI Explanation</p>
+                                  <p className="text-xs">{chartExplanations['scatter-duration-distance'].summary}</p>
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    'scatter-duration-distance',
+                                    'Duration vs Distance',
+                                    'This scatter plot shows the relationship between session duration (minutes) and distance covered (meters).',
+                                    getScatterDataContext('Duration (min)', 'Distance (m)', scatterPlotData, 'durationMinutes', 'distance')
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </CardHeader>
@@ -936,15 +1169,54 @@ const Analytics = () => {
                   {/* Energy vs Duration */}
                   <Card className="border-l-4 border-l-red-500">
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-red-500/10">
-                          <Flame className="h-5 w-5 text-red-500" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-red-500/10">
+                            <Flame className="h-5 w-5 text-red-500" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Energy vs Duration</CardTitle>
+                            <CardDescription>
+                              Calorie burn rate across different session lengths
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Energy vs Duration</CardTitle>
-                          <CardDescription>
-                            Calorie burn rate across different session lengths
-                          </CardDescription>
+                        <div className="flex items-center gap-2">
+                          {chartExplanations['scatter-energy-duration'] && (
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="font-medium mb-1">AI Explanation</p>
+                                  <p className="text-xs">{chartExplanations['scatter-energy-duration'].summary}</p>
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    'scatter-energy-duration',
+                                    'Energy vs Duration',
+                                    'This scatter plot shows the relationship between session duration (minutes) and calories burned (kCal).',
+                                    getScatterDataContext('Duration (min)', 'Energy (kCal)', scatterPlotData, 'durationMinutes', 'energy')
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </CardHeader>
@@ -991,15 +1263,54 @@ const Analytics = () => {
                   {/* Power vs Stroke Rate */}
                   <Card className="border-l-4 border-l-emerald-500">
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-emerald-500/10">
-                          <Target className="h-5 w-5 text-emerald-500" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-emerald-500/10">
+                            <Target className="h-5 w-5 text-emerald-500" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Power vs Stroke Rate</CardTitle>
+                            <CardDescription>
+                              Do you generate more power at higher stroke rates?
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Power vs Stroke Rate</CardTitle>
-                          <CardDescription>
-                            Do you generate more power at higher stroke rates?
-                          </CardDescription>
+                        <div className="flex items-center gap-2">
+                          {chartExplanations['scatter-power-rate'] && (
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="font-medium mb-1">AI Explanation</p>
+                                  <p className="text-xs">{chartExplanations['scatter-power-rate'].summary}</p>
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    'scatter-power-rate',
+                                    'Power vs Stroke Rate',
+                                    'This scatter plot shows the relationship between stroke rate (SPM) and power output (watts).',
+                                    getScatterDataContext('Stroke Rate (SPM)', 'Power (W)', scatterPlotData, 'strokeRate', 'power')
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </CardHeader>
@@ -1046,15 +1357,54 @@ const Analytics = () => {
                   {/* Distance vs Power */}
                   <Card className="border-l-4 border-l-cyan-500">
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-md bg-cyan-500/10">
-                          <TrendingUp className="h-5 w-5 text-cyan-500" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-cyan-500/10">
+                            <TrendingUp className="h-5 w-5 text-cyan-500" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Distance vs Power</CardTitle>
+                            <CardDescription>
+                              Power output at different session distances
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Distance vs Power</CardTitle>
-                          <CardDescription>
-                            Power output at different session distances
-                          </CardDescription>
+                        <div className="flex items-center gap-2">
+                          {chartExplanations['scatter-distance-power'] && (
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-green-500" onClick={() => router.push('/chat')}>
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="font-medium mb-1">AI Explanation</p>
+                                  <p className="text-xs">{chartExplanations['scatter-distance-power'].summary}</p>
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    'scatter-distance-power',
+                                    'Distance vs Power',
+                                    'This scatter plot shows the relationship between session distance (meters) and average power output (watts).',
+                                    getScatterDataContext('Distance (m)', 'Power (W)', scatterPlotData, 'distance', 'power')
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </CardHeader>

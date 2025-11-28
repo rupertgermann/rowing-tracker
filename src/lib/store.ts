@@ -49,6 +49,13 @@ export interface SessionAnalysisSettings {
   segmentSize: 100 | 500;
 }
 
+// Chart explanation from AI
+export interface ChartExplanation {
+  summary: string;
+  chatSessionId: string;
+  generatedAt: Date;
+}
+
 interface ChartSettings {
   enabledCharts: ChartMetric[];
   chartType: ChartType;
@@ -65,6 +72,7 @@ interface RowingStore {
   dashboardSettings: DashboardSettings;
   sessionsViewSettings: SessionsViewSettings;
   sessionAnalysisSettings: SessionAnalysisSettings;
+  chartExplanations: Record<string, ChartExplanation>; // keyed by chartId
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -80,6 +88,8 @@ interface RowingStore {
   updateDashboardSettings: (settings: Partial<DashboardSettings> | Partial<DashboardSettings['comparisonWidget']> | Partial<DashboardSettings['periodStats']>) => void;
   updateSessionsViewSettings: (settings: Partial<SessionsViewSettings> | Partial<SessionsViewSettings['filters']> | Partial<SessionsViewSettings['sortConfig']>) => void;
   updateSessionAnalysisSettings: (settings: Partial<SessionAnalysisSettings>) => void;
+  setChartExplanation: (chartId: string, explanation: ChartExplanation) => void;
+  getChartExplanation: (chartId: string) => ChartExplanation | undefined;
   
   // Computed getters
   getSessions: () => Session[];
@@ -324,6 +334,7 @@ export const useRowingStore = create<RowingStore>()(
       dashboardSettings: defaultDashboardSettings,
       sessionsViewSettings: defaultSessionsViewSettings,
       sessionAnalysisSettings: defaultSessionAnalysisSettings,
+      chartExplanations: {},
 
       // Actions
       addSessions: (newSessions) => {
@@ -509,6 +520,19 @@ export const useRowingStore = create<RowingStore>()(
         }));
       },
 
+      setChartExplanation: (chartId, explanation) => {
+        set((state) => ({
+          chartExplanations: {
+            ...state.chartExplanations,
+            [chartId]: explanation
+          }
+        }));
+      },
+
+      getChartExplanation: (chartId) => {
+        return get().chartExplanations[chartId];
+      },
+
       // Computed getters
       getSessions: () => get().sessions,
       
@@ -544,7 +568,8 @@ export const useRowingStore = create<RowingStore>()(
         dashboardSettings: state.dashboardSettings,
         sessionsViewSettings: state.sessionsViewSettings,
         sessionAnalysisSettings: state.sessionAnalysisSettings,
-        earnedAwards: state.earnedAwards
+        earnedAwards: state.earnedAwards,
+        chartExplanations: state.chartExplanations
       }),
       // Convert string timestamps back to Date objects on rehydrate
       onRehydrateStorage: () => (state) => {

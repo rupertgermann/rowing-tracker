@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Chat } from '@/components/ui/chat';
 import { type Message } from '@/components/ui/chat-message';
 import { useChat } from '@/hooks/useChat';
+import { useRowingStore } from '@/lib/store';
 import { formatChartDate } from '@/lib/dateTimeUtils';
 import {
   MessageCircle,
@@ -32,6 +34,10 @@ import { blobToDataUrl } from '@/lib/documentProcessor';
 import { settings } from '@/lib/settings';
 
 export default function ChatPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { setChartExplanation } = useRowingStore();
+  
   const {
     currentSession,
     sessions,
@@ -62,9 +68,74 @@ export default function ChatPage() {
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
+  const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string } | null>(null);
+  const [pendingInitialMessage, setPendingInitialMessage] = useState<string | null>(null);
+  const initialPromptProcessedRef = useRef(false);
 
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
+
+  // Handle chart explanation URL params - create session and queue initial message
+  useEffect(() => {
+    if (initialPromptProcessedRef.current) return;
+    
+    const prompt = searchParams.get('prompt');
+    const chartId = searchParams.get('chartId');
+    const chartTitle = searchParams.get('chartTitle');
+    
+    if (prompt && chartId && isAIConfigured) {
+      initialPromptProcessedRef.current = true;
+      
+      // Create a new session with the chart title
+      const sessionTitle = chartTitle ? `Explain: ${chartTitle}` : 'Chart Explanation';
+      const newSession = createSession(sessionTitle);
+      
+      if (newSession) {
+        // Store pending chart explanation context and queue the message
+        setPendingChartExplanation({ chartId, prompt });
+        setPendingInitialMessage(prompt);
+        
+        // Clear URL params without triggering navigation
+        router.replace('/chat', { scroll: false });
+      }
+    }
+  }, [searchParams, isAIConfigured, createSession, router]);
+
+  // Send pending initial message once session is ready
+  useEffect(() => {
+    if (pendingInitialMessage && currentSession && !isLoading) {
+      const messageToSend = pendingInitialMessage;
+      setPendingInitialMessage(null); // Clear immediately to prevent re-sends
+      sendMessage(messageToSend);
+    }
+  }, [pendingInitialMessage, currentSession, isLoading, sendMessage]);
+
+  // Monitor for AI response completion to save chart explanation
+  useEffect(() => {
+    if (!pendingChartExplanation || !currentSession) return;
+    
+    // Check if we have an AI response (at least 2 messages: user + assistant)
+    const messages = currentSession.messages;
+    if (messages.length >= 2) {
+      const lastMessage = messages[messages.length - 1];
+      
+      // If the last message is from the assistant and we're not loading, save the explanation
+      if (lastMessage.role === 'assistant' && !isLoading && lastMessage.content) {
+        // Extract a summary (first 200 chars or first paragraph)
+        const summary = lastMessage.content.split('\n\n')[0].slice(0, 300) + 
+          (lastMessage.content.length > 300 ? '...' : '');
+        
+        setChartExplanation(pendingChartExplanation.chartId, {
+          summary,
+          chatSessionId: currentSession.id,
+          generatedAt: new Date()
+        });
+        
+        // Clear pending state
+        setPendingChartExplanation(null);
+      }
+    }
+  }, [currentSession?.messages, isLoading, pendingChartExplanation, setChartExplanation, currentSession?.id]);
 
   // Load prompt suggestions setting from settings
   useEffect(() => {
