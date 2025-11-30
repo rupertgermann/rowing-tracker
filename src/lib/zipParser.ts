@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { Session, StrokeData } from '@/types/session';
+import { Session } from '@/types/session';
 import { parseStrokeCsv } from './strokeParser';
 
 export interface ZipImportResult {
@@ -10,30 +10,40 @@ export interface ZipImportResult {
     updatedSessions: number;
 }
 
+interface FilenameInfo {
+    timestamp: Date;
+    distance: number | null;
+}
+
 /**
- * Extract timestamp from filename
+ * Extract timestamp and distance from filename
  * Expected format: YYYY-MM-DDTHHMMSS_distance.csv or similar
  * Example: 2025-08-15T124445_500m.csv
  */
-function extractTimestampFromFilename(filename: string): Date | null {
+function extractInfoFromFilename(filename: string): FilenameInfo | null {
     try {
+        // Remove path prefix if present (for files inside folders in ZIP)
+        const baseName = filename.split('/').pop() || filename;
         // Remove extension
-        const name = filename.replace('.csv', '');
+        const name = baseName.replace('.csv', '');
 
         // Extract date part (YYYY-MM-DDTHHMMSS)
-        // The format seems to be YYYY-MM-DDTHHMMSS...
         const match = name.match(/^(\d{4}-\d{2}-\d{2}T\d{6})/);
 
         if (match) {
             const dateStr = match[1];
-            // Format: YYYY-MM-DDTHHMMSS
-            // We need to format it to be parseable by Date constructor or parse manually
-            // 2025-08-15T124445 -> 2025-08-15T12:44:45
+            // Format: YYYY-MM-DDTHHMMSS -> YYYY-MM-DDTHH:MM:SS
             const formattedDateStr = dateStr.replace(
                 /(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})(\d{2})/,
                 '$1T$2:$3:$4'
             );
-            return new Date(formattedDateStr + 'Z'); // Assume UTC as per other files
+            const timestamp = new Date(formattedDateStr + 'Z'); // Assume UTC
+            
+            // Extract distance from filename (e.g., _500m, _1000m, _100m)
+            const distanceMatch = name.match(/_(\d+)m$/);
+            const distance = distanceMatch ? parseInt(distanceMatch[1]) : null;
+            
+            return { timestamp, distance };
         }
         return null;
     } catch (e) {
@@ -42,14 +52,33 @@ function extractTimestampFromFilename(filename: string): Date | null {
 }
 
 /**
- * Find matching session for a given timestamp
- * Allows for a small time difference (e.g. 1 minute) as file timestamp might slightly differ from session start time
+ * Find matching session for a given timestamp and optional distance
+ * Uses closest-match algorithm to handle sessions that are close together in time.
+ * 
+ * When distance is provided, it MUST match exactly to avoid assigning
+ * stroke data to the wrong session (e.g., a 100m warmup vs 1000m main workout)
  */
-function findMatchingSession(timestamp: Date, sessions: Session[]): Session | undefined {
-    return sessions.find(session => {
+function findMatchingSession(timestamp: Date, sessions: Session[], distance: number | null): Session | undefined {
+    // Filter by distance first if provided
+    const candidateSessions = distance !== null 
+        ? sessions.filter(s => s.distance === distance)
+        : sessions;
+    
+    // Find the CLOSEST match within 5 minute tolerance
+    const maxTolerance = 5 * 60 * 1000; // 5 minutes
+    
+    let bestMatch: Session | undefined;
+    let bestDiff = Infinity;
+    
+    for (const session of candidateSessions) {
         const timeDiff = Math.abs(session.timestamp.getTime() - timestamp.getTime());
-        return timeDiff < 60 * 1000; // 1 minute tolerance
-    });
+        if (timeDiff < maxTolerance && timeDiff < bestDiff) {
+            bestDiff = timeDiff;
+            bestMatch = session;
+        }
+    }
+    
+    return bestMatch;
 }
 
 /**
@@ -77,15 +106,13 @@ export async function processZipFile(
 
         for (const zipEntry of files) {
             try {
-                const timestamp = extractTimestampFromFilename(zipEntry.name);
+                const fileInfo = extractInfoFromFilename(zipEntry.name);
 
-                if (!timestamp) {
+                if (!fileInfo) {
                     result.skippedFiles++;
-                    // result.errors.push(`Could not extract timestamp from filename: ${zipEntry.name}`);
                     continue;
                 }
-
-                const session = findMatchingSession(timestamp, existingSessions);
+                const session = findMatchingSession(fileInfo.timestamp, existingSessions, fileInfo.distance);
 
                 if (!session) {
                     result.skippedFiles++;
