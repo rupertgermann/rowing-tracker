@@ -3,7 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, customPrompt, apiKey, size = '1024x1024' } = body;
+    const { 
+      title, 
+      description, 
+      customPrompt, 
+      apiKey, 
+      size = '1024x1024',
+      quality = 'auto',  // auto, high, medium, low
+      model = 'gpt-image-1'  // gpt-image-1 (recommended), dall-e-3, dall-e-2
+    } = body;
 
     if (!title || !description) {
       return NextResponse.json(
@@ -42,7 +50,8 @@ Style guidelines:
       .replace('{title}', title)
       .replace('{description}', description);
 
-    // Call OpenAI DALL-E API
+    // Call OpenAI Image API with gpt-image-1 (recommended) or fallback models
+    // See: https://platform.openai.com/docs/guides/image-generation
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
@@ -50,18 +59,21 @@ Style guidelines:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: model,
         prompt: prompt,
         n: 1,
         size: size,
-        quality: 'standard',
-        response_format: 'b64_json'
+        // quality parameter: 'auto' (default), 'high', 'medium', 'low' for gpt-image-1
+        // 'standard' or 'hd' for dall-e-3
+        quality: model === 'gpt-image-1' ? quality : 'standard',
+        // gpt-image-1 returns b64_json by default, dall-e-3 needs explicit format
+        ...(model !== 'gpt-image-1' && { response_format: 'b64_json' })
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI DALL-E API error:', errorText);
+      console.error('OpenAI Image API error:', errorText);
       return NextResponse.json(
         { error: `OpenAI API error: ${response.status}` },
         { status: response.status }
