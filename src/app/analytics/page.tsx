@@ -298,10 +298,28 @@ const Analytics = () => {
     });
   }, [analyticsSettings, updateChartSettings]);
 
+  // Precompute derived session values to avoid repeated heavy calculations in renders
+  const computedSessions = useMemo(() => {
+    return sessions.map(session => {
+      const timestamp = session.timestamp instanceof Date ? session.timestamp : new Date(session.timestamp);
+      const consistencyScore = session.strokeData && session.strokeData.length > 0
+        ? calculateAdvancedStats(session.strokeData).consistencyScore
+        : -1;
+
+      return {
+        ...session,
+        _timestamp: timestamp,
+        _timestampMs: timestamp.getTime(),
+        _formattedDate: formatChartDate(timestamp),
+        _consistencyScore: consistencyScore
+      };
+    });
+  }, [sessions]);
+
   // Get all session dates for the date picker
   const availableDates = useMemo(() => {
-    return sessions.map(s => new Date(s.timestamp));
-  }, [sessions]);
+    return computedSessions.map(s => s._timestamp);
+  }, [computedSessions]);
 
   // Handle anchor links to scroll to specific charts
   useEffect(() => {
@@ -484,8 +502,8 @@ ${explainChartPrompt}`;
 
   // Filter sessions based on custom date range (if set) or time range
   const filteredSessions = useMemo(() => {
-    return sessions.filter(session => {
-      const sessionDate = new Date(session.timestamp);
+    return computedSessions.filter(session => {
+      const sessionDate = session._timestamp;
       
       // If custom date range is set, use it
       if (dateRange?.from) {
@@ -509,9 +527,9 @@ ${explainChartPrompt}`;
       if (!daysAgo) return true;
 
       const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
-      return sessionDate >= cutoffDate;
+      return session._timestampMs >= cutoffDate.getTime();
     });
-  }, [sessions, timeRange, dateRange]);
+  }, [computedSessions, timeRange, dateRange]);
 
   // Calculate filtered stats
   const filteredStats = useMemo(() => {
@@ -540,7 +558,7 @@ ${explainChartPrompt}`;
   const prepareChartDataWithSmoothing = useCallback((sessions: any[], metric: ChartMetric, smoothing: SmoothingOption) => {
     const baseData = sessions
       .map(session => ({
-        date: formatChartDate(new Date(session.timestamp)),
+        date: session._formattedDate ?? formatChartDate(new Date(session.timestamp)),
         [metric]: getMetricValue(session, metric),
         fullDate: session.timestamp,
         sessionId: session.id
@@ -572,7 +590,8 @@ ${explainChartPrompt}`;
       case 'duration': return session.duration;
       case 'splitTime': return session.avgSplit; // For compatibility, though splitTime uses special rendering
       case 'consistencyScore': {
-        // Calculate consistency score from stroke data if available
+        // Use precomputed value to avoid heavy recalculation
+        if (session._consistencyScore !== undefined) return session._consistencyScore;
         if (session.strokeData && session.strokeData.length > 0) {
           const stats = calculateAdvancedStats(session.strokeData);
           return stats.consistencyScore;
