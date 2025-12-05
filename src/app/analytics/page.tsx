@@ -1302,7 +1302,7 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <SplitTimeChart sessions={filteredSessions} />
+                      <SplitTimeChart sessions={filteredSessions} embedded />
                     </CardContent>
                   </Card>
 

@@ -17,6 +17,7 @@ interface Session {
 interface SplitTimeChartProps {
   sessions: Session[];
   headerActions?: React.ReactNode;
+  embedded?: boolean; // render without outer Card/header (for embedding inside another card)
 }
 
 // Color mapping for stroke rate (20-30 SPM)
@@ -96,7 +97,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export const SplitTimeChart = ({ sessions, headerActions }: SplitTimeChartProps) => {
+export const SplitTimeChart = ({ sessions, headerActions, embedded = false }: SplitTimeChartProps) => {
   // Prepare chart data
   const chartData = useMemo(() => {
     if (!sessions.length) return [];
@@ -133,6 +134,93 @@ export const SplitTimeChart = ({ sessions, headerActions }: SplitTimeChartProps)
     return [min, max];
   }, [chartData]);
 
+  const legend = (
+    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <span>Stroke Rate:</span>
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded-full bg-blue-500" />
+        <span>20-22.5 SPM</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded-full bg-emerald-500" />
+        <span>22.5-25 SPM</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded-full bg-amber-500" />
+        <span>25-27.5 SPM</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded-full bg-red-500" />
+        <span>27.5-30 SPM</span>
+      </div>
+    </div>
+  );
+
+  const chartContent = chartData.length > 0 ? (
+    <div className="w-full">
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
+          <XAxis
+            dataKey="date"
+            stroke={chartTheme.axis.strokeColor}
+            tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+          />
+          <YAxis
+            stroke={chartTheme.axis.strokeColor}
+            tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
+            domain={yDomain}
+            reversed={true}
+            label={{
+              value: 'Average Split (s)',
+              angle: -90,
+              position: 'insideLeft',
+              style: chartTheme.axis.labelStyle
+            }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+
+          {/* Individual session data points */}
+          <Line
+            type="monotone"
+            dataKey="avgSplit"
+            stroke="transparent"
+            dot={<CustomDot />}
+            name="Split Time"
+          />
+
+          {/* 3-session moving average line */}
+          <Line
+            type="monotone"
+            dataKey="movingAvg"
+            stroke="#f97316" // orange-500
+            strokeWidth={2}
+            dot={false}
+            connectNulls={false}
+            name="3-Session Moving Avg"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  ) : (
+    <div className="text-center text-muted-foreground py-8">
+      <p>No data available for split time chart.</p>
+      <p className="text-sm">Upload some sessions to see your pace progression.</p>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        {legend}
+        {chartContent}
+      </div>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -158,82 +246,10 @@ export const SplitTimeChart = ({ sessions, headerActions }: SplitTimeChartProps)
         </div>
 
         {/* Legend for stroke rate colors */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span>Stroke Rate:</span>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span>20-22.5 SPM</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span>22.5-25 SPM</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500" />
-            <span>25-27.5 SPM</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
-            <span>27.5-30 SPM</span>
-          </div>
-        </div>
+        {legend}
       </CardHeader>
       <CardContent>
-        {chartData.length > 0 ? (
-          <div className="w-full">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
-                <XAxis
-                  dataKey="date"
-                  stroke={chartTheme.axis.strokeColor}
-                  tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
-                />
-                <YAxis
-                  stroke={chartTheme.axis.strokeColor}
-                  tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
-                  domain={yDomain}
-                  reversed={true}
-                  label={{
-                    value: 'Average Split (s)',
-                    angle: -90,
-                    position: 'insideLeft',
-                    style: chartTheme.axis.labelStyle
-                  }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-
-                {/* Individual session data points */}
-                <Line
-                  type="monotone"
-                  dataKey="avgSplit"
-                  stroke="transparent"
-                  dot={<CustomDot />}
-                  name="Split Time"
-                />
-
-                {/* 3-session moving average line */}
-                <Line
-                  type="monotone"
-                  dataKey="movingAvg"
-                  stroke="#f97316" // orange-500
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls={false}
-                  name="3-Session Moving Avg"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="text-center text-muted-foreground py-8">
-            <p>No data available for split time chart.</p>
-            <p className="text-sm">Upload some sessions to see your pace progression.</p>
-          </div>
-        )}
+        {chartContent}
       </CardContent>
     </Card>
   );
