@@ -622,6 +622,7 @@ ${explainChartPrompt}`;
 
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
+    if (metric === 'splitTime') return; // Split Time is always shown in correlations section
     const currentCharts = chartSettings.enabledCharts;
     const updatedCharts = currentCharts.includes(metric)
       ? currentCharts.filter(m => m !== metric)
@@ -633,11 +634,13 @@ ${explainChartPrompt}`;
   // Prepare chart data for each enabled metric (with smoothing)
   const orderedEnabledCharts = useMemo(() => {
     const orderMap = new Map(chartOrder.map((metric, index) => [metric, index]));
-    return [...chartSettings.enabledCharts].sort((a, b) => {
-      const aOrder = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
-      const bOrder = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
-      return aOrder - bOrder;
-    });
+    return [...chartSettings.enabledCharts]
+      .filter(metric => metric !== 'splitTime') // Always show Split Time separately in correlations section
+      .sort((a, b) => {
+        const aOrder = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      });
   }, [chartSettings.enabledCharts]);
 
   const chartDataMap = useMemo(() => {
@@ -646,6 +649,11 @@ ${explainChartPrompt}`;
       return acc;
     }, {} as Record<ChartMetric, any[]>);
   }, [filteredSessions, orderedEnabledCharts, hasFilteredData, smoothingValue, prepareChartDataWithSmoothing]);
+
+  // Dedicated Split Time chart data for correlations section (always visible)
+  const splitTimeChartData = useMemo(() => {
+    return hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, 'splitTime', smoothingValue) : [];
+  }, [filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue]);
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
@@ -1018,7 +1026,9 @@ ${explainChartPrompt}`;
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                    {Object.entries(chartConfigs).map(([metric, config]) => {
+                    {Object.entries(chartConfigs)
+                      .filter(([metric]) => metric !== 'splitTime') // Split Time now lives in Correlations section
+                      .map(([metric, config]) => {
                       const Icon = config.icon;
                       const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
 
@@ -1037,9 +1047,9 @@ ${explainChartPrompt}`;
                     })}
                   </div>
                   <div className="mt-4 text-sm text-muted-foreground">
-                    {chartSettings.enabledCharts.length === 0
+                    {orderedEnabledCharts.length === 0
                       ? "No charts selected. Select at least one metric to visualize."
-                      : `Showing ${chartSettings.enabledCharts.length} chart${chartSettings.enabledCharts.length > 1 ? 's' : ''} as ${chartSettings.chartType} visualization${chartSettings.chartType !== 'line' ? 's' : ''}`
+                      : `Showing ${orderedEnabledCharts.length} chart${orderedEnabledCharts.length > 1 ? 's' : ''} as ${chartSettings.chartType} visualization${chartSettings.chartType !== 'line' ? 's' : ''}`
                     }
                   </div>
                 </CardContent>
@@ -1053,54 +1063,6 @@ ${explainChartPrompt}`;
                   const config = chartConfigs[metric];
                   const Icon = config.icon;
                   const chartData = chartDataMap[metric];
-
-                  // Special charts render their own Card component
-                  if (config.isSpecial && metric === 'splitTime') {
-                    return (
-                      <div 
-                        key={metric}
-                        id={`metric-${metric}`}
-                        ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
-                      >
-                        <SplitTimeChart 
-                          sessions={filteredSessions}
-                          headerActions={
-                            <>
-                              {isExplanationValid(`metric-splitTime-${timeRange}`) && (
-                                <ExplanationTooltip
-                                  chatSessionId={chartExplanations[`metric-splitTime-${timeRange}`].chatSessionId}
-                                  content={chartExplanations[`metric-splitTime-${timeRange}`].fullResponse || chartExplanations[`metric-splitTime-${timeRange}`].summary}
-                                />
-                              )}
-                              <TooltipProvider>
-                                <UITooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleExplainChart(
-                                        `metric-splitTime-${timeRange}`,
-                                        'Pace Analysis',
-                                        'This chart shows my split times (pace per 500m) over time, with dots colored by stroke rate and a 3-session moving average trend line.',
-                                        getMetricDataContext('splitTime', chartData),
-                                        chartData
-                                      )}
-                                    >
-                                      <HelpCircle className="h-4 w-4 mr-1" />
-                                      Explain
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Ask AI to explain this chart</p>
-                                  </TooltipContent>
-                                </UITooltip>
-                              </TooltipProvider>
-                            </>
-                          }
-                        />
-                      </div>
-                    );
-                  }
 
                   if (config.isSpecial && metric === 'consistencyScore') {
                     return (
@@ -1293,6 +1255,57 @@ ${explainChartPrompt}`;
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Split Time Over Date (always visible) */}
+                  <Card id="correlation-split-time" className="border-l-4 border-l-primary lg:col-span-2" ref={(el) => { chartRefs.current['correlation-split-time'] = el; }}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-primary/10">
+                            <Target className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Split Time Over Date (Lower is Better)</CardTitle>
+                            <CardDescription>
+                              Pace progression with stroke-rate coloring and 3-session moving average
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isExplanationValid(`correlation-split-time-${timeRange}`) && (
+                            <ExplanationTooltip
+                              chatSessionId={chartExplanations[`correlation-split-time-${timeRange}`].chatSessionId}
+                              content={chartExplanations[`correlation-split-time-${timeRange}`].fullResponse || chartExplanations[`correlation-split-time-${timeRange}`].summary}
+                            />
+                          )}
+                          <TooltipProvider>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExplainChart(
+                                    `correlation-split-time-${timeRange}`,
+                                    'Split Time Over Date',
+                                    'This chart shows my split times (pace per 500m) over time with stroke rate color-coding and a 3-session moving average.',
+                                    getMetricDataContext('splitTime', splitTimeChartData),
+                                    splitTimeChartData
+                                  )}
+                                >
+                                  <HelpCircle className="h-4 w-4 mr-1" />
+                                  Explain
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Ask AI to explain this chart</p></TooltipContent>
+                            </UITooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <SplitTimeChart sessions={filteredSessions} />
+                    </CardContent>
+                  </Card>
+
                   {/* Power vs Pace */}
                   <Card id="scatter-power-pace" className="border-l-4 border-l-amber-500" ref={(el) => { chartRefs.current['scatter-power-pace'] = el; }}>
                     <CardHeader>
