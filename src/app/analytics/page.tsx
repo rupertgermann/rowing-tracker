@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRowingStore, ChartMetric, type SmoothingOption, type AnalyticsChartSettings } from '@/lib/store';
@@ -317,12 +317,24 @@ const Analytics = () => {
   }, [analyticsSettings, updateChartSettings]);
 
   // Precompute derived session values to avoid repeated heavy calculations in renders
+  // Cache expensive per-session calculations (e.g., consistency score) across renders
+  const consistencyCache = useRef(new Map<string, { dataRef: any; score: number }>());
+
   const computedSessions = useMemo(() => {
     return sessions.map(session => {
       const timestamp = session.timestamp instanceof Date ? session.timestamp : new Date(session.timestamp);
-      const consistencyScore = session.strokeData && session.strokeData.length > 0
-        ? calculateAdvancedStats(session.strokeData).consistencyScore
-        : -1;
+
+      let consistencyScore = -1;
+      if (session.strokeData && session.strokeData.length > 0) {
+        const cacheKey = session.id;
+        const cached = consistencyCache.current.get(cacheKey);
+        if (cached && cached.dataRef === session.strokeData) {
+          consistencyScore = cached.score;
+        } else {
+          consistencyScore = calculateAdvancedStats(session.strokeData).consistencyScore;
+          consistencyCache.current.set(cacheKey, { dataRef: session.strokeData, score: consistencyScore });
+        }
+      }
 
       return {
         ...session,
@@ -516,7 +528,7 @@ ${explainChartPrompt}`;
 
   useEffect(() => {
     setMounted(true);
-  }, [smoothingValue]);
+  }, []);
 
   // Filter sessions based on custom date range (if set) or time range
   const filteredSessions = useMemo(() => {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
+import { Session, SessionStats, PersonalRecord, SessionFilters, StrokeData } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
 
 // Chart configuration types
