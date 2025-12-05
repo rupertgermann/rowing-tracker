@@ -86,6 +86,10 @@ export interface AISettings {
   insightsPrompt: string;
   explainChartPrompt: string; // System prompt for chart explanations
 
+  // Achievement generator prompts
+  achievementStoryPrompt: string; // System prompt for achievement story generation
+  achievementImagePrompt: string; // Prompt template for achievement image generation
+
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description
   userProfileRawInput: string; // Original user input (for editing)
@@ -233,6 +237,39 @@ Max 6 lines. Key patterns, trends, improvements or concerns in MY data. Be speci
 Max 6 lines. Benchmarks comparison + 1-2 actionable suggestions.
 
 Be brief and direct. No fluff.`,
+
+      // Achievement generator prompts
+      achievementStoryPrompt: `You are a creative writer crafting inspiring achievement stories for rowers. 
+Write a short, motivational story (2-3 paragraphs, ~150-200 words) celebrating a rowing achievement.
+
+The story should:
+- Be personal and emotionally engaging
+- Reference the specific achievement and what it represents
+- Include vivid imagery related to rowing (water, oars, rhythm, power)
+- End with an inspiring message about the journey ahead
+- Be written in second person ("You have...")
+
+Achievement Details:
+Title: {title}
+Description: {description}
+Earned On: {earnedAt}
+
+Write the achievement story:`,
+
+      achievementImagePrompt: `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
+
+Achievement: {title}
+Description: {description}
+
+Style guidelines:
+- Modern, clean design with elegant typography
+- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
+- Use a color palette of deep blues, golds, and whites
+- Include decorative elements suggesting achievement (laurels, ribbons, stars)
+- The image should feel prestigious and celebratory
+- Do NOT include any text - the text will be overlaid separately
+- Aspect ratio: square (1:1)
+- High quality, suitable for display`,
 
       // Personal context defaults
       userProfileContext: '',
