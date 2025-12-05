@@ -1210,8 +1210,12 @@ ${explainChartPrompt}`;
                             )}
 
                           {chartData.length > 0 ? (
-                              <div className="w-full">
-                                <ResponsiveContainer width="100%" height={300}>
+                              <div className="w-full min-w-0">
+                                <ResponsiveContainer
+                                  width="100%"
+                                  height={300}
+                                  initialDimension={{ width: 600, height: 300 }}
+                                >
                                   {renderChart(metric, chartData, config)}
                                 </ResponsiveContainer>
                               </div>
@@ -1365,8 +1369,12 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full min-w-0">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          initialDimension={{ width: 600, height: 300 }}
+                        >
                           <ScatterChart margin={chartTheme.margin.scatter}>
                             <CartesianGrid 
                               strokeDasharray={chartTheme.grid.strokeDasharray} 
@@ -1452,8 +1460,12 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full min-w-0">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          initialDimension={{ width: 600, height: 300 }}
+                        >
                           <ScatterChart margin={chartTheme.margin.scatter}>
                             <CartesianGrid 
                               strokeDasharray={chartTheme.grid.strokeDasharray} 
@@ -1539,8 +1551,12 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full min-w-0">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          initialDimension={{ width: 600, height: 300 }}
+                        >
                           <ScatterChart margin={chartTheme.margin.scatter}>
                             <CartesianGrid 
                               strokeDasharray={chartTheme.grid.strokeDasharray} 
@@ -1626,8 +1642,12 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full min-w-0">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          initialDimension={{ width: 600, height: 300 }}
+                        >
                           <ScatterChart margin={chartTheme.margin.scatter}>
                             <CartesianGrid 
                               strokeDasharray={chartTheme.grid.strokeDasharray} 
@@ -1712,8 +1732,12 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full min-w-0">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          initialDimension={{ width: 600, height: 300 }}
+                        >
                           <ScatterChart margin={chartTheme.margin.scatter}>
                             <CartesianGrid 
                               strokeDasharray={chartTheme.grid.strokeDasharray} 
@@ -1798,8 +1822,12 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[300px] w-full min-w-0">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          initialDimension={{ width: 600, height: 300 }}
+                        >
                           <ScatterChart margin={chartTheme.margin.scatter}>
                             <CartesianGrid 
                               strokeDasharray={chartTheme.grid.strokeDasharray} 

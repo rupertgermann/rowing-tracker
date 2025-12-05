@@ -444,8 +444,12 @@ export const ConsistencyScoreChart = ({
       </CardHeader>
       <CardContent>
         {chartData.length > 0 ? (
-          <div className="w-full">
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="w-full min-w-0">
+            <ResponsiveContainer
+              width="100%"
+              height={300}
+              initialDimension={{ width: 600, height: 300 }}
+            >
               {renderChart()}
             </ResponsiveContainer>
           </div>
