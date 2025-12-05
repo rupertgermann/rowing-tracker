@@ -760,6 +760,16 @@ ${explainChartPrompt}`;
               radius={[4, 4, 0, 0]}
               cursor="pointer"
             />
+            {hasSmoothing && (
+              <Line
+                type="monotone"
+                dataKey="smoothedValue"
+                stroke="#f97316"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            )}
           </BarChart>
         );
       case 'area':
@@ -779,9 +789,8 @@ ${explainChartPrompt}`;
               <Line
                 type="monotone"
                 dataKey="smoothedValue"
-                stroke="#ffffff"
+                stroke="#f97316"
                 strokeWidth={2}
-                strokeDasharray="5 5"
                 dot={false}
                 connectNulls
               />
@@ -813,9 +822,8 @@ ${explainChartPrompt}`;
               <Line
                 type="monotone"
                 dataKey="smoothedValue"
-                stroke="#ffffff"
+                stroke="#f97316"
                 strokeWidth={2}
-                strokeDasharray="5 5"
                 dot={false}
                 connectNulls
               />
@@ -1213,7 +1221,21 @@ ${explainChartPrompt}`;
                               </div>
                             </div>
 
-                            {chartData.length > 0 ? (
+                            {/* Legend (shown when smoothing is enabled) */}
+                            {smoothingValue > 0 && (
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-teal-500" />
+                                  <span>Individual Sessions</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-0.5 bg-orange-500" />
+                                  <span>{smoothingValue}-Session Moving Average</span>
+                                </div>
+                              </div>
+                            )}
+
+                          {chartData.length > 0 ? (
                               <div className="w-full">
                                 <ResponsiveContainer width="100%" height={300}>
                                   {renderChart(metric, chartData, config)}
