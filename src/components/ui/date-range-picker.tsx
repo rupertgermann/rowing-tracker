@@ -92,9 +92,11 @@ export function DateRangePicker({
   }
   
   // Determine selection state for help text
+  // Note: react-day-picker sets from === to on first click, so we check for that
   const selectionState = React.useMemo(() => {
     if (!value?.from) return 'none'
-    if (!value.to) return 'from-selected'
+    // If from and to are the same date, user just selected the start
+    if (!value.to || value.from.getTime() === value.to.getTime()) return 'from-selected'
     return 'complete'
   }, [value])
 
@@ -114,7 +116,8 @@ export function DateRangePicker({
           >
             <CalendarIcon className="mr-2 h-3 w-3" />
             {value?.from ? (
-              value.to ? (
+              // Check if it's a complete range (from !== to) or just first selection
+              value.to && value.from.getTime() !== value.to.getTime() ? (
                 <>
                   {format(value.from, "MMM d, yyyy")} -{" "}
                   {format(value.to, "MMM d, yyyy")}
@@ -141,7 +144,7 @@ export function DateRangePicker({
                 )}
                 {selectionState === 'from-selected' && (
                   <span className="text-muted-foreground">
-                    <span className="font-medium text-foreground">Step 2:</span> Click to select <span className="font-medium text-primary">end date</span>
+                    <span className="text-blue-600 dark:text-blue-400">✓ Start date selected</span> — now click to select <span className="font-medium text-primary">end date</span>
                   </span>
                 )}
                 {selectionState === 'complete' && (
