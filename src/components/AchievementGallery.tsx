@@ -6,6 +6,7 @@ import { AWARDS } from '@/lib/awards';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { useRowingStore } from '@/lib/store';
 import { settings } from '@/lib/settings';
+import { storeAchievementImage, getAchievementImage } from '@/lib/imageStorage';
 import { 
   Dialog, 
   DialogContent, 
@@ -57,6 +58,14 @@ export function AchievementGallery({
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
+
+  // Derived state - must be before useEffects that depend on it
+  const currentAward = earnedAwardsList[currentIndex];
+  const earnedInfo = earnedAwards.find(a => a.awardId === currentAward?.id);
+  const generated = currentAward ? generatedAchievements[currentAward.id] : undefined;
+  const Icon = currentAward?.icon;
 
   // Set initial index only when dialog opens with a specific award
   useEffect(() => {
@@ -68,10 +77,47 @@ export function AchievementGallery({
     }
   }, [open, initialAwardId]); // Remove earnedAwardsList from deps - it's stable now
 
-  const currentAward = earnedAwardsList[currentIndex];
-  const earnedInfo = earnedAwards.find(a => a.awardId === currentAward?.id);
-  const generated = currentAward ? generatedAchievements[currentAward.id] : undefined;
-  const Icon = currentAward?.icon;
+  // Load image from IndexedDB when current award changes
+  useEffect(() => {
+    const loadImage = async () => {
+      if (!currentAward) {
+        setLoadedImageUrl(null);
+        return;
+      }
+
+      const achievement = generatedAchievements[currentAward.id];
+      
+      // If we have imageUrl in memory, use it
+      if (achievement?.imageUrl) {
+        setLoadedImageUrl(achievement.imageUrl);
+        return;
+      }
+      
+      // If hasImage flag is set, load from IndexedDB
+      if (achievement?.hasImage) {
+        setIsLoadingImage(true);
+        try {
+          const imageData = await getAchievementImage(currentAward.id);
+          if (imageData) {
+            setLoadedImageUrl(imageData);
+            // Also update the store with the loaded image
+            updateGeneratedAchievement(currentAward.id, { imageUrl: imageData });
+          } else {
+            setLoadedImageUrl(null);
+          }
+        } catch (err) {
+          console.error('Failed to load image from IndexedDB:', err);
+          setLoadedImageUrl(null);
+        } finally {
+          setIsLoadingImage(false);
+        }
+      } else {
+        setLoadedImageUrl(null);
+      }
+    };
+
+    loadImage();
+  }, [currentAward, generatedAchievements, updateGeneratedAchievement]);
 
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => {
@@ -155,7 +201,10 @@ export function AchievementGallery({
           title: currentAward.title,
           description: currentAward.description,
           customPrompt: aiSettings.achievementImagePrompt,
-          apiKey: aiSettings.openaiApiKey || undefined
+          apiKey: aiSettings.openaiApiKey || undefined,
+          model: aiSettings.achievementImageModel,
+          quality: aiSettings.achievementImageQuality,
+          size: aiSettings.achievementImageSize
         })
       });
       
@@ -166,9 +215,17 @@ export function AchievementGallery({
       
       const data = await response.json();
       
+      // Store image in IndexedDB (avoids localStorage quota issues)
+      await storeAchievementImage(currentAward.id, data.imageUrl);
+      
+      // Update local state immediately
+      setLoadedImageUrl(data.imageUrl);
+      
+      // Update store with hasImage flag (imageUrl will be stripped on persist)
       if (generated) {
         updateGeneratedAchievement(currentAward.id, {
           imageUrl: data.imageUrl,
+          hasImage: true,
           imagePrompt: data.revisedPrompt,
           generatedAt: new Date()
         });
@@ -179,6 +236,7 @@ export function AchievementGallery({
           description: currentAward.description,
           earnedAt: earnedInfo?.earnedAt ? new Date(earnedInfo.earnedAt) : new Date(),
           imageUrl: data.imageUrl,
+          hasImage: true,
           imagePrompt: data.revisedPrompt,
           generatedAt: new Date()
         });
@@ -196,10 +254,10 @@ export function AchievementGallery({
   };
 
   const handleDownloadImage = () => {
-    if (!generated?.imageUrl) return;
+    if (!loadedImageUrl) return;
     
     const link = document.createElement('a');
-    link.href = generated.imageUrl;
+    link.href = loadedImageUrl;
     link.download = `${currentAward?.title.replace(/\s+/g, '_')}_achievement.png`;
     document.body.appendChild(link);
     link.click();
@@ -258,10 +316,17 @@ export function AchievementGallery({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Generated Image */}
-          {generated?.imageUrl ? (
+          {isLoadingImage ? (
+            <div className="aspect-square max-w-lg mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20">
+              <Loader2 className="h-12 w-12 text-muted-foreground/50 animate-spin" />
+              <p className="text-muted-foreground text-sm">
+                Loading image...
+              </p>
+            </div>
+          ) : loadedImageUrl ? (
             <div className="relative aspect-square max-w-lg mx-auto rounded-xl overflow-hidden border shadow-lg">
               <Image
-                src={generated.imageUrl}
+                src={loadedImageUrl}
                 alt={currentAward.title}
                 fill
                 className="object-cover"
@@ -327,7 +392,7 @@ export function AchievementGallery({
 
           {/* Action Buttons */}
           <div className="max-w-2xl mx-auto flex flex-wrap justify-center gap-3">
-            {!generated?.story && !generated?.imageUrl ? (
+            {!generated?.story && !loadedImageUrl && !generated?.hasImage ? (
               <Button
                 onClick={handleGenerateBoth}
                 disabled={isGeneratingStory || isGeneratingImage}

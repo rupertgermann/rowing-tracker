@@ -2,8 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { GeneratedAchievement, AchievementGeneratorSettings, DEFAULT_ACHIEVEMENT_STORY_PROMPT, DEFAULT_ACHIEVEMENT_IMAGE_PROMPT } from '@/types/achievement';
 
+// Note: Images are stored separately in IndexedDB via imageStorage.ts
+// The store only keeps a flag (hasImage) to indicate if an image exists
+// This avoids localStorage quota issues with large base64 images
+
 interface AchievementStore {
   // Generated achievements keyed by awardId
+  // Note: imageUrl is NOT persisted - it's loaded from IndexedDB on demand
   generatedAchievements: Record<string, GeneratedAchievement>;
   
   // Settings for generation
@@ -122,14 +127,25 @@ export const useAchievementStore = create<AchievementStore>()(
       
       hasGeneratedContent: (awardId) => {
         const achievement = get().generatedAchievements[awardId];
-        return Boolean(achievement?.story || achievement?.imageUrl);
+        return Boolean(achievement?.story || achievement?.imageUrl || achievement?.hasImage);
       }
     }),
     {
       name: 'rowing-achievement-generator',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        generatedAchievements: state.generatedAchievements,
+        // Exclude imageUrl from localStorage - images are stored in IndexedDB
+        generatedAchievements: Object.fromEntries(
+          Object.entries(state.generatedAchievements).map(([key, achievement]) => [
+            key,
+            {
+              ...achievement,
+              imageUrl: undefined, // Don't persist base64 images to localStorage
+              // Keep hasImage flag to know if we need to load from IndexedDB
+              hasImage: Boolean(achievement.imageUrl || achievement.hasImage)
+            }
+          ])
+        ),
         settings: state.settings
       }),
       onRehydrateStorage: () => (state) => {

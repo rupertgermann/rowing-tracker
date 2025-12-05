@@ -89,6 +89,9 @@ export interface AISettings {
   // Achievement generator prompts
   achievementStoryPrompt: string; // System prompt for achievement story generation
   achievementImagePrompt: string; // Prompt template for achievement image generation
+  achievementImageModel: 'gpt-image-1' | 'dall-e-3' | 'dall-e-2'; // Image model selection
+  achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
+  achievementImageSize: '1024x1024' | '1792x1024' | '1024x1792'; // image size
 
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description
@@ -237,6 +240,11 @@ Max 6 lines. Key patterns, trends, improvements or concerns in MY data. Be speci
 Max 6 lines. Benchmarks comparison + 1-2 actionable suggestions.
 
 Be brief and direct. No fluff.`,
+
+      // Achievement generator (defaults)
+      achievementImageModel: 'gpt-image-1',
+      achievementImageQuality: 'auto',
+      achievementImageSize: '1024x1024',
 
       // Achievement generator prompts
       achievementStoryPrompt: `You are a creative writer crafting inspiring achievement stories for rowers. 

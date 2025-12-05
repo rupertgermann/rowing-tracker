@@ -112,7 +112,10 @@ export function AchievementCard({
           title: award.title,
           description: award.description,
           customPrompt: aiSettings.achievementImagePrompt,
-          apiKey: aiSettings.openaiApiKey || undefined
+          apiKey: aiSettings.openaiApiKey || undefined,
+          model: aiSettings.achievementImageModel,
+          quality: aiSettings.achievementImageQuality,
+          size: aiSettings.achievementImageSize
         })
       });
       
