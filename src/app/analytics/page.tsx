@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useRowingStore, ChartMetric } from '@/lib/store';
+import { useRowingStore, ChartMetric, type SmoothingOption, type AnalyticsChartSettings } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints, HelpCircle, ExternalLink, MessageCircle } from 'lucide-react';
@@ -21,6 +21,9 @@ import { CloudInsight } from '@/lib/cloudAI';
 import { chartTheme } from '@/lib/chartUtils';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { DateRange } from 'react-day-picker';
+import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { chatStorage } from '@/lib/chatStorage';
 import { ExplanationTooltip } from '@/components/ExplanationTooltip';
@@ -171,15 +174,59 @@ function prepareChartData(sessions: any[]) {
     }));
 }
 
+// Smoothing options for charts
+const smoothingOptions: { value: SmoothingOption; label: string }[] = [
+  { value: 0, label: 'None' },
+  { value: 3, label: '3' },
+  { value: 5, label: '5' },
+  { value: 10, label: '10' },
+];
+
+// Default analytics settings for migration
+const defaultAnalyticsSettings: AnalyticsChartSettings = {
+  dateRangeFrom: null,
+  dateRangeTo: null,
+  smoothing: {
+    distance: 0,
+    pace: 0,
+    power: 0,
+    strokeRate: 0,
+    energy: 0,
+    duration: 0,
+    splitTime: 3,
+    consistencyScore: 0
+  }
+};
+
+// Calculate moving average for smoothing
+const calculateMovingAverage = (data: number[], windowSize: number): (number | null)[] => {
+  if (windowSize === 0) return data;
+  
+  return data.map((_, index) => {
+    if (index < windowSize - 1) return null;
+    
+    const window = data.slice(index - windowSize + 1, index + 1);
+    const sum = window.reduce((acc, d) => acc + d, 0);
+    return sum / windowSize;
+  });
+};
+
 // Custom tooltip component with full styling control
-const CustomTooltip = ({ active, payload, label, config }: any) => {
+const CustomTooltip = ({ active, payload, label, config, smoothing }: any) => {
   if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const smoothedValue = data.smoothedValue;
     return (
       <div style={chartTheme.tooltip.contentStyle}>
         <p style={chartTheme.tooltip.labelStyle}>{label}</p>
         <p style={chartTheme.tooltip.itemStyle}>
           {config.formatter(payload[0].value)} - {config.label}
         </p>
+        {smoothing > 0 && smoothedValue !== null && smoothedValue !== undefined && (
+          <p style={chartTheme.tooltip.itemStyle}>
+            {smoothing}-Session Avg: {config.formatter(smoothedValue)}
+          </p>
+        )}
       </div>
     );
   }
@@ -214,6 +261,47 @@ const Analytics = () => {
 
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
+
+  // Analytics settings (with fallback for migration)
+  const analyticsSettings = chartSettings.analyticsSettings ?? defaultAnalyticsSettings;
+  
+  // Convert stored date range to DateRange object
+  const dateRange: DateRange | undefined = useMemo(() => {
+    if (!analyticsSettings.dateRangeFrom) return undefined;
+    return {
+      from: new Date(analyticsSettings.dateRangeFrom),
+      to: analyticsSettings.dateRangeTo ? new Date(analyticsSettings.dateRangeTo) : undefined
+    };
+  }, [analyticsSettings.dateRangeFrom, analyticsSettings.dateRangeTo]);
+
+  // Update date range handler
+  const setDateRange = useCallback((range: DateRange | undefined) => {
+    updateChartSettings({
+      analyticsSettings: {
+        ...analyticsSettings,
+        dateRangeFrom: range?.from ? range.from.toISOString() : null,
+        dateRangeTo: range?.to ? range.to.toISOString() : null
+      }
+    });
+  }, [analyticsSettings, updateChartSettings]);
+
+  // Update smoothing for a specific metric
+  const setSmoothing = useCallback((metric: ChartMetric, value: SmoothingOption) => {
+    updateChartSettings({
+      analyticsSettings: {
+        ...analyticsSettings,
+        smoothing: {
+          ...analyticsSettings.smoothing,
+          [metric]: value
+        }
+      }
+    });
+  }, [analyticsSettings, updateChartSettings]);
+
+  // Get all session dates for the date picker
+  const availableDates = useMemo(() => {
+    return sessions.map(s => new Date(s.timestamp));
+  }, [sessions]);
 
   // Handle anchor links to scroll to specific charts
   useEffect(() => {
@@ -394,12 +482,27 @@ ${explainChartPrompt}`;
     setMounted(true);
   }, []);
 
-  // Filter sessions based on selected time range
+  // Filter sessions based on custom date range (if set) or time range
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
+      const sessionDate = new Date(session.timestamp);
+      
+      // If custom date range is set, use it
+      if (dateRange?.from) {
+        if (sessionDate < dateRange.from) return false;
+        // Check end date if set and different from start
+        if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
+          // Add 1 day to include the end date fully
+          const endOfDay = new Date(dateRange.to);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (sessionDate > endOfDay) return false;
+        }
+        return true;
+      }
+      
+      // Otherwise use the fixed time range
       if (timeRange === 'all') return true;
 
-      const sessionDate = new Date(session.timestamp);
       const now = new Date();
       const daysAgo = defaultTimeRangeOptions.find(option => option.value === timeRange)?.days;
 
@@ -408,7 +511,7 @@ ${explainChartPrompt}`;
       const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
       return sessionDate >= cutoffDate;
     });
-  }, [sessions, timeRange]);
+  }, [sessions, timeRange, dateRange]);
 
   // Calculate filtered stats
   const filteredStats = useMemo(() => {
@@ -433,9 +536,9 @@ ${explainChartPrompt}`;
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
 
-  // Prepare chart data for different metrics
-  const prepareChartData = (sessions: any[], metric: ChartMetric) => {
-    return sessions
+  // Prepare chart data for different metrics (with smoothing)
+  const prepareChartDataWithSmoothing = useCallback((sessions: any[], metric: ChartMetric, smoothing: SmoothingOption) => {
+    const baseData = sessions
       .map(session => ({
         date: formatChartDate(new Date(session.timestamp)),
         [metric]: getMetricValue(session, metric),
@@ -444,7 +547,19 @@ ${explainChartPrompt}`;
       }))
       // Filter out sessions without data (e.g., consistency score requires strokeData)
       .filter(dataPoint => dataPoint[metric] !== -1);
-  };
+    
+    // Add smoothed values if smoothing is enabled
+    if (smoothing > 0 && baseData.length > 0) {
+      const values = baseData.map(d => d[metric] as number);
+      const smoothedValues = calculateMovingAverage(values, smoothing);
+      return baseData.map((d, i) => ({
+        ...d,
+        smoothedValue: smoothedValues[i]
+      }));
+    }
+    
+    return baseData;
+  }, []);
 
   // Get metric value from session based on metric type
   const getMetricValue = (session: any, metric: ChartMetric): number => {
@@ -478,13 +593,14 @@ ${explainChartPrompt}`;
     updateChartSettings({ enabledCharts: updatedCharts });
   };
 
-  // Prepare chart data for each enabled metric
+  // Prepare chart data for each enabled metric (with smoothing)
   const chartDataMap = useMemo(() => {
     return chartSettings.enabledCharts.reduce((acc, metric) => {
-      acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
+      const smoothing = analyticsSettings.smoothing[metric] ?? 0;
+      acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, metric, smoothing) : [];
       return acc;
     }, {} as Record<ChartMetric, any[]>);
-  }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData]);
+  }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData, analyticsSettings.smoothing, prepareChartDataWithSmoothing]);
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
@@ -553,6 +669,9 @@ ${explainChartPrompt}`;
       return <SplitTimeChart sessions={filteredSessions} />;
     }
 
+    const smoothing = analyticsSettings.smoothing[metric] ?? 0;
+    const hasSmoothing = smoothing > 0 && chartData.some(d => d.smoothedValue !== null && d.smoothedValue !== undefined);
+
     const commonProps = {
       width: '100%' as const,
       height: 300,
@@ -565,8 +684,6 @@ ${explainChartPrompt}`;
       ...commonProps,
       onClick: (data: any) => handleChartClick(data, chartData)
     };
-
-    // ... existing code ...
 
     const commonChartElements = (
       <>
@@ -583,7 +700,7 @@ ${explainChartPrompt}`;
           tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
           tickFormatter={config.yAxisFormatter}
         />
-        <Tooltip content={<CustomTooltip config={config} />} />
+        <Tooltip content={<CustomTooltip config={config} smoothing={smoothing} />} />
       </>
     );
 
@@ -613,6 +730,17 @@ ${explainChartPrompt}`;
               strokeWidth={2}
               cursor="pointer"
             />
+            {hasSmoothing && (
+              <Line
+                type="monotone"
+                dataKey="smoothedValue"
+                stroke="#ffffff"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+                connectNulls
+              />
+            )}
           </AreaChart>
         );
       default: // line
@@ -629,7 +757,6 @@ ${explainChartPrompt}`;
                 r: 6,
                 cursor: 'pointer',
                 onClick: (e: any, payload: any) => {
-                  // For Line charts, payload is the data point, but let's be safe and use index lookup
                   const dataIndex = chartData.findIndex(item => item.date === payload.date);
                   if (dataIndex !== -1) {
                     handleChartClick({ activeIndex: dataIndex }, chartData);
@@ -637,6 +764,17 @@ ${explainChartPrompt}`;
                 }
               }}
             />
+            {hasSmoothing && (
+              <Line
+                type="monotone"
+                dataKey="smoothedValue"
+                stroke="#ffffff"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+                connectNulls
+              />
+            )}
           </LineChart>
         );
     }
@@ -998,6 +1136,38 @@ ${explainChartPrompt}`;
                             </div>
                           </CardHeader>
                           <CardContent>
+                            {/* Controls row */}
+                            <div className="flex flex-wrap items-center gap-4 mb-4 pb-4 border-b border-border">
+                              {/* Date Range Picker */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Period:</span>
+                                <DateRangePicker
+                                  value={dateRange}
+                                  onChange={setDateRange}
+                                  placeholder="All time"
+                                  availableDates={availableDates}
+                                />
+                              </div>
+
+                              {/* Smoothing Selector */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Smooth:</span>
+                                <div className="flex gap-1">
+                                  {smoothingOptions.map((option) => (
+                                    <Button
+                                      key={option.value}
+                                      variant={(analyticsSettings.smoothing[metric] ?? 0) === option.value ? 'default' : 'outline'}
+                                      size="sm"
+                                      onClick={() => setSmoothing(metric, option.value)}
+                                      className="text-xs px-2"
+                                    >
+                                      {option.label}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
                             {chartData.length > 0 ? (
                               <div className="w-full">
                                 <ResponsiveContainer width="100%" height={300}>

@@ -67,17 +67,22 @@ export interface PendingChartExplanation {
   fullData?: string; // JSON stringified data
 }
 
-// Settings for the Consistency Score chart
-export interface ConsistencyScoreChartSettings {
+// Smoothing option type
+export type SmoothingOption = 0 | 3 | 5 | 10;
+
+// Global analytics chart settings
+export interface AnalyticsChartSettings {
+  // Global date range - applies to all charts
   dateRangeFrom: string | null; // ISO date string
   dateRangeTo: string | null; // ISO date string
-  smoothing: 0 | 3 | 5 | 10;
+  // Per-chart smoothing settings
+  smoothing: Record<ChartMetric, SmoothingOption>;
 }
 
 interface ChartSettings {
   enabledCharts: ChartMetric[];
   chartType: ChartType;
-  consistencyScoreChart: ConsistencyScoreChartSettings;
+  analyticsSettings: AnalyticsChartSettings;
 }
 
 interface RowingStore {
@@ -129,16 +134,25 @@ const defaultFilters: SessionFilters = {
   sortOrder: 'desc'
 };
 
-const defaultConsistencyScoreChartSettings: ConsistencyScoreChartSettings = {
+const defaultAnalyticsSettings: AnalyticsChartSettings = {
   dateRangeFrom: null,
   dateRangeTo: null,
-  smoothing: 0
+  smoothing: {
+    distance: 0,
+    pace: 0,
+    power: 0,
+    strokeRate: 0,
+    energy: 0,
+    duration: 0,
+    splitTime: 3, // Default to 3 for pace analysis (already had moving average)
+    consistencyScore: 0
+  }
 };
 
 const defaultChartSettings: ChartSettings = {
   enabledCharts: ['distance', 'power', 'pace'],
   chartType: 'line',
-  consistencyScoreChart: defaultConsistencyScoreChartSettings
+  analyticsSettings: defaultAnalyticsSettings
 };
 
 const defaultDashboardSettings: DashboardSettings = {

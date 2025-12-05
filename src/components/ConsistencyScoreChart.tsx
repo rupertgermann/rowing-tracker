@@ -13,7 +13,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { useRowingStore, type ConsistencyScoreChartSettings } from '@/lib/store';
+import { useRowingStore, type AnalyticsChartSettings, type SmoothingOption } from '@/lib/store';
 
 interface Session {
   id: string;
@@ -29,8 +29,6 @@ interface ConsistencyScoreChartProps {
 }
 
 // Smoothing options
-type SmoothingOption = 0 | 3 | 5 | 10;
-
 const smoothingOptions: { value: SmoothingOption; label: string }[] = [
   { value: 0, label: 'None' },
   { value: 3, label: '3' },
@@ -72,11 +70,20 @@ const CustomTooltip = ({ active, payload, label, smoothing }: any) => {
   return null;
 };
 
-// Default settings for when store hasn't been migrated yet
-const defaultConsistencySettings: ConsistencyScoreChartSettings = {
+// Default analytics settings for migration
+const defaultAnalyticsSettings: AnalyticsChartSettings = {
   dateRangeFrom: null,
   dateRangeTo: null,
-  smoothing: 0
+  smoothing: {
+    distance: 0,
+    pace: 0,
+    power: 0,
+    strokeRate: 0,
+    energy: 0,
+    duration: 0,
+    splitTime: 3,
+    consistencyScore: 0
+  }
 };
 
 export const ConsistencyScoreChart = ({ 
@@ -86,40 +93,43 @@ export const ConsistencyScoreChart = ({
   headerActions 
 }: ConsistencyScoreChartProps) => {
   // Get persisted settings from store (with fallback for migration)
-  const storedSettings = useRowingStore(state => state.chartSettings.consistencyScoreChart);
-  const chartSettings = storedSettings ?? defaultConsistencySettings;
+  const storedSettings = useRowingStore(state => state.chartSettings.analyticsSettings);
+  const analyticsSettings = storedSettings ?? defaultAnalyticsSettings;
   const updateChartSettings = useRowingStore(state => state.updateChartSettings);
 
   // Convert stored settings to component state
   const dateRange: DateRange | undefined = useMemo(() => {
-    if (!chartSettings.dateRangeFrom) return undefined;
+    if (!analyticsSettings.dateRangeFrom) return undefined;
     return {
-      from: new Date(chartSettings.dateRangeFrom),
-      to: chartSettings.dateRangeTo ? new Date(chartSettings.dateRangeTo) : undefined
+      from: new Date(analyticsSettings.dateRangeFrom),
+      to: analyticsSettings.dateRangeTo ? new Date(analyticsSettings.dateRangeTo) : undefined
     };
-  }, [chartSettings.dateRangeFrom, chartSettings.dateRangeTo]);
+  }, [analyticsSettings.dateRangeFrom, analyticsSettings.dateRangeTo]);
 
-  const smoothing = chartSettings.smoothing;
+  const smoothing = analyticsSettings.smoothing.consistencyScore ?? 0;
 
   // Update handlers that persist to store
   const setDateRange = useCallback((range: DateRange | undefined) => {
     updateChartSettings({
-      consistencyScoreChart: {
-        ...chartSettings,
+      analyticsSettings: {
+        ...analyticsSettings,
         dateRangeFrom: range?.from ? range.from.toISOString() : null,
         dateRangeTo: range?.to ? range.to.toISOString() : null
       }
     });
-  }, [chartSettings, updateChartSettings]);
+  }, [analyticsSettings, updateChartSettings]);
 
   const setSmoothing = useCallback((value: SmoothingOption) => {
     updateChartSettings({
-      consistencyScoreChart: {
-        ...chartSettings,
-        smoothing: value
+      analyticsSettings: {
+        ...analyticsSettings,
+        smoothing: {
+          ...analyticsSettings.smoothing,
+          consistencyScore: value
+        }
       }
     });
-  }, [chartSettings, updateChartSettings]);
+  }, [analyticsSettings, updateChartSettings]);
 
   // Get all session dates for the date picker
   const availableDates = useMemo(() => {
