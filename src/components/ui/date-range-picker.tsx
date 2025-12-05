@@ -132,7 +132,7 @@ export function DateRangePicker({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="start" side="bottom" sideOffset={4}>
           <div className="flex flex-col">
             {/* Help text showing current selection state */}
             <div className="px-4 py-2 border-b bg-muted/50">
@@ -181,8 +181,8 @@ export function DateRangePicker({
               </Button>
             </div>
             
-            {/* Calendars */}
-            <div className="flex">
+            {/* Calendars - min-h ensures consistent height across months with different week counts */}
+            <div className="flex min-h-[280px]">
               <Calendar
                 mode="range"
                 month={leftMonth}
@@ -192,6 +192,7 @@ export function DateRangePicker({
                 numberOfMonths={1}
                 disableNavigation
                 toDate={now}
+                fixedWeeks
                 classNames={{
                   month_caption: "hidden", // Hide individual month captions
                 }}
@@ -206,6 +207,7 @@ export function DateRangePicker({
                 numberOfMonths={1}
                 disableNavigation
                 toDate={now}
+                fixedWeeks
                 classNames={{
                   month_caption: "hidden", // Hide individual month captions
                 }}
