@@ -81,6 +81,11 @@ export const ConsistencyScoreChart = ({
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [smoothing, setSmoothing] = useState<SmoothingOption>(0);
 
+  // Get all session dates for the date picker
+  const availableDates = useMemo(() => {
+    return sessions.map(s => new Date(s.timestamp));
+  }, [sessions]);
+
   // Filter sessions by custom date range
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
@@ -349,6 +354,7 @@ export const ConsistencyScoreChart = ({
                 value={dateRange}
                 onChange={setDateRange}
                 placeholder="All time"
+                availableDates={availableDates}
               />
               {dateRange?.from && (
                 <Button
