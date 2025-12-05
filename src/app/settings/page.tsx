@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
 import {
@@ -17,6 +18,10 @@ import {
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_EXPLAIN_CHART_PROMPT
 } from '@/lib/aiPromptDefaults';
+import {
+  DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
+  DEFAULT_ACHIEVEMENT_STORY_PROMPT
+} from '@/types/achievement';
 import { memoryStorage, MemoryDocument } from '@/lib/memoryStorage';
 import {
   Settings as SettingsIcon,
@@ -39,10 +44,18 @@ import {
   FileText,
   Sparkles,
   Heart,
-  Loader2
+  Loader2,
+  Trophy
 } from 'lucide-react';
 
-type SettingsCategory = 'userPreferences' | 'dataManagement' | 'trainingSettings' | 'notificationSettings' | 'privacySettings' | 'aiSettings';
+type SettingsCategory =
+  | 'userPreferences'
+  | 'dataManagement'
+  | 'trainingSettings'
+  | 'notificationSettings'
+  | 'privacySettings'
+  | 'aiSettings'
+  | 'awards';
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('userPreferences');
@@ -189,6 +202,9 @@ export default function SettingsPage() {
         case 'aiSettings':
           settings.updateAISettings(updates);
           break;
+        case 'awards':
+          settings.updateAISettings(updates); // awards settings live under aiSettings
+          break;
       }
 
       loadSettings();
@@ -235,11 +251,24 @@ export default function SettingsPage() {
   };
 
   const resetCategory = (category: SettingsCategory) => {
-    if (confirm(`Are you sure you want to reset ${category} to default values?`)) {
-      settings.resetCategory(category);
+    if (!confirm(`Are you sure you want to reset ${category} to default values?`)) return;
+
+    if (category === 'awards') {
+      settings.updateAISettings({
+        achievementStoryPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT,
+        achievementImagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
+        achievementImageModel: 'gpt-image-1',
+        achievementImageQuality: 'auto',
+        achievementImageSize: '1024x1024'
+      });
       loadSettings();
-      setSuccessMessage('Settings reset to defaults');
+      setSuccessMessage('Awards settings reset to defaults');
+      return;
     }
+
+    settings.resetCategory(category as Exclude<SettingsCategory, 'awards'>);
+    loadSettings();
+    setSuccessMessage('Settings reset to defaults');
   };
 
   const clearDataCategory = (category: 'sessions' | 'chatHistory' | 'trainingPlans') => {
@@ -273,7 +302,8 @@ export default function SettingsPage() {
     { id: 'trainingSettings', name: 'Training Settings', icon: Target, description: 'Training zones, goals, and preferences' },
     { id: 'notificationSettings', name: 'Notifications', icon: Bell, description: 'Alerts and reminders' },
     { id: 'privacySettings', name: 'Privacy', icon: Shield, description: 'Data sharing and privacy controls' },
-    { id: 'aiSettings', name: 'AI Coach', icon: Brain, description: 'Configure AI assistant and training plan generation' }
+    { id: 'aiSettings', name: 'AI Coach', icon: Brain, description: 'Configure AI assistant and training plan generation' },
+    { id: 'awards', name: 'Awards', icon: Trophy, description: 'Achievement stories and image generation prompts' }
   ];
 
   const renderUserPreferences = () => (
@@ -1578,6 +1608,123 @@ You can also paste content from medical documents or training notes."
     );
   };
 
+  const renderAwardsSettings = () => {
+    if (!settingsData?.aiSettings) return null;
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5" />
+              Achievement Generator
+            </CardTitle>
+            <CardDescription>
+              Configure prompts and image generation settings for achievement stories and certificates.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="achievementStoryPrompt">Story System Prompt</Label>
+                <Textarea
+                  id="achievementStoryPrompt"
+                  value={settingsData.aiSettings.achievementStoryPrompt}
+                  onChange={(e) =>
+                    saveSettings('awards', { achievementStoryPrompt: e.target.value })
+                  }
+                  className="h-40"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleResetPrompt('achievementStoryPrompt', DEFAULT_ACHIEVEMENT_STORY_PROMPT)
+                    }
+                  >
+                    Reset Story Prompt
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="achievementImagePrompt">Image Prompt</Label>
+                <Textarea
+                  id="achievementImagePrompt"
+                  value={settingsData.aiSettings.achievementImagePrompt}
+                  onChange={(e) =>
+                    saveSettings('awards', { achievementImagePrompt: e.target.value })
+                  }
+                  className="h-40"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      saveSettings('awards', { achievementImagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT })
+                    }
+                  >
+                    Reset Image Prompt
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label>Image Model</Label>
+                <select
+                  value={settingsData.aiSettings.achievementImageModel}
+                  onChange={(e) =>
+                    saveSettings('awards', { achievementImageModel: e.target.value as any })
+                  }
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="gpt-image-1">GPT Image (recommended)</option>
+                  <option value="dall-e-3">DALL·E 3</option>
+                  <option value="dall-e-2">DALL·E 2</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Image Quality</Label>
+                <select
+                  value={settingsData.aiSettings.achievementImageQuality}
+                  onChange={(e) =>
+                    saveSettings('awards', { achievementImageQuality: e.target.value as any })
+                  }
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="auto">Auto (default)</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Image Size</Label>
+                <select
+                  value={settingsData.aiSettings.achievementImageSize}
+                  onChange={(e) =>
+                    saveSettings('awards', { achievementImageSize: e.target.value as any })
+                  }
+                  className="w-full mt-1 p-2 border rounded-md"
+                >
+                  <option value="1024x1024">1024 x 1024</option>
+                  <option value="1792x1024">1792 x 1024</option>
+                  <option value="1024x1792">1024 x 1792</option>
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderCategoryContent = () => {
     switch (activeCategory) {
       case 'userPreferences':
@@ -1587,13 +1734,15 @@ You can also paste content from medical documents or training notes."
       case 'trainingSettings':
         return renderTrainingSettings();
       case 'notificationSettings':
-        return renderNotificationSettings();
+        return renderNotifications();
       case 'privacySettings':
         return renderPrivacySettings();
       case 'aiSettings':
         return renderAISettings();
+      case 'awards':
+        return renderAwardsSettings();
       default:
-        return null;
+        return renderUserPreferences();
     }
   };
 
