@@ -8,9 +8,11 @@ import { BarChart3, HelpCircle } from 'lucide-react';
 import { chartTheme } from '@/lib/chartUtils';
 import { formatChartDate } from '@/lib/dateTimeUtils';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
-import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 
 interface Session {
   id: string;
@@ -75,25 +77,32 @@ export const ConsistencyScoreChart = ({
   onExplainChart,
   headerActions 
 }: ConsistencyScoreChartProps) => {
-  // Local state for this chart's time range and smoothing
-  const [localTimeRange, setLocalTimeRange] = useState<TimeRange>('all');
+  // Local state for this chart's date range and smoothing
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [smoothing, setSmoothing] = useState<SmoothingOption>(0);
 
-  // Filter sessions by local time range
+  // Filter sessions by custom date range
   const filteredSessions = useMemo(() => {
     return sessions.filter(session => {
-      if (localTimeRange === 'all') return true;
+      // If no date range is set, show all sessions
+      if (!dateRange?.from) return true;
 
       const sessionDate = new Date(session.timestamp);
-      const now = new Date();
-      const daysAgo = defaultTimeRangeOptions.find(option => option.value === localTimeRange)?.days;
-
-      if (!daysAgo) return true;
-
-      const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
-      return sessionDate >= cutoffDate;
+      
+      // Check if session is after the start date
+      if (sessionDate < dateRange.from) return false;
+      
+      // Check if session is before the end date (if set)
+      if (dateRange.to) {
+        // Include the entire end day
+        const endOfDay = new Date(dateRange.to);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (sessionDate > endOfDay) return false;
+      }
+      
+      return true;
     });
-  }, [sessions, localTimeRange]);
+  }, [sessions, dateRange]);
 
   // Prepare chart data with consistency scores
   const chartData = useMemo(() => {
@@ -138,6 +147,13 @@ export const ConsistencyScoreChart = ({
     return [min, max];
   }, [chartData]);
 
+  // Helper to format date range for display
+  const getDateRangeLabel = () => {
+    if (!dateRange?.from) return 'All time';
+    if (!dateRange.to) return `From ${format(dateRange.from, 'MMM d, yyyy')}`;
+    return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+  };
+
   // Generate data context for AI explanation
   const getDataContext = () => {
     if (chartData.length === 0) return 'No data available for this time period.';
@@ -149,7 +165,7 @@ export const ConsistencyScoreChart = ({
     const latest = scores[scores.length - 1];
     const earliest = scores[0];
     
-    return `- Time period: ${localTimeRange === 'all' ? 'All time' : defaultTimeRangeOptions.find(o => o.value === localTimeRange)?.label}
+    return `- Time period: ${getDateRangeLabel()}
 - Data points: ${scores.length} sessions
 - Range: ${Math.round(min)}/100 to ${Math.round(max)}/100
 - Average: ${Math.round(avg)}/100
@@ -159,10 +175,18 @@ export const ConsistencyScoreChart = ({
 - Smoothing: ${smoothing === 0 ? 'None' : `${smoothing}-session moving average`}`;
   };
 
+  // Generate unique chart ID based on date range
+  const getChartId = () => {
+    const rangeStr = dateRange?.from 
+      ? `${dateRange.from.getTime()}-${dateRange.to?.getTime() || 'open'}`
+      : 'all';
+    return `consistency-score-${rangeStr}-${smoothing}`;
+  };
+
   const handleExplain = () => {
     if (onExplainChart) {
       onExplainChart(
-        `consistency-score-${localTimeRange}-${smoothing}`,
+        getChartId(),
         'Consistency Score Over Time',
         'This chart shows my consistency score (0-100) over time. Higher scores indicate more consistent stroke power, rate, and technique within sessions.',
         getDataContext(),
@@ -318,14 +342,25 @@ export const ConsistencyScoreChart = ({
 
           {/* Controls row */}
           <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-border">
-            {/* Time Range Selector */}
-            <TimeRangeSelector
-              value={localTimeRange}
-              onChange={setLocalTimeRange}
-              showLabel
-              label="Period:"
-              size="sm"
-            />
+            {/* Date Range Picker */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Period:</span>
+              <DateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+                placeholder="All time"
+              />
+              {dateRange?.from && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange(undefined)}
+                  className="text-xs px-2 h-8"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
 
             {/* Smoothing Selector */}
             <div className="flex items-center gap-2">
