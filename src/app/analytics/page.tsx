@@ -13,6 +13,7 @@ import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
+import { ConsistencyScoreChart } from '@/components/ConsistencyScoreChart';
 import { Insight } from '@/lib/aiAnalysis';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { formatChartDate } from '@/lib/dateTimeUtils';
@@ -121,7 +122,8 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     fillOpacity: 0.3,
     formatter: (value: number) => `${Math.round(value)}/100`,
     yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'score (0-100)'
+    unit: 'score (0-100)',
+    isSpecial: true
   }
 };
 
@@ -861,15 +863,14 @@ ${explainChartPrompt}`;
                   const Icon = config.icon;
                   const chartData = chartDataMap[metric];
 
-                  return (
-                    <Card 
-                      key={metric}
-                      id={`metric-${metric}`}
-                      className="border-l-4" 
-                      style={{ borderLeftColor: config.color }}
-                      ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
-                    >
-                      {config.isSpecial && metric === 'splitTime' ? (
+                  // Special charts render their own Card component
+                  if (config.isSpecial && metric === 'splitTime') {
+                    return (
+                      <div 
+                        key={metric}
+                        id={`metric-${metric}`}
+                        ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
+                      >
                         <SplitTimeChart 
                           sessions={filteredSessions}
                           headerActions={
@@ -906,9 +907,45 @@ ${explainChartPrompt}`;
                             </>
                           }
                         />
-                      ) : (
-                        <>
-                          <CardHeader>
+                      </div>
+                    );
+                  }
+
+                  if (config.isSpecial && metric === 'consistencyScore') {
+                    return (
+                      <div 
+                        key={metric}
+                        id={`metric-${metric}`}
+                        ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
+                      >
+                        <ConsistencyScoreChart
+                          sessions={sessions}
+                          chartType={chartSettings.chartType}
+                          onExplainChart={handleExplainChart}
+                          headerActions={
+                            isExplanationValid(`metric-consistencyScore-${timeRange}`) ? (
+                              <ExplanationTooltip
+                                chatSessionId={chartExplanations[`metric-consistencyScore-${timeRange}`].chatSessionId}
+                                content={chartExplanations[`metric-consistencyScore-${timeRange}`].fullResponse || chartExplanations[`metric-consistencyScore-${timeRange}`].summary}
+                              />
+                            ) : undefined
+                          }
+                        />
+                      </div>
+                    );
+                  }
+
+                  // Standard charts use the generic Card wrapper
+                  return (
+                    <Card 
+                      key={metric}
+                      id={`metric-${metric}`}
+                      className="border-l-4" 
+                      style={{ borderLeftColor: config.color }}
+                      ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
+                    >
+                      <>
+                        <CardHeader>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-md" style={{ backgroundColor: `${config.color}15` }}>
@@ -975,7 +1012,6 @@ ${explainChartPrompt}`;
                             )}
                           </CardContent>
                         </>
-                      )}
                     </Card>
                   );
                 })}
