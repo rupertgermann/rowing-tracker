@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
       apiKey, 
       size = '1024x1024',
       quality = 'auto',  // auto, high, medium, low
-      model = 'gpt-image-1'  // gpt-image-1 (recommended), dall-e-3, dall-e-2
+      model = 'gpt-image-1',  // gpt-image-1 (recommended), dall-e-3, dall-e-2
+      story
     } = body;
 
     if (!title || !description) {
@@ -46,9 +47,16 @@ Style guidelines:
 - Aspect ratio: square (1:1)
 - High quality, suitable for display`;
 
-    const prompt = (customPrompt || defaultPrompt)
+    let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
       .replace('{description}', description);
+
+    // If a story already exists, include it for better coherence and background alignment
+    if (story) {
+      prompt += `\n\nHere is the achievement story to keep visual consistency:\n${story}\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.`;
+    } else {
+      prompt += `\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement.`;
+    }
 
     // Call OpenAI Image API with gpt-image-1 (recommended) or fallback models
     // See: https://platform.openai.com/docs/guides/image-generation

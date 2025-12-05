@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, earnedAt, customPrompt, apiKey } = body;
+    const { title, description, earnedAt, customPrompt, apiKey, imageUrl } = body;
 
     if (!title || !description) {
       return NextResponse.json(
@@ -40,10 +40,15 @@ Earned On: {earnedAt}
 
 Write the achievement story:`;
 
-    const prompt = (customPrompt || defaultPrompt)
+    let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
       .replace('{description}', description)
       .replace('{earnedAt}', earnedAt || new Date().toLocaleDateString());
+
+    // If an image already exists, include it in the prompt for better story-image coherence
+    if (imageUrl) {
+      prompt += `\n\nYou also have an existing achievement image at this data URL or link:\n${imageUrl}\nDescribe the scene consistently with that visual.`;
+    }
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/responses', {

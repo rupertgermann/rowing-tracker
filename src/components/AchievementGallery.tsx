@@ -6,7 +6,7 @@ import { AWARDS } from '@/lib/awards';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { useRowingStore } from '@/lib/store';
 import { settings } from '@/lib/settings';
-import { storeAchievementImage, getAchievementImage } from '@/lib/imageStorage';
+import { storeAchievementImage, getAchievementImage, deleteAchievementImage } from '@/lib/imageStorage';
 import { 
   Dialog, 
   DialogContent, 
@@ -253,6 +253,28 @@ export function AchievementGallery({
     await handleGenerateImage();
   };
 
+  const handleResetStory = async () => {
+    if (!currentAward) return;
+    updateGeneratedAchievement(currentAward.id, {
+      story: undefined,
+      error: undefined,
+      generatedAt: new Date()
+    });
+  };
+
+  const handleResetImage = async () => {
+    if (!currentAward) return;
+    await deleteAchievementImage(currentAward.id);
+    setLoadedImageUrl(null);
+    updateGeneratedAchievement(currentAward.id, {
+      imageUrl: undefined,
+      hasImage: false,
+      imagePrompt: undefined,
+      error: undefined,
+      generatedAt: new Date()
+    });
+  };
+
   const handleDownloadImage = () => {
     if (!loadedImageUrl) return;
     
@@ -427,6 +449,13 @@ export function AchievementGallery({
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={handleResetStory}
+                  disabled={isGeneratingStory}
+                >
+                  Reset Story
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={handleGenerateImage}
                   disabled={isGeneratingImage}
                 >
@@ -436,6 +465,13 @@ export function AchievementGallery({
                     <RefreshCw className="h-4 w-4 mr-2" />
                   )}
                   Regenerate Image
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResetImage}
+                  disabled={isGeneratingImage}
+                >
+                  Reset Image
                 </Button>
               </>
             )}

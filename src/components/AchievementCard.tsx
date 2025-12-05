@@ -69,7 +69,9 @@ export function AchievementCard({
           description: award.description,
           earnedAt: earnedAt ? formatDateOnly(earnedAt) : formatDateOnly(new Date()),
           customPrompt: aiSettings.achievementStoryPrompt,
-          apiKey: aiSettings.openaiApiKey || undefined
+          apiKey: aiSettings.openaiApiKey || undefined,
+          // If an image already exists, pass it for better coherence
+          imageUrl: generated?.imageUrl
         })
       });
       
@@ -115,7 +117,9 @@ export function AchievementCard({
           apiKey: aiSettings.openaiApiKey || undefined,
           model: aiSettings.achievementImageModel,
           quality: aiSettings.achievementImageQuality,
-          size: aiSettings.achievementImageSize
+          size: aiSettings.achievementImageSize,
+          // If a story already exists, pass it for better coherence
+          story: generated?.story
         })
       });
       
