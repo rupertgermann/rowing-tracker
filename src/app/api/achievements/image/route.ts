@@ -51,6 +51,9 @@ Style guidelines:
       .replace('{title}', title)
       .replace('{description}', description);
 
+    // Ensure the award title is visible on the certificate/card
+    prompt += `\n\nClearly render the award title "${title}" on the certificate/card in the foreground so it is readable and prominent.`;
+
     // If a story already exists, include it for better coherence and background alignment
     if (story) {
       prompt += `\n\nHere is the achievement story to keep visual consistency:\n${story}\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.`;
