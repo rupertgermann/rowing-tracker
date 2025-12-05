@@ -29,7 +29,7 @@ import { chatStorage } from '@/lib/chatStorage';
 import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 
 // Chart type options
-type ChartType = 'line' | 'bar' | 'area';
+type ChartType = 'line' | 'bar' | 'area' | 'scatter';
 
 // Chart configuration options
 
@@ -129,6 +129,9 @@ const chartConfigs: Record<ChartMetric, ChartConfig> = {
     isSpecial: true
   }
 };
+
+// Order reference for charts to keep buttons and diagrams aligned
+const chartOrder = Object.keys(chartConfigs) as ChartMetric[];
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -613,13 +616,22 @@ ${explainChartPrompt}`;
   };
 
   // Prepare chart data for each enabled metric (with smoothing)
+  const orderedEnabledCharts = useMemo(() => {
+    const orderMap = new Map(chartOrder.map((metric, index) => [metric, index]));
+    return [...chartSettings.enabledCharts].sort((a, b) => {
+      const aOrder = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder;
+    });
+  }, [chartSettings.enabledCharts]);
+
   const chartDataMap = useMemo(() => {
-    return chartSettings.enabledCharts.reduce((acc, metric) => {
+    return orderedEnabledCharts.reduce((acc, metric) => {
       const smoothing = analyticsSettings.smoothing[metric] ?? 0;
       acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, metric, smoothing) : [];
       return acc;
     }, {} as Record<ChartMetric, any[]>);
-  }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData, analyticsSettings.smoothing, prepareChartDataWithSmoothing]);
+  }, [filteredSessions, orderedEnabledCharts, hasFilteredData, analyticsSettings.smoothing, prepareChartDataWithSmoothing]);
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
@@ -1013,9 +1025,9 @@ ${explainChartPrompt}`;
             </div>
 
             {/* Configurable Charts */}
-            {chartSettings.enabledCharts.length > 0 && (
+            {orderedEnabledCharts.length > 0 && (
               <div className="space-y-6">
-                {chartSettings.enabledCharts.map(metric => {
+                {orderedEnabledCharts.map(metric => {
                   const config = chartConfigs[metric];
                   const Icon = config.icon;
                   const chartData = chartDataMap[metric];
