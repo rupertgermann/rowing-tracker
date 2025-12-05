@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import { useRowingStore, type ConsistencyScoreChartSettings } from '@/lib/store';
 
 interface Session {
   id: string;
@@ -71,15 +72,54 @@ const CustomTooltip = ({ active, payload, label, smoothing }: any) => {
   return null;
 };
 
+// Default settings for when store hasn't been migrated yet
+const defaultConsistencySettings: ConsistencyScoreChartSettings = {
+  dateRangeFrom: null,
+  dateRangeTo: null,
+  smoothing: 0
+};
+
 export const ConsistencyScoreChart = ({ 
   sessions, 
   chartType = 'line',
   onExplainChart,
   headerActions 
 }: ConsistencyScoreChartProps) => {
-  // Local state for this chart's date range and smoothing
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [smoothing, setSmoothing] = useState<SmoothingOption>(0);
+  // Get persisted settings from store (with fallback for migration)
+  const storedSettings = useRowingStore(state => state.chartSettings.consistencyScoreChart);
+  const chartSettings = storedSettings ?? defaultConsistencySettings;
+  const updateChartSettings = useRowingStore(state => state.updateChartSettings);
+
+  // Convert stored settings to component state
+  const dateRange: DateRange | undefined = useMemo(() => {
+    if (!chartSettings.dateRangeFrom) return undefined;
+    return {
+      from: new Date(chartSettings.dateRangeFrom),
+      to: chartSettings.dateRangeTo ? new Date(chartSettings.dateRangeTo) : undefined
+    };
+  }, [chartSettings.dateRangeFrom, chartSettings.dateRangeTo]);
+
+  const smoothing = chartSettings.smoothing;
+
+  // Update handlers that persist to store
+  const setDateRange = useCallback((range: DateRange | undefined) => {
+    updateChartSettings({
+      consistencyScoreChart: {
+        ...chartSettings,
+        dateRangeFrom: range?.from ? range.from.toISOString() : null,
+        dateRangeTo: range?.to ? range.to.toISOString() : null
+      }
+    });
+  }, [chartSettings, updateChartSettings]);
+
+  const setSmoothing = useCallback((value: SmoothingOption) => {
+    updateChartSettings({
+      consistencyScoreChart: {
+        ...chartSettings,
+        smoothing: value
+      }
+    });
+  }, [chartSettings, updateChartSettings]);
 
   // Get all session dates for the date picker
   const availableDates = useMemo(() => {
@@ -356,16 +396,6 @@ export const ConsistencyScoreChart = ({
                 placeholder="All time"
                 availableDates={availableDates}
               />
-              {dateRange?.from && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDateRange(undefined)}
-                  className="text-xs px-2 h-8"
-                >
-                  Clear
-                </Button>
-              )}
             </div>
 
             {/* Smoothing Selector */}

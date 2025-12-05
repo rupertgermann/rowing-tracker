@@ -100,6 +100,30 @@ export function DateRangePicker({
     return 'complete'
   }, [value])
 
+  // Wrapper to handle range selection behavior
+  // When a complete range exists and user clicks, we want to START FRESH
+  // rather than react-day-picker's default behavior of modifying the existing range
+  const handleSelect = React.useCallback((newRange: DateRange | undefined) => {
+    // If we had a complete range and the new range has from === to,
+    // this means user clicked to start a new selection.
+    // React-day-picker keeps the old 'from' date, but we want the clicked date.
+    if (selectionState === 'complete' && newRange?.from && newRange?.to && 
+        newRange.from.getTime() === newRange.to.getTime()) {
+      // The 'to' date is actually what the user clicked (react-day-picker sets both to the clicked date)
+      // But react-day-picker might keep the old 'from' - we need to check if it changed
+      if (value?.from && newRange.from.getTime() === value.from.getTime()) {
+        // react-day-picker kept the old 'from', but we want to start fresh
+        // We can't know what the user actually clicked, so we clear and let them click again
+        // OR we can use the 'to' value which should be the clicked date
+        // Actually, looking at the logs: both from and to are set to the OLD from date
+        // This means we need to clear the selection to let user start fresh
+        onChange?.(undefined);
+        return;
+      }
+    }
+    onChange?.(newRange);
+  }, [selectionState, value, onChange])
+
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover>
@@ -136,23 +160,36 @@ export function DateRangePicker({
           <div className="flex flex-col">
             {/* Help text showing current selection state */}
             <div className="px-4 py-2 border-b bg-muted/50">
-              <p className="text-xs text-center">
-                {selectionState === 'none' && (
-                  <span className="text-muted-foreground">
-                    <span className="font-medium text-foreground">Step 1:</span> Click to select <span className="font-medium text-primary">start date</span>
-                  </span>
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-xs flex-1 text-center">
+                  {selectionState === 'none' && (
+                    <span className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Step 1:</span> Click to select <span className="font-medium text-primary">start date</span>
+                    </span>
+                  )}
+                  {selectionState === 'from-selected' && (
+                    <span className="text-muted-foreground">
+                      <span className="text-blue-600 dark:text-blue-400">✓ Start date selected</span> — now click to select <span className="font-medium text-primary">end date</span>
+                    </span>
+                  )}
+                  {selectionState === 'complete' && (
+                    <span className="text-green-600 dark:text-green-400 font-medium">
+                      ✓ Range selected — click any date to start over
+                    </span>
+                  )}
+                </p>
+                {/* Reset button - visible when any selection is made */}
+                {selectionState !== 'none' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-6 px-2 text-muted-foreground hover:text-destructive"
+                    onClick={() => onChange?.(undefined)}
+                  >
+                    Reset
+                  </Button>
                 )}
-                {selectionState === 'from-selected' && (
-                  <span className="text-muted-foreground">
-                    <span className="text-blue-600 dark:text-blue-400">✓ Start date selected</span> — now click to select <span className="font-medium text-primary">end date</span>
-                  </span>
-                )}
-                {selectionState === 'complete' && (
-                  <span className="text-green-600 dark:text-green-400 font-medium">
-                    ✓ Range selected — click any date to start over
-                  </span>
-                )}
-              </p>
+              </div>
             </div>
             
             {/* Navigation header */}
@@ -188,7 +225,7 @@ export function DateRangePicker({
                 month={leftMonth}
                 onMonthChange={() => {}} // Controlled externally
                 selected={value}
-                onSelect={onChange}
+                onSelect={handleSelect}
                 numberOfMonths={1}
                 disableNavigation
                 toDate={now}
@@ -203,7 +240,7 @@ export function DateRangePicker({
                 month={displayMonth}
                 onMonthChange={() => {}} // Controlled externally
                 selected={value}
-                onSelect={onChange}
+                onSelect={handleSelect}
                 numberOfMonths={1}
                 disableNavigation
                 toDate={now}

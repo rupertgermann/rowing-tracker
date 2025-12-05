@@ -67,9 +67,17 @@ export interface PendingChartExplanation {
   fullData?: string; // JSON stringified data
 }
 
+// Settings for the Consistency Score chart
+export interface ConsistencyScoreChartSettings {
+  dateRangeFrom: string | null; // ISO date string
+  dateRangeTo: string | null; // ISO date string
+  smoothing: 0 | 3 | 5 | 10;
+}
+
 interface ChartSettings {
   enabledCharts: ChartMetric[];
   chartType: ChartType;
+  consistencyScoreChart: ConsistencyScoreChartSettings;
 }
 
 interface RowingStore {
@@ -121,9 +129,16 @@ const defaultFilters: SessionFilters = {
   sortOrder: 'desc'
 };
 
+const defaultConsistencyScoreChartSettings: ConsistencyScoreChartSettings = {
+  dateRangeFrom: null,
+  dateRangeTo: null,
+  smoothing: 0
+};
+
 const defaultChartSettings: ChartSettings = {
   enabledCharts: ['distance', 'power', 'pace'],
-  chartType: 'line'
+  chartType: 'line',
+  consistencyScoreChart: defaultConsistencyScoreChartSettings
 };
 
 const defaultDashboardSettings: DashboardSettings = {
