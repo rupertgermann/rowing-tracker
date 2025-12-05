@@ -177,7 +177,7 @@ function prepareChartData(sessions: any[]) {
     }));
 }
 
-// Smoothing options for charts
+// Smoothing options for charts (shared across all charts)
 const smoothingOptions: { value: SmoothingOption; label: string }[] = [
   { value: 0, label: 'None' },
   { value: 3, label: '3' },
@@ -288,15 +288,30 @@ const Analytics = () => {
     });
   }, [analyticsSettings, updateChartSettings]);
 
-  // Update smoothing for a specific metric
-  const setSmoothing = useCallback((metric: ChartMetric, value: SmoothingOption) => {
+  // Derive a single smoothing value shared across all charts (aligned like the date selector)
+  const smoothingValue = useMemo<SmoothingOption>(() => {
+    if ('smoothingAll' in analyticsSettings && analyticsSettings.smoothingAll !== undefined) {
+      return analyticsSettings.smoothingAll as SmoothingOption;
+    }
+    // Fallback: prefer existing splitTime default (3) then distance (0)
+    return (analyticsSettings.smoothing?.splitTime ??
+      analyticsSettings.smoothing?.distance ??
+      0) as SmoothingOption;
+  }, [analyticsSettings]);
+
+  // Update smoothing globally for every metric to keep selectors in sync
+  const setSmoothing = useCallback((value: SmoothingOption) => {
+    const nextSmoothing = Object.keys(analyticsSettings.smoothing ?? chartConfigs)
+      .reduce((acc, key) => {
+        acc[key as ChartMetric] = value;
+        return acc;
+      }, {} as Record<ChartMetric, SmoothingOption>);
+
     updateChartSettings({
       analyticsSettings: {
         ...analyticsSettings,
-        smoothing: {
-          ...analyticsSettings.smoothing,
-          [metric]: value
-        }
+        smoothingAll: value,
+        smoothing: nextSmoothing
       }
     });
   }, [analyticsSettings, updateChartSettings]);
@@ -501,7 +516,7 @@ ${explainChartPrompt}`;
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+  }, [smoothingValue]);
 
   // Filter sessions based on custom date range (if set) or time range
   const filteredSessions = useMemo(() => {
@@ -570,9 +585,9 @@ ${explainChartPrompt}`;
       .filter(dataPoint => dataPoint[metric] !== -1);
     
     // Add smoothed values if smoothing is enabled
-    if (smoothing > 0 && baseData.length > 0) {
+    if (smoothingValue > 0 && baseData.length > 0) {
       const values = baseData.map(d => d[metric] as number);
-      const smoothedValues = calculateMovingAverage(values, smoothing);
+      const smoothedValues = calculateMovingAverage(values, smoothingValue);
       return baseData.map((d, i) => ({
         ...d,
         smoothedValue: smoothedValues[i]
@@ -580,7 +595,7 @@ ${explainChartPrompt}`;
     }
     
     return baseData;
-  }, []);
+  }, [smoothingValue]);
 
   // Get metric value from session based on metric type
   const getMetricValue = (session: any, metric: ChartMetric): number => {
@@ -627,11 +642,10 @@ ${explainChartPrompt}`;
 
   const chartDataMap = useMemo(() => {
     return orderedEnabledCharts.reduce((acc, metric) => {
-      const smoothing = analyticsSettings.smoothing[metric] ?? 0;
-      acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, metric, smoothing) : [];
+      acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, metric, smoothingValue) : [];
       return acc;
     }, {} as Record<ChartMetric, any[]>);
-  }, [filteredSessions, orderedEnabledCharts, hasFilteredData, analyticsSettings.smoothing, prepareChartDataWithSmoothing]);
+  }, [filteredSessions, orderedEnabledCharts, hasFilteredData, smoothingValue, prepareChartDataWithSmoothing]);
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
@@ -700,8 +714,8 @@ ${explainChartPrompt}`;
       return <SplitTimeChart sessions={filteredSessions} />;
     }
 
-    const smoothing = analyticsSettings.smoothing[metric] ?? 0;
-    const hasSmoothing = smoothing > 0 && chartData.some(d => d.smoothedValue !== null && d.smoothedValue !== undefined);
+    const smoothing = smoothingValue;
+    const hasSmoothing = smoothingValue > 0 && chartData.some(d => d.smoothedValue !== null && d.smoothedValue !== undefined);
 
     const commonProps = {
       width: '100%' as const,
@@ -1187,9 +1201,9 @@ ${explainChartPrompt}`;
                                   {smoothingOptions.map((option) => (
                                     <Button
                                       key={option.value}
-                                      variant={(analyticsSettings.smoothing[metric] ?? 0) === option.value ? 'default' : 'outline'}
+                                      variant={smoothingValue === option.value ? 'default' : 'outline'}
                                       size="sm"
-                                      onClick={() => setSmoothing(metric, option.value)}
+                                      onClick={() => setSmoothing(option.value)}
                                       className="text-xs px-2"
                                     >
                                       {option.label}

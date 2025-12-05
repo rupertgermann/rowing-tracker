@@ -75,6 +75,8 @@ export interface AnalyticsChartSettings {
   // Global date range - applies to all charts
   dateRangeFrom: string | null; // ISO date string
   dateRangeTo: string | null; // ISO date string
+  // Global smoothing selector (applies to all charts)
+  smoothingAll?: SmoothingOption;
   // Per-chart smoothing settings
   smoothing: Record<ChartMetric, SmoothingOption>;
 }
@@ -137,6 +139,7 @@ const defaultFilters: SessionFilters = {
 const defaultAnalyticsSettings: AnalyticsChartSettings = {
   dateRangeFrom: null,
   dateRangeTo: null,
+  smoothingAll: 0,
   smoothing: {
     distance: 0,
     pace: 0,
