@@ -2,13 +2,14 @@
 
 ## user notes
 
+example image generation prompt with full story:
+
 ```json
 {
   "title": "Getting Habitual",
   "description": "Complete 10 rowing sessions",
-  "customPrompt": "    "sentPrompt": "Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.\n\nAchievement: Getting Habitual\nDescription: Complete 10 rowing sessions\n\nStyle guidelines:\n- Modern, clean design with elegant typography\n- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)\n- Use a color palette of deep blues, golds, and whites\n- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. \n- Include decorative elements suggesting achievement (laurels, ribbons, stars)\n- The image should feel prestigious and celebratory\n- Do NOT include any text - the text will be overlaid separately\n- Aspect ratio award: Square 1:1\n- Aspect ratio for the whole image: lanscape\n- good quality, suitable for display\n\nClearly render the award title \"Getting Habitual\" on the certificate/card in the foreground so it is readable and prominent.\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement."
-"
-,
+  "customPrompt": "Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.\n\nAchievement: On Fire\nDescription: Row for 5 consecutive days\n\nStyle guidelines:\n- Modern, clean design with elegant typography\n- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)\n- Use a color palette of deep blues, golds, and whites\n- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. \n- Include decorative elements suggesting achievement (laurels, ribbons, stars)\n- The image should feel prestigious and celebratory\n- Do NOT include any text - the text will be overlaid separately\n- Aspect ratio award: Square 1:1\n- Aspect ratio for the whole image: lanscape\n- good quality, suitable for display\n\nClearly render the award title \"On Fire\" on the certificate/card in the foreground so it is readable and prominent.\n\nHere is the achievement story to keep visual consistency:\nYou have been on fire—literally earning the \"On Fire\" badge for rowing five consecutive days, a small metal echo of the mornings and evenings you've poured into the boat. On 20 Aug 2025 at 15:12 you saw those words and a quiet swell of pride rose in your chest. Each day you crested the mirror-smooth water, felt the catch of the oar, the hollow surge of the hull cutting wake, and learned the secret language of rhythm and breath. This achievement isn't just five checks on a calendar; it is proof that you showed up when the dawn was cold and when fatigue whispered stop, and that your hands remember the pattern of power.\n\nYou have learned what consistency tastes like—salt, sweat, and sunlight dancing on ripples. The oars became metronomes, your strokes a steady sentence written across the river: effort, recovery, resolve. That badge represents stamina, discipline, and a kindled hunger for more. Keep this ember in your pocket as you push forward; the water will keep answering your rhythm, and the journey ahead is yours to row.\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.",
+
 
   "apiKey": "sk-proj-....",
   "model": "gpt-image-1",
