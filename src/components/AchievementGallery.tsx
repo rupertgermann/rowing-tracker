@@ -377,6 +377,12 @@ export function AchievementGallery({
                 fill
                 className="object-cover"
               />
+              {isGeneratingImage && (
+                <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">Updating image...</p>
+                </div>
+              )}
               <div className="absolute bottom-4 right-4 flex gap-2">
                 <Button
                   size="sm"
@@ -389,11 +395,22 @@ export function AchievementGallery({
               </div>
             </div>
           ) : (
-            <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20`}>
-              <ImageIcon className="h-16 w-16 text-muted-foreground/50" />
-              <p className="text-muted-foreground text-sm">
-                No image generated yet
-              </p>
+            <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20 relative`}>
+              {isGeneratingImage ? (
+                <>
+                  <Loader2 className="h-12 w-12 text-muted-foreground/50 animate-spin" />
+                  <p className="text-muted-foreground text-sm">
+                    Creating image...
+                  </p>
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="h-16 w-16 text-muted-foreground/50" />
+                  <p className="text-muted-foreground text-sm">
+                    No image generated yet
+                  </p>
+                </>
+              )}
             </div>
           )}
 
