@@ -39,6 +39,9 @@ Always provide:
 Focus on practical advice that helps rowers improve performance while avoiding injury and overtraining.
 ```
 
+**Defined at:** `src/lib/aiPromptDefaults.ts` @1-18  
+**Used when:** Cloud AI builds the base system prompt for analysis (with optional user context appended) in `getSystemPrompt()` @src/lib/cloudAI.ts#1030-1037. If users override `aiSettings.systemPrompt` in Settings, that value is used instead of the default.
+
 ### Default chat system prompt
 
 ```
@@ -109,6 +112,9 @@ TOOLS AVAILABLE:
 - get_achievements: Use this to understand the user's personal records and earned awards. Reference these when motivating or contextualizing advice.
 ```
 
+**Defined at:** `src/lib/aiPromptDefaults.ts` @20-85  
+**Used when:** Chat responses are built via `getChatSystemPrompt()` in Cloud AI @src/lib/cloudAI.ts#786-904. If users override `aiSettings.chatSystemPrompt`, the override is used. User profile context is appended automatically.
+
 ### Default plan generation prompt
 
 ```
@@ -131,6 +137,9 @@ Always create plans that are:
 
 Ensure the plan structure follows proper training principles with appropriate volume and intensity progression.
 ```
+
+**Defined at:** `src/lib/aiPromptDefaults.ts` @86-104  
+**Used when:** Plan creation uses `getPlanGenerationSystemPrompt()` in Cloud AI @src/lib/cloudAI.ts#1528-1535. User overrides (`aiSettings.planGenerationPrompt`) replace the default; user profile context is appended.
 
 ### Default insights prompt
 
@@ -164,6 +173,9 @@ Return a JSON array of insights with this structure:
 Limit to 5 most important insights. Focus on actionable advice that will help the rower improve.
 ```
 
+**Defined at:** `src/lib/aiPromptDefaults.ts` @105-132  
+**Used when:** Insights generation pulls from `aiSettings.insightsPrompt` or falls back to `getDefaultInsightsPrompt()` inside `buildInsightPrompt()` @src/lib/cloudAI.ts#1039-1087. User profile context is appended via the system prompt preceding the user prompt.
+
 ### Default explain-chart prompt
 
 ```
@@ -180,6 +192,9 @@ Max 6 lines. Benchmarks comparison + 1-2 actionable suggestions.
 
 Be brief and direct. No fluff.
 ```
+
+**Defined at:** `src/lib/aiPromptDefaults.ts` @133-145  
+**Used when:** Chart explanations read `aiSettings.explainChartPrompt` (defaulting to this value) and append it to chart explanation requests (configured/reset in Settings) @src/app/settings/page.tsx#1480-1600. The prompt is included in explain-chart flows when present in settings.
 
 ### Default achievement story prompt
 
@@ -220,3 +235,12 @@ Style guidelines:
 - Do NOT include any text - the text will be overlaid separately
 - Aspect ratio: square (1:1)
 - High quality, suitable for display
+```
+
+### Additional runtime prompt logic (conditional additions)
+
+- Achievement image prompt adjustments @src/app/api/achievements/image/route.ts#34-112  
+  - Always appends: “Clearly render the award title \<title> on the certificate/card in the foreground…”  
+  - If a story is supplied, it appends the story text and asks to match the background/mood while keeping the certificate in the foreground; otherwise it appends a generic foreground/background instruction.
+- Achievement story prompt adjustment @src/app/api/achievements/story/route.ts#25-110  
+  - If an achievement image URL is provided, it appends a note to keep the story consistent with that visual.
