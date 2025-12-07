@@ -187,6 +187,38 @@ const defaultSessionAnalysisSettings: SessionAnalysisSettings = {
   segmentSize: 500
 };
 
+// Helpers to determine when an award was actually earned
+function sortSessionsByDate(sessions: Session[]): Session[] {
+  return [...sessions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+}
+
+function computeAwardEarnedAt(sessions: Session[], awardId: string): Date | null {
+  const sorted = sortSessionsByDate(sessions);
+  for (let i = 0; i < sorted.length; i++) {
+    const prefix = sorted.slice(0, i + 1);
+    const stats = calculateStats(prefix);
+    const award = AWARDS.find(a => a.id === awardId);
+    if (!award) continue;
+    if (award.condition(prefix, stats)) {
+      return new Date(sorted[i].timestamp);
+    }
+  }
+  return null;
+}
+
+function computeAllEarnedAwards(sessions: Session[]): EarnedAward[] {
+  const earned: EarnedAward[] = [];
+  AWARDS.forEach(award => {
+    const earnedAt = computeAwardEarnedAt(sessions, award.id);
+    if (earnedAt) {
+      earned.push({ awardId: award.id, earnedAt });
+    }
+  });
+  return earned;
+}
+
 // Calculate personal records from sessions
 function calculatePersonalRecords(sessions: Session[]): PersonalRecord[] {
   const records: PersonalRecord[] = [];
@@ -393,29 +425,24 @@ export const useRowingStore = create<RowingStore>()(
           
           const updatedSessions = [...state.sessions, ...uniqueNewSessions];
           const updatedRecords = calculatePersonalRecords(updatedSessions);
-          
-          // Check for new awards
-          const currentAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
-          const stats = calculateStats(updatedSessions);
-          let newAward: EarnedAward | null = null;
-          const updatedAwards = [...state.earnedAwards];
+          // Recompute award dates based on when conditions first became true
+          const recomputedAwards = computeAllEarnedAwards(updatedSessions);
 
-          AWARDS.forEach(award => {
-            if (!currentAwardIds.has(award.id)) {
-              if (award.condition(updatedSessions, stats)) {
-                const earned = { awardId: award.id, earnedAt: new Date() };
-                updatedAwards.push(earned);
-                // Only set one new award for notification to avoid spam, or the last one
-                newAward = earned;
-              }
-            }
-          });
+          // Determine newly earned awards compared to previous state for notification
+          const previousAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
+          const newlyEarned = recomputedAwards.filter(a => !previousAwardIds.has(a.awardId));
+          const newAward =
+            newlyEarned.length > 0
+              ? newlyEarned.reduce((latest, current) =>
+                  current.earnedAt > latest.earnedAt ? current : latest
+                )
+              : null;
           
           return {
             sessions: updatedSessions,
             personalRecords: updatedRecords,
-            earnedAwards: updatedAwards,
-            newlyEarnedAward: state.newlyEarnedAward || newAward // Keep existing if not dismissed, or overwrite? Let's allow overwrite to show latest
+            earnedAwards: recomputedAwards,
+            newlyEarnedAward: state.newlyEarnedAward || newAward // Keep existing if not dismissed
           };
         });
       },
@@ -656,32 +683,7 @@ export const useRowingStore = create<RowingStore>()(
           state.personalRecords = calculatePersonalRecords(state.sessions);
           
           // Rehydrate awards dates
-          if (state.earnedAwards) {
-            state.earnedAwards = state.earnedAwards.map(a => ({
-              ...a,
-              earnedAt: new Date(a.earnedAt)
-            }));
-          }
-
-          // Check for retroactive awards
-          const stats = calculateStats(state.sessions);
-          const currentAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
-          let hasNewRetroactiveAwards = false;
-          const updatedAwards = [...state.earnedAwards];
-
-          AWARDS.forEach(award => {
-             if (!currentAwardIds.has(award.id)) {
-                if (award.condition(state.sessions, stats)) {
-                   updatedAwards.push({ awardId: award.id, earnedAt: new Date() });
-                   hasNewRetroactiveAwards = true;
-                }
-             }
-          });
-
-          if (hasNewRetroactiveAwards) {
-             state.earnedAwards = updatedAwards;
-             // We intentionally don't trigger newlyEarnedAward for retroactive ones to avoid spamming notifications on reload
-          }
+          state.earnedAwards = computeAllEarnedAwards(state.sessions);
         }
       }
     }
