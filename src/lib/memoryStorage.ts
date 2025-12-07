@@ -294,6 +294,31 @@ class MemoryStorageService {
     )[0];
   }
 
+  /**
+   * Keep only the latest N insights in memory, deleting older ones.
+   * Called automatically after adding a new insight.
+   */
+  async cleanupOldInsights(keepCount: number = 3): Promise<number> {
+    const insights = await this.filterByType('insight');
+    if (insights.length <= keepCount) return 0;
+
+    // Sort by uploadedAt descending (newest first)
+    const sorted = insights.sort((a, b) => 
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
+
+    // Delete all but the newest `keepCount`
+    const toDelete = sorted.slice(keepCount);
+    let deletedCount = 0;
+
+    for (const doc of toDelete) {
+      const deleted = await this.deleteDocument(doc.id);
+      if (deleted) deletedCount++;
+    }
+
+    return deletedCount;
+  }
+
   // ============================================================================
   // Storage Management
   // ============================================================================

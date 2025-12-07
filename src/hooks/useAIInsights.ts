@@ -132,6 +132,9 @@ const syncInsightsToMemory = async (insights: (Insight | CloudInsight)[], usingC
         description: `${insights.length} insights from ${usingCloudAI ? 'AI analysis' : 'local analysis'}`
       }
     );
+
+    // Keep only the latest 3 insights in memory to avoid clutter
+    await memoryStorage.cleanupOldInsights(3);
   } catch (error) {
     console.warn('Failed to sync insights to memory:', error);
   }
