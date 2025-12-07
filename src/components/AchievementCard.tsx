@@ -64,9 +64,10 @@ export function AchievementCard({
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerateStory = async (e: React.MouseEvent) => {
+  // Returns the generated story text so it can be passed to image generation
+  const handleGenerateStory = async (e: React.MouseEvent): Promise<string | null> => {
     e.stopPropagation();
-    if (!isEarned) return;
+    if (!isEarned) return null;
     
     setIsGeneratingStory(true);
     setError(null);
@@ -103,14 +104,18 @@ export function AchievementCard({
         story: data.story,
         generatedAt: new Date()
       });
+      
+      return data.story;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate story');
+      return null;
     } finally {
       setIsGeneratingStory(false);
     }
   };
 
-  const handleGenerateImage = async (e: React.MouseEvent) => {
+  // storyOverride allows passing freshly generated story directly (for handleGenerateBoth)
+  const handleGenerateImage = async (e: React.MouseEvent, storyOverride?: string | null) => {
     e.stopPropagation();
     if (!isEarned) return;
     
@@ -119,6 +124,9 @@ export function AchievementCard({
     
     try {
       const aiSettings = settings.getAISettings();
+      
+      // Use storyOverride if provided, otherwise fall back to stored story
+      const storyToUse = storyOverride !== undefined ? storyOverride : generated?.story;
       
       const requestBody = {
         title: award.title,
@@ -129,7 +137,7 @@ export function AchievementCard({
         quality: aiSettings.achievementImageQuality,
         size: aiSettings.achievementImageSize,
         // If a story already exists, pass it for better coherence
-        story: generated?.story
+        story: storyToUse
       };
       if (process.env.NODE_ENV === 'development') {
         console.log('[AchievementCard] image request body', {
@@ -168,9 +176,9 @@ export function AchievementCard({
     e.stopPropagation();
     if (!isEarned) return;
     
-    // Generate story first, then image
-    await handleGenerateStory(e);
-    await handleGenerateImage(e);
+    // Generate story first, then pass it directly to image generation
+    const generatedStory = await handleGenerateStory(e);
+    await handleGenerateImage(e, generatedStory);
   };
 
   if (compact) {

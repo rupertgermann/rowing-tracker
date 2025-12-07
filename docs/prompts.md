@@ -2,13 +2,23 @@
 
 ## user notes
 
+
+### todo
+
+- small award image previews in prs module
+
+
+
+### prompt examples
+
 example image generation prompt with full story:
 
 ```json
 {
   "title": "Getting Habitual",
   "description": "Complete 10 rowing sessions",
-  "customPrompt": "Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.\n\nAchievement: On Fire\nDescription: Row for 5 consecutive days\n\nStyle guidelines:\n- Modern, clean design with elegant typography\n- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)\n- Use a color palette of deep blues, golds, and whites\n- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. \n- Include decorative elements suggesting achievement (laurels, ribbons, stars)\n- The image should feel prestigious and celebratory\n- Do NOT include any text - the text will be overlaid separately\n- Aspect ratio award: Square 1:1\n- Aspect ratio for the whole image: lanscape\n- good quality, suitable for display\n\nClearly render the award title \"On Fire\" on the certificate/card in the foreground so it is readable and prominent.\n\nHere is the achievement story to keep visual consistency:\nYou have been on fire—literally earning the \"On Fire\" badge for rowing five consecutive days, a small metal echo of the mornings and evenings you've poured into the boat. On 20 Aug 2025 at 15:12 you saw those words and a quiet swell of pride rose in your chest. Each day you crested the mirror-smooth water, felt the catch of the oar, the hollow surge of the hull cutting wake, and learned the secret language of rhythm and breath. This achievement isn't just five checks on a calendar; it is proof that you showed up when the dawn was cold and when fatigue whispered stop, and that your hands remember the pattern of power.\n\nYou have learned what consistency tastes like—salt, sweat, and sunlight dancing on ripples. The oars became metronomes, your strokes a steady sentence written across the river: effort, recovery, resolve. That badge represents stamina, discipline, and a kindled hunger for more. Keep this ember in your pocket as you push forward; the water will keep answering your rhythm, and the journey ahead is yours to row.\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.",
+  "customPrompt": "Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.\n\nAchievement: Habit Master\nDescription: Row for 21 consecutive days\n\nStyle guidelines:\n- Modern, clean design with elegant typography\n- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)\n- Use a color palette of deep blues, golds, and whites\n- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. \n- Include decorative elements suggesting achievement (laurels, ribbons, stars)\n- The image should feel prestigious and celebratory\n- Do NOT include any text - the text will be overlaid separately\n- Aspect ratio award: Square 1:1\n- Aspect ratio for the whole image: lanscape\n- good quality, suitable for display\n\nClearly render the award title \"Habit Master\" on the certificate/card in the foreground so it is readable and prominent.\n\nHere is the achievement story to keep visual consistency:\nYou have earned the Habit Master badge — 21 days of rowing completed on 19 Oct 2025 at 19:30 — and the river remembers the steady beat of your oars. For three weeks you rose before excuses, met the water at dawn and dusk, and let rhythm and breath stitch together a new part of who you are. Each stroke carved a small promise into the surface: power through the middle, softness on the catch, trust in the slide. You felt the chill of morning mist, tasted the copper of effort on your tongue, and watched the light break like permission across the wake you left behind.\n\nThis achievement is more than a tally; it is proof that consistency can turn tiny actions into transformation. You have learned how to show up for yourself, how to sync body and mind until the boat answers with speed. Hold this moment — the hum of the hull, the cadence of oars, the steady pulse of your own resolve — as fuel. The Habit Master title marks both an arrival and an opening; the journey ahead is longer, louder, and yours to row.\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background."
+,
 
 
   "apiKey": "sk-proj-....",

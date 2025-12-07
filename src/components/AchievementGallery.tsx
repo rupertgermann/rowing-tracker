@@ -153,8 +153,9 @@ export function AchievementGallery({
     setError(null);
   }, []);
 
-  const handleGenerateStory = async () => {
-    if (!currentAward) return;
+  // Returns the generated story text so it can be passed to image generation
+  const handleGenerateStory = async (): Promise<string | null> => {
+    if (!currentAward) return null;
     
     setIsGeneratingStory(true);
     setError(null);
@@ -191,14 +192,18 @@ export function AchievementGallery({
         story: data.story,
         generatedAt: new Date()
       });
+      
+      return data.story;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate story');
+      return null;
     } finally {
       setIsGeneratingStory(false);
     }
   };
 
-  const handleGenerateImage = async () => {
+  // storyOverride allows passing freshly generated story directly (for handleGenerateBoth)
+  const handleGenerateImage = async (storyOverride?: string | null) => {
     if (!currentAward) return;
     
     setIsGeneratingImage(true);
@@ -206,6 +211,9 @@ export function AchievementGallery({
     
     try {
       const aiSettings = settings.getAISettings();
+      
+      // Use storyOverride if provided, otherwise fall back to stored story
+      const storyToUse = storyOverride !== undefined ? storyOverride : generated?.story;
       
       const requestBody = {
         title: currentAward.title,
@@ -216,7 +224,7 @@ export function AchievementGallery({
         quality: aiSettings.achievementImageQuality,
         size: aiSettings.achievementImageSize,
         // If a story already exists, pass it for better coherence
-        story: generated?.story
+        story: storyToUse
       };
       if (process.env.NODE_ENV === 'development') {
         console.log('[AchievementGallery] image request body', {
@@ -273,8 +281,9 @@ export function AchievementGallery({
   };
 
   const handleGenerateBoth = async () => {
-    await handleGenerateStory();
-    await handleGenerateImage();
+    // Generate story first, then pass it directly to image generation
+    const generatedStory = await handleGenerateStory();
+    await handleGenerateImage(generatedStory);
   };
 
   const handleResetStory = async () => {
@@ -497,7 +506,7 @@ export function AchievementGallery({
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handleGenerateImage}
+                  onClick={() => handleGenerateImage()}
                   disabled={isGeneratingImage}
                 >
                   {isGeneratingImage ? (
