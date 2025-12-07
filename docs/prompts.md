@@ -4,13 +4,14 @@
 
 ```json
 {
-  "title": "First Splash",
-  "description": "Complete your first rowing session",
-  "customPrompt": "Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.\n\nAchievement: {title}\nDescription: {description}\n\nStyle guidelines:\n- Modern, clean design with elegant typography\n- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)\n- Use a color palette of deep blues, golds, and whites\n- Include decorative elements suggesting achievement (laurels, ribbons, stars)\n- The image should feel prestigious and celebratory\n- Do NOT include any text - the text will be overlaid separately\n- Aspect ratio: square (1:1)\n- High quality, suitable for display",
+  "title": "Getting Habitual",
+  "description": "Complete 10 rowing sessions",
+  "customPrompt": "Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.\n\nAchievement: First Splash\nDescription: Complete your first rowing session\n\nStyle guidelines:\n- Modern, clean design with elegant typography\n- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)\n- Use a color palette of deep blues, golds, and whites\n- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. \n- Include decorative elements suggesting achievement (laurels, ribbons, stars)\n- The image should feel prestigious and celebratory\n- Aspect ratio: lanscape (16:10)\n- good quality, suitable for display\n\nClearly render the award title \"First Splash\" on the certificate/card in the foreground so it is readable and prominent.\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement.",
+
   "apiKey": "sk-proj-....",
   "model": "gpt-image-1",
   "quality": "low",
-  "size": "1024x1024"
+  "size": "1536x1024"
 }
 ```
 

@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the image prompt
+    const isDev = process.env.NODE_ENV === 'development';
+
     const defaultPrompt = `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
 
 Achievement: {title}
@@ -52,10 +54,12 @@ Style guidelines:
 - Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. 
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
-- Aspect ratio: lanscape (16:10)
+- Do NOT include any text - the text will be overlaid separately
+- Aspect ratio for the whole image: lanscape
+- Aspect ratio award: Square
 - good quality, suitable for display`;
 
-console.log('defaultPrompt:', defaultPrompt);
+    if (isDev) console.log('defaultPrompt:', defaultPrompt);
 
     let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
@@ -66,12 +70,16 @@ console.log('defaultPrompt:', defaultPrompt);
 
     // If a story already exists, include it for better coherence and background alignment
     const storyText = typeof story === 'string' ? story.trim() : '';
+    if (isDev) {
+      console.log('image route incoming story (raw type/len):', typeof story, story?.length ?? 'n/a');
+      console.log('image route storyText length after trim:', storyText.length);
+    }
     if (storyText) {
       prompt += `\n\nHere is the achievement story to keep visual consistency:\n${storyText}\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.`;
     } else {
       prompt += `\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement.`;
     }
-console.log('prompt:', prompt);
+    if (isDev) console.log('finalPrompt:', prompt);
 
     // Call OpenAI Image API with gpt-image-1 (recommended) or fallback models
     // See: https://platform.openai.com/docs/guides/image-generation
@@ -119,7 +127,8 @@ console.log('prompt:', prompt);
 
     return NextResponse.json({ 
       imageUrl,
-      revisedPrompt 
+      revisedPrompt,
+      sentPrompt: prompt
     });
   } catch (error) {
     console.error('Achievement image generation error:', error);
