@@ -19,6 +19,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+function getAchievementImageSizing(size?: string) {
+  switch (size) {
+    case '1024x1536':
+      return { aspect: 'aspect-[2/3]', maxWidth: 'max-w-xl' }; // portrait
+    case '1536x1024':
+      return { aspect: 'aspect-[3/2]', maxWidth: 'max-w-2xl' }; // landscape
+    default:
+      return { aspect: 'aspect-square', maxWidth: 'max-w-xl' };
+  }
+}
+
 interface AchievementCardProps {
   award: Award;
   earnedAt?: Date;
@@ -46,6 +57,8 @@ export function AchievementCard({
   
   const generated = generatedAchievements[award.id];
   const hasContent = hasGeneratedContent(award.id);
+  const aiSettings = settings.getAISettings();
+  const imageSizing = getAchievementImageSizing(aiSettings.achievementImageSize);
   
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -249,7 +262,7 @@ export function AchievementCard({
 
         {/* Generated Image Preview */}
         {generated?.imageUrl && (
-          <div className="relative aspect-square w-full rounded-lg overflow-hidden border">
+          <div className={`relative ${imageSizing.aspect} ${imageSizing.maxWidth} w-full rounded-lg overflow-hidden border`}>
             <Image
               src={generated.imageUrl}
               alt={award.title}
@@ -261,7 +274,7 @@ export function AchievementCard({
 
         {/* Generated Story Preview */}
         {generated?.story && (
-          <div className="bg-muted/50 rounded-lg p-3 text-sm">
+          <div className={`bg-muted/50 rounded-lg p-3 text-sm w-full ${imageSizing.maxWidth}`}>
             <p className="line-clamp-4 text-muted-foreground italic">
               {generated.story}
             </p>

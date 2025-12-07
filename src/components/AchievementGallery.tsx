@@ -30,6 +30,17 @@ import {
   Download
 } from 'lucide-react';
 
+function getAchievementImageSizing(size?: string) {
+  switch (size) {
+    case '1024x1536':
+      return { aspect: 'aspect-[2/3]', maxWidth: 'max-w-xl' }; // portrait
+    case '1536x1024':
+      return { aspect: 'aspect-[3/2]', maxWidth: 'max-w-4xl' }; // landscape
+    default:
+      return { aspect: 'aspect-square', maxWidth: 'max-w-lg' };
+  }
+}
+
 interface AchievementGalleryProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,6 +58,8 @@ export function AchievementGallery({
     setGeneratedAchievement, 
     updateGeneratedAchievement 
   } = useAchievementStore();
+  const aiSettings = settings.getAISettings();
+  const imageSizing = getAchievementImageSizing(aiSettings.achievementImageSize);
   
   // Memoize earned awards list to prevent recreation on every render
   const earnedAwardsList = useMemo(() => {
@@ -339,14 +352,14 @@ export function AchievementGallery({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Generated Image */}
           {isLoadingImage ? (
-            <div className="aspect-square max-w-lg mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20">
+            <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20`}>
               <Loader2 className="h-12 w-12 text-muted-foreground/50 animate-spin" />
               <p className="text-muted-foreground text-sm">
                 Loading image...
               </p>
             </div>
           ) : loadedImageUrl ? (
-            <div className="relative aspect-square max-w-lg mx-auto rounded-xl overflow-hidden border shadow-lg">
+            <div className={`relative ${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl overflow-hidden border shadow-lg`}>
               <Image
                 src={loadedImageUrl}
                 alt={currentAward.title}
@@ -365,7 +378,7 @@ export function AchievementGallery({
               </div>
             </div>
           ) : (
-            <div className="aspect-square max-w-lg mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20">
+            <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20`}>
               <ImageIcon className="h-16 w-16 text-muted-foreground/50" />
               <p className="text-muted-foreground text-sm">
                 No image generated yet
@@ -374,7 +387,7 @@ export function AchievementGallery({
           )}
 
           {/* Generated Story */}
-          <div className="max-w-2xl mx-auto">
+          <div className={`${imageSizing.maxWidth} mx-auto`}>
             {generated?.story ? (
               <div className="bg-gradient-to-br from-muted/50 to-muted/20 rounded-xl p-6 border">
                 <div className="flex items-center gap-2 mb-4">

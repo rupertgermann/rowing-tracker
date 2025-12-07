@@ -14,6 +14,14 @@ export async function POST(request: NextRequest) {
       story
     } = body;
 
+    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+    if (!allowedSizes.includes(size)) {
+      return NextResponse.json(
+        { error: `Invalid size. Supported values: ${allowedSizes.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
     if (!title || !description) {
       return NextResponse.json(
         { error: 'Missing required fields: title and description' },
@@ -41,11 +49,13 @@ Style guidelines:
 - Modern, clean design with elegant typography
 - Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
 - Use a color palette of deep blues, golds, and whites
+- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. 
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
-- Do NOT include any text - the text will be overlaid separately
-- Aspect ratio: square (1:1)
-- High quality, suitable for display`;
+- Aspect ratio: lanscape (16:10)
+- good quality, suitable for display`;
+
+console.log('defaultPrompt:', defaultPrompt);
 
     let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
@@ -55,11 +65,13 @@ Style guidelines:
     prompt += `\n\nClearly render the award title "${title}" on the certificate/card in the foreground so it is readable and prominent.`;
 
     // If a story already exists, include it for better coherence and background alignment
-    if (story) {
-      prompt += `\n\nHere is the achievement story to keep visual consistency:\n${story}\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.`;
+    const storyText = typeof story === 'string' ? story.trim() : '';
+    if (storyText) {
+      prompt += `\n\nHere is the achievement story to keep visual consistency:\n${storyText}\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.`;
     } else {
       prompt += `\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement.`;
     }
+console.log('prompt:', prompt);
 
     // Call OpenAI Image API with gpt-image-1 (recommended) or fallback models
     // See: https://platform.openai.com/docs/guides/image-generation

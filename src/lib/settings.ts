@@ -91,7 +91,7 @@ export interface AISettings {
   achievementImagePrompt: string; // Prompt template for achievement image generation
   achievementImageModel: 'gpt-image-1' | 'dall-e-3' | 'dall-e-2'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
-  achievementImageSize: '1024x1024' | '1792x1024' | '1024x1792'; // image size
+  achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
 
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description

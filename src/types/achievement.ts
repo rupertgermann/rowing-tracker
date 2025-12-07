@@ -22,7 +22,7 @@ export interface AchievementGeneratorSettings {
   storySystemPrompt: string;
   imagePrompt: string;
   imageStyle: 'realistic' | 'artistic' | 'minimalist' | 'vintage';
-  imageSize: '1024x1024' | '1792x1024' | '1024x1792';
+  imageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 }
 
 // Default prompts for achievement generation

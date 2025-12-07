@@ -1714,8 +1714,9 @@ You can also paste content from medical documents or training notes."
                   className="w-full mt-1 p-2 border rounded-md"
                 >
                   <option value="1024x1024">1024 x 1024</option>
-                  <option value="1792x1024">1792 x 1024</option>
-                  <option value="1024x1792">1024 x 1792</option>
+                  <option value="1024x1536">1024 x 1536</option>
+                  <option value="1536x1024">1536 x 1024</option>
+                  <option value="auto">Auto</option>
                 </select>
               </div>
             </div>
