@@ -5,7 +5,6 @@
 
 ### todo
 
-- small award image previews in prs module
 
 
 
