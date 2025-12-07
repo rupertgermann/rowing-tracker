@@ -7,11 +7,9 @@ import { useAchievementStore } from '@/lib/achievementStore';
 import { AWARDS } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
-import { Sparkles } from 'lucide-react';
 
 export function AwardsList() {
   const { earnedAwards } = useRowingStore();
@@ -92,7 +90,7 @@ export function AwardsList() {
                       className="object-cover"
                     />
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/60" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/90 to-background/10" />
                 </>
               )}
               
@@ -110,12 +108,6 @@ export function AwardsList() {
                   />
                 </div>
                 <div className="flex items-center gap-1">
-                  {hasContent && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-purple-500/10 text-purple-600 dark:text-purple-400 backdrop-blur-sm">
-                      <Sparkles className="h-3 w-3 mr-0.5" />
-                      AI
-                    </Badge>
-                  )}
                   {isEarned && earnedInfo && (
                     <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
                       {formatDateOnly(new Date(earnedInfo.earnedAt))}
