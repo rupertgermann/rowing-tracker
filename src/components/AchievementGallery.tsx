@@ -207,18 +207,29 @@ export function AchievementGallery({
     try {
       const aiSettings = settings.getAISettings();
       
+      const requestBody = {
+        title: currentAward.title,
+        description: currentAward.description,
+        customPrompt: aiSettings.achievementImagePrompt,
+        apiKey: aiSettings.openaiApiKey || undefined,
+        model: aiSettings.achievementImageModel,
+        quality: aiSettings.achievementImageQuality,
+        size: aiSettings.achievementImageSize,
+        // If a story already exists, pass it for better coherence
+        story: generated?.story
+      };
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AchievementGallery] image request body', {
+          ...requestBody,
+          storyPreview: requestBody.story?.slice?.(0, 120) || null,
+          hasStory: Boolean(requestBody.story)
+        });
+      }
+
       const response = await fetch('/api/achievements/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: currentAward.title,
-          description: currentAward.description,
-          customPrompt: aiSettings.achievementImagePrompt,
-          apiKey: aiSettings.openaiApiKey || undefined,
-          model: aiSettings.achievementImageModel,
-          quality: aiSettings.achievementImageQuality,
-          size: aiSettings.achievementImageSize
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {

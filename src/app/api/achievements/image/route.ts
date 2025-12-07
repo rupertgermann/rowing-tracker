@@ -55,8 +55,8 @@ Style guidelines:
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately
+- Aspect ratio award: Square 1:1
 - Aspect ratio for the whole image: lanscape
-- Aspect ratio award: Square
 - good quality, suitable for display`;
 
     if (isDev) console.log('defaultPrompt:', defaultPrompt);
