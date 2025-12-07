@@ -27,6 +27,7 @@ import {
   FileSearch,
   Paperclip,
 } from 'lucide-react';
+import { formatDate, formatSessionDate } from '@/lib/dateTimeUtils';
 
 // ============================================================================
 // Document Type Icons & Labels
@@ -52,12 +53,8 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(date));
+function formatDateShort(date: Date): string {
+  return formatDate(date, { includeTime: false, shortMonth: true });
 }
 
 // ============================================================================
@@ -103,7 +100,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
         <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {formatDate(document.uploadedAt)}
+            {document.type === 'insight' ? formatSessionDate(document.uploadedAt) : formatDateShort(document.uploadedAt)}
           </span>
           <span>•</span>
           <span>{formatBytes(document.size)}</span>
