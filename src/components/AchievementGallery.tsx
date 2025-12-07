@@ -153,6 +153,24 @@ export function AchievementGallery({
     setError(null);
   }, []);
 
+  // Keyboard navigation
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPrevious();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, goToPrevious, goToNext]);
+
   // Returns the generated story text so it can be passed to image generation
   const handleGenerateStory = async (): Promise<string | null> => {
     if (!currentAward) return null;
