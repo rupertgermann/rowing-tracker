@@ -329,7 +329,7 @@ export function AchievementGallery({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] p-0 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 bg-background border-b px-6 py-4">
           <div className="flex items-center justify-between">
