@@ -74,7 +74,7 @@ export function AwardsList() {
               key={award.id} 
               onClick={() => handleAwardClick(award.id, isEarned)}
               className={cn(
-                "transition-all duration-200 h-full relative overflow-hidden",
+                "group transition-all duration-200 h-full relative overflow-hidden",
                 isEarned 
                   ? "border-primary/20 shadow-sm cursor-pointer hover:shadow-md hover:scale-[1.02]" 
                   : "opacity-60 grayscale border-dashed bg-muted/30",
@@ -95,7 +95,7 @@ export function AwardsList() {
                       priority={index < 4} // First row loads eagerly for LCP
                     />
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/90 to-background/10" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/90 to-background/10 opacity-90 transition-opacity duration-200 group-hover:opacity-70" />
                 </>
               )}
               
