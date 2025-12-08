@@ -47,6 +47,7 @@ export interface SessionsViewSettings {
 export interface SessionAnalysisSettings {
   activeTab: 'overview' | 'charts' | 'segments' | 'analysis';
   segmentSize: 100 | 500;
+  useDynamicYAxis: boolean; // Toggle between dynamic (zoomed) and full Y-axis range
 }
 
 // Chart explanation from AI
@@ -184,7 +185,8 @@ const defaultSessionsViewSettings: SessionsViewSettings = {
 
 const defaultSessionAnalysisSettings: SessionAnalysisSettings = {
   activeTab: 'overview',
-  segmentSize: 500
+  segmentSize: 500,
+  useDynamicYAxis: true // Default to dynamic (zoomed) view
 };
 
 // Helpers to determine when an award was actually earned

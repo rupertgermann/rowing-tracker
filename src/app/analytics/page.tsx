@@ -316,32 +316,19 @@ const Analytics = () => {
     });
   }, [analyticsSettings, updateChartSettings]);
 
-  // Precompute derived session values to avoid repeated heavy calculations in renders
-  // Cache expensive per-session calculations (e.g., consistency score) across renders
+  // Cache expensive per-session calculations (e.g., consistency score) - computed lazily on demand
   const consistencyCache = useRef(new Map<string, { dataRef: any; score: number }>());
 
+  // Precompute lightweight derived session values (defer heavy calculations like consistency score)
   const computedSessions = useMemo(() => {
     return sessions.map(session => {
       const timestamp = session.timestamp instanceof Date ? session.timestamp : new Date(session.timestamp);
-
-      let consistencyScore = -1;
-      if (session.strokeData && session.strokeData.length > 0) {
-        const cacheKey = session.id;
-        const cached = consistencyCache.current.get(cacheKey);
-        if (cached && cached.dataRef === session.strokeData) {
-          consistencyScore = cached.score;
-        } else {
-          consistencyScore = calculateAdvancedStats(session.strokeData).consistencyScore;
-          consistencyCache.current.set(cacheKey, { dataRef: session.strokeData, score: consistencyScore });
-        }
-      }
 
       return {
         ...session,
         _timestamp: timestamp,
         _timestampMs: timestamp.getTime(),
-        _formattedDate: formatChartDate(timestamp),
-        _consistencyScore: consistencyScore
+        _formattedDate: formatChartDate(timestamp)
       };
     });
   }, [sessions]);
@@ -584,6 +571,35 @@ ${explainChartPrompt}`;
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
 
+  // Get metric value from session based on metric type
+  // Consistency score is computed lazily and cached to avoid blocking initial render
+  const getMetricValue = useCallback((session: any, metric: ChartMetric): number => {
+    switch (metric) {
+      case 'distance': return session.distance;
+      case 'pace': return session.avgSplit;
+      case 'power': return session.avgPower;
+      case 'strokeRate': return session.avgStrokeRate;
+      case 'energy': return session.energy;
+      case 'duration': return session.duration;
+      case 'splitTime': return session.avgSplit; // For compatibility, though splitTime uses special rendering
+      case 'consistencyScore': {
+        // Lazy computation with caching - only runs when chart is enabled
+        if (session.strokeData && session.strokeData.length > 0) {
+          const cacheKey = session.id;
+          const cached = consistencyCache.current.get(cacheKey);
+          if (cached && cached.dataRef === session.strokeData) {
+            return cached.score;
+          }
+          const score = calculateAdvancedStats(session.strokeData).consistencyScore;
+          consistencyCache.current.set(cacheKey, { dataRef: session.strokeData, score });
+          return score;
+        }
+        return -1; // Return -1 to indicate no data available
+      }
+      default: return 0;
+    }
+  }, []);
+
   // Prepare chart data for different metrics (with smoothing)
   const prepareChartDataWithSmoothing = useCallback((sessions: any[], metric: ChartMetric, smoothing: SmoothingOption) => {
     const baseData = sessions
@@ -607,30 +623,7 @@ ${explainChartPrompt}`;
     }
     
     return baseData;
-  }, [smoothingValue]);
-
-  // Get metric value from session based on metric type
-  const getMetricValue = (session: any, metric: ChartMetric): number => {
-    switch (metric) {
-      case 'distance': return session.distance;
-      case 'pace': return session.avgSplit;
-      case 'power': return session.avgPower;
-      case 'strokeRate': return session.avgStrokeRate;
-      case 'energy': return session.energy;
-      case 'duration': return session.duration;
-      case 'splitTime': return session.avgSplit; // For compatibility, though splitTime uses special rendering
-      case 'consistencyScore': {
-        // Use precomputed value to avoid heavy recalculation
-        if (session._consistencyScore !== undefined) return session._consistencyScore;
-        if (session.strokeData && session.strokeData.length > 0) {
-          const stats = calculateAdvancedStats(session.strokeData);
-          return stats.consistencyScore;
-        }
-        return -1; // Return -1 to indicate no data available
-      }
-      default: return 0;
-    }
-  };
+  }, [smoothingValue, getMetricValue]);
 
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {

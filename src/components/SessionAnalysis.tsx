@@ -22,11 +22,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { StrokeData } from '@/types/session';
 import { calculateAdvancedStats, calculateSegments, calculateRollingAverages, calculatePerformanceSummary } from '@/lib/analysisUtils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Assuming these exist or standard tabs
 import { ComposedChart } from 'recharts';
 import { useRowingStore } from '@/lib/store';
 import { chartTheme } from '@/lib/chartUtils';
 import { ExplainChartButton } from '@/components/ExplainChartButton';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 
 interface SessionAnalysisProps {
   data: StrokeData[];
@@ -94,6 +96,11 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
   }, []);
   const activeTab = sessionAnalysisSettings?.activeTab ?? 'overview';
   const segmentSize = sessionAnalysisSettings?.segmentSize ?? 500;
+  const useDynamicYAxis = sessionAnalysisSettings?.useDynamicYAxis ?? true;
+
+  const toggleDynamicYAxis = () => {
+    updateSessionAnalysisSettings({ useDynamicYAxis: !useDynamicYAxis });
+  };
 
   const handleTabChange = (value: string) => {
     if (value === activeTab) return;
@@ -154,6 +161,56 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
     }
     return result;
   }, [rolling5, rolling10, enrichedData]);
+
+  // Calculate Y-axis domains for rolling charts to show detailed value changes
+  const rollingPowerDomain = useMemo(() => {
+    if (rollingData.length === 0) return [0, 100];
+    const allPowers = rollingData.flatMap(d => [d.power5, d.power10]);
+    const min = Math.min(...allPowers);
+    const max = Math.max(...allPowers);
+    const padding = (max - min) * 0.1 || 10; // 10% padding, minimum 10W
+    return [Math.floor(min - padding), Math.ceil(max + padding)];
+  }, [rollingData]);
+
+  const rollingSplitDomain = useMemo(() => {
+    if (rollingData.length === 0) return [90, 150];
+    const allSplits = rollingData.flatMap(d => [d.split5, d.split10]);
+    const min = Math.min(...allSplits);
+    const max = Math.max(...allSplits);
+    const padding = (max - min) * 0.1 || 2; // 10% padding, minimum 2s
+    return [Math.floor(min - padding), Math.ceil(max + padding)];
+  }, [rollingData]);
+
+  // Calculate Y-axis domains for Performance Graphs charts
+  const paceDomain = useMemo(() => {
+    if (enrichedData.length === 0) return [90, 150];
+    const splits = enrichedData.map(d => d.split).filter(s => s > 0);
+    if (splits.length === 0) return [90, 150];
+    const min = Math.min(...splits);
+    const max = Math.max(...splits);
+    const padding = (max - min) * 0.1 || 5;
+    return [Math.floor(min - padding), Math.ceil(max + padding)];
+  }, [enrichedData]);
+
+  const workDomain = useMemo(() => {
+    if (enrichedData.length === 0) return [0, 100];
+    const works = enrichedData.map(d => d.work).filter(w => w > 0);
+    if (works.length === 0) return [0, 100];
+    const min = Math.min(...works);
+    const max = Math.max(...works);
+    const padding = (max - min) * 0.1 || 10;
+    return [Math.floor(min - padding), Math.ceil(max + padding)];
+  }, [enrichedData]);
+
+  const strokeLengthDomain = useMemo(() => {
+    if (enrichedData.length === 0) return [0, 15];
+    const lengths = enrichedData.map(d => d.strokeLength || 0).filter(l => l > 0);
+    if (lengths.length === 0) return [0, 15];
+    const min = Math.min(...lengths);
+    const max = Math.max(...lengths);
+    const padding = (max - min) * 0.1 || 1;
+    return [Math.max(0, Math.floor((min - padding) * 10) / 10), Math.ceil((max + padding) * 10) / 10];
+  }, [enrichedData]);
 
   // Prepare histogram data
   const distributions = useMemo(() => {
@@ -460,6 +517,28 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
 
         {/* TAB: GRAPHS */}
         <TabsContent value="charts" className="space-y-8">
+          {/* Y-Axis Toggle */}
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleDynamicYAxis}
+              className="flex items-center gap-2"
+            >
+              {useDynamicYAxis ? (
+                <>
+                  <ZoomOut className="h-4 w-4" />
+                  Show Full Range
+                </>
+              ) : (
+                <>
+                  <ZoomIn className="h-4 w-4" />
+                  Zoom to Data
+                </>
+              )}
+            </Button>
+          </div>
+
           {/* Pace Analysis */}
           <Card id={`session-${sessionId}-pace`}>
             <CardHeader>
@@ -490,7 +569,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       stroke={chartTheme.axis.strokeColor}
                     />
                     <YAxis
-                      domain={['dataMin - 5', 'dataMax + 5']}
+                      domain={useDynamicYAxis ? paceDomain : ['auto', 'auto']}
                       reversed={true}
                       tickFormatter={(val) => formatDuration(val)}
                       tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
@@ -544,7 +623,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <AreaChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
-                    <YAxis label={{ value: 'Work (J)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis domain={useDynamicYAxis ? workDomain : [0, 'auto']} label={{ value: 'Work (J)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Area
@@ -586,7 +665,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
-                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis domain={useDynamicYAxis ? strokeLengthDomain : [0, 'auto']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Line
@@ -651,31 +730,51 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
 
         {/* TAB: SEGMENTS */}
         <TabsContent value="segments" className="space-y-6">
-          {/* Segment Size Toggle */}
+          {/* Segment Size Toggle and Y-Axis Toggle */}
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium">Segment Analysis</h3>
               <p className="text-sm text-muted-foreground">Analyze performance by distance segments</p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleSegmentSizeChange(100)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 100
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
+            <div className="flex gap-4 items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleDynamicYAxis}
+                className="flex items-center gap-2"
               >
-                100m
-              </button>
-              <button
-                onClick={() => handleSegmentSizeChange(500)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 500
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-              >
-                500m
-              </button>
+                {useDynamicYAxis ? (
+                  <>
+                    <ZoomOut className="h-4 w-4" />
+                    Show Full Range
+                  </>
+                ) : (
+                  <>
+                    <ZoomIn className="h-4 w-4" />
+                    Zoom to Data
+                  </>
+                )}
+              </Button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSegmentSizeChange(100)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 100
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                >
+                  100m
+                </button>
+                <button
+                  onClick={() => handleSegmentSizeChange(500)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 500
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                >
+                  500m
+                </button>
+              </div>
             </div>
           </div>
 
@@ -776,7 +875,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                         stroke={chartTheme.axis.strokeColor}
                       />
-                      <YAxis label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                      <YAxis domain={useDynamicYAxis ? rollingPowerDomain : [0, 'auto']} label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -845,6 +944,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         stroke={chartTheme.axis.strokeColor}
                       />
                       <YAxis
+                        domain={useDynamicYAxis ? rollingSplitDomain : ['auto', 'auto']}
                         label={{ value: 'Split (s/500m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }}
                         reversed={true}
                         tickFormatter={(val) => formatSplit(val)}
