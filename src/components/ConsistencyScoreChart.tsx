@@ -4,7 +4,7 @@ import { useMemo, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart3, HelpCircle } from 'lucide-react';
+import { BarChart3, HelpCircle, ZoomIn, ZoomOut } from 'lucide-react';
 import { chartTheme } from '@/lib/chartUtils';
 import { formatChartDate } from '@/lib/dateTimeUtils';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
@@ -131,6 +131,33 @@ export const ConsistencyScoreChart = ({
     });
   }, [analyticsSettings, updateChartSettings]);
 
+  // Zoom toggle (true = zoomed/dynamic, false = full range 0-100)
+  const isZoomed = analyticsSettings.chartZoom?.consistencyScore ?? true;
+  
+  const defaultChartZoom = {
+    distance: true,
+    pace: true,
+    power: true,
+    strokeRate: true,
+    energy: true,
+    duration: true,
+    splitTime: true,
+    consistencyScore: true
+  };
+  
+  const toggleZoom = useCallback(() => {
+    updateChartSettings({
+      analyticsSettings: {
+        ...analyticsSettings,
+        chartZoom: {
+          ...defaultChartZoom,
+          ...analyticsSettings.chartZoom,
+          consistencyScore: !isZoomed
+        }
+      }
+    });
+  }, [analyticsSettings, isZoomed, updateChartSettings]);
+
   // Get all session dates for the date picker
   const availableDates = useMemo(() => {
     return sessions.map(s => new Date(s.timestamp));
@@ -186,8 +213,11 @@ export const ConsistencyScoreChart = ({
     }));
   }, [filteredSessions, smoothing]);
 
-  // Calculate Y-axis domain
+  // Calculate Y-axis domain (dynamic when zoomed, full 0-100 when not)
   const yDomain = useMemo(() => {
+    // If not zoomed, use full range
+    if (!isZoomed) return [0, 100];
+    
     if (!chartData.length) return [0, 100];
 
     const scores = chartData.map(d => d.consistencyScore);
@@ -372,6 +402,16 @@ export const ConsistencyScoreChart = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Zoom toggle button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleZoom}
+                className="h-8 w-8 p-0"
+                title={isZoomed ? 'Show Full Range (0-100)' : 'Zoom to Data'}
+              >
+                {isZoomed ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+              </Button>
               {headerActions}
               {onExplainChart && (
                 <TooltipProvider>

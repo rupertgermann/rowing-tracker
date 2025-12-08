@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRowingStore, ChartMetric, type SmoothingOption, type AnalyticsChartSettings } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints, HelpCircle, ExternalLink, MessageCircle } from 'lucide-react';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints, HelpCircle, ExternalLink, MessageCircle, ZoomIn, ZoomOut } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { InsightCard } from '@/components/ai/InsightCard';
@@ -315,6 +315,31 @@ const Analytics = () => {
       }
     });
   }, [analyticsSettings, updateChartSettings]);
+
+  // Per-chart zoom settings (true = zoomed/dynamic, false = full range)
+  const defaultChartZoom: Record<ChartMetric, boolean> = {
+    distance: true,
+    pace: true,
+    power: true,
+    strokeRate: true,
+    energy: true,
+    duration: true,
+    splitTime: true,
+    consistencyScore: true
+  };
+  const chartZoom = analyticsSettings.chartZoom ?? defaultChartZoom;
+
+  const toggleChartZoom = useCallback((metric: ChartMetric) => {
+    updateChartSettings({
+      analyticsSettings: {
+        ...analyticsSettings,
+        chartZoom: {
+          ...chartZoom,
+          [metric]: !chartZoom[metric]
+        }
+      }
+    });
+  }, [analyticsSettings, chartZoom, updateChartSettings]);
 
   // Cache expensive per-session calculations (e.g., consistency score) - computed lazily on demand
   const consistencyCache = useRef(new Map<string, { dataRef: any; score: number }>());
@@ -655,6 +680,37 @@ ${explainChartPrompt}`;
     }, {} as Record<ChartMetric, any[]>);
   }, [filteredSessions, orderedEnabledCharts, hasFilteredData, smoothingValue, prepareChartDataWithSmoothing]);
 
+  // Compute dynamic Y-axis domains for each metric (with 10% padding)
+  const chartDomains = useMemo(() => {
+    const domains: Record<ChartMetric, [number, number] | undefined> = {
+      distance: undefined,
+      pace: undefined,
+      power: undefined,
+      strokeRate: undefined,
+      energy: undefined,
+      duration: undefined,
+      splitTime: undefined,
+      consistencyScore: undefined
+    };
+
+    for (const metric of Object.keys(chartDataMap) as ChartMetric[]) {
+      const data = chartDataMap[metric];
+      if (!data || data.length === 0) continue;
+
+      const values = data.map(d => d[metric]).filter((v): v is number => typeof v === 'number' && !isNaN(v));
+      if (values.length === 0) continue;
+
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min;
+      const padding = range * 0.1 || (max * 0.1) || 10; // 10% padding, fallback to 10% of max or 10
+
+      domains[metric] = [Math.max(0, Math.floor(min - padding)), Math.ceil(max + padding)];
+    }
+
+    return domains;
+  }, [chartDataMap]);
+
   // Dedicated Split Time chart data for correlations section (always visible)
   const splitTimeChartData = useMemo(() => {
     return hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, 'splitTime', smoothingValue) : [];
@@ -730,6 +786,10 @@ ${explainChartPrompt}`;
     const smoothing = smoothingValue;
     const hasSmoothing = smoothingValue > 0 && chartData.some(d => d.smoothedValue !== null && d.smoothedValue !== undefined);
 
+    // Determine Y-axis domain based on zoom setting
+    const isZoomed = chartZoom[metric] ?? true;
+    const domain = isZoomed && chartDomains[metric] ? chartDomains[metric] : undefined;
+
     const commonProps = {
       width: '100%' as const,
       height: 300,
@@ -757,6 +817,7 @@ ${explainChartPrompt}`;
           stroke={chartTheme.axis.strokeColor}
           tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
           tickFormatter={config.yAxisFormatter}
+          domain={domain}
         />
         <Tooltip content={<CustomTooltip config={config} smoothing={smoothing} />} />
       </>
@@ -1121,6 +1182,16 @@ ${explainChartPrompt}`;
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                {/* Zoom toggle button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleChartZoom(metric)}
+                                  className="h-8 w-8 p-0"
+                                  title={chartZoom[metric] ? 'Show Full Range' : 'Zoom to Data'}
+                                >
+                                  {chartZoom[metric] ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                                </Button>
                                 {/* Show saved explanation indicator */}
                                 {isExplanationValid(`metric-${metric}-${timeRange}`) && (
                                   <ExplanationTooltip

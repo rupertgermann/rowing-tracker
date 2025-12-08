@@ -82,6 +82,8 @@ export interface AnalyticsChartSettings {
   smoothingAll?: SmoothingOption;
   // Per-chart smoothing settings
   smoothing: Record<ChartMetric, SmoothingOption>;
+  // Per-chart zoom settings (true = zoomed/dynamic, false = full range)
+  chartZoom?: Record<ChartMetric, boolean>;
 }
 
 interface ChartSettings {
@@ -152,6 +154,16 @@ const defaultAnalyticsSettings: AnalyticsChartSettings = {
     duration: 0,
     splitTime: 3, // Default to 3 for pace analysis (already had moving average)
     consistencyScore: 0
+  },
+  chartZoom: {
+    distance: true,
+    pace: true,
+    power: true,
+    strokeRate: true,
+    energy: true,
+    duration: true,
+    splitTime: true,
+    consistencyScore: true
   }
 };
 

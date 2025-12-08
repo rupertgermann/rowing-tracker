@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Dot } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Target, ZoomIn, ZoomOut } from 'lucide-react';
 import { chartTheme } from '@/lib/chartUtils';
 import { formatChartDate } from '@/lib/dateTimeUtils';
+import { useRowingStore, type ChartMetric } from '@/lib/store';
 
 interface Session {
   id: string;
@@ -98,6 +100,36 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const SplitTimeChart = ({ sessions, headerActions, embedded = false }: SplitTimeChartProps) => {
+  // Get zoom settings from store
+  const storedSettings = useRowingStore(state => state.chartSettings.analyticsSettings);
+  const updateChartSettings = useRowingStore(state => state.updateChartSettings);
+  
+  const isZoomed = storedSettings?.chartZoom?.splitTime ?? true;
+  
+  const defaultChartZoom: Record<ChartMetric, boolean> = {
+    distance: true,
+    pace: true,
+    power: true,
+    strokeRate: true,
+    energy: true,
+    duration: true,
+    splitTime: true,
+    consistencyScore: true
+  };
+  
+  const toggleZoom = useCallback(() => {
+    updateChartSettings({
+      analyticsSettings: {
+        ...storedSettings,
+        chartZoom: {
+          ...defaultChartZoom,
+          ...storedSettings?.chartZoom,
+          splitTime: !isZoomed
+        }
+      }
+    });
+  }, [storedSettings, isZoomed, updateChartSettings]);
+
   // Prepare chart data
   const chartData = useMemo(() => {
     if (!sessions.length) return [];
@@ -120,8 +152,11 @@ export const SplitTimeChart = ({ sessions, headerActions, embedded = false }: Sp
     }));
   }, [sessions]);
 
-  // Calculate Y-axis domain with padding
+  // Calculate Y-axis domain with padding (dynamic when zoomed, auto when not)
   const yDomain = useMemo(() => {
+    // If not zoomed, let Recharts auto-calculate
+    if (!isZoomed) return undefined;
+    
     if (!chartData.length) return [120, 180];
 
     const splits = chartData.map(d => d.avgSplit);
@@ -132,7 +167,7 @@ export const SplitTimeChart = ({ sessions, headerActions, embedded = false }: Sp
     const max = Math.ceil(Math.max(...allValues) + 5);
 
     return [min, max];
-  }, [chartData]);
+  }, [chartData, isZoomed]);
 
   const legend = (
     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -238,11 +273,19 @@ export const SplitTimeChart = ({ sessions, headerActions, embedded = false }: Sp
               </CardDescription>
             </div>
           </div>
-          {headerActions && (
-            <div className="flex items-center gap-2">
-              {headerActions}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Zoom toggle button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleZoom}
+              className="h-8 w-8 p-0"
+              title={isZoomed ? 'Show Full Range' : 'Zoom to Data'}
+            >
+              {isZoomed ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+            </Button>
+            {headerActions}
+          </div>
         </div>
 
         {/* Legend for stroke rate colors */}
