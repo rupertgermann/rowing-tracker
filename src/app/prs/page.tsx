@@ -6,7 +6,7 @@ import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown } from 'lucide-react';
+import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame } from 'lucide-react';
 import { AwardsList } from '@/components/AwardsList';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 
@@ -38,7 +38,7 @@ function formatPace(secondsPer500m: number): string {
 
 
 export default function PRsPage() {
-  const { getPersonalRecords, getSessions } = useRowingStore();
+  const { getPersonalRecords, getSessions, getStats } = useRowingStore();
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
@@ -47,6 +47,7 @@ export default function PRsPage() {
 
   const personalRecords = getPersonalRecords();
   const sessions = getSessions();
+  const stats = getStats();
 
   const hasData = sessions.length > 0;
   const hasPRs = personalRecords.length > 0;
@@ -206,7 +207,7 @@ export default function PRsPage() {
                 Performance Records
               </h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Best Average Power */}
                 <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
                   <CardHeader>
@@ -223,6 +224,31 @@ export default function PRsPage() {
                       <Calendar className="h-4 w-4 text-yellow-500" />
                       <span>Session: {formatDateOnly(bestPower.timestamp)}</span>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Best Streak Record */}
+                <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2 text-yellow-700">
+                      <Flame className="h-5 w-5 text-yellow-500" />
+                      Best Streak Record
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold">
+                      {stats.bestStreak > 0 ? `${stats.bestStreak} days` : '--'}
+                    </div>
+                    {stats.currentStreak >= stats.bestStreak && stats.bestStreak > 0 ? (
+                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-500">
+                        Current Record!
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 text-yellow-500" />
+                        <span>Current: {stats.currentStreak} days</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
