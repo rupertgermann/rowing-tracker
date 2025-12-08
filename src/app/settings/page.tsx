@@ -22,6 +22,10 @@ import {
   DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
   DEFAULT_ACHIEVEMENT_STORY_PROMPT
 } from '@/types/achievement';
+import {
+  migrateImagesFromIndexedDB,
+  getAllAchievementImageIdsFromIndexedDB
+} from '@/lib/imageStorage';
 import { memoryStorage, MemoryDocument } from '@/lib/memoryStorage';
 import {
   Settings as SettingsIcon,
@@ -123,6 +127,11 @@ export default function SettingsPage() {
   const [profileRawInput, setProfileRawInput] = useState('');
   const [memoryDocuments, setMemoryDocuments] = useState<MemoryDocument[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  
+  // Image migration state
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ migrated: number; failed: string[]; total: number } | null>(null);
+  const [indexedDBImageCount, setIndexedDBImageCount] = useState<number | null>(null);
 
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
@@ -158,6 +167,20 @@ export default function SettingsPage() {
       }
     };
     loadDocuments();
+  }, []);
+
+  // Check for legacy IndexedDB images that need migration
+  useEffect(() => {
+    const checkIndexedDBImages = async () => {
+      try {
+        const ids = await getAllAchievementImageIdsFromIndexedDB();
+        setIndexedDBImageCount(ids.length);
+      } catch (error) {
+        console.error('Failed to check IndexedDB images:', error);
+        setIndexedDBImageCount(0);
+      }
+    };
+    checkIndexedDBImages();
   }, []);
 
   const loadSettings = () => {
@@ -1608,11 +1631,80 @@ You can also paste content from medical documents or training notes."
     );
   };
 
+  const handleMigrateImages = async () => {
+    setIsMigrating(true);
+    setMigrationResult(null);
+    try {
+      const result = await migrateImagesFromIndexedDB();
+      setMigrationResult(result);
+      setIndexedDBImageCount(0);
+      if (result.migrated > 0) {
+        setSuccessMessage(`Successfully migrated ${result.migrated} image(s) to filesystem`);
+      }
+    } catch (error) {
+      setErrorMessage('Failed to migrate images');
+      console.error('Migration error:', error);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   const renderAwardsSettings = () => {
     if (!settingsData?.aiSettings) return null;
 
     return (
       <div className="space-y-6">
+        {/* Image Migration Card - only show if there are images to migrate */}
+        {indexedDBImageCount !== null && indexedDBImageCount > 0 && (
+          <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-5 w-5" />
+                Image Migration Required
+              </CardTitle>
+              <CardDescription>
+                {indexedDBImageCount} award image(s) found in browser storage (IndexedDB). 
+                Migrate them to the filesystem for better persistence and performance.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={handleMigrateImages}
+                  disabled={isMigrating}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {isMigrating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Migrating...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Migrate {indexedDBImageCount} Image(s)
+                    </>
+                  )}
+                </Button>
+                {migrationResult && (
+                  <div className="text-sm">
+                    {migrationResult.migrated > 0 && (
+                      <span className="text-green-600 dark:text-green-400">
+                        ✓ {migrationResult.migrated} migrated
+                      </span>
+                    )}
+                    {migrationResult.failed.length > 0 && (
+                      <span className="text-red-600 dark:text-red-400 ml-2">
+                        ✗ {migrationResult.failed.length} failed
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1640,7 +1732,7 @@ You can also paste content from medical documents or training notes."
                     variant="outline"
                     size="sm"
                     onClick={() =>
-                      handleResetPrompt('achievementStoryPrompt', DEFAULT_ACHIEVEMENT_STORY_PROMPT)
+                      saveSettings('awards', { achievementStoryPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT })
                     }
                   >
                     Reset Story Prompt
@@ -1735,7 +1827,7 @@ You can also paste content from medical documents or training notes."
       case 'trainingSettings':
         return renderTrainingSettings();
       case 'notificationSettings':
-        return renderNotifications();
+        return renderNotificationSettings();
       case 'privacySettings':
         return renderPrivacySettings();
       case 'aiSettings':

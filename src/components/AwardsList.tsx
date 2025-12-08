@@ -20,7 +20,7 @@ export function AwardsList() {
   const [selectedAwardId, setSelectedAwardId] = useState<string | null>(null);
   const [loadedImages, setLoadedImages] = useState<Record<string, string>>({});
 
-  // Load images from IndexedDB for awards that have them
+  // Load images from filesystem for awards that have them
   useEffect(() => {
     const loadImages = async () => {
       const imagePromises = AWARDS.filter(award => {
@@ -28,12 +28,12 @@ export function AwardsList() {
         return achievement?.hasImage || achievement?.imageUrl;
       }).map(async (award) => {
         const achievement = generatedAchievements[award.id];
-        // Use in-memory imageUrl if available, otherwise load from IndexedDB
+        // Use in-memory imageUrl if available, otherwise check filesystem
         if (achievement?.imageUrl) {
           return { awardId: award.id, imageData: achievement.imageUrl };
         }
-        const imageData = await getAchievementImage(award.id);
-        return { awardId: award.id, imageData };
+        const imagePath = await getAchievementImage(award.id);
+        return { awardId: award.id, imageData: imagePath };
       });
 
       const results = await Promise.all(imagePromises);

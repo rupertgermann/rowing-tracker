@@ -90,7 +90,7 @@ export function AchievementGallery({
     }
   }, [open, initialAwardId]); // Remove earnedAwardsList from deps - it's stable now
 
-  // Load image from IndexedDB when current award changes
+  // Load image from filesystem when current award changes
   useEffect(() => {
     const loadImage = async () => {
       if (!currentAward) {
@@ -100,26 +100,26 @@ export function AchievementGallery({
 
       const achievement = generatedAchievements[currentAward.id];
       
-      // If we have imageUrl in memory, use it
+      // If we have imageUrl in memory (file path), use it
       if (achievement?.imageUrl) {
         setLoadedImageUrl(achievement.imageUrl);
         return;
       }
       
-      // If hasImage flag is set, load from IndexedDB
+      // If hasImage flag is set, check if file exists on filesystem
       if (achievement?.hasImage) {
         setIsLoadingImage(true);
         try {
-          const imageData = await getAchievementImage(currentAward.id);
-          if (imageData) {
-            setLoadedImageUrl(imageData);
-            // Also update the store with the loaded image
-            updateGeneratedAchievement(currentAward.id, { imageUrl: imageData });
+          const imagePath = await getAchievementImage(currentAward.id);
+          if (imagePath) {
+            setLoadedImageUrl(imagePath);
+            // Also update the store with the loaded image path
+            updateGeneratedAchievement(currentAward.id, { imageUrl: imagePath });
           } else {
             setLoadedImageUrl(null);
           }
         } catch (err) {
-          console.error('Failed to load image from IndexedDB:', err);
+          console.error('Failed to load image from filesystem:', err);
           setLoadedImageUrl(null);
         } finally {
           setIsLoadingImage(false);
@@ -265,16 +265,16 @@ export function AchievementGallery({
       
       const data = await response.json();
       
-      // Store image in IndexedDB (avoids localStorage quota issues)
-      await storeAchievementImage(currentAward.id, data.imageUrl);
+      // Store image to filesystem via API
+      const filePath = await storeAchievementImage(currentAward.id, data.imageUrl);
       
-      // Update local state immediately
-      setLoadedImageUrl(data.imageUrl);
+      // Update local state with the file path
+      setLoadedImageUrl(filePath);
       
-      // Update store with hasImage flag (imageUrl will be stripped on persist)
+      // Update store with file path and hasImage flag
       if (generated) {
         updateGeneratedAchievement(currentAward.id, {
-          imageUrl: data.imageUrl,
+          imageUrl: filePath,
           hasImage: true,
           imagePrompt: data.revisedPrompt,
           generatedAt: new Date()
@@ -285,7 +285,7 @@ export function AchievementGallery({
           title: currentAward.title,
           description: currentAward.description,
           earnedAt: earnedInfo?.earnedAt ? new Date(earnedInfo.earnedAt) : new Date(),
-          imageUrl: data.imageUrl,
+          imageUrl: filePath,
           hasImage: true,
           imagePrompt: data.revisedPrompt,
           generatedAt: new Date()

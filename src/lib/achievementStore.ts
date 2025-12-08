@@ -2,13 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { GeneratedAchievement, AchievementGeneratorSettings, DEFAULT_ACHIEVEMENT_STORY_PROMPT, DEFAULT_ACHIEVEMENT_IMAGE_PROMPT } from '@/types/achievement';
 
-// Note: Images are stored separately in IndexedDB via imageStorage.ts
-// The store only keeps a flag (hasImage) to indicate if an image exists
+// Note: Images are stored as files in public/assets/awards/ via imageStorage.ts
+// The store keeps the file path (imageUrl) and a hasImage flag
 // This avoids localStorage quota issues with large base64 images
 
 interface AchievementStore {
   // Generated achievements keyed by awardId
-  // Note: imageUrl is NOT persisted - it's loaded from IndexedDB on demand
+  // Note: imageUrl contains the file path (e.g., /assets/awards/award_id.png)
   generatedAchievements: Record<string, GeneratedAchievement>;
   
   // Settings for generation
@@ -134,14 +134,16 @@ export const useAchievementStore = create<AchievementStore>()(
       name: 'rowing-achievement-generator',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Exclude imageUrl from localStorage - images are stored in IndexedDB
+        // Images are stored as files in public/assets/awards/
+        // We persist the file path (imageUrl) and hasImage flag
         generatedAchievements: Object.fromEntries(
           Object.entries(state.generatedAchievements).map(([key, achievement]) => [
             key,
             {
               ...achievement,
-              imageUrl: undefined, // Don't persist base64 images to localStorage
-              // Keep hasImage flag to know if we need to load from IndexedDB
+              // Keep imageUrl if it's a file path (starts with /), otherwise clear it
+              imageUrl: achievement.imageUrl?.startsWith('/') ? achievement.imageUrl : undefined,
+              // Keep hasImage flag to know if we need to check filesystem
               hasImage: Boolean(achievement.imageUrl || achievement.hasImage)
             }
           ])

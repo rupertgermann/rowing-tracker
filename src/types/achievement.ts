@@ -8,9 +8,9 @@ export interface GeneratedAchievement {
   
   // Generated content
   story?: string;           // AI-generated narrative/story
-  imageUrl?: string;        // Generated image URL (in-memory only, not persisted to localStorage)
+  imageUrl?: string;        // File path to image in public/assets/awards/ (e.g., /assets/awards/award_id.png)
   imagePrompt?: string;     // The prompt used to generate the image
-  hasImage?: boolean;       // Flag indicating image exists in IndexedDB (persisted instead of imageUrl)
+  hasImage?: boolean;       // Flag indicating image exists on filesystem
   
   // Generation metadata
   generatedAt?: Date;
