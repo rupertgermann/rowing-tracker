@@ -96,10 +96,21 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
   }, []);
   const activeTab = sessionAnalysisSettings?.activeTab ?? 'overview';
   const segmentSize = sessionAnalysisSettings?.segmentSize ?? 500;
-  const useDynamicYAxis = sessionAnalysisSettings?.useDynamicYAxis ?? true;
+  const chartZoom = sessionAnalysisSettings?.chartZoom ?? {
+    pace: true,
+    work: true,
+    strokeLength: true,
+    rollingPower: true,
+    rollingSplit: true
+  };
 
-  const toggleDynamicYAxis = () => {
-    updateSessionAnalysisSettings({ useDynamicYAxis: !useDynamicYAxis });
+  const toggleChartZoom = (chartKey: 'pace' | 'work' | 'strokeLength' | 'rollingPower' | 'rollingSplit') => {
+    updateSessionAnalysisSettings({
+      chartZoom: {
+        ...chartZoom,
+        [chartKey]: !chartZoom[chartKey]
+      }
+    });
   };
 
   const handleTabChange = (value: string) => {
@@ -517,28 +528,6 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
 
         {/* TAB: GRAPHS */}
         <TabsContent value="charts" className="space-y-8">
-          {/* Y-Axis Toggle */}
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleDynamicYAxis}
-              className="flex items-center gap-2"
-            >
-              {useDynamicYAxis ? (
-                <>
-                  <ZoomOut className="h-4 w-4" />
-                  Show Full Range
-                </>
-              ) : (
-                <>
-                  <ZoomIn className="h-4 w-4" />
-                  Zoom to Data
-                </>
-              )}
-            </Button>
-          </div>
-
           {/* Pace Analysis */}
           <Card id={`session-${sessionId}-pace`}>
             <CardHeader>
@@ -547,14 +536,25 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <CardTitle>Pace Analysis</CardTitle>
                   <CardDescription>Actual vs Average Split (/500m)</CardDescription>
                 </div>
-                <ExplainChartButton
-                  chartId={`session-${sessionId}-pace`}
-                  chartTitle="Pace Analysis"
-                  chartDescription="This chart shows my actual split time vs average split (per 500m) throughout this rowing session."
-                  dataContext={getChartDataContext('pace')}
-                  fullData={enrichedData}
-                  variant="compact"
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleChartZoom('pace')}
+                    className="h-8 w-8 p-0"
+                    title={chartZoom.pace ? 'Show Full Range' : 'Zoom to Data'}
+                  >
+                    {chartZoom.pace ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                  </Button>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-pace`}
+                    chartTitle="Pace Analysis"
+                    chartDescription="This chart shows my actual split time vs average split (per 500m) throughout this rowing session."
+                    dataContext={getChartDataContext('pace')}
+                    fullData={enrichedData}
+                    variant="compact"
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -569,7 +569,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       stroke={chartTheme.axis.strokeColor}
                     />
                     <YAxis
-                      domain={useDynamicYAxis ? paceDomain : ['auto', 'auto']}
+                      domain={chartZoom.pace ? paceDomain : ['auto', 'auto']}
                       reversed={true}
                       tickFormatter={(val) => formatDuration(val)}
                       tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
@@ -607,14 +607,25 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <CardTitle>Work per Stroke</CardTitle>
                   <CardDescription>Energy expenditure (Joules) per stroke</CardDescription>
                 </div>
-                <ExplainChartButton
-                  chartId={`session-${sessionId}-work`}
-                  chartTitle="Work per Stroke"
-                  chartDescription="This chart shows the energy expenditure (Joules) per stroke throughout this rowing session."
-                  dataContext={getChartDataContext('work')}
-                  fullData={enrichedData}
-                  variant="compact"
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleChartZoom('work')}
+                    className="h-8 w-8 p-0"
+                    title={chartZoom.work ? 'Show Full Range' : 'Zoom to Data'}
+                  >
+                    {chartZoom.work ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                  </Button>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-work`}
+                    chartTitle="Work per Stroke"
+                    chartDescription="This chart shows the energy expenditure (Joules) per stroke throughout this rowing session."
+                    dataContext={getChartDataContext('work')}
+                    fullData={enrichedData}
+                    variant="compact"
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -623,7 +634,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <AreaChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
-                    <YAxis domain={useDynamicYAxis ? workDomain : [0, 'auto']} label={{ value: 'Work (J)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis domain={chartZoom.work ? workDomain : [0, 'auto']} label={{ value: 'Work (J)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Area
@@ -649,14 +660,25 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <CardTitle>Stroke Length Consistency</CardTitle>
                   <CardDescription>Distance covered per stroke (meters)</CardDescription>
                 </div>
-                <ExplainChartButton
-                  chartId={`session-${sessionId}-stroke-length`}
-                  chartTitle="Stroke Length Consistency"
-                  chartDescription="This chart shows the distance covered per stroke (meters) throughout this rowing session."
-                  dataContext={getChartDataContext('stroke-length')}
-                  fullData={enrichedData}
-                  variant="compact"
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleChartZoom('strokeLength')}
+                    className="h-8 w-8 p-0"
+                    title={chartZoom.strokeLength ? 'Show Full Range' : 'Zoom to Data'}
+                  >
+                    {chartZoom.strokeLength ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                  </Button>
+                  <ExplainChartButton
+                    chartId={`session-${sessionId}-stroke-length`}
+                    chartTitle="Stroke Length Consistency"
+                    chartDescription="This chart shows the distance covered per stroke (meters) throughout this rowing session."
+                    dataContext={getChartDataContext('stroke-length')}
+                    fullData={enrichedData}
+                    variant="compact"
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -665,7 +687,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
-                    <YAxis domain={useDynamicYAxis ? strokeLengthDomain : [0, 'auto']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                    <YAxis domain={chartZoom.strokeLength ? strokeLengthDomain : [0, 'auto']} label={{ value: 'Length (m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
                     <Line
@@ -730,51 +752,31 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
 
         {/* TAB: SEGMENTS */}
         <TabsContent value="segments" className="space-y-6">
-          {/* Segment Size Toggle and Y-Axis Toggle */}
+          {/* Segment Size Toggle */}
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium">Segment Analysis</h3>
               <p className="text-sm text-muted-foreground">Analyze performance by distance segments</p>
             </div>
-            <div className="flex gap-4 items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleDynamicYAxis}
-                className="flex items-center gap-2"
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSegmentSizeChange(100)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 100
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
               >
-                {useDynamicYAxis ? (
-                  <>
-                    <ZoomOut className="h-4 w-4" />
-                    Show Full Range
-                  </>
-                ) : (
-                  <>
-                    <ZoomIn className="h-4 w-4" />
-                    Zoom to Data
-                  </>
-                )}
-              </Button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleSegmentSizeChange(100)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 100
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                >
-                  100m
-                </button>
-                <button
-                  onClick={() => handleSegmentSizeChange(500)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 500
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                >
-                  500m
-                </button>
-              </div>
+                100m
+              </button>
+              <button
+                onClick={() => handleSegmentSizeChange(500)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${segmentSize === 500
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+              >
+                500m
+              </button>
             </div>
           </div>
 
@@ -854,14 +856,25 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                     <CardTitle>Rolling Power Average</CardTitle>
                     <CardDescription>5-stroke vs 10-stroke rolling average power</CardDescription>
                   </div>
-                  <ExplainChartButton
-                    chartId={`session-${sessionId}-rolling-power`}
-                    chartTitle="Rolling Power Average"
-                    chartDescription="This chart shows my 5-stroke and 10-stroke rolling average power throughout the session."
-                    dataContext={getChartDataContext('rolling-power')}
-                    fullData={rollingData}
-                    variant="compact"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleChartZoom('rollingPower')}
+                      className="h-8 w-8 p-0"
+                      title={chartZoom.rollingPower ? 'Show Full Range' : 'Zoom to Data'}
+                    >
+                      {chartZoom.rollingPower ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                    </Button>
+                    <ExplainChartButton
+                      chartId={`session-${sessionId}-rolling-power`}
+                      chartTitle="Rolling Power Average"
+                      chartDescription="This chart shows my 5-stroke and 10-stroke rolling average power throughout the session."
+                      dataContext={getChartDataContext('rolling-power')}
+                      fullData={rollingData}
+                      variant="compact"
+                    />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -875,7 +888,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                         stroke={chartTheme.axis.strokeColor}
                       />
-                      <YAxis domain={useDynamicYAxis ? rollingPowerDomain : [0, 'auto']} label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
+                      <YAxis domain={chartZoom.rollingPower ? rollingPowerDomain : [0, 'auto']} label={{ value: 'Power (W)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
                       <Tooltip
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -922,14 +935,25 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                     <CardTitle>Rolling Split Average</CardTitle>
                     <CardDescription>5-stroke vs 10-stroke rolling average split time</CardDescription>
                   </div>
-                  <ExplainChartButton
-                    chartId={`session-${sessionId}-rolling-split`}
-                    chartTitle="Rolling Split Average"
-                    chartDescription="This chart shows my 5-stroke and 10-stroke rolling average split time throughout the session."
-                    dataContext={getChartDataContext('rolling-split')}
-                    fullData={rollingData}
-                    variant="compact"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleChartZoom('rollingSplit')}
+                      className="h-8 w-8 p-0"
+                      title={chartZoom.rollingSplit ? 'Show Full Range' : 'Zoom to Data'}
+                    >
+                      {chartZoom.rollingSplit ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                    </Button>
+                    <ExplainChartButton
+                      chartId={`session-${sessionId}-rolling-split`}
+                      chartTitle="Rolling Split Average"
+                      chartDescription="This chart shows my 5-stroke and 10-stroke rolling average split time throughout the session."
+                      dataContext={getChartDataContext('rolling-split')}
+                      fullData={rollingData}
+                      variant="compact"
+                    />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -944,7 +968,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         stroke={chartTheme.axis.strokeColor}
                       />
                       <YAxis
-                        domain={useDynamicYAxis ? rollingSplitDomain : ['auto', 'auto']}
+                        domain={chartZoom.rollingSplit ? rollingSplitDomain : ['auto', 'auto']}
                         label={{ value: 'Split (s/500m)', angle: -90, position: 'insideLeft', style: chartTheme.axis.labelStyle }}
                         reversed={true}
                         tickFormatter={(val) => formatSplit(val)}

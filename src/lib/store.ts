@@ -44,10 +44,12 @@ export interface SessionsViewSettings {
   };
 }
 
+export type ChartZoomKey = 'pace' | 'work' | 'strokeLength' | 'rollingPower' | 'rollingSplit';
+
 export interface SessionAnalysisSettings {
   activeTab: 'overview' | 'charts' | 'segments' | 'analysis';
   segmentSize: 100 | 500;
-  useDynamicYAxis: boolean; // Toggle between dynamic (zoomed) and full Y-axis range
+  chartZoom: Record<ChartZoomKey, boolean>; // Per-chart zoom toggle (true = zoomed/dynamic, false = full range)
 }
 
 // Chart explanation from AI
@@ -186,7 +188,13 @@ const defaultSessionsViewSettings: SessionsViewSettings = {
 const defaultSessionAnalysisSettings: SessionAnalysisSettings = {
   activeTab: 'overview',
   segmentSize: 500,
-  useDynamicYAxis: true // Default to dynamic (zoomed) view
+  chartZoom: {
+    pace: true,
+    work: true,
+    strokeLength: true,
+    rollingPower: true,
+    rollingSplit: true
+  }
 };
 
 // Helpers to determine when an award was actually earned
