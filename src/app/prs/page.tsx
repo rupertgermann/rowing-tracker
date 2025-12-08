@@ -208,7 +208,7 @@ export default function PRsPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Best Average Power */}
-                <Card className="border border-gold-200/60 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
+                <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
                       <Zap className="h-5 w-5 text-gold-500" />
@@ -227,7 +227,7 @@ export default function PRsPage() {
                 </Card>
 
                 {/* Best Stroke Rate */}
-                <Card className="border border-gold-200/60 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
+                <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2 text-yellow-700">
                       <Target className="h-5 w-5 text-yellow-500" />
