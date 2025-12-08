@@ -64,8 +64,13 @@ export function AwardsList() {
           const Icon = award.icon;
           const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
           const hasContent = hasGeneratedContent(award.id);
+          const achievement = generatedAchievements[award.id];
           
           const imageUrl = loadedImages[award.id];
+          // Add version query param for cache busting
+          const imageUrlWithVersion = imageUrl && achievement?.imageVersion 
+            ? `${imageUrl}?v=${achievement.imageVersion}` 
+            : imageUrl;
           
           return (
             <Card 
@@ -80,14 +85,16 @@ export function AwardsList() {
               )}
             >
               {/* Background Image with Gradient Overlay */}
-              {imageUrl && isEarned && (
+              {imageUrlWithVersion && isEarned && (
                 <>
                   <div className="absolute inset-0">
                     <Image
-                      src={imageUrl}
+                      src={imageUrlWithVersion}
                       alt=""
                       fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       className="object-cover"
+                      unoptimized // Bypass Next.js image optimization to allow query string cache busting
                     />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/90 to-background/10" />

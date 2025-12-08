@@ -11,6 +11,7 @@ export interface GeneratedAchievement {
   imageUrl?: string;        // File path to image in public/assets/awards/ (e.g., /assets/awards/award_id.png)
   imagePrompt?: string;     // The prompt used to generate the image
   hasImage?: boolean;       // Flag indicating image exists on filesystem
+  imageVersion?: number;    // Cache-busting version number, incremented on regeneration
   
   // Generation metadata
   generatedAt?: Date;

@@ -271,12 +271,14 @@ export function AchievementGallery({
       // Update local state with the file path
       setLoadedImageUrl(filePath);
       
-      // Update store with file path and hasImage flag
+      // Update store with file path, hasImage flag, and increment version for cache busting
+      const newVersion = (generated?.imageVersion || 0) + 1;
       if (generated) {
         updateGeneratedAchievement(currentAward.id, {
           imageUrl: filePath,
           hasImage: true,
           imagePrompt: data.revisedPrompt,
+          imageVersion: newVersion,
           generatedAt: new Date()
         });
       } else {
@@ -288,6 +290,7 @@ export function AchievementGallery({
           imageUrl: filePath,
           hasImage: true,
           imagePrompt: data.revisedPrompt,
+          imageVersion: newVersion,
           generatedAt: new Date()
         });
       }
@@ -399,10 +402,12 @@ export function AchievementGallery({
           ) : loadedImageUrl ? (
             <div className={`relative ${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl overflow-hidden border shadow-lg`}>
               <Image
-                src={loadedImageUrl}
+                src={generated?.imageVersion ? `${loadedImageUrl}?v=${generated.imageVersion}` : loadedImageUrl}
                 alt={currentAward.title}
                 fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 className="object-cover"
+                unoptimized // Bypass Next.js image optimization to allow query string cache busting
               />
               {isGeneratingImage && (
                 <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
