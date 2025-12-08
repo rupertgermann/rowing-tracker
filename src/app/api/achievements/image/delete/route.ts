@@ -4,17 +4,21 @@ import { existsSync } from 'fs';
 import path from 'path';
 
 const AWARDS_DIR = path.join(process.cwd(), 'public', 'assets', 'awards');
-const NEXT_CACHE_DIR = path.join(process.cwd(), '.next', 'cache');
+const NEXT_DIR = path.join(process.cwd(), '.next');
 
 /**
  * Clear Next.js image optimization cache
  * This removes all cached optimized images, forcing regeneration on next request
+ * Handles both production (.next/cache/images) and dev/Turbopack (.next/dev/cache/images)
  */
 async function clearNextImageCache(): Promise<boolean> {
-  // Possible cache locations depending on Next.js version and bundler
   const cachePaths = [
-    path.join(NEXT_CACHE_DIR, 'images'),
-    path.join(NEXT_CACHE_DIR, 'fetch-cache'),
+    // Production cache
+    path.join(NEXT_DIR, 'cache', 'images'),
+    path.join(NEXT_DIR, 'cache', 'fetch-cache'),
+    // Development/Turbopack cache
+    path.join(NEXT_DIR, 'dev', 'cache', 'images'),
+    path.join(NEXT_DIR, 'dev', 'cache'),
   ];
   
   let cleared = false;
@@ -23,12 +27,16 @@ async function clearNextImageCache(): Promise<boolean> {
     if (existsSync(cachePath)) {
       try {
         await rm(cachePath, { recursive: true, force: true });
-        console.log(`Cleared Next.js cache: ${cachePath}`);
+        console.log(`[ImageDelete] Cleared Next.js cache: ${cachePath}`);
         cleared = true;
       } catch (error) {
-        console.error(`Error clearing cache at ${cachePath}:`, error);
+        console.error(`[ImageDelete] Error clearing cache at ${cachePath}:`, error);
       }
     }
+  }
+  
+  if (!cleared) {
+    console.log('[ImageDelete] No cache directories found to clear');
   }
   
   return cleared;

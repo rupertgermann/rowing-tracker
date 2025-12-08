@@ -1,9 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
 const AWARDS_DIR = path.join(process.cwd(), 'public', 'assets', 'awards');
+const NEXT_DIR = path.join(process.cwd(), '.next');
+
+/**
+ * Clear Next.js image optimization cache
+ * This removes all cached optimized images, forcing regeneration on next request
+ * Handles both production (.next/cache/images) and dev/Turbopack (.next/dev/cache/images)
+ */
+async function clearNextImageCache(): Promise<boolean> {
+  const cachePaths = [
+    // Production cache
+    path.join(NEXT_DIR, 'cache', 'images'),
+    path.join(NEXT_DIR, 'cache', 'fetch-cache'),
+    // Development/Turbopack cache
+    path.join(NEXT_DIR, 'dev', 'cache', 'images'),
+    path.join(NEXT_DIR, 'dev', 'cache'),
+  ];
+  
+  let cleared = false;
+  
+  for (const cachePath of cachePaths) {
+    if (existsSync(cachePath)) {
+      try {
+        await rm(cachePath, { recursive: true, force: true });
+        console.log(`[ImageSave] Cleared Next.js cache: ${cachePath}`);
+        cleared = true;
+      } catch (error) {
+        console.error(`[ImageSave] Error clearing cache at ${cachePath}:`, error);
+      }
+    }
+  }
+  
+  if (!cleared) {
+    console.log('[ImageSave] No cache directories found to clear');
+  }
+  
+  return cleared;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,13 +80,17 @@ export async function POST(request: NextRequest) {
     // Write the file
     await writeFile(filePath, buffer);
 
+    // Clear Next.js image optimization cache to ensure fresh images are served
+    const cacheCleared = await clearNextImageCache();
+
     // Return the public URL path
     const publicUrl = `/assets/awards/${filename}`;
 
     return NextResponse.json({ 
       success: true,
       filePath: publicUrl,
-      filename
+      filename,
+      cacheCleared
     });
   } catch (error) {
     console.error('Failed to save achievement image:', error);
