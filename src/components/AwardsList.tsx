@@ -59,18 +59,15 @@ export function AwardsList() {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {AWARDS.map((award) => {
+        {AWARDS.map((award, index) => {
           const isEarned = earnedIds.has(award.id);
           const Icon = award.icon;
           const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
           const hasContent = hasGeneratedContent(award.id);
-          const achievement = generatedAchievements[award.id];
           
+          // Use base imageUrl without version param to allow Next.js optimization
+          // Cache busting handled in gallery detail view, not needed for list thumbnails
           const imageUrl = loadedImages[award.id];
-          // Add version query param for cache busting
-          const imageUrlWithVersion = imageUrl && achievement?.imageVersion 
-            ? `${imageUrl}?v=${achievement.imageVersion}` 
-            : imageUrl;
           
           return (
             <Card 
@@ -84,17 +81,18 @@ export function AwardsList() {
                 hasContent && "ring-2 ring-purple-500/30"
               )}
             >
-              {/* Background Image with Gradient Overlay */}
-              {imageUrlWithVersion && isEarned && (
+              {/* Background Image with Gradient Overlay - optimized thumbnails */}
+              {imageUrl && isEarned && (
                 <>
                   <div className="absolute inset-0">
                     <Image
-                      src={imageUrlWithVersion}
+                      src={imageUrl}
                       alt=""
                       fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                       className="object-cover"
-                      unoptimized // Bypass Next.js image optimization to allow query string cache busting
+                      quality={60}
+                      priority={index < 4} // First row loads eagerly for LCP
                     />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/90 to-background/10" />

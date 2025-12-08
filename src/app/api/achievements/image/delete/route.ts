@@ -1,9 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { unlink } from 'fs/promises';
+import { unlink, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
 const AWARDS_DIR = path.join(process.cwd(), 'public', 'assets', 'awards');
+const NEXT_CACHE_DIR = path.join(process.cwd(), '.next', 'cache');
+
+/**
+ * Clear Next.js image optimization cache
+ * This removes all cached optimized images, forcing regeneration on next request
+ */
+async function clearNextImageCache(): Promise<boolean> {
+  // Possible cache locations depending on Next.js version and bundler
+  const cachePaths = [
+    path.join(NEXT_CACHE_DIR, 'images'),
+    path.join(NEXT_CACHE_DIR, 'fetch-cache'),
+  ];
+  
+  let cleared = false;
+  
+  for (const cachePath of cachePaths) {
+    if (existsSync(cachePath)) {
+      try {
+        await rm(cachePath, { recursive: true, force: true });
+        console.log(`Cleared Next.js cache: ${cachePath}`);
+        cleared = true;
+      } catch (error) {
+        console.error(`Error clearing cache at ${cachePath}:`, error);
+      }
+    }
+  }
+  
+  return cleared;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,9 +62,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Clear Next.js image optimization cache
+    let cacheCleared = false;
+    if (deleted) {
+      cacheCleared = await clearNextImageCache();
+    }
+
     return NextResponse.json({ 
       success: true,
-      deleted
+      deleted,
+      cacheCleared
     });
   } catch (error) {
     console.error('Failed to delete achievement image:', error);
