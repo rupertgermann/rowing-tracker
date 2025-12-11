@@ -10,6 +10,7 @@ import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame, BarChar
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { AwardsList } from '@/components/AwardsList';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
+import { cardStyles, getCardClassName } from '@/lib/cardStyles';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -36,7 +37,6 @@ function formatPace(secondsPer500m: number): string {
   const seconds = Math.floor(secondsPer500m % 60);
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
-
 
 export default function PRsPage() {
   const { getPersonalRecords, getSessions, getStats } = useRowingStore();
@@ -188,14 +188,12 @@ export default function PRsPage() {
                       href={record.sessionId ? `/sessions/${record.sessionId}` : '#'}
                       className={record.sessionId ? 'block' : 'pointer-events-none'}
                     >
-                      <Card
-                        className={`relative overflow-hidden border border-gold-200/40 bg-gradient-to-br from-gold-50/60 via-background to-transparent shadow-[0_20px_45px_-25px_rgba(255,215,0,0.9)] h-full ${record.sessionId ? 'cursor-pointer transition-all hover:scale-[1.02] hover:shadow-[0_25px_50px_-20px_rgba(255,215,0,1)]' : ''}`}
-                      >
+                      <Card className={getCardClassName('gold', !!record.sessionId)}>
                         <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-gold-200/60 to-transparent rounded-bl-full opacity-80" />
                         <CardHeader className="pb-4 relative z-10">
                           <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
-                              <Trophy className="h-5 w-5 text-[#d4af37] fill-[#f7e5a5]" />
+                            <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.gold.titleColor}`}>
+                              <Trophy className={`h-5 w-5 ${cardStyles.gold.iconColor}`} />
                               {formatDistance(record.distance)}
                             </CardTitle>
                             <Badge className="bg-gradient-to-r from-gold-400 to-amber-500 text-gold-950 text-xs border border-gold-500 shadow-sm">
@@ -224,7 +222,7 @@ export default function PRsPage() {
                           </div>
                           
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4 text-gold-500" />
+                            <Calendar className={`h-4 w-4 ${cardStyles.gold.accentColor}`} />
                             <span>Achieved: {formatDateOnly(record.date)}</span>
                           </div>
                         </CardContent>
@@ -253,10 +251,10 @@ export default function PRsPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Best Average Power */}
-                <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
+                <Card className={getCardClassName('amber')}>
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
-                      <Zap className="h-5 w-5 text-gold-500" />
+                    <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
+                      <Zap className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
                       Best Average Power
                     </CardTitle>
                   </CardHeader>
@@ -265,17 +263,17 @@ export default function PRsPage() {
                       {bestPower.avgPower > 0 ? `${Math.round(bestPower.avgPower)}W` : '--'}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4 text-yellow-500" />
+                      <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
                       <span>Session: {formatDateOnly(bestPower.timestamp)}</span>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Best Streak Record */}
-                <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
+                <Card className={getCardClassName('amber')}>
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2 text-yellow-700">
-                      <Flame className="h-5 w-5 text-yellow-500" />
+                    <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
+                      <Flame className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
                       Best Streak Record
                     </CardTitle>
                   </CardHeader>
@@ -289,7 +287,7 @@ export default function PRsPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4 text-yellow-500" />
+                        <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
                         <span>Current: {stats.currentStreak} days</span>
                       </div>
                     )}
@@ -297,10 +295,10 @@ export default function PRsPage() {
                 </Card>
 
                 {/* Best Stroke Rate */}
-                <Card className="border border-yellow-500/30 bg-gradient-to-br from-amber-50 via-background/40 to-background/80">
+                <Card className={getCardClassName('amber')}>
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2 text-yellow-700">
-                      <Target className="h-5 w-5 text-yellow-500" />
+                    <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
+                      <Target className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
                       Best Stroke Rate
                     </CardTitle>
                   </CardHeader>
@@ -309,7 +307,7 @@ export default function PRsPage() {
                       {bestStrokeRate.avgStrokeRate > 0 ? `${Math.round(bestStrokeRate.avgStrokeRate)} SPM` : '--'}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4 text-yellow-500" />
+                      <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
                       <span>Session: {formatDateOnly(bestStrokeRate.timestamp)}</span>
                     </div>
                   </CardContent>
@@ -331,10 +329,10 @@ export default function PRsPage() {
                     href={consistencyRecords.bestScoreSession ? `/sessions/${consistencyRecords.bestScoreSession.id}` : '#'}
                     className={consistencyRecords.bestScoreSession ? 'block' : 'pointer-events-none'}
                   >
-                    <Card className={`border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30 h-full ${consistencyRecords.bestScoreSession ? 'cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg' : ''}`}>
+                    <Card className={getCardClassName('teal', !!consistencyRecords.bestScoreSession)}>
                       <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
-                          <Trophy className="h-5 w-5 text-teal-500" />
+                        <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.teal.titleColor}`}>
+                          <Trophy className={`h-5 w-5 ${cardStyles.teal.iconColor}`} />
                           Best Consistency
                         </CardTitle>
                       </CardHeader>
@@ -344,7 +342,7 @@ export default function PRsPage() {
                         </div>
                         {consistencyRecords.bestScoreSession && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4 text-teal-500" />
+                            <Calendar className={`h-4 w-4 ${cardStyles.teal.accentColor}`} />
                             <span>{formatDateOnly(consistencyRecords.bestScoreSession.timestamp)}</span>
                           </div>
                         )}
@@ -353,10 +351,10 @@ export default function PRsPage() {
                   </Link>
 
                   {/* Average Consistency */}
-                  <Card className="border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30">
+                  <Card className={getCardClassName('teal')}>
                     <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
-                        <Target className="h-5 w-5 text-teal-500" />
+                      <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.teal.titleColor}`}>
+                        <Target className={`h-5 w-5 ${cardStyles.teal.iconColor}`} />
                         Average Consistency
                       </CardTitle>
                     </CardHeader>
@@ -371,10 +369,10 @@ export default function PRsPage() {
                   </Card>
 
                   {/* Excellent Sessions Count */}
-                  <Card className="border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30">
+                  <Card className={getCardClassName('teal')}>
                     <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
-                        <Medal className="h-5 w-5 text-teal-500" />
+                      <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.teal.titleColor}`}>
+                        <Medal className={`h-5 w-5 ${cardStyles.teal.iconColor}`} />
                         Excellent Sessions
                       </CardTitle>
                     </CardHeader>
@@ -389,10 +387,10 @@ export default function PRsPage() {
                   </Card>
 
                   {/* Consistency Trend */}
-                  <Card className="border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30">
+                  <Card className={getCardClassName('teal')}>
                     <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
-                        <TrendingUp className="h-5 w-5 text-teal-500" />
+                      <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.teal.titleColor}`}>
+                        <TrendingUp className={`h-5 w-5 ${cardStyles.teal.iconColor}`} />
                         Consistency Trend
                       </CardTitle>
                     </CardHeader>
