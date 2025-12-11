@@ -95,14 +95,27 @@ export default function PRsPage() {
     // Sessions with excellent consistency (≥80)
     const excellentCount = sessionScores.filter(s => s.score >= 75).length;
 
-    // Trend: compare last 5 sessions avg vs first 5 sessions avg (if enough data)
+    // Trend: compare last 2 weeks avg vs 2 weeks from 3 months ago
     let trend = 0;
-    if (sessionScores.length >= 6) {
-      const firstFive = sessionScores.slice(0, 5);
-      const lastFive = sessionScores.slice(-5);
-      const firstAvg = firstFive.reduce((sum, s) => sum + s.score, 0) / 5;
-      const lastAvg = lastFive.reduce((sum, s) => sum + s.score, 0) / 5;
-      trend = lastAvg - firstAvg;
+    let hasTrendData = false;
+    const now = Date.now();
+    const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+    const threeMonthsMs = 90 * 24 * 60 * 60 * 1000;
+    
+    // Last 2 weeks
+    const recentStart = now - twoWeeksMs;
+    const recentSessions = sessionScores.filter(s => s.timestamp >= recentStart);
+    
+    // 2 weeks from 3 months ago (between 3 months ago and 3 months - 2 weeks ago)
+    const oldEnd = now - threeMonthsMs;
+    const oldStart = oldEnd - twoWeeksMs;
+    const oldSessions = sessionScores.filter(s => s.timestamp >= oldStart && s.timestamp < oldEnd);
+    
+    if (recentSessions.length > 0 && oldSessions.length > 0) {
+      const recentAvg = recentSessions.reduce((sum, s) => sum + s.score, 0) / recentSessions.length;
+      const oldAvg = oldSessions.reduce((sum, s) => sum + s.score, 0) / oldSessions.length;
+      trend = recentAvg - oldAvg;
+      hasTrendData = true;
     }
 
     return {
@@ -111,6 +124,7 @@ export default function PRsPage() {
       avgScore,
       excellentCount,
       trend,
+      hasTrendData,
       totalWithData: sessionsWithStrokeData.length
     };
   })();
@@ -395,20 +409,20 @@ export default function PRsPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {consistencyRecords.totalWithData >= 6 ? (
+                      {consistencyRecords.hasTrendData ? (
                         <>
                           <div className={`text-3xl font-bold ${consistencyRecords.trend >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
                             {consistencyRecords.trend >= 0 ? '+' : ''}{Math.round(consistencyRecords.trend)}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Recent vs early sessions
+                            Last 2 weeks vs 3 months ago
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="text-3xl font-bold text-muted-foreground">--</div>
                           <div className="text-sm text-muted-foreground">
-                            Need 6+ sessions
+                            Need data from last 2 weeks and 3 months ago
                           </div>
                         </>
                       )}

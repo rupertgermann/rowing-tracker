@@ -4,13 +4,13 @@ export const cardStyles = {
   glow: {
     // Base state shadow geometry
     yOffset: 0,
-    blur: 45,
-    spread: -20,
-    opacity: 0.8,
+    blur: 35,
+    spread: -15,
+    opacity: 0.6,
     // Hover state shadow geometry  
     hoverYOffset: 0,
-    hoverBlur: 40,
-    hoverSpread: -15,
+    hoverBlur: 30,
+    hoverSpread: -4,
     hoverOpacity: 1,
   },
   
