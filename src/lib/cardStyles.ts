@@ -5,13 +5,13 @@ export const cardStyles = {
     // Base state shadow geometry
     yOffset: 0,
     blur: 45,
-    spread: -25,
-    opacity: 0.7,
+    spread: -20,
+    opacity: 0.8,
     // Hover state shadow geometry  
     hoverYOffset: 0,
-    hoverBlur: 50,
-    hoverSpread: -20,
-    hoverOpacity: 0.9,
+    hoverBlur: 40,
+    hoverSpread: -15,
+    hoverOpacity: 1,
   },
   
   // Color themes for different sections (RGB values)
