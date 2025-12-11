@@ -1,17 +1,24 @@
 // Centralized card styling for records and achievements sections
 export const cardStyles = {
   // Glow shadow settings - adjust these to change glow appearance for ALL themes
-  // Format: shadow-[y-offset_blur_spread_rgba(r,g,b,opacity)]
-  shadowBase: '0_20px_45px_-25px',      // y-offset, blur, spread for base state
-  shadowHover: '0_25px_50px_-20px',     // y-offset, blur, spread for hover state
-  glowOpacity: 0.7,                      // base glow opacity
-  glowHoverOpacity: 0.9,                 // hover glow opacity
+  glow: {
+    // Base state shadow geometry
+    yOffset: 0,
+    blur: 45,
+    spread: -25,
+    opacity: 0.7,
+    // Hover state shadow geometry  
+    hoverYOffset: 0,
+    hoverBlur: 50,
+    hoverSpread: -20,
+    hoverOpacity: 0.9,
+  },
   
-  // Color themes for different sections
+  // Color themes for different sections (RGB values)
   gold: {
     border: 'border-gold-200/40',
     bg: 'bg-gradient-to-br from-gold-50/60 via-background to-transparent dark:from-gold-950/20',
-    glowColor: '212,175,55',  // RGB for gold
+    glowColor: { r: 212, g: 175, b: 55 },
     titleColor: 'text-gold-700 dark:text-gold-400',
     iconColor: 'text-gold-500',
     accentColor: 'text-gold-500',
@@ -20,7 +27,7 @@ export const cardStyles = {
   amber: {
     border: 'border-amber-500/30',
     bg: 'bg-gradient-to-br from-amber-50/60 via-background to-transparent dark:from-amber-950/20',
-    glowColor: '245,158,11',  // RGB for amber
+    glowColor: { r: 245, g: 158, b: 11 },
     titleColor: 'text-amber-700 dark:text-amber-400',
     iconColor: 'text-amber-500',
     accentColor: 'text-amber-500',
@@ -28,7 +35,7 @@ export const cardStyles = {
   teal: {
     border: 'border-teal-500/30',
     bg: 'bg-gradient-to-br from-teal-50/60 via-background to-transparent dark:from-teal-950/20',
-    glowColor: '20,184,166',  // RGB for teal
+    glowColor: { r: 20, g: 184, b: 166 },
     titleColor: 'text-teal-700 dark:text-teal-400',
     iconColor: 'text-teal-500',
     accentColor: 'text-teal-500',
@@ -36,7 +43,7 @@ export const cardStyles = {
   purple: {
     border: 'border-purple-500/30',
     bg: 'bg-gradient-to-br from-purple-50/60 via-background to-transparent dark:from-purple-950/20',
-    glowColor: '168,85,247',  // RGB for purple
+    glowColor: { r: 168, g: 85, b: 247 },
     titleColor: 'text-purple-700 dark:text-purple-400',
     iconColor: 'text-purple-500',
     accentColor: 'text-purple-500',
@@ -48,21 +55,25 @@ export const cardStyles = {
 
 export type CardTheme = 'gold' | 'amber' | 'teal' | 'purple';
 
-// Helper to build shadow class from centralized settings
-export const getShadowClass = (theme: CardTheme) => {
-  const color = cardStyles[theme].glowColor;
-  return `shadow-[${cardStyles.shadowBase}_rgba(${color},${cardStyles.glowOpacity})]`;
+// Helper to build inline shadow style (works with any opacity value)
+export const getShadowStyle = (theme: CardTheme): React.CSSProperties => {
+  const { r, g, b } = cardStyles[theme].glowColor;
+  const { yOffset, blur, spread, opacity } = cardStyles.glow;
+  return {
+    boxShadow: `0 ${yOffset}px ${blur}px ${spread}px rgba(${r}, ${g}, ${b}, ${opacity})`,
+  };
 };
 
-export const getHoverShadowClass = (theme: CardTheme) => {
-  const color = cardStyles[theme].glowColor;
-  return `hover:shadow-[${cardStyles.shadowHover}_rgba(${color},${cardStyles.glowHoverOpacity})]`;
+export const getHoverShadowStyle = (theme: CardTheme): React.CSSProperties => {
+  const { r, g, b } = cardStyles[theme].glowColor;
+  const { hoverYOffset, hoverBlur, hoverSpread, hoverOpacity } = cardStyles.glow;
+  return {
+    boxShadow: `0 ${hoverYOffset}px ${hoverBlur}px ${hoverSpread}px rgba(${r}, ${g}, ${b}, ${hoverOpacity})`,
+  };
 };
 
-// Helper to build card className
+// Helper to build card className (without shadow - shadow applied via style prop)
 export const getCardClassName = (theme: CardTheme, isClickable: boolean = false) => {
   const t = cardStyles[theme];
-  const shadow = getShadowClass(theme);
-  const hoverShadow = getHoverShadowClass(theme);
-  return `${cardStyles.base} ${t.border} ${t.bg} ${shadow} ${isClickable ? `${cardStyles.clickable} ${hoverShadow}` : ''}`;
+  return `${cardStyles.base} ${t.border} ${t.bg} ${isClickable ? cardStyles.clickable : ''}`;
 };

@@ -8,7 +8,7 @@ import { AWARDS } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { cardStyles, getShadowClass, getHoverShadowClass } from '@/lib/cardStyles';
+import { cardStyles, getShadowStyle, getCardClassName } from '@/lib/cardStyles';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
 
@@ -75,13 +75,13 @@ export function AwardsList() {
               key={award.id} 
               onClick={() => handleAwardClick(award.id, isEarned)}
               className={cn(
-                cardStyles.base,
                 "group transition-all duration-200",
                 isEarned 
-                  ? `${cardStyles.purple.border} ${cardStyles.purple.bg} ${getShadowClass('purple')} ${cardStyles.clickable} ${getHoverShadowClass('purple')}` 
-                  : "opacity-60 grayscale border-dashed bg-muted/30",
+                  ? getCardClassName('purple', true)
+                  : "opacity-60 grayscale border-dashed bg-muted/30 relative overflow-hidden h-full",
                 hasContent && "ring-2 ring-purple-500/30"
               )}
+              style={isEarned ? getShadowStyle('purple') : undefined}
             >
               {/* Background Image with Gradient Overlay - optimized thumbnails */}
               {imageUrl && isEarned && (
