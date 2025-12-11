@@ -68,7 +68,7 @@ export interface PrivacySettings {
 export interface UseCaseConfig {
   reasoning: 'minimal' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
-  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1';
+  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' | 'gpt-5.2';
 }
 
 export interface AISettings {
@@ -119,7 +119,7 @@ export class SettingsService {
       theme: 'system',
       units: 'metric',
       dateFormat: 'MM/DD/YYYY',
-      timeFormat: '12h',
+      timeFormat: '24h',
       language: 'en',
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       defaultChartType: 'line',

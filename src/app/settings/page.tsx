@@ -1120,6 +1120,7 @@ export default function SettingsPage() {
                           <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
                           <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
                           <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Choose model based on speed vs quality preference
