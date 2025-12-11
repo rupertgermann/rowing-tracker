@@ -153,7 +153,10 @@ export default function PRsPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center space-y-4 mb-10">
-          <div className="inline-flex flex-col items-center justify-center px-6 py-4 rounded-2xl bg-gradient-to-br from-gold-100 via-background to-transparent border border-gold-200/60 shadow-[0_25px_60px_-35px_rgba(255,215,0,0.8)]">
+          <div 
+            className={`inline-flex flex-col items-center justify-center px-6 py-4 rounded-2xl ${cardStyles.gold.border} ${cardStyles.gold.bg}`}
+            style={getShadowStyle('gold')}
+          >
             <div className="flex items-center justify-center gap-3">
               <Trophy className="h-8 w-8 text-[#d4af37] drop-shadow" />
               <h1 className="text-3xl font-bold text-foreground tracking-tight">Personal Records</h1>
@@ -207,7 +210,7 @@ export default function PRsPage() {
                         <CardHeader className="pb-4 relative z-10">
                           <div className="flex items-center justify-between">
                             <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.gold.titleColor}`}>
-                              <Trophy className={`h-5 w-5 ${cardStyles.gold.iconColor}`} />
+                              <Trophy className="h-5 w-5 text-[#d4af37]" />
                               {formatDistance(record.distance)}
                             </CardTitle>
                             <Badge className="bg-gradient-to-r from-gold-400 to-amber-500 text-gold-950 text-xs border border-gold-500 shadow-sm">
