@@ -6,7 +6,8 @@ import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame } from 'lucide-react';
+import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame, BarChart3 } from 'lucide-react';
+import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { AwardsList } from '@/components/AwardsList';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 
@@ -62,6 +63,57 @@ export default function PRsPage() {
     session.avgStrokeRate > best.avgStrokeRate ? session : best, 
     sessions[0] || { avgStrokeRate: 0, timestamp: new Date() }
   );
+
+  // Calculate consistency records from sessions with stroke data
+  const consistencyRecords = (() => {
+    const sessionsWithStrokeData = sessions.filter(s => s.strokeData && s.strokeData.length > 0);
+    
+    if (sessionsWithStrokeData.length === 0) {
+      return {
+        bestScore: 0,
+        bestScoreSession: null as typeof sessions[0] | null,
+        avgScore: 0,
+        excellentCount: 0,
+        trend: 0,
+        totalWithData: 0
+      };
+    }
+
+    // Calculate consistency scores for all sessions
+    const sessionScores = sessionsWithStrokeData.map(session => ({
+      session,
+      score: calculateAdvancedStats(session.strokeData!).consistencyScore,
+      timestamp: new Date(session.timestamp).getTime()
+    })).sort((a, b) => a.timestamp - b.timestamp);
+
+    // Best consistency score
+    const best = sessionScores.reduce((max, curr) => curr.score > max.score ? curr : max, sessionScores[0]);
+
+    // Average consistency
+    const avgScore = sessionScores.reduce((sum, s) => sum + s.score, 0) / sessionScores.length;
+
+    // Sessions with excellent consistency (≥80)
+    const excellentCount = sessionScores.filter(s => s.score >= 75).length;
+
+    // Trend: compare last 5 sessions avg vs first 5 sessions avg (if enough data)
+    let trend = 0;
+    if (sessionScores.length >= 6) {
+      const firstFive = sessionScores.slice(0, 5);
+      const lastFive = sessionScores.slice(-5);
+      const firstAvg = firstFive.reduce((sum, s) => sum + s.score, 0) / 5;
+      const lastAvg = lastFive.reduce((sum, s) => sum + s.score, 0) / 5;
+      trend = lastAvg - firstAvg;
+    }
+
+    return {
+      bestScore: best.score,
+      bestScoreSession: best.session,
+      avgScore,
+      excellentCount,
+      trend,
+      totalWithData: sessionsWithStrokeData.length
+    };
+  })();
 
   // Show loading placeholder during hydration
   if (!mounted) {
@@ -131,61 +183,53 @@ export default function PRsPage() {
               {hasPRs ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {personalRecords.map((record) => (
-                    <Card
+                    <Link
                       key={record.distance}
-                      className="relative overflow-hidden border border-gold-200/40 bg-gradient-to-br from-gold-50/60 via-background to-transparent shadow-[0_20px_45px_-25px_rgba(255,215,0,0.9)]"
+                      href={record.sessionId ? `/sessions/${record.sessionId}` : '#'}
+                      className={record.sessionId ? 'block' : 'pointer-events-none'}
                     >
-                      <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-gold-200/60 to-transparent rounded-bl-full opacity-80" />
-                      <CardHeader className="pb-4 relative z-10">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
-                            <Trophy className="h-5 w-5 text-[#d4af37] fill-[#f7e5a5]" />
-                            {formatDistance(record.distance)}
-                          </CardTitle>
-                          <Badge className="bg-gradient-to-r from-gold-400 to-amber-500 text-gold-950 text-xs border border-gold-500 shadow-sm">
-                            BEST TIME
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4 relative z-10">
-                        <div className="text-3xl font-bold text-foreground font-mono">
-                          {formatDuration(record.bestTime)}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Avg Pace:</span>
-                            <div className="font-mono font-semibold">
-                              {formatPace(record.bestPace)}
+                      <Card
+                        className={`relative overflow-hidden border border-gold-200/40 bg-gradient-to-br from-gold-50/60 via-background to-transparent shadow-[0_20px_45px_-25px_rgba(255,215,0,0.9)] h-full ${record.sessionId ? 'cursor-pointer transition-all hover:scale-[1.02] hover:shadow-[0_25px_50px_-20px_rgba(255,215,0,1)]' : ''}`}
+                      >
+                        <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-gold-200/60 to-transparent rounded-bl-full opacity-80" />
+                        <CardHeader className="pb-4 relative z-10">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg flex items-center gap-2 text-gold-700">
+                              <Trophy className="h-5 w-5 text-[#d4af37] fill-[#f7e5a5]" />
+                              {formatDistance(record.distance)}
+                            </CardTitle>
+                            <Badge className="bg-gradient-to-r from-gold-400 to-amber-500 text-gold-950 text-xs border border-gold-500 shadow-sm">
+                              BEST TIME
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4 relative z-10">
+                          <div className="text-3xl font-bold text-foreground font-mono">
+                            {formatDuration(record.bestTime)}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Avg Pace:</span>
+                              <div className="font-mono font-semibold">
+                                {formatPace(record.bestPace)}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Avg Power:</span>
+                              <div className="font-semibold">
+                                {record.avgPower > 0 ? `${Math.round(record.avgPower)}W` : '--'}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <span className="text-muted-foreground">Avg Power:</span>
-                            <div className="font-semibold">
-                              {record.avgPower > 0 ? `${Math.round(record.avgPower)}W` : '--'}
-                            </div>
+                          
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4 text-gold-500" />
+                            <span>Achieved: {formatDateOnly(record.date)}</span>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4 text-gold-500" />
-                          <span>Achieved: {formatDateOnly(record.date)}</span>
-                        </div>
-                        
-                        {record.sessionId && (
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="w-full border-gold-300 text-gold-700 hover:bg-gold-50"
-                          >
-                            <Link href={`/sessions/${record.sessionId}`}>
-                              View Session
-                            </Link>
-                          </Button>
-                        )}
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    </Link>
                   ))}
                 </div>
               ) : (
@@ -271,6 +315,118 @@ export default function PRsPage() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+
+            {/* Consistency Records */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-teal-500" />
+                Consistency Records
+              </h2>
+              
+              {consistencyRecords.totalWithData > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Best Consistency Score */}
+                  <Link
+                    href={consistencyRecords.bestScoreSession ? `/sessions/${consistencyRecords.bestScoreSession.id}` : '#'}
+                    className={consistencyRecords.bestScoreSession ? 'block' : 'pointer-events-none'}
+                  >
+                    <Card className={`border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30 h-full ${consistencyRecords.bestScoreSession ? 'cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg' : ''}`}>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
+                          <Trophy className="h-5 w-5 text-teal-500" />
+                          Best Consistency
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="text-3xl font-bold">
+                          {Math.round(consistencyRecords.bestScore)}/100
+                        </div>
+                        {consistencyRecords.bestScoreSession && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4 text-teal-500" />
+                            <span>{formatDateOnly(consistencyRecords.bestScoreSession.timestamp)}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  {/* Average Consistency */}
+                  <Card className="border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
+                        <Target className="h-5 w-5 text-teal-500" />
+                        Average Consistency
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-3xl font-bold">
+                        {Math.round(consistencyRecords.avgScore)}/100
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Across {consistencyRecords.totalWithData} sessions
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Excellent Sessions Count */}
+                  <Card className="border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
+                        <Medal className="h-5 w-5 text-teal-500" />
+                        Excellent Sessions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-3xl font-bold">
+                        {consistencyRecords.excellentCount}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Sessions with score ≥75
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Consistency Trend */}
+                  <Card className="border border-teal-500/30 bg-gradient-to-br from-teal-50 via-background/40 to-background/80 dark:from-teal-950/30">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2 text-teal-700 dark:text-teal-400">
+                        <TrendingUp className="h-5 w-5 text-teal-500" />
+                        Consistency Trend
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {consistencyRecords.totalWithData >= 6 ? (
+                        <>
+                          <div className={`text-3xl font-bold ${consistencyRecords.trend >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                            {consistencyRecords.trend >= 0 ? '+' : ''}{Math.round(consistencyRecords.trend)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Recent vs early sessions
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-3xl font-bold text-muted-foreground">--</div>
+                          <div className="text-sm text-muted-foreground">
+                            Need 6+ sessions
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-muted-foreground">
+                      <p>No consistency data yet.</p>
+                      <p className="text-sm">Upload stroke-by-stroke data for your sessions to see consistency records.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Achievements Section */}
