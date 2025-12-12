@@ -64,6 +64,9 @@ export default function PRsPage() {
     sessions[0] || { avgStrokeRate: 0, timestamp: new Date() }
   );
 
+  const bestPowerSessionId = (bestPower as { id?: string }).id;
+  const bestStrokeRateSessionId = (bestStrokeRate as { id?: string }).id;
+
   // Calculate consistency records from sessions with stroke data
   const consistencyRecords = (() => {
     const sessionsWithStrokeData = sessions.filter(s => s.strokeData && s.strokeData.length > 0);
@@ -268,23 +271,28 @@ export default function PRsPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Best Average Power */}
-                <Card className={getCardClassName('amber')} style={getShadowStyle('amber')}>
-                  <CardHeader>
-                    <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
-                      <Zap className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
-                      Best Average Power
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold">
-                      {bestPower.avgPower > 0 ? `${Math.round(bestPower.avgPower)}W` : '--'}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
-                      <span>Session: {formatDateOnly(bestPower.timestamp)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Link
+                  href={bestPowerSessionId ? `/sessions/${bestPowerSessionId}` : '#'}
+                  className={bestPowerSessionId ? 'block' : 'pointer-events-none'}
+                >
+                  <Card className={getCardClassName('amber', !!bestPowerSessionId)} style={getShadowStyle('amber')}>
+                    <CardHeader>
+                      <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
+                        <Zap className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
+                        Best Average Power
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-3xl font-bold">
+                        {bestPower.avgPower > 0 ? `${Math.round(bestPower.avgPower)}W` : '--'}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
+                        <span>Session: {formatDateOnly(bestPower.timestamp)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
 
                 {/* Best Streak Record */}
                 <Card className={getCardClassName('amber')} style={getShadowStyle('amber')}>
@@ -312,23 +320,28 @@ export default function PRsPage() {
                 </Card>
 
                 {/* Best Stroke Rate */}
-                <Card className={getCardClassName('amber')} style={getShadowStyle('amber')}>
-                  <CardHeader>
-                    <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
-                      <Target className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
-                      Best Stroke Rate
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold">
-                      {bestStrokeRate.avgStrokeRate > 0 ? `${Math.round(bestStrokeRate.avgStrokeRate)} SPM` : '--'}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
-                      <span>Session: {formatDateOnly(bestStrokeRate.timestamp)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Link
+                  href={bestStrokeRateSessionId ? `/sessions/${bestStrokeRateSessionId}` : '#'}
+                  className={bestStrokeRateSessionId ? 'block' : 'pointer-events-none'}
+                >
+                  <Card className={getCardClassName('amber', !!bestStrokeRateSessionId)} style={getShadowStyle('amber')}>
+                    <CardHeader>
+                      <CardTitle className={`text-lg flex items-center gap-2 ${cardStyles.amber.titleColor}`}>
+                        <Target className={`h-5 w-5 ${cardStyles.amber.iconColor}`} />
+                        Best Stroke Rate
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-3xl font-bold">
+                        {bestStrokeRate.avgStrokeRate > 0 ? `${Math.round(bestStrokeRate.avgStrokeRate)} SPM` : '--'}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className={`h-4 w-4 ${cardStyles.amber.accentColor}`} />
+                        <span>Session: {formatDateOnly(bestStrokeRate.timestamp)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               </div>
             </div>
 
