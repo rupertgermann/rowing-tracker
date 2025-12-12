@@ -311,7 +311,7 @@ Style guidelines:
 
       const settings = JSON.parse(stored);
       const migrated = this.migrateSettings(settings);
-      this.saveSettings(migrated);
+      this.saveSettings(migrated, { dispatchEvent: false });
       return migrated;
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -525,13 +525,16 @@ Style guidelines:
   }
 
   // Private helper methods
-  private saveSettings(settings: Settings): void {
+  private saveSettings(settings: Settings, options?: { dispatchEvent?: boolean }): void {
     try {
       // Guard against SSR/non-browser environments
       if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
         return;
       }
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
+      if (options?.dispatchEvent !== false) {
+        window.dispatchEvent(new Event('rowing_app_settings_updated'));
+      }
     } catch (error) {
       console.error('Failed to save settings:', error);
     }
