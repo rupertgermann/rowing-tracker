@@ -220,17 +220,6 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
                   Took action
                 </Button>
               )}
-              {onArchive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleArchive}
-                  className="h-6 px-2 text-xs hover:text-orange-600"
-                >
-                  <Archive className="h-3 w-3 mr-1" />
-                  {isArchived ? 'Unarchive' : 'Archive'}
-                </Button>
-              )}
               {isArchived && onDelete && (
                 <Button
                   variant="ghost"
