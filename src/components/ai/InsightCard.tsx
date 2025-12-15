@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import {
   Archive,
   Trash2
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 // Helper function to safely format dates from insights
 const formatInsightDate = (dateGenerated: Date | string): string => {
@@ -45,6 +46,7 @@ interface InsightCardProps {
 }
 
 export function InsightCard({ insight, onFeedback, isArchived = false, onArchive, onDelete }: InsightCardProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { recordFeedback, getFeedback } = useInsightFeedback();
   const existingFeedback = getFeedback(insight.id);
   const isCloudInsight = 'confidence' in insight && insight.id && insight.id.startsWith('cloud-');
@@ -113,9 +115,12 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
   };
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to permanently delete this insight?')) {
-      onDelete?.(insight.id);
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    onDelete?.(insight.id);
+    setShowDeleteConfirm(false);
   };
 
   const getConfidenceDisplay = () => {
@@ -248,6 +253,17 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
           </div>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Insight"
+        description="Are you sure you want to permanently delete this insight? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDelete}
+        variant="destructive"
+      />
     </Card>
   );
 }

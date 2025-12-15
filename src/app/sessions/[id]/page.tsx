@@ -27,6 +27,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { formatSessionDetailDate } from '@/lib/dateTimeUtils';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -64,6 +65,7 @@ export default function SessionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [strokeData, setStrokeData] = useState<StrokeData[] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Find previous and next sessions for navigation
   // We calculate this early so we can use it in the effect hook
@@ -226,12 +228,7 @@ export default function SessionDetailPage() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this session? This will also remove any associated stroke data. This action cannot be undone.')) {
-                  deleteSession(session.id);
-                  router.push('/sessions');
-                }
-              }}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -478,6 +475,20 @@ export default function SessionDetailPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Session"
+        description="Are you sure you want to delete this session? This will also remove any associated stroke data. This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          deleteSession(session.id);
+          router.push('/sessions');
+        }}
+        variant="destructive"
+      />
     </div>
   );
 }
