@@ -165,65 +165,7 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-full">
-                  <Sparkles className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{insights?.length || 0}</p>
-                  <p className="text-xs text-muted-foreground">Current Insights</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/10 rounded-full">
-                  <Archive className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{archivedInsights?.length || 0}</p>
-                  <p className="text-xs text-muted-foreground">Archived</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-500/10 rounded-full">
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {[...(insights || []), ...(archivedInsights || [])].filter(i => i.priority === 'high').length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">High Priority</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-full">
-                  <Trophy className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {[...(insights || []), ...(archivedInsights || [])].filter(i => i.type === 'achievement').length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Achievements</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'current' | 'archive')} className="space-y-6">
