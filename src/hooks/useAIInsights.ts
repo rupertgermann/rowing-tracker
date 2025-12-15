@@ -531,18 +531,30 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         // Generate new insights
         const result = await performAnalysis();
         if (isMounted) {
-          const archivedInsights = getArchivedInsights();
-          const updatedResult = {
-            ...result,
-            archivedInsights,
-            isArchivedView
-          };
-          setData(updatedResult);
-          // Cache the results
-          const isCloudAIConfigured = initializeCloudAI();
-          const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
-          const usingCloudAI = isAIAvailableForUse;
-          saveCachedInsights(sessions, usingCloudAI, updatedResult);
+          // Archive existing insights before replacing with new ones
+          setData(prevData => {
+            let currentArchived = getArchivedInsights();
+            
+            // Archive previous insights if any exist
+            if (prevData.insights.length > 0) {
+              currentArchived = addToArchive(currentArchived, prevData.insights);
+              saveArchivedInsights(currentArchived);
+            }
+
+            const updatedResult = {
+              ...result,
+              archivedInsights: currentArchived,
+              isArchivedView
+            };
+
+            // Cache the results
+            const isCloudAIConfigured = initializeCloudAI();
+            const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
+            const usingCloudAI = isAIAvailableForUse;
+            saveCachedInsights(sessions, usingCloudAI, updatedResult);
+
+            return updatedResult;
+          });
         }
       } catch (error) {
         console.error('Analysis error:', error);

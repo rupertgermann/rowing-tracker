@@ -23,7 +23,8 @@ import {
   Activity,
   Flame,
   Gauge,
-  Upload
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { formatSessionDetailDate } from '@/lib/dateTimeUtils';
 
@@ -56,7 +57,7 @@ function formatPace(secondsPer500m: number): string {
 export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { getSessions, updateSession } = useRowingStore();
+  const { getSessions, updateSession, deleteSession } = useRowingStore();
   const sessions = getSessions();
 
   const [session, setSession] = useState<any>(null);
@@ -222,6 +223,19 @@ export default function SessionDetailPage() {
                 </Link>
               </Button>
             )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this session? This will also remove any associated stroke data. This action cannot be undone.')) {
+                  deleteSession(session.id);
+                  router.push('/sessions');
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
           </div>
         </div>
 
