@@ -374,16 +374,41 @@ export default function InsightsPage() {
                       <h3 className="text-sm font-medium text-muted-foreground">{date}</h3>
                       <div className="flex-1 h-px bg-border" />
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {dateInsights.map((insight, index) => (
-                        <InsightCard
-                          key={insight.id || `insight-${index}`}
-                          insight={insight}
-                          isArchived={false}
-                          onArchive={archiveInsight}
-                        />
-                      ))}
-                    </div>
+                    {(() => {
+                      // Sort by priority to find the highest priority insight
+                      const priorityOrder = { high: 0, medium: 1, low: 2 };
+                      const sorted = [...dateInsights].sort((a, b) => 
+                        (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
+                      );
+                      const [featured, ...rest] = sorted;
+                      
+                      return (
+                        <div className="space-y-4">
+                          {/* Featured (highest priority) insight - full width */}
+                          {featured && (
+                            <InsightCard
+                              key={featured.id || 'featured'}
+                              insight={featured}
+                              isArchived={false}
+                              onArchive={archiveInsight}
+                            />
+                          )}
+                          {/* Remaining insights in 2 columns */}
+                          {rest.length > 0 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {rest.map((insight, index) => (
+                                <InsightCard
+                                  key={insight.id || `insight-${index}`}
+                                  insight={insight}
+                                  isArchived={false}
+                                  onArchive={archiveInsight}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -422,17 +447,43 @@ export default function InsightsPage() {
                       <h3 className="text-sm font-medium text-muted-foreground">{date}</h3>
                       <div className="flex-1 h-px bg-border" />
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {dateInsights.map((insight, index) => (
-                        <InsightCard
-                          key={insight.id || `archived-${index}`}
-                          insight={insight}
-                          isArchived={true}
-                          onArchive={unarchiveInsight}
-                          onDelete={deleteInsight}
-                        />
-                      ))}
-                    </div>
+                    {(() => {
+                      // Sort by priority to find the highest priority insight
+                      const priorityOrder = { high: 0, medium: 1, low: 2 };
+                      const sorted = [...dateInsights].sort((a, b) => 
+                        (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
+                      );
+                      const [featured, ...rest] = sorted;
+                      
+                      return (
+                        <div className="space-y-4">
+                          {/* Featured (highest priority) insight - full width */}
+                          {featured && (
+                            <InsightCard
+                              key={featured.id || 'featured-archived'}
+                              insight={featured}
+                              isArchived={true}
+                              onArchive={unarchiveInsight}
+                              onDelete={deleteInsight}
+                            />
+                          )}
+                          {/* Remaining insights in 2 columns */}
+                          {rest.length > 0 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {rest.map((insight, index) => (
+                                <InsightCard
+                                  key={insight.id || `archived-${index}`}
+                                  insight={insight}
+                                  isArchived={true}
+                                  onArchive={unarchiveInsight}
+                                  onDelete={deleteInsight}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
