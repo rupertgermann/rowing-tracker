@@ -173,7 +173,7 @@ export function MetricComparisonWidget() {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div style={chartTheme.tooltip.contentStyle}>
+        <div style={{ ...chartTheme.tooltip.contentStyle, color: '#374151' }}>
           <p style={chartTheme.tooltip.labelStyle}>{label}</p>
           <p style={{ ...chartTheme.tooltip.itemStyle, fontWeight: 'bold' }}>
              {metric === 'pace' ? formatPace(data.value) : 
@@ -181,7 +181,7 @@ export function MetricComparisonWidget() {
               Math.round(data.value).toLocaleString()}
              <span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.25rem' }}>{activeMetric.unit}</span>
           </p>
-          <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+          <div style={{ ...chartTheme.tooltip.secondaryTextStyle, fontSize: '0.75rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
               <span>Sessions:</span>
               <span style={{ fontWeight: 500 }}>{data.count}</span>

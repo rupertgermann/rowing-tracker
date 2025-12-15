@@ -143,7 +143,7 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
             </div>
             <CardTitle className="text-lg">{insight.title}</CardTitle>
             {isCloudInsight && (
-              <Cloud className="h-4 w-4 text-blue-500" />
+              <Cloud className="h-6 w-6 mr-2 text-blue-500" />
             )}
           </div>
           <Badge variant={getPriorityBadgeVariant()}>

@@ -22,14 +22,17 @@ export const chartTheme = {
             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', // shadow-lg
         },
         itemStyle: {
-            color: '#000000',
+            color: '#111827', // gray-900
             fontSize: '1rem', // text-base (16px)
         },
         labelStyle: {
-            color: '#000000',
+            color: '#111827', // gray-900
             fontWeight: 500,
             fontSize: '1rem', // text-base (16px)
             marginBottom: '0.5rem', // mb-2
+        },
+        secondaryTextStyle: {
+            color: '#374151', // gray-700
         },
     },
     legend: {
