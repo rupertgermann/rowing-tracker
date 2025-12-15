@@ -641,24 +641,6 @@ const Dashboard = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant={!isArchivedView ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setIsArchivedView?.(false)}
-                        className="text-xs"
-                      >
-                        Current
-                      </Button>
-                      <Button
-                        variant={isArchivedView ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setIsArchivedView?.(true)}
-                        className="text-xs"
-                      >
-                        Archive ({archivedInsights?.length || 0})
-                      </Button>
-                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -668,6 +650,16 @@ const Dashboard = () => {
                       <RefreshCw className="h-4 w-4" />
                       Refresh
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <Link href="/insights">
+                        View All ({(insights?.length || 0) + (archivedInsights?.length || 0)})
+                      </Link>
+                    </Button>
                     {lastAnalyzed && (
                       <div className="text-xs text-muted-foreground">
                         Last analyzed: {formatDateOnly(lastAnalyzed)}
@@ -676,18 +668,17 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {(isArchivedView ? archivedInsights ?? [] : insights ?? [])?.length > 0 ? (
+                {(insights ?? [])?.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {(isArchivedView ? archivedInsights ?? [] : insights ?? [])?.map((insight: Insight | CloudInsight, index: number) => (
+                    {(insights ?? [])?.map((insight: Insight | CloudInsight, index: number) => (
                       <InsightCard
                         key={insight.id || `local-${insight.type}-${index}`}
                         insight={insight}
                         onFeedback={() => {
                           // Feedback recorded
                         }}
-                        isArchived={isArchivedView}
-                        onArchive={isArchivedView ? unarchiveInsight : archiveInsight}
-                        onDelete={isArchivedView ? deleteInsight : undefined}
+                        isArchived={false}
+                        onArchive={archiveInsight}
                       />
                     ))}
                   </div>
@@ -699,17 +690,18 @@ const Dashboard = () => {
                           <Brain className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold text-foreground mb-2">
-                          {isArchivedView ? 'No Archived Insights' : 'Analyzing Your Data'}
+                          Analyzing Your Data
                         </h3>
                         <p className="text-muted-foreground mb-4">
-                          {isArchivedView
-                            ? 'Archive insights you want to save for later reference.'
-                            : 'AI is processing your training patterns to generate personalized insights.'
-                          }
+                          AI is processing your training patterns to generate personalized insights.
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          More sessions will provide better recommendations.
-                        </p>
+                        {(archivedInsights?.length || 0) > 0 && (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href="/insights">
+                              View {archivedInsights?.length} Archived Insights
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
