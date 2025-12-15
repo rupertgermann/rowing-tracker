@@ -46,7 +46,17 @@ const generateCacheKey = (sessions: Session[], usingCloudAI: boolean): string =>
     .map(s => new Date(s.timestamp).getTime())
     .sort((a, b) => b - a)[0] || 0;
 
-  return `${sessionCount}-${lastSessionTimestamp}-${usingCloudAI}`;
+  // Include a hash of session IDs to detect when sessions are deleted/replaced
+  // even if count and last timestamp remain the same
+  const sessionIdsHash = sessions
+    .map(s => s.id)
+    .sort()
+    .join(',')
+    .split('')
+    .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
+    .toString(36);
+
+  return `${sessionCount}-${lastSessionTimestamp}-${usingCloudAI}-${sessionIdsHash}`;
 };
 
 // Get cached insights if valid
@@ -83,7 +93,24 @@ const getCachedInsights = (sessions: Session[], usingCloudAI: boolean): AIInsigh
   return null;
 };
 
-// Save insights to cache
+// Get any cached insights (even if stale/mismatched) for archiving before regeneration
+const getStaleInsightsForArchiving = (): (Insight | CloudInsight)[] => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [];
+  }
+
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return [];
+
+    const cache: InsightCache = JSON.parse(cached);
+    return cache.data?.insights || [];
+  } catch (error) {
+    return [];
+  }
+};
+
+// Save insights to cache (archives old insights before overwriting)
 const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AIInsightData): void => {
   // Guard against SSR/non-browser environments
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
@@ -91,6 +118,22 @@ const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AI
   }
 
   try {
+    // Archive existing cached insights BEFORE overwriting
+    const existingCached = localStorage.getItem(CACHE_KEY);
+    if (existingCached) {
+      try {
+        const oldCache: InsightCache = JSON.parse(existingCached);
+        const oldInsights = oldCache.data?.insights || [];
+        if (oldInsights.length > 0) {
+          const currentArchived = getArchivedInsights();
+          const newArchived = addToArchive(currentArchived, oldInsights);
+          saveArchivedInsights(newArchived);
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse old cache for archiving:', parseError);
+      }
+    }
+
     const cache: InsightCache = {
       data,
       cacheKey: generateCacheKey(sessions, usingCloudAI),
@@ -520,6 +563,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           const usingCloudAI = isAIAvailableForUse;
 
           const cachedData = getCachedInsights(sessions, usingCloudAI);
+          
           if (cachedData) {
             if (isMounted) {
               setData(cachedData);
@@ -528,33 +572,32 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           }
         }
 
+        // Archive stale cached insights BEFORE generating new ones
+        // This handles the case where React state is empty but cache has old insights
+        const staleInsights = getStaleInsightsForArchiving();
+        let currentArchived = getArchivedInsights();
+        
+        if (staleInsights.length > 0) {
+          currentArchived = addToArchive(currentArchived, staleInsights);
+          saveArchivedInsights(currentArchived);
+        }
+
         // Generate new insights
         const result = await performAnalysis();
         if (isMounted) {
-          // Archive existing insights before replacing with new ones
-          setData(prevData => {
-            let currentArchived = getArchivedInsights();
-            
-            // Archive previous insights if any exist
-            if (prevData.insights.length > 0) {
-              currentArchived = addToArchive(currentArchived, prevData.insights);
-              saveArchivedInsights(currentArchived);
-            }
+          const updatedResult = {
+            ...result,
+            archivedInsights: currentArchived,
+            isArchivedView
+          };
 
-            const updatedResult = {
-              ...result,
-              archivedInsights: currentArchived,
-              isArchivedView
-            };
+          // Cache the results
+          const isCloudAIConfigured = initializeCloudAI();
+          const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
+          const usingCloudAI = isAIAvailableForUse;
+          saveCachedInsights(sessions, usingCloudAI, updatedResult);
 
-            // Cache the results
-            const isCloudAIConfigured = initializeCloudAI();
-            const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
-            const usingCloudAI = isAIAvailableForUse;
-            saveCachedInsights(sessions, usingCloudAI, updatedResult);
-
-            return updatedResult;
-          });
+          setData(updatedResult);
         }
       } catch (error) {
         console.error('Analysis error:', error);
