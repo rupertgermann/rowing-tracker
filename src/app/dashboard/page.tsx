@@ -669,19 +669,44 @@ const Dashboard = () => {
                 </div>
 
                 {(insights ?? [])?.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {(insights ?? [])?.map((insight: Insight | CloudInsight, index: number) => (
-                      <InsightCard
-                        key={insight.id || `local-${insight.type}-${index}`}
-                        insight={insight}
-                        onFeedback={() => {
-                          // Feedback recorded
-                        }}
-                        isArchived={false}
-                        onArchive={archiveInsight}
-                      />
-                    ))}
-                  </div>
+                  (() => {
+                    const insightsList = insights ?? [];
+                    // Sort by priority to find the highest priority insight
+                    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+                    const sorted = [...insightsList].sort((a, b) => 
+                      (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
+                    );
+                    const [featured, ...rest] = sorted;
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Featured (highest priority) insight - full width */}
+                        {featured && (
+                          <InsightCard
+                            key={featured.id || 'featured'}
+                            insight={featured}
+                            onFeedback={() => {}}
+                            isArchived={false}
+                            onArchive={archiveInsight}
+                          />
+                        )}
+                        {/* Remaining insights in 2 columns */}
+                        {rest.length > 0 && (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {rest.map((insight: Insight | CloudInsight, index: number) => (
+                              <InsightCard
+                                key={insight.id || `local-${insight.type}-${index}`}
+                                insight={insight}
+                                onFeedback={() => {}}
+                                isArchived={false}
+                                onArchive={archiveInsight}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <Card>
                     <CardContent className="pt-6">

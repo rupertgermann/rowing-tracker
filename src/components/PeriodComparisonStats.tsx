@@ -107,7 +107,7 @@ export function PeriodComparisonStats() {
     const isNeutral = valueB === 0 || Math.abs(percentChange) < 0.1;
     
     return (
-      <Card className="bg-card/50 border-muted/50 shadow-sm">
+      <Card className="bg-card/50 border-muted/50 shadow-sm border border-input">
         <CardContent className="px-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
