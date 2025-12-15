@@ -173,11 +173,11 @@ export default function InsightsPage() {
             <TabsList className="grid w-full sm:w-auto grid-cols-2">
               <TabsTrigger value="current" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                Current ({insights?.length || 0})
+                Current ({currentInsights.length})
               </TabsTrigger>
               <TabsTrigger value="archive" className="flex items-center gap-2">
                 <Archive className="h-4 w-4" />
-                Archive ({archivedInsights?.length || 0})
+                Archive ({archivedInsightsList.length})
               </TabsTrigger>
             </TabsList>
 
