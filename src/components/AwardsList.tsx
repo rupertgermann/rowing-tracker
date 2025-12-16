@@ -2,28 +2,39 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useRowingStore } from '@/lib/store';
+import { useRowingStore, AIAwardSuggestion } from '@/lib/store';
 import { useAchievementStore } from '@/lib/achievementStore';
-import { AWARDS } from '@/lib/awards';
+import { AWARDS, Award } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getShadowStyle, getCardClassName } from '@/lib/cardStyles';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Sparkles } from 'lucide-react';
+
+// Unified display item for both static awards and AI-generated goals
+interface DisplayAward {
+  id: string;
+  title: string;
+  description: string;
+  icon: any;
+  color: string;
+  isEarned: boolean;
+  earnedAt?: Date;
+  isAIGoal: boolean;
+  aiSuggestion?: AIAwardSuggestion;
+  hasGeneratedContent: boolean;
+  imageUrl?: string;
+  sourceAward?: Award;
+}
 
 export function AwardsList() {
   const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion } = useRowingStore();
   const { hasGeneratedContent, generatedAchievements } = useAchievementStore();
   const earnedIds = new Set(earnedAwards.map(a => a.awardId));
 
-  const aiGoals = useMemo(() => {
-    return aiAwardSuggestions.filter(s => s.status === 'approved');
-  }, [aiAwardSuggestions]);
-  
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedAwardId, setSelectedAwardId] = useState<string | null>(null);
   const [loadedImages, setLoadedImages] = useState<Record<string, string>>({});
@@ -36,7 +47,6 @@ export function AwardsList() {
         return achievement?.hasImage || achievement?.imageUrl;
       }).map(async (award) => {
         const achievement = generatedAchievements[award.id];
-        // Use in-memory imageUrl if available, otherwise check filesystem
         if (achievement?.imageUrl) {
           return { awardId: award.id, imageData: achievement.imageUrl };
         }
@@ -57,90 +67,88 @@ export function AwardsList() {
     loadImages();
   }, [generatedAchievements]);
 
-  const handleAwardClick = (awardId: string, isEarned: boolean) => {
-    if (isEarned) {
-      setSelectedAwardId(awardId);
+  // Build unified list: static awards + approved AI goals
+  const displayAwards = useMemo((): DisplayAward[] => {
+    const staticAwardIds = new Set(AWARDS.map(a => a.id));
+    const approvedAIGoals = aiAwardSuggestions.filter(s => s.status === 'approved');
+
+    // Static awards from AWARDS array
+    const staticItems: DisplayAward[] = AWARDS.map(award => {
+      const isEarned = earnedIds.has(award.id);
+      const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
+      return {
+        id: award.id,
+        title: award.title,
+        description: award.description,
+        icon: award.icon,
+        color: award.color,
+        isEarned,
+        earnedAt: earnedInfo?.earnedAt,
+        isAIGoal: false,
+        hasGeneratedContent: hasGeneratedContent(award.id),
+        imageUrl: loadedImages[award.id],
+        sourceAward: award
+      };
+    });
+
+    // AI-generated goals (only those not already in static awards)
+    const aiItems: DisplayAward[] = approvedAIGoals
+      .filter(goal => !staticAwardIds.has(goal.id))
+      .map(goal => ({
+        id: goal.id,
+        title: goal.title,
+        description: goal.description,
+        icon: Sparkles,
+        color: 'text-purple-500',
+        isEarned: false,
+        isAIGoal: true,
+        aiSuggestion: goal,
+        hasGeneratedContent: false
+      }));
+
+    return [...staticItems, ...aiItems];
+  }, [earnedIds, earnedAwards, aiAwardSuggestions, hasGeneratedContent, loadedImages]);
+
+  const handleAwardClick = (item: DisplayAward) => {
+    if (item.isEarned && item.sourceAward) {
+      setSelectedAwardId(item.id);
       setGalleryOpen(true);
     }
   };
 
   return (
     <>
-      {aiGoals.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">AI-Generated Goals</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {aiGoals.map((goal) => (
-              <Card key={goal.id} className="border-primary/10">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-base">{goal.title}</CardTitle>
-                      <div className="text-xs text-muted-foreground">{goal.description}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-[10px]">AI Goal</Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => deleteAIAwardSuggestion(goal.id)}
-                        className="h-8 px-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="text-xs">{goal.rationale}</div>
-                  {goal.targetDate && (
-                    <div className="text-xs text-muted-foreground">
-                      Target: {formatDateOnly(new Date(goal.targetDate))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {AWARDS.map((award, index) => {
-          const isEarned = earnedIds.has(award.id);
-          const Icon = award.icon;
-          const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
-          const hasContent = hasGeneratedContent(award.id);
-          
-          // Use base imageUrl without version param to allow Next.js optimization
-          // Cache busting handled in gallery detail view, not needed for list thumbnails
-          const imageUrl = loadedImages[award.id];
+        {displayAwards.map((item, index) => {
+          const Icon = item.icon;
           
           return (
             <Card 
-              key={award.id} 
-              onClick={() => handleAwardClick(award.id, isEarned)}
+              key={item.id} 
+              onClick={() => handleAwardClick(item)}
               className={cn(
-                "group transition-all duration-200",
-                isEarned 
+                "group transition-all duration-200 relative overflow-hidden",
+                item.isEarned 
                   ? getCardClassName('purple', true)
-                  : "opacity-60 grayscale border-dashed bg-muted/30 relative overflow-hidden h-full",
-                hasContent && "ring-2 ring-purple-500/30"
+                  : item.isAIGoal
+                    ? "border-purple-500/30 bg-purple-500/5 border-dashed"
+                    : "opacity-60 grayscale border-dashed bg-muted/30",
+                item.hasGeneratedContent && "ring-2 ring-purple-500/30"
               )}
-              style={isEarned ? getShadowStyle('purple') : undefined}
+              style={item.isEarned ? getShadowStyle('purple') : undefined}
             >
-              {/* Background Image with Gradient Overlay - optimized thumbnails */}
-              {imageUrl && isEarned && (
+              {/* Background Image with Gradient Overlay */}
+              {item.imageUrl && item.isEarned && (
                 <>
                   <div className="absolute inset-0">
                     <Image
-                      src={imageUrl}
+                      src={item.imageUrl}
                       alt=""
                       fill
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                       className="object-cover"
                       quality={60}
-                      priority={index < 4} // First row loads eagerly for LCP
+                      priority={index < 4}
                     />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/90 to-background/10 opacity-90 transition-opacity duration-200 group-hover:opacity-70" />
@@ -151,29 +159,52 @@ export function AwardsList() {
               <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0 gap-2 relative z-10">
                 <div className={cn(
                   "p-2 rounded-full",
-                  isEarned ? "bg-background/80 shadow-sm backdrop-blur-sm" : "bg-transparent"
+                  item.isEarned ? "bg-background/80 shadow-sm backdrop-blur-sm" : "bg-transparent"
                 )}>
                   <Icon 
                     className={cn(
                       "h-6 w-6", 
-                      isEarned ? award.color : "text-muted-foreground"
+                      item.isEarned ? item.color : item.isAIGoal ? "text-purple-500" : "text-muted-foreground"
                     )} 
                   />
                 </div>
                 <div className="flex items-center gap-1">
-                  {isEarned && earnedInfo && (
+                  {item.isAIGoal && (
+                    <>
+                      <span className="text-[10px] text-purple-500 font-mono bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                        AI Goal
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAIAwardSuggestion(item.id);
+                        }}
+                        className="h-6 w-6 p-0 hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                  {item.isEarned && item.earnedAt && (
                     <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
-                      {formatDateOnly(new Date(earnedInfo.earnedAt))}
+                      {formatDateOnly(new Date(item.earnedAt))}
                     </span>
                   )}
                 </div>
               </CardHeader>
               <CardContent className="relative z-10">
-                <CardTitle className="text-base mb-1 leading-tight">{award.title}</CardTitle>
-                <p className="text-xs text-muted-foreground line-clamp-3">
-                  {award.description}
+                <CardTitle className="text-base mb-1 leading-tight">{item.title}</CardTitle>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {item.description}
                 </p>
-                {isEarned && (
+                {item.isAIGoal && item.aiSuggestion?.targetDate && (
+                  <p className="text-[10px] text-purple-500 mt-1">
+                    Target: {formatDateOnly(new Date(item.aiSuggestion.targetDate))}
+                  </p>
+                )}
+                {item.isEarned && (
                   <p className="text-[10px] text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     Click to view & generate story
                   </p>
