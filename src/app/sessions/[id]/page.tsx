@@ -226,7 +226,7 @@ export default function SessionDetailPage() {
               </Button>
             )}
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
               onClick={() => setShowDeleteConfirm(true)}
             >
