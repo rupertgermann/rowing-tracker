@@ -20,14 +20,8 @@ export function AwardsList() {
   const { hasGeneratedContent, generatedAchievements } = useAchievementStore();
   const earnedIds = new Set(earnedAwards.map(a => a.awardId));
 
-  const aiSuggestionById = useMemo(() => {
-    return new Map(aiAwardSuggestions.map(s => [s.awardId, s]));
-  }, [aiAwardSuggestions]);
-
   const aiGoals = useMemo(() => {
-    return aiAwardSuggestions
-      .map(s => ({ suggestion: s, award: AWARDS.find(a => a.id === s.awardId) }))
-      .filter(x => Boolean(x.award)) as Array<{ suggestion: typeof aiAwardSuggestions[number]; award: (typeof AWARDS)[number] }>;
+    return aiAwardSuggestions.filter(s => s.status === 'approved');
   }, [aiAwardSuggestions]);
   
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -74,23 +68,22 @@ export function AwardsList() {
     <>
       {aiGoals.length > 0 && (
         <div className="mb-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">AI-Generated Goals</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {aiGoals.map(({ suggestion, award }) => (
-              <Card key={award.id} className="border-primary/10">
+            {aiGoals.map((goal) => (
+              <Card key={goal.id} className="border-primary/10">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="text-base">{award.title}</CardTitle>
-                      <div className="text-xs text-muted-foreground">{award.description}</div>
+                      <CardTitle className="text-base">{goal.title}</CardTitle>
+                      <div className="text-xs text-muted-foreground">{goal.description}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {suggestion.status === 'approved' ? 'Approved' : 'Suggested'}
-                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">AI Goal</Badge>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => deleteAIAwardSuggestion(award.id)}
+                        onClick={() => deleteAIAwardSuggestion(goal.id)}
                         className="h-8 px-2"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -99,10 +92,10 @@ export function AwardsList() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="text-xs">{suggestion.rationale}</div>
-                  {suggestion.targetDate && (
+                  <div className="text-xs">{goal.rationale}</div>
+                  {goal.targetDate && (
                     <div className="text-xs text-muted-foreground">
-                      Target: {formatDateOnly(new Date(suggestion.targetDate))}
+                      Target: {formatDateOnly(new Date(goal.targetDate))}
                     </div>
                   )}
                 </CardContent>
@@ -118,7 +111,6 @@ export function AwardsList() {
           const Icon = award.icon;
           const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
           const hasContent = hasGeneratedContent(award.id);
-          const aiGoal = aiSuggestionById.get(award.id);
           
           // Use base imageUrl without version param to allow Next.js optimization
           // Cache busting handled in gallery detail view, not needed for list thumbnails
@@ -169,11 +161,6 @@ export function AwardsList() {
                   />
                 </div>
                 <div className="flex items-center gap-1">
-                  {!isEarned && aiGoal && (
-                    <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
-                      {aiGoal.status === 'approved' ? 'GOAL' : 'AI'}
-                    </span>
-                  )}
                   {isEarned && earnedInfo && (
                     <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
                       {formatDateOnly(new Date(earnedInfo.earnedAt))}

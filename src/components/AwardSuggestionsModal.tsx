@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useRowingStore } from '@/lib/store';
-import { AWARDS } from '@/lib/awards';
 import { settings } from '@/lib/settings';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { Loader2, Sparkles, Trash2, CheckCircle2 } from 'lucide-react';
@@ -29,17 +28,6 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const earnedIds = useMemo(() => new Set(earnedAwards.map(a => a.awardId)), [earnedAwards]);
-
-  const suggestionsById = useMemo(() => {
-    const map = new Map(aiAwardSuggestions.map(s => [s.awardId, s]));
-    return map;
-  }, [aiAwardSuggestions]);
-
-  const unearnedAwards = useMemo(() => {
-    return AWARDS.filter(a => !earnedIds.has(a.id));
-  }, [earnedIds]);
-
   const handleGenerate = async () => {
     setIsGenerating(true);
     setError(null);
@@ -59,7 +47,10 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
             avgPower: s.avgPower,
             avgStrokeRate: s.avgStrokeRate
           })),
-          earnedAwardIds: earnedAwards.map(a => a.awardId),
+          earnedAwards: earnedAwards.map(a => ({
+            awardId: a.awardId,
+            earnedAt: a.earnedAt instanceof Date ? a.earnedAt.toISOString() : a.earnedAt
+          })),
           maxSuggestions: 5,
           customPrompt: aiSettings.awardSuggestionsPrompt,
           apiKey: aiSettings.openaiApiKey || undefined,
@@ -84,7 +75,9 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
       for (const s of suggestions) {
         const targetDate = s.targetDate ? new Date(s.targetDate) : undefined;
         upsertAIAwardSuggestion({
-          awardId: s.awardId,
+          id: s.id,
+          title: s.title,
+          description: s.description,
           status: 'suggested',
           rationale: s.rationale,
           targetDate,
@@ -93,7 +86,7 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
       }
 
       if (suggestions.length === 0) {
-        setError('No realistic upcoming achievements found. Try again after a few more sessions.');
+        setError('No new achievement ideas generated. Try again later.');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
@@ -103,27 +96,25 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
   };
 
   const suggestedList = useMemo(() => {
-    const list = aiAwardSuggestions
+    const seen = new Set<string>();
+    return aiAwardSuggestions
       .filter(s => s.status === 'suggested')
-      .map(s => ({
-        suggestion: s,
-        award: AWARDS.find(a => a.id === s.awardId)
-      }))
-      .filter(x => Boolean(x.award));
-
-    return list as Array<{ suggestion: typeof aiAwardSuggestions[number]; award: (typeof AWARDS)[number] }>;
+      .filter(s => {
+        if (!s.id || seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
   }, [aiAwardSuggestions]);
 
   const approvedList = useMemo(() => {
-    const list = aiAwardSuggestions
+    const seen = new Set<string>();
+    return aiAwardSuggestions
       .filter(s => s.status === 'approved')
-      .map(s => ({
-        suggestion: s,
-        award: AWARDS.find(a => a.id === s.awardId)
-      }))
-      .filter(x => Boolean(x.award));
-
-    return list as Array<{ suggestion: typeof aiAwardSuggestions[number]; award: (typeof AWARDS)[number] }>;
+      .filter(s => {
+        if (!s.id || seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
   }, [aiAwardSuggestions]);
 
   const hasAny = suggestedList.length + approvedList.length > 0;
@@ -137,18 +128,18 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
             AI Award Suggestions
           </DialogTitle>
           <DialogDescription>
-            Generate realistic upcoming achievement milestones based on your sessions. Approve to add them to your list.
+            Generate creative new achievement ideas based on your rowing progress. Approve to add them to your goals.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Generate Suggestions</CardTitle>
+              <CardTitle className="text-base">Generate New Award Ideas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="text-sm text-muted-foreground">
-                Unearned achievements available: {unearnedAwards.length}
+                Sessions available for analysis: {sessions.length}
               </div>
               {error && <div className="text-sm text-destructive">{error}</div>}
               <div>
@@ -164,34 +155,34 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Suggested</CardTitle>
+                  <CardTitle className="text-base">Suggested ({suggestedList.length})</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {suggestedList.length === 0 ? (
                     <div className="text-sm text-muted-foreground">No pending suggestions.</div>
                   ) : (
-                    suggestedList.map(({ suggestion, award }) => (
-                      <div key={award.id} className="border rounded-md p-3 space-y-2">
+                    suggestedList.map((s) => (
+                      <div key={s.id} className="border rounded-md p-3 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="font-medium text-sm">{award.title}</div>
-                            <div className="text-xs text-muted-foreground">{award.description}</div>
+                            <div className="font-medium text-sm">{s.title}</div>
+                            <div className="text-xs text-muted-foreground">{s.description}</div>
                           </div>
                           <Badge variant="secondary" className="text-[10px]">AI</Badge>
                         </div>
 
-                        {suggestion.targetDate && (
+                        {s.targetDate && (
                           <div className="text-xs text-muted-foreground">
-                            Target: {formatDateOnly(new Date(suggestion.targetDate))}
+                            Target: {formatDateOnly(new Date(s.targetDate))}
                           </div>
                         )}
 
-                        <div className="text-xs">{suggestion.rationale}</div>
+                        <div className="text-xs">{s.rationale}</div>
 
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            onClick={() => approveAIAwardSuggestion(award.id)}
+                            onClick={() => approveAIAwardSuggestion(s.id)}
                             className="flex items-center gap-1"
                           >
                             <CheckCircle2 className="h-4 w-4" />
@@ -200,7 +191,7 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => deleteAIAwardSuggestion(award.id)}
+                            onClick={() => deleteAIAwardSuggestion(s.id)}
                             className="flex items-center gap-1"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -215,35 +206,35 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Approved</CardTitle>
+                  <CardTitle className="text-base">Approved ({approvedList.length})</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {approvedList.length === 0 ? (
                     <div className="text-sm text-muted-foreground">No approved AI goals yet.</div>
                   ) : (
-                    approvedList.map(({ suggestion, award }) => (
-                      <div key={award.id} className="border rounded-md p-3 space-y-2">
+                    approvedList.map((s) => (
+                      <div key={s.id} className="border rounded-md p-3 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="font-medium text-sm">{award.title}</div>
-                            <div className="text-xs text-muted-foreground">{award.description}</div>
+                            <div className="font-medium text-sm">{s.title}</div>
+                            <div className="text-xs text-muted-foreground">{s.description}</div>
                           </div>
                           <Badge variant="secondary" className="text-[10px]">Approved</Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Added: {formatDateOnly(new Date(suggestion.approvedAt || suggestion.suggestedAt))}
+                          Added: {formatDateOnly(new Date(s.approvedAt || s.suggestedAt))}
                         </div>
-                        {suggestion.targetDate && (
+                        {s.targetDate && (
                           <div className="text-xs text-muted-foreground">
-                            Target: {formatDateOnly(new Date(suggestion.targetDate))}
+                            Target: {formatDateOnly(new Date(s.targetDate))}
                           </div>
                         )}
-                        <div className="text-xs">{suggestion.rationale}</div>
+                        <div className="text-xs">{s.rationale}</div>
                         <div>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => deleteAIAwardSuggestion(award.id)}
+                            onClick={() => deleteAIAwardSuggestion(s.id)}
                             className="flex items-center gap-1"
                           >
                             <Trash2 className="h-4 w-4" />

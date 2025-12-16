@@ -73,7 +73,9 @@ export interface PendingChartExplanation {
 export type AIAwardSuggestionStatus = 'suggested' | 'approved';
 
 export interface AIAwardSuggestion {
-  awardId: string;
+  id: string; // Unique ID for this suggestion (AI-generated kebab-case)
+  title: string; // Award title
+  description: string; // How to earn this award
   status: AIAwardSuggestionStatus;
   rationale: string;
   targetDate?: Date;
@@ -549,7 +551,9 @@ export const useRowingStore = create<RowingStore>()(
       upsertAIAwardSuggestion: (suggestion) => {
         set((state) => {
           const next: AIAwardSuggestion = {
-            awardId: suggestion.awardId,
+            id: suggestion.id,
+            title: suggestion.title,
+            description: suggestion.description,
             status: suggestion.status,
             rationale: suggestion.rationale,
             targetDate: suggestion.targetDate,
@@ -558,7 +562,7 @@ export const useRowingStore = create<RowingStore>()(
             model: suggestion.model
           };
 
-          const existingIndex = state.aiAwardSuggestions.findIndex(s => s.awardId === suggestion.awardId);
+          const existingIndex = state.aiAwardSuggestions.findIndex(s => s.id === suggestion.id);
           if (existingIndex === -1) {
             return { aiAwardSuggestions: [...state.aiAwardSuggestions, next] };
           }
@@ -569,10 +573,10 @@ export const useRowingStore = create<RowingStore>()(
         });
       },
 
-      approveAIAwardSuggestion: (awardId) => {
+      approveAIAwardSuggestion: (id) => {
         set((state) => {
           const updated: AIAwardSuggestion[] = state.aiAwardSuggestions.map((s): AIAwardSuggestion => {
-            if (s.awardId !== awardId) return s;
+            if (s.id !== id) return s;
             if (s.status === 'approved') return s;
             return { ...s, status: 'approved' as AIAwardSuggestionStatus, approvedAt: new Date() };
           });
@@ -580,9 +584,9 @@ export const useRowingStore = create<RowingStore>()(
         });
       },
 
-      deleteAIAwardSuggestion: (awardId) => {
+      deleteAIAwardSuggestion: (id) => {
         set((state) => ({
-          aiAwardSuggestions: state.aiAwardSuggestions.filter(s => s.awardId !== awardId)
+          aiAwardSuggestions: state.aiAwardSuggestions.filter(s => s.id !== id)
         }));
       },
 

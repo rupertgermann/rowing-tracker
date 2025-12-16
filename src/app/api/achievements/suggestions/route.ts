@@ -7,7 +7,9 @@ type VerbositySetting = 'low' | 'medium' | 'high';
 
 interface SuggestionResponse {
   suggestions: Array<{
-    awardId: string;
+    id: string;
+    title: string;
+    description: string;
     rationale: string;
     targetDate?: string;
   }>;
@@ -65,12 +67,12 @@ export async function POST(request: NextRequest) {
 
     const {
       sessions,
-      earnedAwardIds,
+      earnedAwards: earnedAwardsInput,
       maxSuggestions = 5,
       customPrompt,
       apiKey,
       model = 'gpt-5-mini',
-      reasoning = 'medium',
+      reasoning = 'low',
       verbosity = 'low',
       maxOutputTokens
     } = body as {
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
         avgPower: number;
         avgStrokeRate: number;
       }>;
-      earnedAwardIds: string[];
+      earnedAwards?: Array<{ awardId: string; earnedAt: string }>;
       maxSuggestions?: number;
       customPrompt?: string;
       apiKey?: string;
@@ -96,12 +98,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing sessions' }, { status: 400 });
     }
 
-    const earned = new Set(Array.isArray(earnedAwardIds) ? earnedAwardIds : []);
-    const unearnedAwards = AWARDS.filter(a => !earned.has(a.id));
+    const earnedAwardsList = Array.isArray(earnedAwardsInput) ? earnedAwardsInput : [];
 
-    if (unearnedAwards.length === 0) {
-      return NextResponse.json({ suggestions: [] } satisfies SuggestionResponse);
-    }
+    const earnedAwardsForPrompt = earnedAwardsList
+      .map(e => {
+        const award = AWARDS.find(a => a.id === e.awardId);
+        if (!award) return null;
+        const earnedDate = e.earnedAt ? new Date(e.earnedAt).toISOString().split('T')[0] : 'unknown';
+        return `- "${award.title}" — ${award.description} (earned: ${earnedDate})`;
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    const existingAwardCategories = [
+      'Session counts (e.g., 1, 10, 50, 100, 365 sessions)',
+      'Duration milestones (e.g., 1h, 5h, 10h, 24h, 50h, 100h total)',
+      'Streak achievements (e.g., 3, 5, 7, 10, 14, 21, 30, 45, 60, 100 consecutive days)',
+      'Distance milestones (e.g., 10k, 50k, 100k, 250k, 750k, 1M meters)',
+      'Power achievements (e.g., 150W, 200W, 250W, 300W average)',
+      'Speed achievements (e.g., sub 1:45, sub 1:40, sub 1:35 per 500m)',
+      'Improvement awards (e.g., +10%, +25%, +50% power/pace vs baseline)',
+      'Time-of-day awards (e.g., early bird, night owl)'
+    ].join('\n- ');
 
     const openaiApiKey = apiKey || process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
@@ -127,9 +145,12 @@ export async function POST(request: NextRequest) {
       avgStrokeRate: s.avgStrokeRate
     }));
 
-    const prompt = `AVAILABLE ACHIEVEMENTS (ONLY THESE IDs ARE VALID):
+    const prompt = `ALREADY EARNED ACHIEVEMENTS (for context — do not suggest duplicates of these):
 
-${unearnedAwards.map(a => `- ${a.id}: ${a.title}`).join('\n')}
+${earnedAwardsForPrompt || '(none yet)'}
+
+EXISTING AWARD CATEGORIES IN THE APP:
+- ${existingAwardCategories}
 
 CURRENT TOTALS:
 - totalSessions: ${sortedSessions.length}
@@ -139,7 +160,10 @@ CURRENT TOTALS:
 RECENT SESSIONS (most recent last):
 ${JSON.stringify(recent, null, 2)}
 
-Return suggestions for up to ${maxSuggestions} achievements. Do not include already earned achievements.`.trim();
+Suggest up to ${maxSuggestions} NEW achievement ideas. Be creative! You can:
+- Suggest new milestones in existing categories
+- Invent entirely new award categories (e.g., consistency, weekly goals, personal bests, technique)
+- Create fun/motivational achievements tailored to this athlete's progress`.trim();
 
     const instructions = `${customPrompt || ''}
 
@@ -184,11 +208,13 @@ Keep output short:
                     items: {
                       type: 'object',
                       properties: {
-                        awardId: { type: 'string' },
-                        rationale: { type: 'string' },
-                        targetDate: { type: ['string', 'null'] }
+                        id: { type: 'string', description: 'Unique kebab-case ID for the award (e.g., weekly-warrior, power-surge)' },
+                        title: { type: 'string', description: 'Short catchy title (2-4 words)' },
+                        description: { type: 'string', description: 'Brief description of how to earn this award' },
+                        rationale: { type: 'string', description: 'Why this award is suggested for this athlete' },
+                        targetDate: { type: ['string', 'null'], description: 'Estimated date to achieve (YYYY-MM-DD) or null' }
                       },
-                      required: ['awardId', 'rationale', 'targetDate'],
+                      required: ['id', 'title', 'description', 'rationale', 'targetDate'],
                       additionalProperties: false
                     }
                   }
@@ -246,16 +272,17 @@ Keep output short:
       return NextResponse.json({ error: 'Invalid JSON from AI', details: extracted.value.slice(0, 1000) }, { status: 500 });
     }
 
-    const allowedIds = new Set(unearnedAwards.map(a => a.id));
     const filtered = (parsed.suggestions || [])
-      .filter(s => s && typeof s.awardId === 'string' && allowedIds.has(s.awardId))
+      .filter(s => s && typeof s.id === 'string' && typeof s.title === 'string' && typeof s.description === 'string')
       .slice(0, Math.max(0, Math.min(10, maxSuggestions)))
       .map(s => ({
-        awardId: s.awardId,
+        id: String(s.id).trim(),
+        title: String(s.title).trim(),
+        description: String(s.description).trim(),
         rationale: String(s.rationale || '').trim(),
         targetDate: s.targetDate ? String(s.targetDate) : undefined
       }))
-      .filter(s => s.rationale.length > 0);
+      .filter(s => s.id.length > 0 && s.title.length > 0 && s.description.length > 0);
 
     return NextResponse.json({ suggestions: filtered } satisfies SuggestionResponse);
   } catch (error) {
