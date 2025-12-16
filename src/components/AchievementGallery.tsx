@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { AWARDS } from '@/lib/awards';
+import { AWARDS, Award } from '@/lib/awards';
 import { useAchievementStore } from '@/lib/achievementStore';
-import { useRowingStore } from '@/lib/store';
+import { useRowingStore, AIAwardSuggestion } from '@/lib/store';
 import { settings } from '@/lib/settings';
 import { storeAchievementImage, getAchievementImage, deleteAchievementImage } from '@/lib/imageStorage';
 import { 
@@ -30,6 +30,19 @@ import {
   Download
 } from 'lucide-react';
 
+// Unified gallery item for both static awards and AI awards
+interface GalleryAward {
+  id: string;
+  title: string;
+  description: string;
+  icon: any;
+  color: string;
+  earnedAt: Date;
+  isAIAward: boolean;
+  sourceAward?: Award;
+  aiSuggestion?: AIAwardSuggestion;
+}
+
 function getAchievementImageSizing(size?: string) {
   switch (size) {
     case '1024x1536':
@@ -52,7 +65,7 @@ export function AchievementGallery({
   onOpenChange, 
   initialAwardId 
 }: AchievementGalleryProps) {
-  const { earnedAwards } = useRowingStore();
+  const { earnedAwards, aiAwardSuggestions } = useRowingStore();
   const { 
     generatedAchievements, 
     setGeneratedAchievement, 
@@ -61,11 +74,43 @@ export function AchievementGallery({
   const aiSettings = settings.getAISettings();
   const imageSizing = getAchievementImageSizing(aiSettings.achievementImageSize);
   
-  // Memoize earned awards list to prevent recreation on every render
-  const earnedAwardsList = useMemo(() => {
+  // Memoize earned awards list (static + AI) to prevent recreation on every render
+  const earnedAwardsList = useMemo((): GalleryAward[] => {
     const earnedAwardIds = new Set(earnedAwards.map(a => a.awardId));
-    return AWARDS.filter(a => earnedAwardIds.has(a.id));
-  }, [earnedAwards]);
+    
+    // Static awards that are earned
+    const staticItems: GalleryAward[] = AWARDS
+      .filter(a => earnedAwardIds.has(a.id))
+      .map(award => {
+        const earnedInfo = earnedAwards.find(e => e.awardId === award.id);
+        return {
+          id: award.id,
+          title: award.title,
+          description: award.description,
+          icon: award.icon,
+          color: award.color,
+          earnedAt: earnedInfo?.earnedAt ? new Date(earnedInfo.earnedAt) : new Date(),
+          isAIAward: false,
+          sourceAward: award
+        };
+      });
+    
+    // AI awards that are earned
+    const aiItems: GalleryAward[] = aiAwardSuggestions
+      .filter(s => s.status === 'earned')
+      .map(suggestion => ({
+        id: suggestion.id,
+        title: suggestion.title,
+        description: suggestion.description,
+        icon: Sparkles,
+        color: 'text-purple-500',
+        earnedAt: suggestion.earnedAt ? new Date(suggestion.earnedAt) : new Date(),
+        isAIAward: true,
+        aiSuggestion: suggestion
+      }));
+    
+    return [...staticItems, ...aiItems];
+  }, [earnedAwards, aiAwardSuggestions]);
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
@@ -76,7 +121,6 @@ export function AchievementGallery({
 
   // Derived state - must be before useEffects that depend on it
   const currentAward = earnedAwardsList[currentIndex];
-  const earnedInfo = earnedAwards.find(a => a.awardId === currentAward?.id);
   const generated = currentAward ? generatedAchievements[currentAward.id] : undefined;
   const Icon = currentAward?.icon;
 
@@ -187,8 +231,8 @@ export function AchievementGallery({
         body: JSON.stringify({
           title: currentAward.title,
           description: currentAward.description,
-          earnedAt: earnedInfo?.earnedAt 
-            ? formatDateOnly(new Date(earnedInfo.earnedAt)) 
+          earnedAt: currentAward.earnedAt 
+            ? formatDateOnly(new Date(currentAward.earnedAt)) 
             : formatDateOnly(new Date()),
           customPrompt: aiSettings.achievementStoryPrompt,
           apiKey: aiSettings.openaiApiKey || undefined
@@ -206,7 +250,7 @@ export function AchievementGallery({
         awardId: currentAward.id,
         title: currentAward.title,
         description: currentAward.description,
-        earnedAt: earnedInfo?.earnedAt ? new Date(earnedInfo.earnedAt) : new Date(),
+        earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : new Date(),
         story: data.story,
         generatedAt: new Date()
       });
@@ -286,7 +330,7 @@ export function AchievementGallery({
           awardId: currentAward.id,
           title: currentAward.title,
           description: currentAward.description,
-          earnedAt: earnedInfo?.earnedAt ? new Date(earnedInfo.earnedAt) : new Date(),
+          earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : new Date(),
           imageUrl: filePath,
           hasImage: true,
           imagePrompt: data.revisedPrompt,
@@ -377,9 +421,14 @@ export function AchievementGallery({
               </div>
             </div>
             <div className="flex items-center gap-2 mr-8">
-              {earnedInfo?.earnedAt && (
+              {currentAward.earnedAt && (
                 <Badge variant="secondary" className="font-mono">
-                  Earned: {formatDateOnly(new Date(earnedInfo.earnedAt))}
+                  Earned: {formatDateOnly(new Date(currentAward.earnedAt))}
+                </Badge>
+              )}
+              {currentAward.isAIAward && (
+                <Badge variant="outline" className="text-purple-500 border-purple-500/30">
+                  AI Award
                 </Badge>
               )}
               <span className="text-sm text-muted-foreground">

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { getShadowStyle, getCardClassName } from '@/lib/cardStyles';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
-import { Trash2, Sparkles } from 'lucide-react';
+import { Trash2, Sparkles, CheckCircle2 } from 'lucide-react';
 
 // Unified display item for both static awards and AI-generated goals
 interface DisplayAward {
@@ -31,7 +31,7 @@ interface DisplayAward {
 }
 
 export function AwardsList() {
-  const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion } = useRowingStore();
+  const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion, markAIAwardEarned } = useRowingStore();
   const { hasGeneratedContent, generatedAchievements } = useAchievementStore();
   const earnedIds = new Set(earnedAwards.map(a => a.awardId));
 
@@ -67,10 +67,9 @@ export function AwardsList() {
     loadImages();
   }, [generatedAchievements]);
 
-  // Build unified list: static awards + approved AI goals
+  // Build unified list: static awards + AI goals (approved or earned)
   const displayAwards = useMemo((): DisplayAward[] => {
     const staticAwardIds = new Set(AWARDS.map(a => a.id));
-    const approvedAIGoals = aiAwardSuggestions.filter(s => s.status === 'approved');
 
     // Static awards from AWARDS array
     const staticItems: DisplayAward[] = AWARDS.map(award => {
@@ -91,8 +90,9 @@ export function AwardsList() {
       };
     });
 
-    // AI-generated goals (only those not already in static awards)
-    const aiItems: DisplayAward[] = approvedAIGoals
+    // AI-generated goals (approved or earned, not already in static awards)
+    const aiGoals = aiAwardSuggestions.filter(s => s.status === 'approved' || s.status === 'earned');
+    const aiItems: DisplayAward[] = aiGoals
       .filter(goal => !staticAwardIds.has(goal.id))
       .map(goal => ({
         id: goal.id,
@@ -100,7 +100,8 @@ export function AwardsList() {
         description: goal.description,
         icon: Sparkles,
         color: 'text-purple-500',
-        isEarned: false,
+        isEarned: goal.status === 'earned',
+        earnedAt: goal.earnedAt,
         isAIGoal: true,
         aiSuggestion: goal,
         hasGeneratedContent: false
@@ -110,7 +111,8 @@ export function AwardsList() {
   }, [earnedIds, earnedAwards, aiAwardSuggestions, hasGeneratedContent, loadedImages]);
 
   const handleAwardClick = (item: DisplayAward) => {
-    if (item.isEarned && item.sourceAward) {
+    // Open gallery for any earned award (static or AI)
+    if (item.isEarned) {
       setSelectedAwardId(item.id);
       setGalleryOpen(true);
     }
@@ -169,7 +171,7 @@ export function AwardsList() {
                   />
                 </div>
                 <div className="flex items-center gap-1">
-                  {item.isAIGoal && (
+                  {item.isAIGoal && !item.isEarned && (
                     <>
                       <span className="text-[10px] text-purple-500 font-mono bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
                         AI Goal
@@ -179,9 +181,41 @@ export function AwardsList() {
                         variant="ghost"
                         onClick={(e) => {
                           e.stopPropagation();
+                          markAIAwardEarned(item.id);
+                        }}
+                        className="h-6 w-6 p-0 hover:bg-green-500/10"
+                        title="Mark as earned"
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-muted-foreground hover:text-green-500" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           deleteAIAwardSuggestion(item.id);
                         }}
                         className="h-6 w-6 p-0 hover:bg-destructive/10"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                  {item.isAIGoal && item.isEarned && (
+                    <>
+                      <span className="text-[10px] text-green-500 font-mono bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">
+                        Earned
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAIAwardSuggestion(item.id);
+                        }}
+                        className="h-6 w-6 p-0 hover:bg-destructive/10"
+                        title="Delete"
                       >
                         <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                       </Button>

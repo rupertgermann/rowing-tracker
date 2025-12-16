@@ -70,7 +70,14 @@ export interface PendingChartExplanation {
   fullData?: string; // JSON stringified data
 }
 
-export type AIAwardSuggestionStatus = 'suggested' | 'approved';
+export type AIAwardSuggestionStatus = 'suggested' | 'approved' | 'earned';
+
+// Structured criteria for automatic evaluation
+export interface AIAwardCriteria {
+  type: 'total_distance' | 'total_duration' | 'total_sessions' | 'single_session_distance' | 'single_session_duration' | 'single_session_power' | 'single_session_pace' | 'weekly_sessions' | 'streak_days' | 'custom';
+  value: number; // The threshold value (meters, seconds, count, watts, pace in seconds/500m)
+  comparison: 'gte' | 'lte' | 'eq'; // greater-than-or-equal, less-than-or-equal, equal
+}
 
 export interface AIAwardSuggestion {
   id: string; // Unique ID for this suggestion (AI-generated kebab-case)
@@ -78,9 +85,11 @@ export interface AIAwardSuggestion {
   description: string; // How to earn this award
   status: AIAwardSuggestionStatus;
   rationale: string;
+  criteria?: AIAwardCriteria; // Machine-parseable criteria for automatic evaluation
   targetDate?: Date;
   suggestedAt: Date;
   approvedAt?: Date;
+  earnedAt?: Date; // When the user marked this as earned or auto-earned
   model?: string;
 }
 
@@ -133,8 +142,9 @@ interface RowingStore {
   dismissNewAward: () => void;
 
   upsertAIAwardSuggestion: (suggestion: Omit<AIAwardSuggestion, 'suggestedAt'> & { suggestedAt?: Date }) => void;
-  approveAIAwardSuggestion: (awardId: string) => void;
-  deleteAIAwardSuggestion: (awardId: string) => void;
+  approveAIAwardSuggestion: (id: string) => void;
+  markAIAwardEarned: (id: string) => void;
+  deleteAIAwardSuggestion: (id: string) => void;
   
   updateDashboardSettings: (settings: Partial<DashboardSettings> | Partial<DashboardSettings['comparisonWidget']> | Partial<DashboardSettings['periodStats']>) => void;
   updateSessionsViewSettings: (settings: Partial<SessionsViewSettings> | Partial<SessionsViewSettings['filters']> | Partial<SessionsViewSettings['sortConfig']>) => void;
@@ -258,6 +268,116 @@ function computeAllEarnedAwards(sessions: Session[]): EarnedAward[] {
     }
   });
   return earned;
+}
+
+// Evaluate AI award criteria against session data
+function evaluateAIAwardCriteria(
+  criteria: AIAwardCriteria,
+  sessions: Session[],
+  stats: SessionStats
+): boolean {
+  const compare = (actual: number, target: number, comparison: string): boolean => {
+    switch (comparison) {
+      case 'gte': return actual >= target;
+      case 'lte': return actual <= target;
+      case 'eq': return actual === target;
+      default: return actual >= target;
+    }
+  };
+
+  switch (criteria.type) {
+    case 'total_distance':
+      return compare(stats.totalDistance, criteria.value, criteria.comparison);
+    
+    case 'total_duration':
+      return compare(stats.totalTime, criteria.value, criteria.comparison);
+    
+    case 'total_sessions':
+      return compare(sessions.length, criteria.value, criteria.comparison);
+    
+    case 'single_session_distance':
+      return sessions.some(s => compare(s.distance, criteria.value, criteria.comparison));
+    
+    case 'single_session_duration':
+      return sessions.some(s => compare(s.duration, criteria.value, criteria.comparison));
+    
+    case 'single_session_power':
+      return sessions.some(s => s.avgPower && compare(s.avgPower, criteria.value, criteria.comparison));
+    
+    case 'single_session_pace':
+      // Pace is in seconds per 500m, lower is better
+      return sessions.some(s => s.avgSplit && compare(s.avgSplit, criteria.value, criteria.comparison));
+    
+    case 'weekly_sessions': {
+      // Check if any week has >= criteria.value sessions
+      const weekMap = new Map<string, number>();
+      sessions.forEach(s => {
+        const date = new Date(s.timestamp);
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0];
+        weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + 1);
+      });
+      return Array.from(weekMap.values()).some(count => compare(count, criteria.value, criteria.comparison));
+    }
+    
+    case 'streak_days': {
+      // Check for consecutive days with sessions
+      const dates = [...new Set(sessions.map(s => 
+        new Date(s.timestamp).toISOString().split('T')[0]
+      ))].sort();
+      
+      let maxStreak = 1;
+      let currentStreak = 1;
+      
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) {
+          currentStreak++;
+          maxStreak = Math.max(maxStreak, currentStreak);
+        } else {
+          currentStreak = 1;
+        }
+      }
+      
+      return compare(maxStreak, criteria.value, criteria.comparison);
+    }
+    
+    case 'custom':
+    default:
+      // Custom criteria can't be auto-evaluated
+      return false;
+  }
+}
+
+// Check and update AI awards based on session data
+function checkAIAwards(
+  sessions: Session[],
+  aiAwardSuggestions: AIAwardSuggestion[]
+): AIAwardSuggestion[] {
+  const stats = calculateStats(sessions);
+  
+  return aiAwardSuggestions.map(suggestion => {
+    // Only check approved awards that have criteria and aren't already earned
+    if (suggestion.status !== 'approved' || !suggestion.criteria) {
+      return suggestion;
+    }
+    
+    const isEarned = evaluateAIAwardCriteria(suggestion.criteria, sessions, stats);
+    
+    if (isEarned) {
+      return {
+        ...suggestion,
+        status: 'earned' as AIAwardSuggestionStatus,
+        earnedAt: new Date()
+      };
+    }
+    
+    return suggestion;
+  });
 }
 
 // Calculate personal records from sessions
@@ -468,6 +588,9 @@ export const useRowingStore = create<RowingStore>()(
           const updatedRecords = calculatePersonalRecords(updatedSessions);
           // Recompute award dates based on when conditions first became true
           const recomputedAwards = computeAllEarnedAwards(updatedSessions);
+          
+          // Check AI awards for automatic completion
+          const updatedAIAwards = checkAIAwards(updatedSessions, state.aiAwardSuggestions);
 
           // Determine newly earned awards compared to previous state for notification
           const previousAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
@@ -483,6 +606,7 @@ export const useRowingStore = create<RowingStore>()(
             sessions: updatedSessions,
             personalRecords: updatedRecords,
             earnedAwards: recomputedAwards,
+            aiAwardSuggestions: updatedAIAwards,
             newlyEarnedAward: state.newlyEarnedAward || newAward // Keep existing if not dismissed
           };
         });
@@ -556,6 +680,7 @@ export const useRowingStore = create<RowingStore>()(
             description: suggestion.description,
             status: suggestion.status,
             rationale: suggestion.rationale,
+            criteria: suggestion.criteria,
             targetDate: suggestion.targetDate,
             suggestedAt: suggestion.suggestedAt ?? new Date(),
             approvedAt: suggestion.approvedAt,
@@ -579,6 +704,17 @@ export const useRowingStore = create<RowingStore>()(
             if (s.id !== id) return s;
             if (s.status === 'approved') return s;
             return { ...s, status: 'approved' as AIAwardSuggestionStatus, approvedAt: new Date() };
+          });
+          return { aiAwardSuggestions: updated };
+        });
+      },
+
+      markAIAwardEarned: (id) => {
+        set((state) => {
+          const updated: AIAwardSuggestion[] = state.aiAwardSuggestions.map((s): AIAwardSuggestion => {
+            if (s.id !== id) return s;
+            if (s.status === 'earned') return s;
+            return { ...s, status: 'earned' as AIAwardSuggestionStatus, earnedAt: new Date() };
           });
           return { aiAwardSuggestions: updated };
         });

@@ -80,6 +80,7 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
           description: s.description,
           status: 'suggested',
           rationale: s.rationale,
+          criteria: s.criteria,
           targetDate,
           model: aiSettings.awardSuggestions?.model
         });

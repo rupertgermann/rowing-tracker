@@ -5,12 +5,19 @@ type ReasoningSetting = 'minimal' | 'low' | 'medium' | 'high';
 
 type VerbositySetting = 'low' | 'medium' | 'high';
 
+interface SuggestionCriteria {
+  type: string;
+  value: number;
+  comparison: string;
+}
+
 interface SuggestionResponse {
   suggestions: Array<{
     id: string;
     title: string;
     description: string;
     rationale: string;
+    criteria?: SuggestionCriteria;
     targetDate?: string;
   }>;
 }
@@ -110,16 +117,8 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join('\n');
 
-    const existingAwardCategories = [
-      'Session counts (e.g., 1, 10, 50, 100, 365 sessions)',
-      'Duration milestones (e.g., 1h, 5h, 10h, 24h, 50h, 100h total)',
-      'Streak achievements (e.g., 3, 5, 7, 10, 14, 21, 30, 45, 60, 100 consecutive days)',
-      'Distance milestones (e.g., 10k, 50k, 100k, 250k, 750k, 1M meters)',
-      'Power achievements (e.g., 150W, 200W, 250W, 300W average)',
-      'Speed achievements (e.g., sub 1:45, sub 1:40, sub 1:35 per 500m)',
-      'Improvement awards (e.g., +10%, +25%, +50% power/pace vs baseline)',
-      'Time-of-day awards (e.g., early bird, night owl)'
-    ].join('\n- ');
+    // Build list of all existing awards to prevent duplicates
+    const existingAwardsList = AWARDS.map(a => `- "${a.title}": ${a.description}`).join('\n');
 
     const openaiApiKey = apiKey || process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
@@ -145,12 +144,13 @@ export async function POST(request: NextRequest) {
       avgStrokeRate: s.avgStrokeRate
     }));
 
-    const prompt = `ALREADY EARNED ACHIEVEMENTS (for context — do not suggest duplicates of these):
+    const prompt = `ALREADY EARNED ACHIEVEMENTS (for context):
 
 ${earnedAwardsForPrompt || '(none yet)'}
 
-EXISTING AWARD CATEGORIES IN THE APP:
-- ${existingAwardCategories}
+EXISTING AWARDS IN THE APP (DO NOT suggest duplicates or variations of these — they already exist):
+
+${existingAwardsList}
 
 CURRENT TOTALS:
 - totalSessions: ${sortedSessions.length}
@@ -163,7 +163,20 @@ ${JSON.stringify(recent, null, 2)}
 Suggest up to ${maxSuggestions} NEW achievement ideas. Be creative! You can:
 - Suggest new milestones in existing categories
 - Invent entirely new award categories (e.g., consistency, weekly goals, personal bests, technique)
-- Create fun/motivational achievements tailored to this athlete's progress`.trim();
+- Create fun/motivational achievements tailored to this athlete's progress
+
+IMPORTANT: For each suggestion, include machine-parseable "criteria" so the app can automatically detect when the award is earned.
+Criteria types:
+- total_distance: Total meters rowed across all sessions
+- total_duration: Total seconds rowed across all sessions  
+- total_sessions: Number of sessions completed
+- single_session_distance: Distance in a single session (meters)
+- single_session_duration: Duration of a single session (seconds)
+- single_session_power: Average power in a single session (watts)
+- single_session_pace: Pace in a single session (seconds per 500m, lower is faster)
+- weekly_sessions: Number of sessions in a single week
+- streak_days: Consecutive days with sessions
+- custom: For criteria that can't be auto-evaluated (user marks manually)`.trim();
 
     const instructions = `${customPrompt || ''}
 
@@ -172,6 +185,7 @@ Return ONLY valid JSON that matches the required schema. Do not include markdown
 Keep output short:
 - suggestions: at most ${maxSuggestions}
 - rationale: 1-2 short sentences
+- criteria: REQUIRED - use appropriate type, value, and comparison (gte/lte/eq)
 - targetDate: ISO date (YYYY-MM-DD) or null`.trim();
 
     const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -212,9 +226,24 @@ Keep output short:
                         title: { type: 'string', description: 'Short catchy title (2-4 words)' },
                         description: { type: 'string', description: 'Brief description of how to earn this award' },
                         rationale: { type: 'string', description: 'Why this award is suggested for this athlete' },
+                        criteria: {
+                          type: 'object',
+                          description: 'Machine-parseable criteria for automatic evaluation',
+                          properties: {
+                            type: { 
+                              type: 'string', 
+                              enum: ['total_distance', 'total_duration', 'total_sessions', 'single_session_distance', 'single_session_duration', 'single_session_power', 'single_session_pace', 'weekly_sessions', 'streak_days', 'custom'],
+                              description: 'Type of criteria to evaluate'
+                            },
+                            value: { type: 'number', description: 'Threshold value (meters for distance, seconds for duration/pace, count for sessions, watts for power)' },
+                            comparison: { type: 'string', enum: ['gte', 'lte', 'eq'], description: 'gte=greater-or-equal, lte=less-or-equal, eq=equal' }
+                          },
+                          required: ['type', 'value', 'comparison'],
+                          additionalProperties: false
+                        },
                         targetDate: { type: ['string', 'null'], description: 'Estimated date to achieve (YYYY-MM-DD) or null' }
                       },
-                      required: ['id', 'title', 'description', 'rationale', 'targetDate'],
+                      required: ['id', 'title', 'description', 'rationale', 'criteria', 'targetDate'],
                       additionalProperties: false
                     }
                   }
@@ -280,6 +309,11 @@ Keep output short:
         title: String(s.title).trim(),
         description: String(s.description).trim(),
         rationale: String(s.rationale || '').trim(),
+        criteria: s.criteria && typeof s.criteria === 'object' ? {
+          type: String(s.criteria.type || 'custom'),
+          value: Number(s.criteria.value) || 0,
+          comparison: String(s.criteria.comparison || 'gte')
+        } : undefined,
         targetDate: s.targetDate ? String(s.targetDate) : undefined
       }))
       .filter(s => s.id.length > 0 && s.title.length > 0 && s.description.length > 0);

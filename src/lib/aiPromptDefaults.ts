@@ -151,15 +151,20 @@ Your task:
 - Be imaginative! Create fun, motivating milestones that will inspire continued training.
 
 Ideas for new achievements:
-- New milestones in existing categories (distance, duration, power, speed, streaks)
 - Entirely new categories (consistency, weekly goals, technique, recovery, variety)
 - Personal bests and improvement-based awards
 - Fun/quirky achievements (e.g., "Weekend Warrior", "Comeback King", "Steady Eddie")
+
+IMPORTANT:
+- Do NOT suggest any achievement that duplicates or closely resembles an existing award in the app.
+- The existing awards list is provided — avoid those milestones entirely.
+- Include machine-parseable "criteria" so the app can automatically detect when earned.
 
 Rules:
 - Create unique kebab-case IDs for each suggestion (e.g., "weekly-warrior", "power-surge").
 - Provide a catchy title (2-4 words) and clear description of how to earn it.
 - Include a short rationale explaining why this goal fits the athlete.
+- Include criteria with type, value, and comparison (gte/lte/eq).
 - Estimate a realistic target date (or null if open-ended).
 
 Return ONLY valid JSON that matches the required schema.`;
