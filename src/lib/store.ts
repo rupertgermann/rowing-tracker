@@ -353,26 +353,41 @@ function evaluateAIAwardCriteria(
   }
 }
 
+// Compute when an AI award's criteria was first satisfied
+function computeAIAwardEarnedAt(sessions: Session[], criteria: AIAwardCriteria): Date | null {
+  const sorted = sortSessionsByDate(sessions);
+  
+  for (let i = 0; i < sorted.length; i++) {
+    const prefix = sorted.slice(0, i + 1);
+    const stats = calculateStats(prefix);
+    
+    if (evaluateAIAwardCriteria(criteria, prefix, stats)) {
+      return new Date(sorted[i].timestamp);
+    }
+  }
+  
+  return null;
+}
+
 // Check and update AI awards based on session data
 function checkAIAwards(
   sessions: Session[],
   aiAwardSuggestions: AIAwardSuggestion[]
 ): AIAwardSuggestion[] {
-  const stats = calculateStats(sessions);
-  
   return aiAwardSuggestions.map(suggestion => {
     // Only check approved awards that have criteria and aren't already earned
     if (suggestion.status !== 'approved' || !suggestion.criteria) {
       return suggestion;
     }
     
-    const isEarned = evaluateAIAwardCriteria(suggestion.criteria, sessions, stats);
+    // Compute when the criteria was first satisfied
+    const earnedAt = computeAIAwardEarnedAt(sessions, suggestion.criteria);
     
-    if (isEarned) {
+    if (earnedAt) {
       return {
         ...suggestion,
         status: 'earned' as AIAwardSuggestionStatus,
-        earnedAt: new Date()
+        earnedAt
       };
     }
     
