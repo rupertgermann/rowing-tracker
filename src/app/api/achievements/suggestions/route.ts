@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
       apiKey,
       model = 'gpt-5-mini',
       reasoning = 'medium',
-      verbosity = 'low'
+      verbosity = 'low',
+      maxOutputTokens
     } = body as {
       sessions: Array<{
         timestamp: string;
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
       model?: string;
       reasoning?: ReasoningSetting;
       verbosity?: VerbositySetting;
+      maxOutputTokens?: number;
     };
 
     if (!Array.isArray(sessions) || sessions.length === 0) {
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
     const totalDistance = sortedSessions.reduce((acc, s) => acc + (s.distance || 0), 0);
     const totalDuration = sortedSessions.reduce((acc, s) => acc + (s.duration || 0), 0);
 
-    const recent = sortedSessions.slice(Math.max(0, sortedSessions.length - 20)).map(s => ({
+    const recent = sortedSessions.slice(Math.max(0, sortedSessions.length - 12)).map(s => ({
       date: new Date(s.timestamp).toISOString().split('T')[0],
       distance: s.distance,
       duration: s.duration,
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     const prompt = `AVAILABLE ACHIEVEMENTS (ONLY THESE IDs ARE VALID):
 
-${unearnedAwards.map(a => `- ${a.id}: ${a.title} — ${a.description}`).join('\n')}
+${unearnedAwards.map(a => `- ${a.id}: ${a.title}`).join('\n')}
 
 CURRENT TOTALS:
 - totalSessions: ${sortedSessions.length}
@@ -141,61 +143,90 @@ Return suggestions for up to ${maxSuggestions} achievements. Do not include alre
 
     const instructions = `${customPrompt || ''}
 
-Return ONLY valid JSON that matches the required schema. Do not include markdown, code fences, or extra text.`.trim();
+Return ONLY valid JSON that matches the required schema. Do not include markdown, code fences, or extra text.
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        input: prompt,
-        instructions,
-        max_output_tokens: 1500,
-        reasoning: { effort: mapReasoningEffort(model, reasoning) },
-        text: {
-          verbosity,
-          format: {
-            type: 'json_schema',
-            name: 'award_suggestions',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                suggestions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      awardId: { type: 'string' },
-                      rationale: { type: 'string' },
-                      targetDate: { type: ['string', 'null'] }
-                    },
-                    required: ['awardId', 'rationale', 'targetDate'],
-                    additionalProperties: false
+Keep output short:
+- suggestions: at most ${maxSuggestions}
+- rationale: 1-2 short sentences
+- targetDate: ISO date (YYYY-MM-DD) or null`.trim();
+
+    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+    const initialMaxOutputTokens = clamp(
+      typeof maxOutputTokens === 'number' ? maxOutputTokens : 2500,
+      800,
+      6000
+    );
+
+    const callOpenAI = async (requestedMaxOutputTokens: number) => {
+      const resp = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          input: prompt,
+          instructions,
+          max_output_tokens: requestedMaxOutputTokens,
+          reasoning: { effort: mapReasoningEffort(model, reasoning) },
+          text: {
+            verbosity,
+            format: {
+              type: 'json_schema',
+              name: 'award_suggestions',
+              strict: true,
+              schema: {
+                type: 'object',
+                properties: {
+                  suggestions: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        awardId: { type: 'string' },
+                        rationale: { type: 'string' },
+                        targetDate: { type: ['string', 'null'] }
+                      },
+                      required: ['awardId', 'rationale', 'targetDate'],
+                      additionalProperties: false
+                    }
                   }
-                }
-              },
-              required: ['suggestions'],
-              additionalProperties: false
+                },
+                required: ['suggestions'],
+                additionalProperties: false
+              }
             }
           }
-        }
-      })
-    });
+        })
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', errorText);
-      return NextResponse.json(
-        { error: `OpenAI API error: ${response.status}`, details: errorText },
-        { status: response.status }
-      );
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error('OpenAI API error:', errorText);
+        return NextResponse.json(
+          { error: `OpenAI API error: ${resp.status}`, details: errorText },
+          { status: resp.status }
+        );
+      }
+
+      const json = await resp.json();
+      return json;
+    };
+
+    let data: any = await callOpenAI(initialMaxOutputTokens);
+    // If callOpenAI returned an HTTP NextResponse due to OpenAI error, return it.
+    if (data instanceof Response) {
+      return data;
     }
 
-    const data = await response.json();
+    if (data?.status === 'incomplete' && data?.incomplete_details?.reason === 'max_output_tokens' && initialMaxOutputTokens < 6000) {
+      const retryMax = clamp(initialMaxOutputTokens * 2, 800, 6000);
+      data = await callOpenAI(retryMax);
+      if (data instanceof Response) {
+        return data;
+      }
+    }
     const extracted = extractResponseTextOrJson(data);
     if (!extracted) {
       const outputTypes = Array.isArray(data?.output) ? data.output.map((o: any) => o?.type).filter(Boolean) : [];
