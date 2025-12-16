@@ -4,3 +4,6 @@ replace that ugly alert confirmation dialogs with something more modern
 - the chat window does not show confirmation when deleting a chat
 
 - every form field for a prompt input should use the real DEFAULT_*_PROMPT, see DEFAULT_AWARD_SUGGESTIONS_PROMPT as example, as the default value instead of a placeholder string or an empty string, so “Reset to default” matches the actual prompt constant.
+
+
+- add more context to the list of earned awards in the ai award suggestions prompt

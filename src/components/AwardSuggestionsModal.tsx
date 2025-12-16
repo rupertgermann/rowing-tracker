@@ -71,7 +71,11 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to generate award suggestions');
+        const details = typeof data.details === 'string'
+          ? data.details
+          : data.details?.message || '';
+        const message = details ? `${data.error || 'Request failed'}: ${details}` : (data.error || 'Failed to generate award suggestions');
+        throw new Error(message);
       }
 
       const data = await response.json();

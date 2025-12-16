@@ -13,6 +13,45 @@ interface SuggestionResponse {
   }>;
 }
 
+function extractResponseTextOrJson(data: any): { kind: 'text' | 'json'; value: string } | null {
+  if (data?.status === 'incomplete') {
+    const reason = data?.incomplete_details?.reason || 'unknown';
+    throw new Error(`Response incomplete: ${reason}`);
+  }
+
+  // output_text helper (works for normal text responses, sometimes also for json_schema)
+  if (typeof data?.output_text === 'string' && data.output_text.trim()) {
+    return { kind: 'text', value: data.output_text };
+  }
+
+  const outputItems = Array.isArray(data?.output) ? data.output : [];
+
+  // Search all message content parts for output_text/output_json/refusal
+  for (const item of outputItems) {
+    if (item?.type !== 'message') continue;
+    const content = Array.isArray(item?.content) ? item.content : [];
+
+    const refusal = content.find((c: any) => c?.type === 'refusal');
+    if (refusal) {
+      const refusalText = typeof refusal?.refusal === 'string' ? refusal.refusal : 'Model refusal';
+      throw new Error(refusalText);
+    }
+
+    const jsonPart = content.find((c: any) => c?.type === 'output_json' && c?.json);
+    if (jsonPart?.json) {
+      return { kind: 'json', value: JSON.stringify(jsonPart.json) };
+    }
+
+    const textPart = content.find((c: any) => c?.type === 'output_text' && typeof c?.text === 'string');
+    if (textPart?.text && textPart.text.trim()) {
+      return { kind: 'text', value: textPart.text };
+    }
+  }
+
+  // Fallback: sometimes the API returns structured output without output_text; log summary for debugging.
+  return null;
+}
+
 function mapReasoningEffort(model: string, reasoning: ReasoningSetting): 'none' | 'minimal' | 'low' | 'medium' | 'high' {
   if (reasoning === 'minimal') {
     return model === 'gpt-5.1' ? 'none' : 'minimal';
@@ -86,9 +125,8 @@ export async function POST(request: NextRequest) {
       avgStrokeRate: s.avgStrokeRate
     }));
 
-    const prompt = `${customPrompt || ''}
+    const prompt = `AVAILABLE ACHIEVEMENTS (ONLY THESE IDs ARE VALID):
 
-AVAILABLE ACHIEVEMENTS (ONLY THESE IDs ARE VALID):
 ${unearnedAwards.map(a => `- ${a.id}: ${a.title} — ${a.description}`).join('\n')}
 
 CURRENT TOTALS:
@@ -101,6 +139,10 @@ ${JSON.stringify(recent, null, 2)}
 
 Return suggestions for up to ${maxSuggestions} achievements. Do not include already earned achievements.`.trim();
 
+    const instructions = `${customPrompt || ''}
+
+Return ONLY valid JSON that matches the required schema. Do not include markdown, code fences, or extra text.`.trim();
+
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -110,7 +152,8 @@ Return suggestions for up to ${maxSuggestions} achievements. Do not include alre
       body: JSON.stringify({
         model,
         input: prompt,
-        max_output_tokens: 800,
+        instructions,
+        max_output_tokens: 1500,
         reasoning: { effort: mapReasoningEffort(model, reasoning) },
         text: {
           verbosity,
@@ -147,22 +190,29 @@ Return suggestions for up to ${maxSuggestions} achievements. Do not include alre
       const errorText = await response.text();
       console.error('OpenAI API error:', errorText);
       return NextResponse.json(
-        { error: `OpenAI API error: ${response.status}` },
+        { error: `OpenAI API error: ${response.status}`, details: errorText },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const outputText = (data && typeof data.output_text === 'string') ? data.output_text : null;
-    if (!outputText) {
-      return NextResponse.json({ error: 'Failed to generate suggestions' }, { status: 500 });
+    const extracted = extractResponseTextOrJson(data);
+    if (!extracted) {
+      const outputTypes = Array.isArray(data?.output) ? data.output.map((o: any) => o?.type).filter(Boolean) : [];
+      console.error('OpenAI response had no extractable content.', {
+        status: data?.status,
+        outputTypes,
+        incomplete_details: data?.incomplete_details
+      });
+      return NextResponse.json({ error: 'Failed to generate suggestions', details: 'No extractable content from model response' }, { status: 500 });
     }
 
     let parsed: SuggestionResponse;
     try {
-      parsed = JSON.parse(outputText);
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON from AI' }, { status: 500 });
+      parsed = JSON.parse(extracted.value);
+    } catch (e) {
+      console.error('Failed to parse JSON from AI output:', extracted.value);
+      return NextResponse.json({ error: 'Invalid JSON from AI', details: extracted.value.slice(0, 1000) }, { status: 500 });
     }
 
     const allowedIds = new Set(unearnedAwards.map(a => a.id));
@@ -179,6 +229,11 @@ Return suggestions for up to ${maxSuggestions} achievements. Do not include alre
     return NextResponse.json({ suggestions: filtered } satisfies SuggestionResponse);
   } catch (error) {
     console.error('Award suggestions generation error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const isDev = process.env.NODE_ENV === 'development';
+    const details =
+      isDev && error instanceof Error
+        ? { message: error.message, stack: error.stack }
+        : undefined;
+    return NextResponse.json({ error: 'Internal server error', details }, { status: 500 });
   }
 }
