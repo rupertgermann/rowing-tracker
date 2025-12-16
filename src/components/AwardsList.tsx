@@ -39,10 +39,11 @@ export function AwardsList() {
   const [selectedAwardId, setSelectedAwardId] = useState<string | null>(null);
   const [loadedImages, setLoadedImages] = useState<Record<string, string>>({});
 
-  // Load images from filesystem for awards that have them
+  // Load images from filesystem for awards that have them (static + AI)
   useEffect(() => {
     const loadImages = async () => {
-      const imagePromises = AWARDS.filter(award => {
+      // Static awards with images
+      const staticPromises = AWARDS.filter(award => {
         const achievement = generatedAchievements[award.id];
         return achievement?.hasImage || achievement?.imageUrl;
       }).map(async (award) => {
@@ -54,7 +55,21 @@ export function AwardsList() {
         return { awardId: award.id, imageData: imagePath };
       });
 
-      const results = await Promise.all(imagePromises);
+      // AI awards with images (earned ones that might have generated content)
+      const earnedAIAwards = aiAwardSuggestions.filter(s => s.status === 'earned');
+      const aiPromises = earnedAIAwards.filter(aiAward => {
+        const achievement = generatedAchievements[aiAward.id];
+        return achievement?.hasImage || achievement?.imageUrl;
+      }).map(async (aiAward) => {
+        const achievement = generatedAchievements[aiAward.id];
+        if (achievement?.imageUrl) {
+          return { awardId: aiAward.id, imageData: achievement.imageUrl };
+        }
+        const imagePath = await getAchievementImage(aiAward.id);
+        return { awardId: aiAward.id, imageData: imagePath };
+      });
+
+      const results = await Promise.all([...staticPromises, ...aiPromises]);
       const imageMap: Record<string, string> = {};
       results.forEach(({ awardId, imageData }) => {
         if (imageData) {
@@ -65,7 +80,7 @@ export function AwardsList() {
     };
 
     loadImages();
-  }, [generatedAchievements]);
+  }, [generatedAchievements, aiAwardSuggestions]);
 
   // Build unified list: static awards + AI goals (approved or earned)
   const displayAwards = useMemo((): DisplayAward[] => {
@@ -104,7 +119,8 @@ export function AwardsList() {
         earnedAt: goal.earnedAt,
         isAIGoal: true,
         aiSuggestion: goal,
-        hasGeneratedContent: false
+        hasGeneratedContent: hasGeneratedContent(goal.id),
+        imageUrl: loadedImages[goal.id]
       }));
 
     return [...staticItems, ...aiItems];
