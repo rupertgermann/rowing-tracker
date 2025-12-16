@@ -16,7 +16,8 @@ import {
   DEFAULT_CHAT_SYSTEM_PROMPT,
   DEFAULT_PLAN_GENERATION_PROMPT,
   DEFAULT_INSIGHTS_PROMPT,
-  DEFAULT_EXPLAIN_CHART_PROMPT
+  DEFAULT_EXPLAIN_CHART_PROMPT,
+  DEFAULT_AWARD_SUGGESTIONS_PROMPT
 } from '@/lib/aiPromptDefaults';
 import {
   DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
@@ -193,7 +194,7 @@ export default function SettingsPage() {
   };
 
   const handleResetPrompt = async (
-    promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt' | 'explainChartPrompt',
+    promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt' | 'explainChartPrompt' | 'awardSuggestionsPrompt',
     defaultValue: string
   ) => {
     await saveSettings('aiSettings', { [promptKey]: defaultValue });
@@ -1129,6 +1130,68 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Award Suggestions Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        Award Suggestions
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Suggest upcoming achievements based on your recent sessions
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.awardSuggestions?.reasoning || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="minimal">Minimal (Ultra-fast)</option>
+                          <option value="low">Low (Fast)</option>
+                          <option value="medium">Medium (Balanced)</option>
+                          <option value="high">High (Quality)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.awardSuggestions?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="low">Low (Concise)</option>
+                          <option value="medium">Medium (Natural)</option>
+                          <option value="high">High (Detailed)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.awardSuggestions?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Balanced models work well for quick, realistic milestone suggestions
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   {/* Insights Configuration */}
                   <Card>
                     <CardHeader className="pb-3">
@@ -1598,6 +1661,30 @@ You can also paste content from medical documents or training notes."
                 <p className="text-xs text-muted-foreground mt-1">
                   This prompt controls how the AI analyzes your rowing data and generates insights.
                   Use {`{sessionData}`} as a placeholder for the actual session data.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="awardSuggestionsPrompt">Award Suggestions Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResetPrompt('awardSuggestionsPrompt', DEFAULT_AWARD_SUGGESTIONS_PROMPT)}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
+                <textarea
+                  id="awardSuggestionsPrompt"
+                  rows={6}
+                  value={settingsData.aiSettings.awardSuggestionsPrompt || DEFAULT_AWARD_SUGGESTIONS_PROMPT}
+                  onChange={(e) => saveSettings('aiSettings', { awardSuggestionsPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
+                  placeholder="Configure the prompt used for AI award suggestion generation..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controls how the AI proposes upcoming achievements you might reach soon.
                 </p>
               </div>
 

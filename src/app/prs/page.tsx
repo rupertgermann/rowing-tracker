@@ -6,9 +6,10 @@ import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame, BarChart3 } from 'lucide-react';
+import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame, BarChart3, Sparkles } from 'lucide-react';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { AwardsList } from '@/components/AwardsList';
+import { AwardSuggestionsModal } from '@/components/AwardSuggestionsModal';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { cardStyles, getCardClassName, getShadowStyle } from '@/lib/cardStyles';
 
@@ -41,6 +42,7 @@ function formatPace(secondsPer500m: number): string {
 export default function PRsPage() {
   const { getPersonalRecords, getSessions, getStats } = useRowingStore();
   const [mounted, setMounted] = useState(false);
+  const [awardSuggestionsOpen, setAwardSuggestionsOpen] = useState(false);
   
   useEffect(() => {
     setMounted(true);
@@ -459,11 +461,26 @@ export default function PRsPage() {
 
             {/* Achievements Section */}
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
-                <Crown className="h-6 w-6 text-primary" />
-                Achievements
-              </h2>
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                  <Crown className="h-6 w-6 text-primary" />
+                  Achievements
+                </h2>
+                <Button
+                  variant="outline"
+                  onClick={() => setAwardSuggestionsOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  AI Suggestions
+                </Button>
+              </div>
               <AwardsList />
+
+              <AwardSuggestionsModal
+                open={awardSuggestionsOpen}
+                onOpenChange={setAwardSuggestionsOpen}
+              />
             </div>
 
             {/* Summary */}

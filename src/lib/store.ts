@@ -70,6 +70,18 @@ export interface PendingChartExplanation {
   fullData?: string; // JSON stringified data
 }
 
+export type AIAwardSuggestionStatus = 'suggested' | 'approved';
+
+export interface AIAwardSuggestion {
+  awardId: string;
+  status: AIAwardSuggestionStatus;
+  rationale: string;
+  targetDate?: Date;
+  suggestedAt: Date;
+  approvedAt?: Date;
+  model?: string;
+}
+
 // Smoothing option type
 export type SmoothingOption = 0 | 3 | 5 | 10;
 
@@ -97,6 +109,7 @@ interface RowingStore {
   sessions: Session[];
   personalRecords: PersonalRecord[];
   earnedAwards: EarnedAward[];
+  aiAwardSuggestions: AIAwardSuggestion[];
   newlyEarnedAward: EarnedAward | null; // For notification
   filters: SessionFilters;
   chartSettings: ChartSettings;
@@ -116,6 +129,10 @@ interface RowingStore {
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
   dismissNewAward: () => void;
+
+  upsertAIAwardSuggestion: (suggestion: Omit<AIAwardSuggestion, 'suggestedAt'> & { suggestedAt?: Date }) => void;
+  approveAIAwardSuggestion: (awardId: string) => void;
+  deleteAIAwardSuggestion: (awardId: string) => void;
   
   updateDashboardSettings: (settings: Partial<DashboardSettings> | Partial<DashboardSettings['comparisonWidget']> | Partial<DashboardSettings['periodStats']>) => void;
   updateSessionsViewSettings: (settings: Partial<SessionsViewSettings> | Partial<SessionsViewSettings['filters']> | Partial<SessionsViewSettings['sortConfig']>) => void;
@@ -426,10 +443,10 @@ function filterAndSortSessions(sessions: Session[], filters: SessionFilters): Se
 export const useRowingStore = create<RowingStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       sessions: [],
       personalRecords: [],
       earnedAwards: [],
+      aiAwardSuggestions: [],
       newlyEarnedAward: null,
       filters: defaultFilters,
       chartSettings: defaultChartSettings,
@@ -527,6 +544,46 @@ export const useRowingStore = create<RowingStore>()(
 
       dismissNewAward: () => {
         set({ newlyEarnedAward: null });
+      },
+
+      upsertAIAwardSuggestion: (suggestion) => {
+        set((state) => {
+          const next: AIAwardSuggestion = {
+            awardId: suggestion.awardId,
+            status: suggestion.status,
+            rationale: suggestion.rationale,
+            targetDate: suggestion.targetDate,
+            suggestedAt: suggestion.suggestedAt ?? new Date(),
+            approvedAt: suggestion.approvedAt,
+            model: suggestion.model
+          };
+
+          const existingIndex = state.aiAwardSuggestions.findIndex(s => s.awardId === suggestion.awardId);
+          if (existingIndex === -1) {
+            return { aiAwardSuggestions: [...state.aiAwardSuggestions, next] };
+          }
+
+          const updated = [...state.aiAwardSuggestions];
+          updated[existingIndex] = { ...updated[existingIndex], ...next };
+          return { aiAwardSuggestions: updated };
+        });
+      },
+
+      approveAIAwardSuggestion: (awardId) => {
+        set((state) => {
+          const updated: AIAwardSuggestion[] = state.aiAwardSuggestions.map((s): AIAwardSuggestion => {
+            if (s.awardId !== awardId) return s;
+            if (s.status === 'approved') return s;
+            return { ...s, status: 'approved' as AIAwardSuggestionStatus, approvedAt: new Date() };
+          });
+          return { aiAwardSuggestions: updated };
+        });
+      },
+
+      deleteAIAwardSuggestion: (awardId) => {
+        set((state) => ({
+          aiAwardSuggestions: state.aiAwardSuggestions.filter(s => s.awardId !== awardId)
+        }));
       },
 
       updateDashboardSettings: (newSettings) => {
@@ -691,6 +748,7 @@ export const useRowingStore = create<RowingStore>()(
         sessionsViewSettings: state.sessionsViewSettings,
         sessionAnalysisSettings: state.sessionAnalysisSettings,
         earnedAwards: state.earnedAwards,
+        aiAwardSuggestions: state.aiAwardSuggestions,
         chartExplanations: state.chartExplanations
       }),
       // Convert string timestamps back to Date objects on rehydrate
@@ -706,6 +764,14 @@ export const useRowingStore = create<RowingStore>()(
           
           // Rehydrate awards dates
           state.earnedAwards = computeAllEarnedAwards(state.sessions);
+
+          // Rehydrate AI award suggestion dates
+          state.aiAwardSuggestions = (state.aiAwardSuggestions || []).map((s: any) => ({
+            ...s,
+            suggestedAt: s.suggestedAt ? new Date(s.suggestedAt) : new Date(),
+            targetDate: s.targetDate ? new Date(s.targetDate) : undefined,
+            approvedAt: s.approvedAt ? new Date(s.approvedAt) : undefined
+          }));
         }
       }
     }

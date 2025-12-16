@@ -1,3 +1,5 @@
+import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
+
 // Settings types and interfaces
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'system';
@@ -80,11 +82,14 @@ export interface AISettings {
   chat: UseCaseConfig;
   insights: UseCaseConfig;
   trainingPlans: UseCaseConfig;
+  awardSuggestions: UseCaseConfig;
   systemPrompt: string;
   chatSystemPrompt: string;
   planGenerationPrompt: string;
   insightsPrompt: string;
   explainChartPrompt: string; // System prompt for chart explanations
+
+  awardSuggestionsPrompt: string; // System prompt for award suggestion generation
 
   // Achievement generator prompts
   achievementStoryPrompt: string; // System prompt for achievement story generation
@@ -197,6 +202,11 @@ export class SettingsService {
         verbosity: 'high',        // Detailed explanations
         model: 'gpt-5.1'          // Best quality for complex plans
       },
+      awardSuggestions: {
+        reasoning: 'medium',
+        verbosity: 'low',
+        model: 'gpt-5-mini'
+      },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: 'You are a personal AI rowing coach...',
       planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...',
@@ -240,6 +250,8 @@ Max 6 lines. Key patterns, trends, improvements or concerns in MY data. Be speci
 Max 6 lines. Benchmarks comparison + 1-2 actionable suggestions.
 
 Be brief and direct. No fluff.`,
+
+      awardSuggestionsPrompt: DEFAULT_AWARD_SUGGESTIONS_PROMPT,
 
       // Achievement generator (defaults)
       achievementImageModel: 'gpt-image-1',
@@ -576,16 +588,19 @@ Style guidelines:
           // New nested structure without model fields (hardcoded to GPT-5.1)
           chat: this.defaultSettings.aiSettings.chat,
           insights: this.defaultSettings.aiSettings.insights,
-          trainingPlans: this.defaultSettings.aiSettings.trainingPlans
+          trainingPlans: this.defaultSettings.aiSettings.trainingPlans,
+          awardSuggestions: this.defaultSettings.aiSettings.awardSuggestions,
+          awardSuggestionsPrompt: oldAiSettings.awardSuggestionsPrompt ?? this.defaultSettings.aiSettings.awardSuggestionsPrompt
         };
-      } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model) {
+      } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model || oldAiSettings.awardSuggestions?.model) {
         migratedSettings.aiSettings = {
           ...this.defaultSettings.aiSettings,
           ...oldAiSettings,
           // Preserve the nested structure with model fields
           chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
-          trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans }
+          trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
+          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions }
         };
       } else {
         // New format - just ensure all nested properties exist
@@ -594,7 +609,8 @@ Style guidelines:
           ...oldAiSettings,
           chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
-          trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans }
+          trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
+          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions }
         };
       }
     } else {
@@ -609,7 +625,8 @@ Style guidelines:
         const needsModelMigration =
           !migratedSettings.aiSettings.chat?.model ||
           !migratedSettings.aiSettings.insights?.model ||
-          !migratedSettings.aiSettings.trainingPlans?.model;
+          !migratedSettings.aiSettings.trainingPlans?.model ||
+          !migratedSettings.aiSettings.awardSuggestions?.model;
 
         if (needsModelMigration) {
           migratedSettings.aiSettings = {
@@ -625,10 +642,14 @@ Style guidelines:
             trainingPlans: {
               ...this.defaultSettings.aiSettings.trainingPlans,
               ...migratedSettings.aiSettings.trainingPlans
+            },
+            awardSuggestions: {
+              ...this.defaultSettings.aiSettings.awardSuggestions,
+              ...migratedSettings.aiSettings.awardSuggestions
             }
           };
         }
-        
+
         // v1.2.0: Force update explainChartPrompt to new "Why This Chart Matters" format
         migratedSettings.aiSettings.explainChartPrompt = this.defaultSettings.aiSettings.explainChartPrompt;
       }

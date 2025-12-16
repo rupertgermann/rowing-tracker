@@ -1,21 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRowingStore } from '@/lib/store';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { AWARDS } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { cardStyles, getShadowStyle, getCardClassName } from '@/lib/cardStyles';
+import { getShadowStyle, getCardClassName } from '@/lib/cardStyles';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
+import { Trash2 } from 'lucide-react';
 
 export function AwardsList() {
-  const { earnedAwards } = useRowingStore();
+  const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion } = useRowingStore();
   const { hasGeneratedContent, generatedAchievements } = useAchievementStore();
   const earnedIds = new Set(earnedAwards.map(a => a.awardId));
+
+  const aiSuggestionById = useMemo(() => {
+    return new Map(aiAwardSuggestions.map(s => [s.awardId, s]));
+  }, [aiAwardSuggestions]);
+
+  const aiGoals = useMemo(() => {
+    return aiAwardSuggestions
+      .map(s => ({ suggestion: s, award: AWARDS.find(a => a.id === s.awardId) }))
+      .filter(x => Boolean(x.award)) as Array<{ suggestion: typeof aiAwardSuggestions[number]; award: (typeof AWARDS)[number] }>;
+  }, [aiAwardSuggestions]);
   
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedAwardId, setSelectedAwardId] = useState<string | null>(null);
@@ -59,12 +72,53 @@ export function AwardsList() {
 
   return (
     <>
+      {aiGoals.length > 0 && (
+        <div className="mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {aiGoals.map(({ suggestion, award }) => (
+              <Card key={award.id} className="border-primary/10">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">{award.title}</CardTitle>
+                      <div className="text-xs text-muted-foreground">{award.description}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-[10px]">
+                        {suggestion.status === 'approved' ? 'Approved' : 'Suggested'}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteAIAwardSuggestion(award.id)}
+                        className="h-8 px-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-xs">{suggestion.rationale}</div>
+                  {suggestion.targetDate && (
+                    <div className="text-xs text-muted-foreground">
+                      Target: {formatDateOnly(new Date(suggestion.targetDate))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {AWARDS.map((award, index) => {
           const isEarned = earnedIds.has(award.id);
           const Icon = award.icon;
           const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
           const hasContent = hasGeneratedContent(award.id);
+          const aiGoal = aiSuggestionById.get(award.id);
           
           // Use base imageUrl without version param to allow Next.js optimization
           // Cache busting handled in gallery detail view, not needed for list thumbnails
@@ -115,6 +169,11 @@ export function AwardsList() {
                   />
                 </div>
                 <div className="flex items-center gap-1">
+                  {!isEarned && aiGoal && (
+                    <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
+                      {aiGoal.status === 'approved' ? 'GOAL' : 'AI'}
+                    </span>
+                  )}
                   {isEarned && earnedInfo && (
                     <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
                       {formatDateOnly(new Date(earnedInfo.earnedAt))}
