@@ -9,6 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
 import {
@@ -133,6 +141,17 @@ export default function SettingsPage() {
   const [migrationResult, setMigrationResult] = useState<{ migrated: number; failed: string[]; total: number } | null>(null);
   const [indexedDBImageCount, setIndexedDBImageCount] = useState<number | null>(null);
 
+  // Prompt editor modal state
+  const [promptEditorOpen, setPromptEditorOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<{
+    key: string;
+    label: string;
+    description: string;
+    value: string;
+    defaultValue: string;
+  } | null>(null);
+  const [promptEditorValue, setPromptEditorValue] = useState('');
+
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
     if (connectionStatus === 'success' || connectionStatus === 'error') {
@@ -198,6 +217,32 @@ export default function SettingsPage() {
   ) => {
     await saveSettings('aiSettings', { [promptKey]: defaultValue });
     setSuccessMessage('Prompt reset to default');
+  };
+
+  const openPromptEditor = (
+    key: string,
+    label: string,
+    description: string,
+    value: string,
+    defaultValue: string
+  ) => {
+    setEditingPrompt({ key, label, description, value, defaultValue });
+    setPromptEditorValue(value);
+    setPromptEditorOpen(true);
+  };
+
+  const savePromptFromEditor = () => {
+    if (editingPrompt) {
+      saveSettings('aiSettings', { [editingPrompt.key]: promptEditorValue });
+      setPromptEditorOpen(false);
+      setEditingPrompt(null);
+    }
+  };
+
+  const resetPromptInEditor = () => {
+    if (editingPrompt) {
+      setPromptEditorValue(editingPrompt.defaultValue);
+    }
   };
 
   const saveSettings = async (category: SettingsCategory, updates: any) => {
@@ -1379,9 +1424,9 @@ export default function SettingsPage() {
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-image-1">GPT Image (recommended)</option>
-                          <option value="dall-e-3">DALL·E 3</option>
-                          <option value="dall-e-2">DALL·E 2</option>
+                          <option value="gpt-image-1">GPT Image 1 (Balanced)</option>
+                          <option value="gpt-image-1-mini">GPT Image 1 Mini (Fast)</option>
+                          <option value="gpt-image-1.5">GPT Image 1.5 (Best Quality)</option>
                         </select>
                       </div>
                       <div>
@@ -1660,202 +1705,136 @@ You can also paste content from medical documents or training notes."
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Prompts</CardTitle>
-              <CardDescription>Customize AI prompts and behavior</CardDescription>
+              <CardDescription>Customize AI prompts and behavior. Click on any prompt to edit in full-screen.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="systemPrompt">System Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResetPrompt('systemPrompt', DEFAULT_SYSTEM_PROMPT)}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="systemPrompt"
-                  rows={4}
-                  value={settingsData.aiSettings.systemPrompt}
-                  onChange={(e) => saveSettings('aiSettings', { systemPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the base system prompt for AI interactions..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Base system prompt used for all AI interactions. Sets the AI's personality and expertise level.
+            <CardContent className="space-y-3">
+              <button
+                onClick={() => openPromptEditor(
+                  'systemPrompt',
+                  'System Prompt',
+                  'Base system prompt used for all AI interactions. Sets the AI\'s personality and expertise level.',
+                  settingsData.aiSettings.systemPrompt,
+                  DEFAULT_SYSTEM_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">System Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {settingsData.aiSettings.systemPrompt.substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="chatSystemPrompt">Chat System Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResetPrompt('chatSystemPrompt', DEFAULT_CHAT_SYSTEM_PROMPT)}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="chatSystemPrompt"
-                  rows={4}
-                  value={settingsData.aiSettings.chatSystemPrompt}
-                  onChange={(e) => saveSettings('aiSettings', { chatSystemPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the chat-specific system prompt for AI coach conversations..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Specific system prompt for chat interactions. Defines how the AI coach behaves in conversations.
+              <button
+                onClick={() => openPromptEditor(
+                  'chatSystemPrompt',
+                  'Chat System Prompt',
+                  'Specific system prompt for chat interactions. Defines how the AI coach behaves in conversations.',
+                  settingsData.aiSettings.chatSystemPrompt,
+                  DEFAULT_CHAT_SYSTEM_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Chat System Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {settingsData.aiSettings.chatSystemPrompt.substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="planGenerationPrompt">Training Plan Generation Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResetPrompt('planGenerationPrompt', DEFAULT_PLAN_GENERATION_PROMPT)}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="planGenerationPrompt"
-                  rows={4}
-                  value={settingsData.aiSettings.planGenerationPrompt}
-                  onChange={(e) => saveSettings('aiSettings', { planGenerationPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the prompt used for generating training plans..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Controls how the AI generates personalized training plans based on your goals and fitness level.
+              <button
+                onClick={() => openPromptEditor(
+                  'planGenerationPrompt',
+                  'Training Plan Generation Prompt',
+                  'Controls how the AI generates personalized training plans based on your goals and fitness level.',
+                  settingsData.aiSettings.planGenerationPrompt,
+                  DEFAULT_PLAN_GENERATION_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Training Plan Generation Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {settingsData.aiSettings.planGenerationPrompt.substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="insightsPrompt">AI Insights Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResetPrompt('insightsPrompt', DEFAULT_INSIGHTS_PROMPT)}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="insightsPrompt"
-                  rows={8}
-                  value={settingsData.aiSettings.insightsPrompt}
-                  onChange={(e) => saveSettings('aiSettings', { insightsPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the prompt used for generating AI insights in the dashboard..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  This prompt controls how the AI analyzes your rowing data and generates insights.
-                  Use {`{sessionData}`} as a placeholder for the actual session data.
+              <button
+                onClick={() => openPromptEditor(
+                  'insightsPrompt',
+                  'AI Insights Prompt',
+                  'This prompt controls how the AI analyzes your rowing data and generates insights. Use {sessionData} as a placeholder.',
+                  settingsData.aiSettings.insightsPrompt,
+                  DEFAULT_INSIGHTS_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">AI Insights Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {settingsData.aiSettings.insightsPrompt.substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="awardSuggestionsPrompt">Award Suggestions Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResetPrompt('awardSuggestionsPrompt', DEFAULT_AWARD_SUGGESTIONS_PROMPT)}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="awardSuggestionsPrompt"
-                  rows={6}
-                  value={settingsData.aiSettings.awardSuggestionsPrompt || DEFAULT_AWARD_SUGGESTIONS_PROMPT}
-                  onChange={(e) => saveSettings('aiSettings', { awardSuggestionsPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the prompt used for AI award suggestion generation..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Controls how the AI proposes upcoming achievements you might reach soon.
+              <button
+                onClick={() => openPromptEditor(
+                  'awardSuggestionsPrompt',
+                  'Award Suggestions Prompt',
+                  'Controls how the AI proposes upcoming achievements you might reach soon.',
+                  settingsData.aiSettings.awardSuggestionsPrompt || DEFAULT_AWARD_SUGGESTIONS_PROMPT,
+                  DEFAULT_AWARD_SUGGESTIONS_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Award Suggestions Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {(settingsData.aiSettings.awardSuggestionsPrompt || DEFAULT_AWARD_SUGGESTIONS_PROMPT).substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="explainChartPrompt">Chart Explanation Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResetPrompt('explainChartPrompt', DEFAULT_EXPLAIN_CHART_PROMPT)}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="explainChartPrompt"
-                  rows={6}
-                  value={settingsData.aiSettings.explainChartPrompt || DEFAULT_EXPLAIN_CHART_PROMPT}
-                  onChange={(e) => saveSettings('aiSettings', { explainChartPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure how the AI explains charts in analytics..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  This prompt is appended to chart explanation requests. Use it to control the response format and length.
-                  Include a &quot;TOOLTIP SUMMARY&quot; section for the info tooltip display.
+              <button
+                onClick={() => openPromptEditor(
+                  'explainChartPrompt',
+                  'Chart Explanation Prompt',
+                  'This prompt is appended to chart explanation requests. Include a "TOOLTIP SUMMARY" section for the info tooltip display.',
+                  settingsData.aiSettings.explainChartPrompt || DEFAULT_EXPLAIN_CHART_PROMPT,
+                  DEFAULT_EXPLAIN_CHART_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Chart Explanation Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {(settingsData.aiSettings.explainChartPrompt || DEFAULT_EXPLAIN_CHART_PROMPT).substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="achievementStoryPrompt">Achievement Story Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => saveSettings('aiSettings', { achievementStoryPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT })}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="achievementStoryPrompt"
-                  rows={4}
-                  value={settingsData.aiSettings.achievementStoryPrompt}
-                  onChange={(e) => saveSettings('aiSettings', { achievementStoryPrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the prompt for generating achievement stories..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Controls how the AI generates celebratory stories for your achievements.
+              <button
+                onClick={() => openPromptEditor(
+                  'achievementStoryPrompt',
+                  'Achievement Story Prompt',
+                  'Controls how the AI generates celebratory stories for your achievements.',
+                  settingsData.aiSettings.achievementStoryPrompt,
+                  DEFAULT_ACHIEVEMENT_STORY_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Achievement Story Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {settingsData.aiSettings.achievementStoryPrompt.substring(0, 150)}...
                 </p>
-              </div>
+              </button>
 
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <Label htmlFor="achievementImagePrompt">Achievement Image Prompt</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => saveSettings('aiSettings', { achievementImagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT })}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-                <textarea
-                  id="achievementImagePrompt"
-                  rows={4}
-                  value={settingsData.aiSettings.achievementImagePrompt}
-                  onChange={(e) => saveSettings('aiSettings', { achievementImagePrompt: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
-                  placeholder="Configure the prompt for generating achievement certificate images..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Controls how the AI generates images for achievement certificates.
+              <button
+                onClick={() => openPromptEditor(
+                  'achievementImagePrompt',
+                  'Achievement Image Prompt',
+                  'Controls how the AI generates images for achievement certificates.',
+                  settingsData.aiSettings.achievementImagePrompt,
+                  DEFAULT_ACHIEVEMENT_IMAGE_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Achievement Image Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {settingsData.aiSettings.achievementImagePrompt.substring(0, 150)}...
                 </p>
-              </div>
+              </button>
             </CardContent>
           </Card>
         )}
@@ -2049,6 +2028,35 @@ You can also paste content from medical documents or training notes."
           </Card>
         </div>
       </div>
+
+      {/* Prompt Editor Modal */}
+      <Dialog open={promptEditorOpen} onOpenChange={setPromptEditorOpen}>
+        <DialogContent className="w-[80vw] max-w-none h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{editingPrompt?.label}</DialogTitle>
+            <DialogDescription>{editingPrompt?.description}</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            <textarea
+              value={promptEditorValue}
+              onChange={(e) => setPromptEditorValue(e.target.value)}
+              className="w-full h-full p-4 border rounded-md resize-none font-mono text-sm bg-muted/50"
+              placeholder="Enter your prompt..."
+            />
+          </div>
+          <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2">
+            <Button variant="outline" onClick={resetPromptInEditor}>
+              Reset to default
+            </Button>
+            <Button variant="outline" onClick={() => setPromptEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={savePromptFromEditor}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

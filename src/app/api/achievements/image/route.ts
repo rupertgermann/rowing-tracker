@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       apiKey, 
       size = '1024x1024',
       quality = 'auto',  // auto, high, medium, low
-      model = 'gpt-image-1',  // gpt-image-1 (recommended), dall-e-3, dall-e-2
+      model = 'gpt-image-1',  // gpt-image-1, gpt-image-1-mini, gpt-image-1.5
       story
     } = body;
 
@@ -81,8 +81,8 @@ Style guidelines:
     }
     if (isDev) console.log('finalPrompt:', prompt);
 
-    // Call OpenAI Image API with gpt-image-1 (recommended) or fallback models
-    // See: https://platform.openai.com/docs/guides/image-generation
+    // Call OpenAI Image API with GPT image models
+    // See: https://platform.openai.com/docs/api-reference/images/create
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
@@ -94,11 +94,10 @@ Style guidelines:
         prompt: prompt,
         n: 1,
         size: size,
-        // quality parameter: 'auto' (default), 'high', 'medium', 'low' for gpt-image-1
-        // 'standard' or 'hd' for dall-e-3
-        quality: model === 'gpt-image-1' ? quality : 'standard',
-        // gpt-image-1 returns b64_json by default, dall-e-3 needs explicit format
-        ...(model !== 'gpt-image-1' && { response_format: 'b64_json' })
+        // quality parameter: 'auto' (default), 'high', 'medium', 'low' for GPT image models
+        quality: quality,
+        // GPT image models return b64_json by default, output_format controls the format
+        output_format: 'png'
       })
     });
 

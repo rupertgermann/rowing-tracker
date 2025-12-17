@@ -95,7 +95,7 @@ export interface AISettings {
   achievementStoryPrompt: string; // System prompt for achievement story generation
   achievementImagePrompt: string; // Prompt template for achievement image generation
   achievementText: UseCaseConfig; // Text/story generation configuration
-  achievementImageModel: 'gpt-image-1' | 'dall-e-3' | 'dall-e-2'; // Image model selection
+  achievementImageModel: 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
   achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
 
