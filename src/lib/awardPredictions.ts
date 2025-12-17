@@ -53,7 +53,12 @@ function calculateStats(sessions: Session[]): SessionStats {
   const totalDistance = sessions.reduce((acc, s) => acc + (s.distance || 0), 0);
   const totalDuration = sessions.reduce((acc, s) => acc + (s.duration || 0), 0);
   const avgPower = sessions.reduce((acc, s) => acc + (s.avgPower || 0), 0) / sessions.length;
-  const bestPower = Math.max(...sessions.map(s => s.avgPower || 0));
+  
+  // Best power from qualifying sessions only (>5 min) to match award conditions
+  const qualifyingSessions = sessions.filter(s => s.duration > 300);
+  const bestPower = qualifyingSessions.length > 0 
+    ? Math.max(...qualifyingSessions.map(s => s.avgPower || 0))
+    : 0;
 
   const firstDate = new Date(sorted[0].timestamp);
   const lastDate = new Date(sorted[sorted.length - 1].timestamp);
@@ -266,36 +271,98 @@ export function calculateAwardPredictions(
     }
 
     // Improvement awards - harder to predict, show progress only
+    // Award conditions require: sessions.length >= 10 AND valid.length >= 5
     else if (award.id.startsWith('improve-')) {
       const sorted = [...sessions].sort((a, b) => 
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
       const valid = sorted.filter(s => s.duration > 300);
       
-      if (valid.length >= 3) {
+      // Match award condition requirements: 10+ total sessions, 5+ valid sessions
+      if (sessions.length >= 10 && valid.length >= 5) {
         const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
         const best = Math.max(...valid.map(s => s.avgPower));
         
+        // Check longer strings first to avoid partial matches (e.g., '100' contains '10')
         let targetMultiplier = 1;
-        if (award.id.includes('10')) targetMultiplier = 1.10;
-        else if (award.id.includes('25')) targetMultiplier = 1.25;
-        else if (award.id.includes('50')) targetMultiplier = 1.50;
+        if (award.id.includes('100')) targetMultiplier = 2.0;
         else if (award.id.includes('75')) targetMultiplier = 1.75;
-        else if (award.id.includes('100')) targetMultiplier = 2.0;
+        else if (award.id.includes('50')) targetMultiplier = 1.50;
+        else if (award.id.includes('25')) targetMultiplier = 1.25;
+        else if (award.id.includes('10')) targetMultiplier = 1.10;
         
         const targetPower = baseline * targetMultiplier;
         const progress = Math.min(100, ((best - baseline) / (targetPower - baseline)) * 100);
         
+        // If progress is 100% but award not earned, there's a data mismatch - cap at 99%
+        const cappedProgress = progress >= 100 ? 99 : progress;
+        
+        // Estimate target date based on power improvement rate
+        const powerGained = best - baseline;
+        const powerNeeded = targetPower - best;
+        let estimatedDays: number | null = null;
+        let estimatedDate: Date | null = null;
+        
+        if (powerGained > 0 && powerNeeded > 0 && stats.daysSinceFirstSession > 7) {
+          const powerPerDay = powerGained / stats.daysSinceFirstSession;
+          estimatedDays = Math.ceil(powerNeeded / powerPerDay);
+          estimatedDate = new Date(today.getTime() + estimatedDays * 24 * 60 * 60 * 1000);
+        }
+        
         prediction = {
           awardId: award.id,
           criteria: { type: 'custom', value: Math.round(targetPower), comparison: 'gte' },
-          currentProgress: Math.max(0, progress),
+          currentProgress: Math.max(0, cappedProgress),
           targetValue: Math.round(targetPower),
           currentValue: Math.round(best),
           unit: `watts (baseline: ${Math.round(baseline)}W)`,
-          targetDate: null, // Too variable to predict
-          daysRemaining: null,
+          targetDate: estimatedDate,
+          daysRemaining: estimatedDays,
           isAchievable: best >= baseline * 0.9 // Making some progress
+        };
+      } else if (valid.length >= 3) {
+        // Not enough sessions yet - show progress toward having enough data
+        const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgPower, 0) / 3;
+        const best = Math.max(...valid.map(s => s.avgPower));
+        
+        let targetMultiplier = 1;
+        // Check longer strings first to avoid partial matches (e.g., '100' contains '10')
+        if (award.id.includes('100')) targetMultiplier = 2.0;
+        else if (award.id.includes('75')) targetMultiplier = 1.75;
+        else if (award.id.includes('50')) targetMultiplier = 1.50;
+        else if (award.id.includes('25')) targetMultiplier = 1.25;
+        else if (award.id.includes('10')) targetMultiplier = 1.10;
+        
+        const targetPower = baseline * targetMultiplier;
+        const powerProgress = ((best - baseline) / (targetPower - baseline)) * 100;
+        
+        // Factor in session requirements: need 10 sessions and 5 valid
+        const sessionProgress = Math.min(100, (sessions.length / 10) * 100);
+        const validProgress = Math.min(100, (valid.length / 5) * 100);
+        
+        // Combined progress: weight power progress but cap by session requirements
+        const combinedProgress = Math.min(
+          Math.max(0, powerProgress),
+          sessionProgress,
+          validProgress
+        );
+        
+        // Estimate when we'll have enough sessions
+        const sessionsNeeded = Math.max(0, 10 - sessions.length);
+        const daysForSessions = stats.avgSessionsPerWeek > 0 
+          ? Math.ceil(sessionsNeeded / (stats.avgSessionsPerWeek / 7))
+          : null;
+        
+        prediction = {
+          awardId: award.id,
+          criteria: { type: 'custom', value: Math.round(targetPower), comparison: 'gte' },
+          currentProgress: Math.max(0, Math.min(99, combinedProgress)),
+          targetValue: Math.round(targetPower),
+          currentValue: Math.round(best),
+          unit: `watts (need ${sessionsNeeded} more sessions)`,
+          targetDate: daysForSessions ? new Date(today.getTime() + daysForSessions * 24 * 60 * 60 * 1000) : null,
+          daysRemaining: daysForSessions,
+          isAchievable: true
         };
       }
     }

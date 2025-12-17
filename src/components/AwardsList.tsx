@@ -195,7 +195,7 @@ export function AwardsList() {
                 <div className="flex items-center gap-1">
                   {item.isAIGoal && !item.isEarned && (
                     <>
-                      <span className="text-[10px] text-purple-500 font-mono bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                      <span className="text-xs text-purple-500 font-mono bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
                         AI Goal
                       </span>
                       <Button
@@ -226,7 +226,7 @@ export function AwardsList() {
                   )}
                   {item.isAIGoal && item.isEarned && (
                     <>
-                      <span className="text-[10px] text-green-500 font-mono bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">
+                      <span className="text-xs text-green-500 font-mono bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">
                         Earned
                       </span>
                       <Button
@@ -243,24 +243,49 @@ export function AwardsList() {
                       </Button>
                     </>
                   )}
-                  {item.isEarned && item.earnedAt && (
-                    <span className="text-[10px] text-muted-foreground font-mono bg-background/80 px-1.5 py-0.5 rounded border backdrop-blur-sm">
-                      {formatDateOnly(new Date(item.earnedAt))}
-                    </span>
-                  )}
                 </div>
               </CardHeader>
               <CardContent className="relative z-10">
-                <CardTitle className="text-base mb-1 leading-tight">{item.title}</CardTitle>
-                <p className="text-xs text-muted-foreground line-clamp-2">
+                <CardTitle className={cn(
+                  "text-base mb-1 leading-tight",
+                  !item.isEarned && "text-foreground/80"
+                )}>{item.title}</CardTitle>
+                <p className={cn(
+                  "text-xs line-clamp-2",
+                  item.isEarned ? "text-muted-foreground" : "text-muted-foreground/80"
+                )}>
                   {item.description}
                 </p>
-                {/* AI Goal target date */}
-                {item.isAIGoal && item.aiSuggestion?.targetDate && (
-                  <p className="text-[10px] text-purple-500 mt-1">
-                    Target: {formatDateOnly(new Date(item.aiSuggestion.targetDate))}
-                  </p>
-                )}
+                {/* AI Goal target date - only show for un-earned AI goals, styled like static awards */}
+                {item.isAIGoal && !item.isEarned && item.aiSuggestion?.targetDate && (() => {
+                  const targetDate = new Date(item.aiSuggestion.targetDate);
+                  const now = new Date();
+                  const daysRemaining = Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  
+                  // Format relative time like static awards
+                  let relativeTime = '';
+                  if (daysRemaining <= 0) {
+                    relativeTime = 'due now';
+                  } else if (daysRemaining <= 7) {
+                    relativeTime = `~${daysRemaining} day${daysRemaining === 1 ? '' : 's'} away`;
+                  } else if (daysRemaining <= 30) {
+                    const weeks = Math.round(daysRemaining / 7);
+                    relativeTime = `~${weeks} week${weeks === 1 ? '' : 's'} away`;
+                  } else if (daysRemaining <= 365) {
+                    const months = Math.round(daysRemaining / 30);
+                    relativeTime = `~${months} month${months === 1 ? '' : 's'} away`;
+                  } else {
+                    const years = Math.round(daysRemaining / 365 * 10) / 10;
+                    relativeTime = `~${years} year${years === 1 ? '' : 's'} away`;
+                  }
+                  
+                  return (
+                    <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground/80">
+                      <TrendingUp className="h-3 w-3" />
+                      <span>Target: {formatDateOnly(targetDate)} ({relativeTime})</span>
+                    </div>
+                  );
+                })()}
                 {/* Prediction for un-earned static awards - aligned with AI suggestions format */}
                 {!item.isEarned && !item.isAIGoal && predictions.has(item.id) && (() => {
                   const pred = predictions.get(item.id)!;
@@ -274,12 +299,12 @@ export function AwardsList() {
                             style={{ width: `${Math.min(100, pred.currentProgress)}%` }}
                           />
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-mono">
+                        <span className="text-xs text-muted-foreground/80 font-mono">
                           {Math.round(pred.currentProgress)}%
                         </span>
                       </div>
                       {/* Target date and time estimate */}
-                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground/80">
                         <TrendingUp className="h-3 w-3" />
                         {pred.targetDate ? (
                           <span>
@@ -293,9 +318,16 @@ export function AwardsList() {
                   );
                 })()}
                 {item.isEarned && (
-                  <p className="text-[10px] text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Click to view & generate story
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    {item.earnedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Earned: {formatDateOnly(new Date(item.earnedAt))}
+                      </p>
+                    )}
+                    <p className="text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                      Click to view & generate story
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
