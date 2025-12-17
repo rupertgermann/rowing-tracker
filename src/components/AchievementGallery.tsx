@@ -491,23 +491,23 @@ export function AchievementGallery({
               />
               {isGeneratingImage && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                  {/* Animated rowing boat */}
-                  <div className="relative w-32 h-20">
+                  {/* Animated rowing boat - 3x size */}
+                  <div className="relative w-96 h-60">
                     <div className="absolute inset-0 flex items-center justify-center">
                       {/* Water waves */}
-                      <div className="absolute bottom-0 left-0 right-0 h-6 overflow-hidden">
-                        <div className="animate-pulse flex gap-1 justify-center">
+                      <div className="absolute bottom-0 left-0 right-0 h-16 overflow-hidden">
+                        <div className="animate-pulse flex gap-3 justify-center">
                           {[...Array(8)].map((_, i) => (
                             <div 
                               key={i} 
-                              className="w-4 h-2 bg-blue-400/30 rounded-full"
+                              className="w-12 h-6 bg-blue-400/30 rounded-full"
                               style={{ animationDelay: `${i * 0.1}s` }}
                             />
                           ))}
                         </div>
                       </div>
                       {/* Boat emoji with rowing animation */}
-                      <div className="text-4xl animate-bounce" style={{ animationDuration: '1s' }}>
+                      <div className="text-9xl animate-bounce" style={{ animationDuration: '1s' }}>
                         🚣
                       </div>
                     </div>
@@ -546,23 +546,23 @@ export function AchievementGallery({
             <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20 relative overflow-hidden`}>
               {isGeneratingImage ? (
                 <>
-                  {/* Animated rowing boat */}
-                  <div className="relative w-32 h-20">
+                  {/* Animated rowing boat - 3x size */}
+                  <div className="relative w-96 h-60">
                     <div className="absolute inset-0 flex items-center justify-center">
                       {/* Water waves */}
-                      <div className="absolute bottom-0 left-0 right-0 h-6 overflow-hidden">
-                        <div className="animate-pulse flex gap-1">
+                      <div className="absolute bottom-0 left-0 right-0 h-16 overflow-hidden">
+                        <div className="animate-pulse flex gap-3 justify-center">
                           {[...Array(8)].map((_, i) => (
                             <div 
                               key={i} 
-                              className="w-4 h-2 bg-blue-400/30 rounded-full"
+                              className="w-12 h-6 bg-blue-400/30 rounded-full"
                               style={{ animationDelay: `${i * 0.1}s` }}
                             />
                           ))}
                         </div>
                       </div>
                       {/* Boat emoji with rowing animation */}
-                      <div className="text-4xl animate-bounce" style={{ animationDuration: '1s' }}>
+                      <div className="text-9xl animate-bounce" style={{ animationDuration: '1s' }}>
                         🚣
                       </div>
                     </div>
