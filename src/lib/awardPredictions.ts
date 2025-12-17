@@ -367,6 +367,149 @@ export function calculateAwardPredictions(
       }
     }
 
+    // Speed awards (500m pace targets)
+    else if (award.id === 'speed-demon' || award.id === 'speed-light') {
+      const targetSplit = award.id === 'speed-demon' ? 105 : 95; // 1:45 or 1:35 in seconds
+      
+      // Find best 500m pace from sessions
+      const sessions500m = sessions.filter(s => s.distance === 500);
+      const bestSplit = sessions500m.length > 0 
+        ? Math.min(...sessions500m.map(s => s.avgSplit || Infinity))
+        : null;
+      
+      if (bestSplit !== null && bestSplit < Infinity) {
+        const progress = Math.min(100, ((180 - bestSplit) / (180 - targetSplit)) * 100);
+        
+        // Estimate improvement rate
+        const splitImprovement = stats.daysSinceFirstSession > 14 && sessions500m.length >= 2
+          ? (sessions500m[0].avgSplit - bestSplit) / stats.daysSinceFirstSession
+          : 0;
+        const daysRemaining = splitImprovement > 0 && bestSplit > targetSplit
+          ? Math.ceil((bestSplit - targetSplit) / splitImprovement)
+          : null;
+        
+        prediction = {
+          awardId: award.id,
+          criteria: { type: 'single_session_pace', value: targetSplit, comparison: 'lte' },
+          currentProgress: Math.max(0, progress),
+          targetValue: targetSplit,
+          currentValue: Math.round(bestSplit),
+          unit: `sec/500m (target: ${Math.floor(targetSplit / 60)}:${String(targetSplit % 60).padStart(2, '0')})`,
+          targetDate: daysRemaining ? new Date(today.getTime() + daysRemaining * 24 * 60 * 60 * 1000) : null,
+          daysRemaining,
+          isAchievable: bestSplit <= targetSplit * 1.2
+        };
+      } else {
+        // No 500m sessions yet - show as 0% with guidance
+        prediction = {
+          awardId: award.id,
+          criteria: { type: 'single_session_pace', value: targetSplit, comparison: 'lte' },
+          currentProgress: 0,
+          targetValue: targetSplit,
+          currentValue: 0,
+          unit: `sec/500m (need 500m sessions)`,
+          targetDate: null,
+          daysRemaining: null,
+          isAchievable: true
+        };
+      }
+    }
+
+    // Pace improvement awards
+    else if (award.id.startsWith('improve-pace-')) {
+      const sorted = [...sessions].sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      const valid = sorted.filter(s => s.duration > 300 && s.avgSplit > 0);
+      
+      if (sessions.length >= 10 && valid.length >= 5) {
+        const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgSplit, 0) / 3;
+        const best = Math.min(...valid.map(s => s.avgSplit));
+        
+        // Check longer strings first
+        let targetImprovement = 0;
+        if (award.id.includes('10')) targetImprovement = 0.10;
+        else if (award.id.includes('5')) targetImprovement = 0.05;
+        
+        const targetSplit = baseline * (1 - targetImprovement);
+        const improvement = (baseline - best) / baseline;
+        const progress = Math.min(100, (improvement / targetImprovement) * 100);
+        
+        const cappedProgress = progress >= 100 ? 99 : progress;
+        
+        // Estimate based on pace improvement rate
+        const paceImproved = baseline - best;
+        const paceNeeded = best - targetSplit;
+        let estimatedDays: number | null = null;
+        
+        if (paceImproved > 0 && paceNeeded > 0 && stats.daysSinceFirstSession > 7) {
+          const pacePerDay = paceImproved / stats.daysSinceFirstSession;
+          estimatedDays = Math.ceil(paceNeeded / pacePerDay);
+        }
+        
+        prediction = {
+          awardId: award.id,
+          criteria: { type: 'custom', value: Math.round(targetSplit), comparison: 'lte' },
+          currentProgress: Math.max(0, cappedProgress),
+          targetValue: Math.round(targetSplit),
+          currentValue: Math.round(best),
+          unit: `sec/500m (baseline: ${Math.round(baseline)}s)`,
+          targetDate: estimatedDays ? new Date(today.getTime() + estimatedDays * 24 * 60 * 60 * 1000) : null,
+          daysRemaining: estimatedDays,
+          isAchievable: best <= baseline
+        };
+      } else if (valid.length >= 3) {
+        const baseline = valid.slice(0, 3).reduce((acc, s) => acc + s.avgSplit, 0) / 3;
+        const best = Math.min(...valid.map(s => s.avgSplit));
+        
+        let targetImprovement = 0;
+        if (award.id.includes('10')) targetImprovement = 0.10;
+        else if (award.id.includes('5')) targetImprovement = 0.05;
+        
+        const targetSplit = baseline * (1 - targetImprovement);
+        const improvement = (baseline - best) / baseline;
+        const paceProgress = (improvement / targetImprovement) * 100;
+        
+        const sessionProgress = Math.min(100, (sessions.length / 10) * 100);
+        const validProgress = Math.min(100, (valid.length / 5) * 100);
+        const combinedProgress = Math.min(Math.max(0, paceProgress), sessionProgress, validProgress);
+        
+        const sessionsNeeded = Math.max(0, 10 - sessions.length);
+        const daysForSessions = stats.avgSessionsPerWeek > 0 
+          ? Math.ceil(sessionsNeeded / (stats.avgSessionsPerWeek / 7))
+          : null;
+        
+        prediction = {
+          awardId: award.id,
+          criteria: { type: 'custom', value: Math.round(targetSplit), comparison: 'lte' },
+          currentProgress: Math.max(0, Math.min(99, combinedProgress)),
+          targetValue: Math.round(targetSplit),
+          currentValue: Math.round(best),
+          unit: `sec/500m (need ${sessionsNeeded} more sessions)`,
+          targetDate: daysForSessions ? new Date(today.getTime() + daysForSessions * 24 * 60 * 60 * 1000) : null,
+          daysRemaining: daysForSessions,
+          isAchievable: true
+        };
+      }
+    }
+
+    // Time-based awards (early bird, night owl)
+    else if (award.id === 'early-bird' || award.id === 'night-owl') {
+      // These are binary - either you've done it or not
+      // Show as "achievable anytime" with 0% progress
+      prediction = {
+        awardId: award.id,
+        criteria: { type: 'custom', value: award.id === 'early-bird' ? 8 : 21, comparison: award.id === 'early-bird' ? 'lte' : 'gte' },
+        currentProgress: 0,
+        targetValue: award.id === 'early-bird' ? 8 : 21,
+        currentValue: 0,
+        unit: award.id === 'early-bird' ? 'AM (row before 8 AM)' : 'PM (row after 9 PM)',
+        targetDate: null,
+        daysRemaining: null,
+        isAchievable: true
+      };
+    }
+
     if (prediction) {
       predictions.set(award.id, prediction);
     }
