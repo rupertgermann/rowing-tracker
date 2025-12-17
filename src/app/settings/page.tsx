@@ -1679,21 +1679,24 @@ You can also paste content from medical documents or training notes."
               {/* Generated Context (Editable) */}
               {settingsData.aiSettings.userProfileContext && (
                 <div className="mt-4 pt-4 border-t">
-                  <Label htmlFor="userProfileContext" className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    Generated AI Context (Editable)
-                  </Label>
-                  <textarea
-                    id="userProfileContext"
-                    rows={6}
-                    value={settingsData.aiSettings.userProfileContext}
-                    onChange={(e) => saveSettings('aiSettings', { userProfileContext: e.target.value })}
-                    className="w-full mt-1 p-3 border rounded-md resize-y font-mono text-sm bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This context is automatically injected into AI prompts for chat, insights, and training plans.
-                    You can edit it directly if needed.
-                  </p>
+                  <button
+                    onClick={() => openPromptEditor(
+                      'userProfileContext',
+                      'Generated AI Context',
+                      'This context is automatically injected into AI prompts for chat, insights, and training plans. You can edit it directly if needed.',
+                      settingsData.aiSettings.userProfileContext,
+                      '' // No default - regenerate instead
+                    )}
+                    className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
+                  >
+                    <div className="font-medium text-sm flex items-center gap-2 text-green-900 dark:text-green-100">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Generated AI Context (Editable)
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                      {settingsData.aiSettings.userProfileContext.substring(0, 150)}...
+                    </p>
+                  </button>
                 </div>
               )}
             </CardContent>
