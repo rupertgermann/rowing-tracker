@@ -1838,10 +1838,13 @@ Use this data to create an appropriate plan that matches their current fitness a
     }
 
     try {
-      const prompt = `You are helping a rowing coach AI understand a user's personal context. The user has provided information about themselves that should influence how the AI coach gives advice.
+      const aiSettings = SettingsService.getInstance().getSettings().aiSettings;
+      
+      // Use customizable prompt with {userInput} placeholder
+      const promptTemplate = aiSettings.userProfilePrompt || `You are helping a rowing coach AI understand a user's personal context. The user has provided information about themselves that should influence how the AI coach gives advice.
 
 USER'S INFORMATION:
-${rawInput}
+{userInput}
 
 YOUR TASK:
 Condense this information into a concise, structured system prompt addition (max 300 words) that will help the AI coach personalize its advice. Focus on:
@@ -1863,11 +1866,35 @@ PERSONAL CONTEXT:
 
 Be specific and actionable. Only include information relevant to rowing training and coaching.`;
 
+      const prompt = promptTemplate.replace('{userInput}', rawInput);
+      
+      const generationConfig = aiSettings.userProfileGeneration || {
+        reasoning: 'low' as const,
+        verbosity: 'low' as const,
+        model: 'gpt-5-mini' as const
+      };
+
+      // Map UseCaseConfig model to ApiRequestConfig model (gpt-5.2 not supported in API)
+      const modelMap: Record<string, 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1'> = {
+        'gpt-5-nano': 'gpt-5-nano',
+        'gpt-5-mini': 'gpt-5-mini',
+        'gpt-5.1': 'gpt-5.1',
+        'gpt-5.2': 'gpt-5.1' // Fallback
+      };
+      
+      // Map UseCaseConfig reasoning to ApiRequestConfig reasoning (minimal -> none)
+      const reasoningMap: Record<string, 'none' | 'low' | 'medium' | 'high'> = {
+        'minimal': 'none',
+        'low': 'low',
+        'medium': 'medium',
+        'high': 'high'
+      };
+
       const config: ApiRequestConfig = {
         input: prompt,
-        model: 'gpt-5-mini',
-        reasoning: 'low', // Use low reasoning for faster, simpler condensation
-        verbosity: 'low',
+        model: modelMap[generationConfig.model] || 'gpt-5-mini',
+        reasoning: reasoningMap[generationConfig.reasoning] || 'low',
+        verbosity: generationConfig.verbosity,
         maxTokens: 800 // Increase to accommodate reasoning + output tokens
       };
 

@@ -168,3 +168,28 @@ Rules:
 - Estimate a realistic target date (or null if open-ended).
 
 Return ONLY valid JSON that matches the required schema.`;
+
+export const DEFAULT_USER_PROFILE_PROMPT = `You are helping a rowing coach AI understand a user's personal context. The user has provided information about themselves that should influence how the AI coach gives advice.
+
+USER'S INFORMATION:
+{userInput}
+
+YOUR TASK:
+Condense this information into a concise, structured system prompt addition (max 300 words) that will help the AI coach personalize its advice. Focus on:
+
+1. **Health/Medical Considerations**: Any conditions, injuries, or limitations that affect training (e.g., heart conditions, joint issues, medications)
+2. **Physical Profile**: Age, fitness level, experience, physical constraints
+3. **Goals & Preferences**: Training goals, preferred workout types, time availability
+4. **Special Needs**: Any accommodations or modifications needed for safe training
+
+FORMAT YOUR RESPONSE AS:
+A direct system prompt addition that starts with "PERSONAL CONTEXT:" followed by bullet points. This text will be injected directly into AI prompts, so write it as instructions for an AI, not as a summary for the user.
+
+Example format:
+PERSONAL CONTEXT:
+- User has [condition], adjust recommendations to [specific guidance]
+- Avoid suggesting [specific activities] due to [reason]
+- User prefers [preference], incorporate this into plans
+- [Any other relevant coaching considerations]
+
+Be specific and actionable. Only include information relevant to rowing training and coaching.`;

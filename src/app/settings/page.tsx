@@ -25,7 +25,8 @@ import {
   DEFAULT_PLAN_GENERATION_PROMPT,
   DEFAULT_INSIGHTS_PROMPT,
   DEFAULT_EXPLAIN_CHART_PROMPT,
-  DEFAULT_AWARD_SUGGESTIONS_PROMPT
+  DEFAULT_AWARD_SUGGESTIONS_PROMPT,
+  DEFAULT_USER_PROFILE_PROMPT
 } from '@/lib/aiPromptDefaults';
 import {
   DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
@@ -233,6 +234,10 @@ export default function SettingsPage() {
 
   const savePromptFromEditor = () => {
     if (editingPrompt) {
+      // Special handling for userProfileRawInput - also update local state
+      if (editingPrompt.key === 'userProfileRawInput') {
+        setProfileRawInput(promptEditorValue);
+      }
       saveSettings('aiSettings', { [editingPrompt.key]: promptEditorValue });
       setPromptEditorOpen(false);
       setEditingPrompt(null);
@@ -354,7 +359,7 @@ export default function SettingsPage() {
     { id: 'trainingSettings', name: 'Training Settings', icon: Target, description: 'Training zones, goals, and preferences' },
     { id: 'notificationSettings', name: 'Notifications', icon: Bell, description: 'Alerts and reminders' },
     { id: 'privacySettings', name: 'Privacy', icon: Shield, description: 'Data sharing and privacy controls' },
-    { id: 'aiSettings', name: 'AI Settings', icon: Brain, description: 'Configure AI assistant, training plans, and achievement generation' }
+    { id: 'aiSettings', name: 'AI Settings', icon: Brain, description: 'Configure AI assistant, training plans, achievement generation, etc.' }
   ];
 
   const renderUserPreferences = () => (
@@ -1462,6 +1467,68 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Personal Context Generation Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                        Personal Context Generation
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        AI-generated context from your personal information for coaching personalization
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.reasoning || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="minimal">Minimal (Ultra-fast)</option>
+                          <option value="low">Low (Fast)</option>
+                          <option value="medium">Medium (Balanced)</option>
+                          <option value="high">High (Quality)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="low">Low (Concise)</option>
+                          <option value="medium">Medium (Natural)</option>
+                          <option value="high">High (Detailed)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Condensing personal info works well with balanced models
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   {/* Global Settings */}
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                     <div>
@@ -1525,27 +1592,24 @@ export default function SettingsPage() {
 
               {/* Raw Input Area */}
               <div>
-                <Label htmlFor="profileRawInput" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Your Information
-                </Label>
-                <textarea
-                  id="profileRawInput"
-                  rows={6}
-                  value={profileRawInput}
-                  onChange={(e) => setProfileRawInput(e.target.value)}
-                  className="w-full mt-1 p-3 border rounded-md resize-y text-sm"
-                  placeholder="Describe any relevant information about yourself, for example:
-
-• Medical conditions (e.g., 'I have a heart condition and need to keep HR below 150')
-• Injuries or limitations (e.g., 'Recovering from a knee injury, avoid high-impact')
-• Age and fitness level (e.g., '45 years old, returning to exercise after 5 years')
-• Goals (e.g., 'Training for a charity 2K race in 3 months')
-• Preferences (e.g., 'I prefer shorter, more intense workouts')
-• Availability (e.g., 'Can only train 3 times per week for 30 minutes')
-
-You can also paste content from medical documents or training notes."
-                />
+                <button
+                  onClick={() => openPromptEditor(
+                    'userProfileRawInput',
+                    'Your Information',
+                    'Describe any relevant information about yourself that should influence AI coaching advice. Write freely or paste from documents.',
+                    profileRawInput,
+                    '' // No default
+                  )}
+                  className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+                >
+                  <div className="font-medium text-sm flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Your Information
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                    {profileRawInput ? profileRawInput.substring(0, 150) + (profileRawInput.length > 150 ? '...' : '') : 'Click to add your personal information...'}
+                  </p>
+                </button>
                 <p className="text-xs text-muted-foreground mt-1">
                   Write freely or paste from documents. The AI will condense this into actionable coaching context.
                 </p>
@@ -1631,6 +1695,10 @@ You can also paste content from medical documents or training notes."
                     
                     setIsCondensingProfile(true);
                     try {
+                      // Initialize cloudAI with API key before use
+                      if (!cloudAI.isConfigured()) {
+                        cloudAI.initialize(settingsData.aiSettings.openaiApiKey);
+                      }
                       const condensed = await cloudAI.condenseUserProfile(profileRawInput);
                       saveSettings('aiSettings', { 
                         userProfileContext: condensed,
@@ -1836,6 +1904,22 @@ You can also paste content from medical documents or training notes."
                 <div className="font-medium text-sm">Achievement Image Prompt</div>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
                   {settingsData.aiSettings.achievementImagePrompt.substring(0, 150)}...
+                </p>
+              </button>
+
+              <button
+                onClick={() => openPromptEditor(
+                  'userProfilePrompt',
+                  'Personal Context Generation Prompt',
+                  'Controls how the AI condenses your personal information into context for coaching. Use {userInput} as a placeholder for the user\'s input.',
+                  settingsData.aiSettings.userProfilePrompt || DEFAULT_USER_PROFILE_PROMPT,
+                  DEFAULT_USER_PROFILE_PROMPT
+                )}
+                className="w-full text-left p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
+                <div className="font-medium text-sm">Personal Context Generation Prompt</div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                  {(settingsData.aiSettings.userProfilePrompt || DEFAULT_USER_PROFILE_PROMPT).substring(0, 150)}...
                 </p>
               </button>
             </CardContent>
