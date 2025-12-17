@@ -116,7 +116,34 @@ export function AchievementGallery({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageLoadingMessage, setImageLoadingMessage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Fun rowing-themed loading messages
+  const loadingMessages = [
+    "🚣 Warming up the oars...",
+    "🎨 Mixing the perfect colors...",
+    "🌊 Catching the perfect wave...",
+    "✨ Adding some magic sparkles...",
+    "🏆 Polishing your trophy...",
+    "🖼️ Framing your achievement...",
+    "💪 Flexing those artistic muscles...",
+    "🌅 Painting the sunrise...",
+    "🎭 Striking a heroic pose...",
+    "🔥 Making it legendary..."
+  ];
+
+  // Cycle through loading messages
+  useEffect(() => {
+    if (!isGeneratingImage) {
+      setImageLoadingMessage(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setImageLoadingMessage(prev => (prev + 1) % loadingMessages.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [isGeneratingImage, loadingMessages.length]);
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
 
@@ -463,9 +490,22 @@ export function AchievementGallery({
                 unoptimized // Bypass Next.js image optimization to allow query string cache busting
               />
               {isGeneratingImage && (
-                <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                  <p className="text-sm text-muted-foreground">Updating image...</p>
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+                  <div className="text-3xl animate-bounce" style={{ animationDuration: '1s' }}>
+                    🚣
+                  </div>
+                  <p className="text-sm font-medium text-foreground">
+                    {loadingMessages[imageLoadingMessage]}
+                  </p>
+                  <div className="flex gap-1.5">
+                    {[...Array(5)].map((_, i) => (
+                      <div 
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"
+                        style={{ animationDelay: `${i * 0.2}s` }}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="absolute bottom-4 right-4 flex gap-2">
@@ -480,12 +520,46 @@ export function AchievementGallery({
               </div>
             </div>
           ) : (
-            <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20 relative`}>
+            <div className={`${imageSizing.aspect} ${imageSizing.maxWidth} mx-auto rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-4 bg-muted/20 relative overflow-hidden`}>
               {isGeneratingImage ? (
                 <>
-                  <Loader2 className="h-12 w-12 text-muted-foreground/50 animate-spin" />
-                  <p className="text-muted-foreground text-sm">
-                    Creating image...
+                  {/* Animated rowing boat */}
+                  <div className="relative w-32 h-20">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {/* Water waves */}
+                      <div className="absolute bottom-0 left-0 right-0 h-6 overflow-hidden">
+                        <div className="animate-pulse flex gap-1">
+                          {[...Array(8)].map((_, i) => (
+                            <div 
+                              key={i} 
+                              className="w-4 h-2 bg-blue-400/30 rounded-full"
+                              style={{ animationDelay: `${i * 0.1}s` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {/* Boat emoji with rowing animation */}
+                      <div className="text-4xl animate-bounce" style={{ animationDuration: '1s' }}>
+                        🚣
+                      </div>
+                    </div>
+                  </div>
+                  {/* Progress dots */}
+                  <div className="flex gap-1.5">
+                    {[...Array(5)].map((_, i) => (
+                      <div 
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"
+                        style={{ animationDelay: `${i * 0.2}s` }}
+                      />
+                    ))}
+                  </div>
+                  {/* Cycling fun message */}
+                  <p className="text-muted-foreground text-sm font-medium transition-all duration-300">
+                    {loadingMessages[imageLoadingMessage]}
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    This usually takes 10-20 seconds
                   </p>
                 </>
               ) : (
