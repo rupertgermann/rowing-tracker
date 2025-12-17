@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       earnedAwards: earnedAwardsInput,
       maxSuggestions = 5,
       customPrompt,
+      userPrompt,
       apiKey,
       model = 'gpt-5-mini',
       reasoning = 'low',
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
       earnedAwards?: Array<{ awardId: string; earnedAt: string }>;
       maxSuggestions?: number;
       customPrompt?: string;
+      userPrompt?: string;
       apiKey?: string;
       model?: string;
       reasoning?: ReasoningSetting;
@@ -179,7 +181,7 @@ Criteria types:
 - custom: For criteria that can't be auto-evaluated (user marks manually)`.trim();
 
     const instructions = `${customPrompt || ''}
-
+${userPrompt ? `\nUSER REQUEST: ${userPrompt}\n` : ''}
 Return ONLY valid JSON that matches the required schema. Do not include markdown, code fences, or extra text.
 
 Keep output short:

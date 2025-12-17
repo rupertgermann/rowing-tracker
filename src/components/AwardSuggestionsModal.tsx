@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useRowingStore } from '@/lib/store';
 import { settings } from '@/lib/settings';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
@@ -27,6 +29,7 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userPrompt, setUserPrompt] = useState('');
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -53,6 +56,7 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
           })),
           maxSuggestions: 5,
           customPrompt: aiSettings.awardSuggestionsPrompt,
+          userPrompt: userPrompt.trim() || undefined,
           apiKey: aiSettings.openaiApiKey || undefined,
           model: aiSettings.awardSuggestions?.model,
           reasoning: aiSettings.awardSuggestions?.reasoning,
@@ -138,9 +142,22 @@ export function AwardSuggestionsModal({ open, onOpenChange }: AwardSuggestionsMo
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Generate New Award Ideas</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               <div className="text-sm text-muted-foreground">
                 Sessions available for analysis: {sessions.length}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="userPrompt" className="text-sm">
+                  Custom instructions (optional)
+                </Label>
+                <Textarea
+                  id="userPrompt"
+                  placeholder="e.g., Focus on consistency awards, suggest fun/quirky achievements, create awards for morning workouts..."
+                  value={userPrompt}
+                  onChange={(e) => setUserPrompt(e.target.value)}
+                  className="min-h-[60px] text-sm"
+                  disabled={isGenerating}
+                />
               </div>
               {error && <div className="text-sm text-destructive">{error}</div>}
               <div>

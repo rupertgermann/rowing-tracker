@@ -6,13 +6,14 @@ import { useRowingStore, AIAwardSuggestion } from '@/lib/store';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { AWARDS, Award } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
+import { calculateAwardPredictions, formatPrediction, AwardPrediction } from '@/lib/awardPredictions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getShadowStyle, getCardClassName } from '@/lib/cardStyles';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
-import { Trash2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Trash2, Sparkles, CheckCircle2, TrendingUp } from 'lucide-react';
 
 // Unified display item for both static awards and AI-generated goals
 interface DisplayAward {
@@ -31,9 +32,14 @@ interface DisplayAward {
 }
 
 export function AwardsList() {
-  const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion, markAIAwardEarned } = useRowingStore();
+  const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion, markAIAwardEarned, sessions } = useRowingStore();
   const { hasGeneratedContent, generatedAchievements } = useAchievementStore();
   const earnedIds = new Set(earnedAwards.map(a => a.awardId));
+
+  // Calculate predictions for un-earned awards
+  const predictions = useMemo(() => {
+    return calculateAwardPredictions(sessions, earnedIds);
+  }, [sessions, earnedIds]);
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedAwardId, setSelectedAwardId] = useState<string | null>(null);
@@ -249,11 +255,43 @@ export function AwardsList() {
                 <p className="text-xs text-muted-foreground line-clamp-2">
                   {item.description}
                 </p>
+                {/* AI Goal target date */}
                 {item.isAIGoal && item.aiSuggestion?.targetDate && (
                   <p className="text-[10px] text-purple-500 mt-1">
                     Target: {formatDateOnly(new Date(item.aiSuggestion.targetDate))}
                   </p>
                 )}
+                {/* Prediction for un-earned static awards - aligned with AI suggestions format */}
+                {!item.isEarned && !item.isAIGoal && predictions.has(item.id) && (() => {
+                  const pred = predictions.get(item.id)!;
+                  return (
+                    <div className="mt-2 space-y-1">
+                      {/* Progress bar */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary/60 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, pred.currentProgress)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {Math.round(pred.currentProgress)}%
+                        </span>
+                      </div>
+                      {/* Target date and time estimate */}
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <TrendingUp className="h-3 w-3" />
+                        {pred.targetDate ? (
+                          <span>
+                            Target: {formatDateOnly(pred.targetDate)} ({formatPrediction(pred)})
+                          </span>
+                        ) : (
+                          <span>{formatPrediction(pred)}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {item.isEarned && (
                   <p className="text-[10px] text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     Click to view & generate story
