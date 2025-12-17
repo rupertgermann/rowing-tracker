@@ -141,7 +141,7 @@ export function AchievementGallery({
     }
     const interval = setInterval(() => {
       setImageLoadingMessage(prev => (prev + 1) % loadingMessages.length);
-    }, 2000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [isGeneratingImage, loadingMessages.length]);
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
