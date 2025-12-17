@@ -607,15 +607,36 @@ export const useRowingStore = create<RowingStore>()(
           // Check AI awards for automatic completion
           const updatedAIAwards = checkAIAwards(updatedSessions, state.aiAwardSuggestions);
 
-          // Determine newly earned awards compared to previous state for notification
+          // Determine newly earned static awards compared to previous state for notification
           const previousAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
-          const newlyEarned = recomputedAwards.filter(a => !previousAwardIds.has(a.awardId));
-          const newAward =
-            newlyEarned.length > 0
-              ? newlyEarned.reduce((latest, current) =>
-                  current.earnedAt > latest.earnedAt ? current : latest
-                )
-              : null;
+          const newlyEarnedStatic = recomputedAwards.filter(a => !previousAwardIds.has(a.awardId));
+          
+          // Determine newly earned AI awards
+          const previousAIEarnedIds = new Set(
+            state.aiAwardSuggestions.filter(a => a.status === 'earned').map(a => a.id)
+          );
+          const newlyEarnedAI = updatedAIAwards.filter(
+            a => a.status === 'earned' && !previousAIEarnedIds.has(a.id)
+          );
+          
+          // Combine and find the most recent newly earned award
+          let newAward: EarnedAward | null = null;
+          
+          if (newlyEarnedStatic.length > 0) {
+            newAward = newlyEarnedStatic.reduce((latest, current) =>
+              current.earnedAt > latest.earnedAt ? current : latest
+            );
+          }
+          
+          // Check if an AI award was earned more recently
+          if (newlyEarnedAI.length > 0) {
+            const latestAI = newlyEarnedAI.reduce((latest, current) =>
+              (current.earnedAt || new Date()) > (latest.earnedAt || new Date()) ? current : latest
+            );
+            if (!newAward || (latestAI.earnedAt && latestAI.earnedAt > newAward.earnedAt)) {
+              newAward = { awardId: latestAI.id, earnedAt: latestAI.earnedAt || new Date() };
+            }
+          }
           
           return {
             sessions: updatedSessions,

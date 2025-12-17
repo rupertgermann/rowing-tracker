@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { AWARDS } from '@/lib/awards';
-import { X, PartyPopper } from 'lucide-react';
+import { X, PartyPopper, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function AwardNotification() {
-  const { newlyEarnedAward, dismissNewAward } = useRowingStore();
+  const { newlyEarnedAward, dismissNewAward, aiAwardSuggestions } = useRowingStore();
   const [visible, setVisible] = useState(false);
 
   const handleDismiss = () => {
@@ -31,10 +31,22 @@ export function AwardNotification() {
 
   if (!newlyEarnedAward || !visible) return null;
 
-  const awardDef = AWARDS.find(a => a.id === newlyEarnedAward.awardId);
-  if (!awardDef) return null;
+  // Try to find in static awards first
+  const staticAward = AWARDS.find(a => a.id === newlyEarnedAward.awardId);
+  
+  // If not found, check AI awards
+  const aiAward = !staticAward 
+    ? aiAwardSuggestions.find(a => a.id === newlyEarnedAward.awardId)
+    : null;
+  
+  // If neither found, don't show notification
+  if (!staticAward && !aiAward) return null;
 
-  const Icon = awardDef.icon;
+  const Icon = staticAward ? staticAward.icon : Sparkles;
+  const title = staticAward ? staticAward.title : aiAward?.title || 'Achievement';
+  const description = staticAward ? staticAward.description : aiAward?.description || '';
+  const color = staticAward ? staticAward.color : 'text-purple-500';
+  const isAIAward = !staticAward && aiAward;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
@@ -59,17 +71,20 @@ export function AwardNotification() {
 
         <CardHeader className="text-center pt-10 pb-2 relative z-10">
           <div className="mx-auto mb-4 p-4 rounded-full bg-secondary/50 w-24 h-24 flex items-center justify-center shadow-inner">
-            <Icon className={`h-12 w-12 ${awardDef.color}`} />
+            <Icon className={`h-12 w-12 ${color}`} />
           </div>
           <div className="space-y-1">
+            {isAIAward && (
+              <div className="text-xs font-medium text-purple-500 uppercase tracking-widest mb-1">AI Goal Achieved!</div>
+            )}
             <div className="text-sm font-medium text-primary uppercase tracking-widest">New Achievement Unlocked!</div>
-            <CardTitle className="text-2xl font-bold">{awardDef.title}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{title}</CardTitle>
           </div>
         </CardHeader>
 
         <CardContent className="text-center pb-8 relative z-10">
           <p className="text-muted-foreground">
-            {awardDef.description}
+            {description}
           </p>
         </CardContent>
       </Card>
