@@ -490,22 +490,45 @@ export function AchievementGallery({
                 unoptimized // Bypass Next.js image optimization to allow query string cache busting
               />
               {isGeneratingImage && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-                  <div className="text-3xl animate-bounce" style={{ animationDuration: '1s' }}>
-                    🚣
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                  {/* Animated rowing boat */}
+                  <div className="relative w-32 h-20">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {/* Water waves */}
+                      <div className="absolute bottom-0 left-0 right-0 h-6 overflow-hidden">
+                        <div className="animate-pulse flex gap-1 justify-center">
+                          {[...Array(8)].map((_, i) => (
+                            <div 
+                              key={i} 
+                              className="w-4 h-2 bg-blue-400/30 rounded-full"
+                              style={{ animationDelay: `${i * 0.1}s` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {/* Boat emoji with rowing animation */}
+                      <div className="text-4xl animate-bounce" style={{ animationDuration: '1s' }}>
+                        🚣
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium text-foreground">
-                    {loadingMessages[imageLoadingMessage]}
-                  </p>
+                  {/* Progress dots */}
                   <div className="flex gap-1.5">
                     {[...Array(5)].map((_, i) => (
                       <div 
                         key={i}
-                        className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"
+                        className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"
                         style={{ animationDelay: `${i * 0.2}s` }}
                       />
                     ))}
                   </div>
+                  {/* Cycling fun message */}
+                  <p className="text-sm font-medium text-foreground">
+                    {loadingMessages[imageLoadingMessage]}
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    This usually takes 10-20 seconds
+                  </p>
                 </div>
               )}
               <div className="absolute bottom-4 right-4 flex gap-2">
