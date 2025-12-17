@@ -492,25 +492,34 @@ export function AchievementGallery({
               {isGeneratingImage && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
                   {/* Animated rowing boat - 3x size */}
-                  <div className="relative w-96 h-60">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {/* Water waves */}
-                      <div className="absolute bottom-0 left-0 right-0 h-16 overflow-hidden">
-                        <div className="animate-pulse flex gap-3 justify-center">
-                          {[...Array(8)].map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="w-12 h-6 bg-blue-400/30 rounded-full"
-                              style={{ animationDelay: `${i * 0.1}s` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      {/* Boat emoji with rowing animation */}
-                      <div className="text-9xl animate-bounce" style={{ animationDuration: '1s' }}>
-                        🚣
+                  <div className="relative w-96 h-60 overflow-hidden">
+                    {/* Water waves - full width */}
+                    <div className="absolute bottom-8 left-0 right-0 h-16 overflow-hidden">
+                      <div className="animate-pulse flex gap-3 justify-center">
+                        {[...Array(8)].map((_, i) => (
+                          <div 
+                            key={i} 
+                            className="w-12 h-6 bg-blue-400/30 rounded-full"
+                            style={{ animationDelay: `${i * 0.1}s` }}
+                          />
+                        ))}
                       </div>
                     </div>
+                    {/* Boat emoji with rowing and wandering animation */}
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 text-9xl"
+                      style={{ 
+                        animation: 'wander 4s linear infinite, bounce 1s ease-in-out infinite'
+                      }}
+                    >
+                      🚣
+                    </div>
+                    <style jsx>{`
+                      @keyframes wander {
+                        0% { left: -120px; }
+                        100% { left: 100%; }
+                      }
+                    `}</style>
                   </div>
                   {/* Progress dots */}
                   <div className="flex gap-1.5">
@@ -547,25 +556,34 @@ export function AchievementGallery({
               {isGeneratingImage ? (
                 <>
                   {/* Animated rowing boat - 3x size */}
-                  <div className="relative w-96 h-60">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {/* Water waves */}
-                      <div className="absolute bottom-0 left-0 right-0 h-16 overflow-hidden">
-                        <div className="animate-pulse flex gap-3 justify-center">
-                          {[...Array(8)].map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="w-12 h-6 bg-blue-400/30 rounded-full"
-                              style={{ animationDelay: `${i * 0.1}s` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      {/* Boat emoji with rowing animation */}
-                      <div className="text-9xl animate-bounce" style={{ animationDuration: '1s' }}>
-                        🚣
+                  <div className="relative w-96 h-60 overflow-hidden">
+                    {/* Water waves - full width */}
+                    <div className="absolute bottom-8 left-0 right-0 h-16 overflow-hidden">
+                      <div className="animate-pulse flex gap-3 justify-center">
+                        {[...Array(8)].map((_, i) => (
+                          <div 
+                            key={i} 
+                            className="w-12 h-6 bg-blue-400/30 rounded-full"
+                            style={{ animationDelay: `${i * 0.1}s` }}
+                          />
+                        ))}
                       </div>
                     </div>
+                    {/* Boat emoji with rowing and wandering animation */}
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 text-9xl"
+                      style={{ 
+                        animation: 'wander 4s linear infinite, bounce 1s ease-in-out infinite'
+                      }}
+                    >
+                      🚣
+                    </div>
+                    <style jsx>{`
+                      @keyframes wander {
+                        0% { left: -120px; }
+                        100% { left: 100%; }
+                      }
+                    `}</style>
                   </div>
                   {/* Progress dots */}
                   <div className="flex gap-1.5">
