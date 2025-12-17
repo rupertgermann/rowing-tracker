@@ -59,8 +59,7 @@ type SettingsCategory =
   | 'trainingSettings'
   | 'notificationSettings'
   | 'privacySettings'
-  | 'aiSettings'
-  | 'awards';
+  | 'aiSettings';
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('userPreferences');
@@ -226,9 +225,6 @@ export default function SettingsPage() {
         case 'aiSettings':
           settings.updateAISettings(updates);
           break;
-        case 'awards':
-          settings.updateAISettings(updates); // awards settings live under aiSettings
-          break;
       }
 
       loadSettings();
@@ -277,20 +273,7 @@ export default function SettingsPage() {
   const resetCategory = (category: SettingsCategory) => {
     if (!confirm(`Are you sure you want to reset ${category} to default values?`)) return;
 
-    if (category === 'awards') {
-      settings.updateAISettings({
-        achievementStoryPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT,
-        achievementImagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
-        achievementImageModel: 'gpt-image-1',
-        achievementImageQuality: 'auto',
-        achievementImageSize: '1024x1024'
-      });
-      loadSettings();
-      setSuccessMessage('Awards settings reset to defaults');
-      return;
-    }
-
-    settings.resetCategory(category as Exclude<SettingsCategory, 'awards'>);
+    settings.resetCategory(category);
     loadSettings();
     setSuccessMessage('Settings reset to defaults');
   };
@@ -326,8 +309,7 @@ export default function SettingsPage() {
     { id: 'trainingSettings', name: 'Training Settings', icon: Target, description: 'Training zones, goals, and preferences' },
     { id: 'notificationSettings', name: 'Notifications', icon: Bell, description: 'Alerts and reminders' },
     { id: 'privacySettings', name: 'Privacy', icon: Shield, description: 'Data sharing and privacy controls' },
-    { id: 'aiSettings', name: 'AI Coach', icon: Brain, description: 'Configure AI assistant and training plan generation' },
-    { id: 'awards', name: 'Awards', icon: Trophy, description: 'Achievement stories and image generation prompts' }
+    { id: 'aiSettings', name: 'AI Settings', icon: Brain, description: 'Configure AI assistant, training plans, and achievement generation' }
   ];
 
   const renderUserPreferences = () => (
@@ -1314,6 +1296,127 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Achievement Text Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        Achievement Stories
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        AI-generated celebratory stories for achievement certificates
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementText?.reasoning || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            achievementText: { ...settingsData.aiSettings.achievementText, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="minimal">Minimal (Ultra-fast)</option>
+                          <option value="low">Low (Fast)</option>
+                          <option value="medium">Medium (Balanced)</option>
+                          <option value="high">High (Quality)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementText?.verbosity || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            achievementText: { ...settingsData.aiSettings.achievementText, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="low">Low (Concise)</option>
+                          <option value="medium">Medium (Natural)</option>
+                          <option value="high">High (Detailed)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementText?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            achievementText: { ...settingsData.aiSettings.achievementText, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Creative writing benefits from balanced models
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Achievement Images Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        Achievement Images
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        AI-generated images for achievement certificates
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label>Image Model</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementImageModel}
+                          onChange={(e) =>
+                            saveSettings('aiSettings', { achievementImageModel: e.target.value as any })
+                          }
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="gpt-image-1">GPT Image (recommended)</option>
+                          <option value="dall-e-3">DALL·E 3</option>
+                          <option value="dall-e-2">DALL·E 2</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Image Quality</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementImageQuality}
+                          onChange={(e) =>
+                            saveSettings('aiSettings', { achievementImageQuality: e.target.value as any })
+                          }
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="auto">Auto (default)</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Image Size</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementImageSize}
+                          onChange={(e) =>
+                            saveSettings('aiSettings', { achievementImageSize: e.target.value as any })
+                          }
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          <option value="1024x1024">1024 x 1024</option>
+                          <option value="1024x1536">1024 x 1536</option>
+                          <option value="1536x1024">1536 x 1024</option>
+                          <option value="auto">Auto</option>
+                        </select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   {/* Global Settings */}
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                     <div>
@@ -1333,16 +1436,6 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Privacy Notice */}
-                <Alert>
-                  <Shield className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Privacy & Data:</strong> Your workout data is anonymized before sending to AI services.
-                    Only metrics like pace, power, and distance are shared - no personal information is transmitted.
-                  </AlertDescription>
-                </Alert>
-
 
               </>
             )}
@@ -1373,12 +1466,15 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert className="border-blue-200 bg-blue-50">
-                <Info className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800">
-                  <strong>Why add personal context?</strong> If you have medical conditions, injuries, or specific needs, 
-                  sharing this information helps the AI coach provide safer and more appropriate recommendations.
-                  Your data stays private and is only used locally.
+              <Alert className="border-slate-700 bg-slate-900 text-slate-100 dark:border-slate-600 dark:bg-slate-900">
+                <Info className="h-4 w-4 text-blue-400 dark:text-blue-300" />
+                <AlertDescription className="text-slate-100 dark:text-slate-100">
+                  <strong className="font-semibold text-blue-300 dark:text-blue-200">
+                    Why add personal context?
+                  </strong>{" "}
+                  If you have medical conditions, injuries, or specific needs, sharing this
+                  information helps the AI coach provide safer and more appropriate
+                  recommendations. Your data stays private and is only used locally.
                 </AlertDescription>
               </Alert>
 
@@ -1559,11 +1655,11 @@ You can also paste content from medical documents or training notes."
           </Card>
         )}
 
-        {/* Advanced Configuration */}
+        {/* Prompts */}
         {settingsData.aiSettings.cloudAIEnabled && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Advanced Configuration</CardTitle>
+              <CardTitle className="text-lg">Prompts</CardTitle>
               <CardDescription>Customize AI prompts and behavior</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1712,38 +1808,60 @@ You can also paste content from medical documents or training notes."
                   Include a &quot;TOOLTIP SUMMARY&quot; section for the info tooltip display.
                 </p>
               </div>
+
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="achievementStoryPrompt">Achievement Story Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => saveSettings('aiSettings', { achievementStoryPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT })}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
+                <textarea
+                  id="achievementStoryPrompt"
+                  rows={4}
+                  value={settingsData.aiSettings.achievementStoryPrompt}
+                  onChange={(e) => saveSettings('aiSettings', { achievementStoryPrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
+                  placeholder="Configure the prompt for generating achievement stories..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controls how the AI generates celebratory stories for your achievements.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <Label htmlFor="achievementImagePrompt">Achievement Image Prompt</Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => saveSettings('aiSettings', { achievementImagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT })}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
+                <textarea
+                  id="achievementImagePrompt"
+                  rows={4}
+                  value={settingsData.aiSettings.achievementImagePrompt}
+                  onChange={(e) => saveSettings('aiSettings', { achievementImagePrompt: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-md resize-y font-mono text-sm"
+                  placeholder="Configure the prompt for generating achievement certificate images..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controls how the AI generates images for achievement certificates.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
-      </div>
-    );
-  };
 
-  const handleMigrateImages = async () => {
-    setIsMigrating(true);
-    setMigrationResult(null);
-    try {
-      const result = await migrateImagesFromIndexedDB();
-      setMigrationResult(result);
-      setIndexedDBImageCount(0);
-      if (result.migrated > 0) {
-        setSuccessMessage(`Successfully migrated ${result.migrated} image(s) to filesystem`);
-      }
-    } catch (error) {
-      setErrorMessage('Failed to migrate images');
-      console.error('Migration error:', error);
-    } finally {
-      setIsMigrating(false);
-    }
-  };
-
-  const renderAwardsSettings = () => {
-    if (!settingsData?.aiSettings) return null;
-
-    return (
-      <div className="space-y-6">
         {/* Image Migration Card - only show if there are images to migrate */}
-        {indexedDBImageCount !== null && indexedDBImageCount > 0 && (
+        {settingsData.aiSettings.cloudAIEnabled && indexedDBImageCount !== null && indexedDBImageCount > 0 && (
           <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
@@ -1792,118 +1910,26 @@ You can also paste content from medical documents or training notes."
             </CardContent>
           </Card>
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" />
-              Achievement Generator
-            </CardTitle>
-            <CardDescription>
-              Configure prompts and image generation settings for achievement stories and certificates.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="achievementStoryPrompt">Story System Prompt</Label>
-                <Textarea
-                  id="achievementStoryPrompt"
-                  value={settingsData.aiSettings.achievementStoryPrompt}
-                  onChange={(e) =>
-                    saveSettings('awards', { achievementStoryPrompt: e.target.value })
-                  }
-                  className="h-40"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      saveSettings('awards', { achievementStoryPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT })
-                    }
-                  >
-                    Reset Story Prompt
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="achievementImagePrompt">Image Prompt</Label>
-                <Textarea
-                  id="achievementImagePrompt"
-                  value={settingsData.aiSettings.achievementImagePrompt}
-                  onChange={(e) =>
-                    saveSettings('awards', { achievementImagePrompt: e.target.value })
-                  }
-                  className="h-40"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      saveSettings('awards', { achievementImagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT })
-                    }
-                  >
-                    Reset Image Prompt
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <Label>Image Model</Label>
-                <select
-                  value={settingsData.aiSettings.achievementImageModel}
-                  onChange={(e) =>
-                    saveSettings('awards', { achievementImageModel: e.target.value as any })
-                  }
-                  className="w-full mt-1 p-2 border rounded-md"
-                >
-                  <option value="gpt-image-1">GPT Image (recommended)</option>
-                  <option value="dall-e-3">DALL·E 3</option>
-                  <option value="dall-e-2">DALL·E 2</option>
-                </select>
-              </div>
-
-              <div>
-                <Label>Image Quality</Label>
-                <select
-                  value={settingsData.aiSettings.achievementImageQuality}
-                  onChange={(e) =>
-                    saveSettings('awards', { achievementImageQuality: e.target.value as any })
-                  }
-                  className="w-full mt-1 p-2 border rounded-md"
-                >
-                  <option value="auto">Auto (default)</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-
-              <div>
-                <Label>Image Size</Label>
-                <select
-                  value={settingsData.aiSettings.achievementImageSize}
-                  onChange={(e) =>
-                    saveSettings('awards', { achievementImageSize: e.target.value as any })
-                  }
-                  className="w-full mt-1 p-2 border rounded-md"
-                >
-                  <option value="1024x1024">1024 x 1024</option>
-                  <option value="1024x1536">1024 x 1536</option>
-                  <option value="1536x1024">1536 x 1024</option>
-                  <option value="auto">Auto</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
+  };
+
+  const handleMigrateImages = async () => {
+    setIsMigrating(true);
+    setMigrationResult(null);
+    try {
+      const result = await migrateImagesFromIndexedDB();
+      setMigrationResult(result);
+      setIndexedDBImageCount(0);
+      if (result.migrated > 0) {
+        setSuccessMessage(`Successfully migrated ${result.migrated} image(s) to filesystem`);
+      }
+    } catch (error) {
+      setErrorMessage('Failed to migrate images');
+      console.error('Migration error:', error);
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   const renderCategoryContent = () => {
@@ -1920,8 +1946,6 @@ You can also paste content from medical documents or training notes."
         return renderPrivacySettings();
       case 'aiSettings':
         return renderAISettings();
-      case 'awards':
-        return renderAwardsSettings();
       default:
         return renderUserPreferences();
     }

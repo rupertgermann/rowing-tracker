@@ -235,7 +235,10 @@ export function AchievementGallery({
             ? formatDateOnly(new Date(currentAward.earnedAt)) 
             : formatDateOnly(new Date()),
           customPrompt: aiSettings.achievementStoryPrompt,
-          apiKey: aiSettings.openaiApiKey || undefined
+          apiKey: aiSettings.openaiApiKey || undefined,
+          model: aiSettings.achievementText?.model || 'gpt-5-mini',
+          reasoning: aiSettings.achievementText?.reasoning || 'low',
+          verbosity: aiSettings.achievementText?.verbosity || 'medium'
         })
       });
       

@@ -94,6 +94,7 @@ export interface AISettings {
   // Achievement generator prompts
   achievementStoryPrompt: string; // System prompt for achievement story generation
   achievementImagePrompt: string; // Prompt template for achievement image generation
+  achievementText: UseCaseConfig; // Text/story generation configuration
   achievementImageModel: 'gpt-image-1' | 'dall-e-3' | 'dall-e-2'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
   achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
@@ -254,6 +255,7 @@ Be brief and direct. No fluff.`,
       awardSuggestionsPrompt: DEFAULT_AWARD_SUGGESTIONS_PROMPT,
 
       // Achievement generator (defaults)
+      achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5-mini' },
       achievementImageModel: 'gpt-image-1',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',

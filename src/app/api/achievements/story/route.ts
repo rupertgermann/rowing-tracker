@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, earnedAt, customPrompt, apiKey, imageUrl } = body;
+    const { title, description, earnedAt, customPrompt, apiKey, model, reasoning, verbosity, imageUrl } = body;
 
     if (!title || !description) {
       return NextResponse.json(
@@ -58,11 +58,11 @@ Write the achievement story:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: model || 'gpt-5-mini',
         input: prompt,
         max_output_tokens: 500,
-        reasoning: { effort: 'low' },
-        text: { verbosity: 'medium' }
+        reasoning: { effort: reasoning || 'low' },
+        text: { verbosity: verbosity || 'medium' }
       })
     });
 
