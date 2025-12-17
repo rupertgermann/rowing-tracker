@@ -295,7 +295,7 @@ export function AchievementCard({
         {/* Generated Story Preview */}
         {generated?.story && (
           <div className={`bg-muted/50 rounded-lg p-3 text-sm w-full ${imageSizing.maxWidth}`}>
-            <p className="line-clamp-4 text-muted-foreground italic">
+            <p className="line-clamp-4 text-muted-foreground italic whitespace-pre-wrap">
               {generated.story}
             </p>
           </div>

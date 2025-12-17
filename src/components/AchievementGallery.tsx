@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
+import ReactMarkdown from 'react-markdown';
 import { AWARDS, Award } from '@/lib/awards';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { useRowingStore, AIAwardSuggestion } from '@/lib/store';
@@ -506,12 +507,8 @@ export function AchievementGallery({
                   <BookOpen className="h-5 w-5 text-primary" />
                   <h3 className="font-semibold">Your Achievement Story</h3>
                 </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  {generated.story.split('\n\n').map((paragraph, i) => (
-                    <p key={i} className="text-muted-foreground leading-relaxed">
-                      {paragraph}
-                    </p>
-                  ))}
+                <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground leading-relaxed">
+                  <ReactMarkdown>{generated.story}</ReactMarkdown>
                 </div>
                 {generated.generatedAt && (
                   <p className="text-xs text-muted-foreground mt-4 pt-4 border-t">
