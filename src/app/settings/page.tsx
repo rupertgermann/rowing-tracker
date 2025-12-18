@@ -61,7 +61,14 @@ import {
   Loader2,
   Trophy
 } from 'lucide-react';
-import { AI_TEXT_MODEL_OPTIONS } from '@/lib/aiModelOptions';
+import {
+  AI_TEXT_MODEL_OPTIONS,
+  AI_REASONING_EFFORT_OPTIONS,
+  AI_RESPONSE_VERBOSITY_OPTIONS,
+  AI_ACHIEVEMENT_IMAGE_MODEL_OPTIONS,
+  AI_ACHIEVEMENT_IMAGE_QUALITY_OPTIONS,
+  AI_ACHIEVEMENT_IMAGE_SIZE_OPTIONS,
+} from '@/lib/aiModelOptions';
 
 type SettingsCategory =
   | 'userPreferences'
@@ -1112,37 +1119,8 @@ export default function SettingsPage() {
                         Real-time conversation with your AI coach
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-3">
+                  <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="minimal">Minimal (Ultra-fast)</option>
-                          <option value="low">Low (Fast)</option>
-                          <option value="medium">Medium (Balanced)</option>
-                          <option value="high">High (Quality)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.chat?.verbosity || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            chat: { ...settingsData.aiSettings.chat, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="low">Low (Concise)</option>
-                          <option value="medium">Medium (Natural)</option>
-                          <option value="high">High (Detailed)</option>
-                        </select>
-                      </div>
-                      <div className="md:col-span-1">
                         <Label>AI Model</Label>
                         <select
                           value={settingsData.aiSettings.chat?.model || 'gpt-5-mini'}
@@ -1161,6 +1139,38 @@ export default function SettingsPage() {
                           Choose model based on speed vs quality preference
                         </p>
                       </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.chat?.verbosity || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            chat: { ...settingsData.aiSettings.chat, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -1175,36 +1185,7 @@ export default function SettingsPage() {
                         Suggest upcoming achievements based on your recent sessions
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.awardSuggestions?.reasoning || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="minimal">Minimal (Ultra-fast)</option>
-                          <option value="low">Low (Fast)</option>
-                          <option value="medium">Medium (Balanced)</option>
-                          <option value="high">High (Quality)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.awardSuggestions?.verbosity || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="low">Low (Concise)</option>
-                          <option value="medium">Medium (Natural)</option>
-                          <option value="high">High (Detailed)</option>
-                        </select>
-                      </div>
+                  <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1224,6 +1205,38 @@ export default function SettingsPage() {
                           Balanced models work well for quick, realistic milestone suggestions
                         </p>
                       </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.awardSuggestions?.reasoning || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.awardSuggestions?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -1239,35 +1252,6 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.insights?.reasoning || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="minimal">Minimal (Ultra-fast)</option>
-                          <option value="low">Low (Fast)</option>
-                          <option value="medium">Medium (Balanced)</option>
-                          <option value="high">High (Quality)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.insights?.verbosity || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            insights: { ...settingsData.aiSettings.insights, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="low">Low (Concise)</option>
-                          <option value="medium">Medium (Natural)</option>
-                          <option value="high">High (Detailed)</option>
-                        </select>
-                      </div>
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1287,6 +1271,38 @@ export default function SettingsPage() {
                           Analysis tasks work well with balanced models
                         </p>
                       </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.insights?.reasoning || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.insights?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            insights: { ...settingsData.aiSettings.insights, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -1302,35 +1318,6 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="minimal">Minimal (Ultra-fast)</option>
-                          <option value="low">Low (Fast)</option>
-                          <option value="medium">Medium (Balanced)</option>
-                          <option value="high">High (Quality)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.trainingPlans?.verbosity || 'high'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="low">Low (Concise)</option>
-                          <option value="medium">Medium (Natural)</option>
-                          <option value="high">High (Detailed)</option>
-                        </select>
-                      </div>
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1350,6 +1337,38 @@ export default function SettingsPage() {
                           Complex planning benefits from the most capable model
                         </p>
                       </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.trainingPlans?.verbosity || 'high'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -1364,36 +1383,7 @@ export default function SettingsPage() {
                         AI-generated celebratory stories for achievement certificates
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.achievementText?.reasoning || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            achievementText: { ...settingsData.aiSettings.achievementText, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="minimal">Minimal (Ultra-fast)</option>
-                          <option value="low">Low (Fast)</option>
-                          <option value="medium">Medium (Balanced)</option>
-                          <option value="high">High (Quality)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.achievementText?.verbosity || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            achievementText: { ...settingsData.aiSettings.achievementText, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="low">Low (Concise)</option>
-                          <option value="medium">Medium (Natural)</option>
-                          <option value="high">High (Detailed)</option>
-                        </select>
-                      </div>
+                  <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1412,6 +1402,38 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground mt-1">
                           Creative writing benefits from balanced models
                         </p>
+                      </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementText?.reasoning || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            achievementText: { ...settingsData.aiSettings.achievementText, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.achievementText?.verbosity || 'medium'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            achievementText: { ...settingsData.aiSettings.achievementText, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </CardContent>
                   </Card>
@@ -1437,9 +1459,11 @@ export default function SettingsPage() {
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-image-1">GPT Image 1 (Balanced)</option>
-                          <option value="gpt-image-1-mini">GPT Image 1 Mini (Fast)</option>
-                          <option value="gpt-image-1.5">GPT Image 1.5 (Best Quality)</option>
+                          {AI_ACHIEVEMENT_IMAGE_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
@@ -1451,10 +1475,11 @@ export default function SettingsPage() {
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="auto">Auto (default)</option>
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
+                          {AI_ACHIEVEMENT_IMAGE_QUALITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
@@ -1466,10 +1491,11 @@ export default function SettingsPage() {
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="1024x1024">1024 x 1024</option>
-                          <option value="1024x1536">1024 x 1536</option>
-                          <option value="1536x1024">1536 x 1024</option>
-                          <option value="auto">Auto</option>
+                          {AI_ACHIEVEMENT_IMAGE_SIZE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </CardContent>
@@ -1486,36 +1512,7 @@ export default function SettingsPage() {
                         AI-generated context from your personal information for coaching personalization
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.userProfileGeneration?.reasoning || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="minimal">Minimal (Ultra-fast)</option>
-                          <option value="low">Low (Fast)</option>
-                          <option value="medium">Medium (Balanced)</option>
-                          <option value="high">High (Quality)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.userProfileGeneration?.verbosity || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          <option value="low">Low (Concise)</option>
-                          <option value="medium">Medium (Natural)</option>
-                          <option value="high">High (Detailed)</option>
-                        </select>
-                      </div>
+                  <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1534,6 +1531,38 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground mt-1">
                           Condensing personal info works well with balanced models
                         </p>
+                      </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.reasoning || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </CardContent>
                   </Card>
