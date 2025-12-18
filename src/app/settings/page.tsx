@@ -61,6 +61,7 @@ import {
   Loader2,
   Trophy
 } from 'lucide-react';
+import { AI_TEXT_MODEL_OPTIONS } from '@/lib/aiModelOptions';
 
 type SettingsCategory =
   | 'userPreferences'
@@ -1150,10 +1151,11 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
-                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
-                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Choose model based on speed vs quality preference
@@ -1212,10 +1214,11 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
-                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
-                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Balanced models work well for quick, realistic milestone suggestions
@@ -1274,9 +1277,11 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
-                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Analysis tasks work well with balanced models
@@ -1335,9 +1340,11 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
-                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Complex planning benefits from the most capable model
@@ -1396,10 +1403,11 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
-                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
-                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Creative writing benefits from balanced models
@@ -1517,10 +1525,11 @@ export default function SettingsPage() {
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
-                          <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
-                          <option value="gpt-5.1">GPT-5.1 (Most Capable)</option>
-                          <option value="gpt-5.2">GPT-5.2 (Even more Capable)</option>
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
                           Condensing personal info works well with balanced models

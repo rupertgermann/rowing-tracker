@@ -445,15 +445,17 @@ export default function PlansPage() {
       {activePlan && (
         <Card className="mb-6 border-blue-200">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 pb-4">
-                  <Play className="h-5 w-5 text-blue-600" />
-                  {activePlan.title}
-                </CardTitle>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Play className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                  <CardTitle className="truncate">
+                    {activePlan.title}
+                  </CardTitle>
+                </div>
                 <CardDescription>{activePlan.description}</CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {getStatusBadge(activePlan.status)}
                 <Button variant="outline" size="sm" onClick={handleAnalyzeAdherence}>
                   <TrendingUp className="h-4 w-4 mr-2" />
@@ -600,17 +602,19 @@ export default function PlansPage() {
             {plans.map((plan) => (
               <Card key={plan.id} className={plan.id === activePlan?.id ? 'border-blue-200' : ''}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2 pb-4">
-                        {plan.title}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CardTitle className="truncate">
+                          {plan.title}
+                        </CardTitle>
                         {plan.id === activePlan?.id && (
-                          <Play className="h-4 w-4 text-blue-600" />
+                          <Play className="h-4 w-4 text-blue-600 flex-shrink-0" />
                         )}
-                      </CardTitle>
+                      </div>
                       <CardDescription>{plan.description}</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {getStatusBadge(plan.status)}
                       <div className="flex items-center gap-1">
                         <Badge variant="outline">{plan.level}</Badge>

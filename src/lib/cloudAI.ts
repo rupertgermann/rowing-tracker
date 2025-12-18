@@ -59,6 +59,8 @@ interface ApiRequestConfig {
   onToken?: (token: string) => void;
 }
 
+type SupportedTextModel = ApiRequestConfig['model'];
+
 // File attachment for chat messages
 export interface FileAttachment {
   name: string;
@@ -143,6 +145,12 @@ export class CloudAIService {
   // Check if service is configured
   isConfigured(): boolean {
     return this.config !== null;
+  }
+
+  private mapModel(model: string): SupportedTextModel {
+    if (model === 'gpt-5-nano') return 'gpt-5-nano';
+    if (model === 'gpt-5-mini') return 'gpt-5-mini';
+    return 'gpt-5.1';
   }
 
   // Send chat message to AI trainer
@@ -336,7 +344,7 @@ export class CloudAIService {
       for (let turn = 0; turn < 5; turn++) {
         const config: ApiRequestConfig = {
           input: currentInput,
-          model: useCaseConfig.model,
+          model: this.mapModel(useCaseConfig.model),
           reasoning: useCaseConfig.reasoning,
           verbosity: useCaseConfig.verbosity,
           maxTokens: this.aiSettings.maxTokens,
@@ -971,7 +979,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
       const config: ApiRequestConfig = {
         input: `${this.getSystemPrompt()}\n\n${prompt}`,
-        model: useCaseConfig.model, // Use model from AI settings
+        model: this.mapModel(useCaseConfig.model),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 1500,
@@ -1275,7 +1283,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const config: ApiRequestConfig = {
         input: `${this.getPlanGenerationSystemPrompt()}\n\n${prompt}`,
         instructions: "Generate a structured training plan following the specified JSON schema",
-        model: useCaseConfig.model, // Use model from AI settings
+        model: this.mapModel(useCaseConfig.model),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 4000,
@@ -1350,7 +1358,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       const config: ApiRequestConfig = {
         input: `${this.getPlanModificationSystemPrompt()}\n\n${prompt}`,
         instructions: "Modify the training plan following the specified JSON schema",
-        model: useCaseConfig.model, // Use model from AI settings
+        model: this.mapModel(useCaseConfig.model),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings?.maxTokens || 4000,
@@ -1422,7 +1430,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
 
       const config: ApiRequestConfig = {
         input: `${this.getAdherenceAnalysisSystemPrompt()}\n\n${prompt}`,
-        model: useCaseConfig.model, // Use model from AI settings
+        model: this.mapModel(useCaseConfig.model),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
         maxTokens: this.aiSettings.maxTokens
