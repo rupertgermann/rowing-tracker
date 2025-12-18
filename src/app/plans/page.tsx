@@ -447,7 +447,7 @@ export default function PlansPage() {
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 pb-4">
                   <Play className="h-5 w-5 text-blue-600 flex-shrink-0" />
                   <CardTitle className="truncate">
                     {activePlan.title}
@@ -598,28 +598,21 @@ export default function PlansPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
-            {plans.map((plan) => (
-              <Card key={plan.id} className={plan.id === activePlan?.id ? 'border-blue-200' : ''}>
+          <div className="grid gap-4 md:grid-cols-2">
+            {plans
+              .filter((plan) => plan.id !== activePlan?.id)
+              .map((plan) => (
+              <Card key={plan.id}>
                 <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CardTitle className="truncate">
-                          {plan.title}
-                        </CardTitle>
-                        {plan.id === activePlan?.id && (
-                          <Play className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                        )}
-                      </div>
-                      <CardDescription>{plan.description}</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="min-w-0">
+                    <CardTitle className="truncate pb-4">
+                      {plan.title}
+                    </CardTitle>
+                    <CardDescription>{plan.description}</CardDescription>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       {getStatusBadge(plan.status)}
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline">{plan.level}</Badge>
-                        <Badge variant="outline">{plan.focus}</Badge>
-                      </div>
+                      <Badge variant="outline">{plan.level}</Badge>
+                      <Badge variant="outline">{plan.focus}</Badge>
                     </div>
                   </div>
                 </CardHeader>
