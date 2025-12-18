@@ -28,6 +28,7 @@ import {
   BarChart3,
   ArrowLeft,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { MemoryManager } from '@/components/MemoryManager';
 import { useMemory } from '@/hooks/useMemory';
 import { MemoryDocument, memoryStorage } from '@/lib/memoryStorage';
@@ -74,6 +75,7 @@ export default function ChatPage() {
   const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string; chartTitle: string } | null>(null);
   const [chartAttachments, setChartAttachments] = useState<FileAttachment[]>([]);
   const initialPromptProcessedRef = useRef(false);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
@@ -741,7 +743,7 @@ export default function ChatPage() {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteSession(session.id);
+                                setDeleteSessionId(session.id);
                               }}
                             >
                               <Trash2 className="h-3 w-3" />
@@ -884,6 +886,22 @@ export default function ChatPage() {
           )}
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={deleteSessionId !== null}
+        onOpenChange={(open) => !open && setDeleteSessionId(null)}
+        title="Delete Conversation"
+        description="Are you sure you want to delete this conversation? All messages will be permanently removed. This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          if (deleteSessionId) {
+            deleteSession(deleteSessionId);
+            setDeleteSessionId(null);
+          }
+        }}
+        variant="destructive"
+      />
     </div>
   );
 }

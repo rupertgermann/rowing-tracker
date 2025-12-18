@@ -16,6 +16,7 @@ export interface AIInsightData {
   usingCloudAI: boolean;
   cloudAIError: string | null;
   isCloudAIConfigured: boolean;
+  isGenerating: boolean;
   refreshInsights?: () => void;
   archivedInsights?: (Insight | CloudInsight)[];
   archiveInsight?: (insightId: string) => void;
@@ -332,6 +333,17 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isArchivedView, setIsArchivedView] = useState(false);
 
+  // Load archived insights state (loaded from localStorage in useEffect to avoid hydration mismatch)
+  const [archivedInsightsState, setArchivedInsightsState] = useState<(Insight | CloudInsight)[]>([]);
+  const [archivedLoaded, setArchivedLoaded] = useState(false);
+
+  // Load archived insights from localStorage after mount (client-side only)
+  useEffect(() => {
+    const archived = getArchivedInsights();
+    setArchivedInsightsState(archived);
+    setArchivedLoaded(true);
+  }, []);
+
   // State for analysis results
   const [data, setData] = useState<AIInsightData>({
     insights: [],
@@ -343,6 +355,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     usingCloudAI: false,
     cloudAIError: null,
     isCloudAIConfigured: false,
+    isGenerating: false,
     archivedInsights: [],
     isArchivedView: false
   });
@@ -374,6 +387,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         const existingArchived = getArchivedInsights();
         const newArchived = addToArchive(existingArchived, prevData.insights);
         saveArchivedInsights(newArchived);
+        setArchivedInsightsState(newArchived);
 
         return {
           ...prevData,
@@ -392,6 +406,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const archiveInsightCallback = useCallback((insightId: string) => {
     setData(prevData => {
       const { updatedInsights, archivedInsights } = archiveInsight(insightId, prevData.insights);
+      setArchivedInsightsState(archivedInsights);
       return {
         ...prevData,
         insights: updatedInsights,
@@ -404,10 +419,12 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const unarchiveInsightCallback = useCallback((insightId: string) => {
     try {
       const unarchivedInsight = unarchiveInsight(insightId);
+      const updatedArchived = getArchivedInsights();
+      setArchivedInsightsState(updatedArchived);
       setData(prevData => ({
         ...prevData,
         insights: [...prevData.insights, unarchivedInsight],
-        archivedInsights: getArchivedInsights()
+        archivedInsights: updatedArchived
       }));
     } catch (error) {
       console.error('Failed to unarchive insight:', error);
@@ -426,8 +443,9 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   // Delete insight function
   const deleteInsightCallback = useCallback((insightId: string) => {
     deleteInsight(insightId);
+    const updatedArchived = getArchivedInsights();
+    setArchivedInsightsState(updatedArchived);
     setData(prevData => {
-      const updatedArchived = prevData.archivedInsights?.filter(insight => insight.id !== insightId) || [];
       return {
         ...prevData,
         archivedInsights: updatedArchived
@@ -462,7 +480,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         lastAnalyzed: new Date(),
         usingCloudAI: false,
         cloudAIError: null,
-        isCloudAIConfigured: false
+        isCloudAIConfigured: false,
+        isGenerating: false
       };
     } catch (error) {
       console.error('Local analysis failed:', error);
@@ -475,7 +494,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         lastAnalyzed: null,
         usingCloudAI: false,
         cloudAIError: 'Local analysis failed',
-        isCloudAIConfigured: false
+        isCloudAIConfigured: false,
+        isGenerating: false
       };
     }
   };
@@ -496,7 +516,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         lastAnalyzed: null,
         usingCloudAI: false,
         cloudAIError: null,
-        isCloudAIConfigured
+        isCloudAIConfigured,
+        isGenerating: false
       };
     }
 
@@ -533,7 +554,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           lastAnalyzed: new Date(),
           usingCloudAI: true,
           cloudAIError: null,
-          isCloudAIConfigured: true
+          isCloudAIConfigured: true,
+          isGenerating: false
         };
       } catch (error) {
         console.error('Cloud AI failed, falling back to local analysis:', error);
@@ -614,8 +636,21 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     };
   }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI]);
 
+  // Compute isAnalyzable directly from sessions count to ensure it's always accurate
+  // (not dependent on async analysis completing)
+  const isAnalyzable = sessions.length >= 3;
+
+  // Use archivedInsightsState as the source of truth (loaded immediately on mount)
+  // Fall back to data.archivedInsights if state hasn't been updated yet
+  const archivedInsights = archivedInsightsState.length > 0 
+    ? archivedInsightsState 
+    : (data.archivedInsights || []);
+
   return {
     ...data,
+    isAnalyzable,
+    isGenerating: isAnalyzing,
+    archivedInsights,
     refreshInsights,
     archiveInsight: archiveInsightCallback,
     unarchiveInsight: unarchiveInsightCallback,

@@ -27,6 +27,7 @@ import {
   FileSearch,
   Paperclip,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatDate, formatSessionDate } from '@/lib/dateTimeUtils';
 
 // ============================================================================
@@ -335,6 +336,7 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
   const [viewingDocId, setViewingDocId] = useState<string | null>(null);
   const [viewingUrl, setViewingUrl] = useState<string | null>(null);
   const [viewingTextDoc, setViewingTextDoc] = useState<MemoryDocument | null>(null);
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
 
   // Filter documents
   const filteredDocuments = documents.filter(doc => {
@@ -353,9 +355,14 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
   };
 
   // Handle delete
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this document?')) {
-      await deleteDocument(id);
+  const handleDelete = (id: string) => {
+    setDeleteDocId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteDocId) {
+      await deleteDocument(deleteDocId);
+      setDeleteDocId(null);
     }
   };
 
@@ -538,6 +545,18 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDocId !== null}
+        onOpenChange={(open) => !open && setDeleteDocId(null)}
+        title="Delete Document"
+        description="Are you sure you want to delete this document? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDelete}
+        variant="destructive"
+      />
 
       {/* Extracted Text Modal */}
       {viewingTextDoc && (

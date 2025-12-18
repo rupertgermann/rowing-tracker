@@ -66,6 +66,7 @@ export default function SessionDetailPage() {
   const [strokeData, setStrokeData] = useState<StrokeData[] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showClearAnalysisConfirm, setShowClearAnalysisConfirm] = useState(false);
 
   // Find previous and next sessions for navigation
   // We calculate this early so we can use it in the effect hook
@@ -123,13 +124,17 @@ export default function SessionDetailPage() {
 
   const handleClearAnalysis = () => {
     if (!session) return;
-    if (confirm('Are you sure you want to remove the detailed stroke analysis from this session?')) {
-      const updatedSession = { ...session };
-      delete updatedSession.strokeData;
-      updateSession(updatedSession);
-      setSession(updatedSession);
-      setStrokeData(null);
-    }
+    setShowClearAnalysisConfirm(true);
+  };
+
+  const confirmClearAnalysis = () => {
+    if (!session) return;
+    const updatedSession = { ...session };
+    delete updatedSession.strokeData;
+    updateSession(updatedSession);
+    setSession(updatedSession);
+    setStrokeData(null);
+    setShowClearAnalysisConfirm(false);
   };
 
   useEffect(() => {
@@ -487,6 +492,17 @@ export default function SessionDetailPage() {
           deleteSession(session.id);
           router.push('/sessions');
         }}
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={showClearAnalysisConfirm}
+        onOpenChange={setShowClearAnalysisConfirm}
+        title="Clear Stroke Analysis"
+        description="Are you sure you want to remove the detailed stroke analysis from this session? You can re-upload the data later."
+        confirmLabel="Clear"
+        cancelLabel="Cancel"
+        onConfirm={confirmClearAnalysis}
         variant="destructive"
       />
     </div>

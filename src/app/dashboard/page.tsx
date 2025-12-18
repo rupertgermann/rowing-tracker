@@ -208,7 +208,8 @@ const Dashboard = () => {
     unarchiveInsight,
     deleteInsight,
     isArchivedView,
-    setIsArchivedView
+    setIsArchivedView,
+    isGenerating
   } = useAIInsights();
 
   useEffect(() => {
@@ -711,15 +712,29 @@ const Dashboard = () => {
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-center py-8">
-                        <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                          <Brain className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Analyzing Your Data
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          AI is processing your training patterns to generate personalized insights.
-                        </p>
+                        {isGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              Generating Insights...
+                            </h3>
+                            <p className="text-muted-foreground mb-4">
+                              AI is analyzing your training patterns. This may take a moment.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                              <Brain className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              No Current Insights
+                            </h3>
+                            <p className="text-muted-foreground mb-4">
+                              Click Refresh to generate new personalized insights.
+                            </p>
+                          </>
+                        )}
                         {(archivedInsights?.length || 0) > 0 && (
                           <Button variant="outline" size="sm" asChild>
                             <Link href="/insights">

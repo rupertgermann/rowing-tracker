@@ -34,6 +34,7 @@ import {
   Download,
   Upload
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 export default function PlansPage() {
   const { getSessions } = useRowingStore();
@@ -44,6 +45,7 @@ export default function PlansPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [adherenceAnalysis, setAdherenceAnalysis] = useState<string | null>(null);
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
   // Form state for plan creation
   const [planForm, setPlanForm] = useState({
@@ -209,17 +211,21 @@ export default function PlansPage() {
   };
 
   const handleDeletePlan = (planId: string) => {
-    if (confirm('Are you sure you want to delete this plan?')) {
-      try {
-        trainingPlans.deletePlan(planId);
-        setPlans(plans.filter(p => p.id !== planId));
-        if (activePlan?.id === planId) {
-          setActivePlan(null);
-        }
-      } catch (err) {
-        setError('Failed to delete plan');
+    setDeletePlanId(planId);
+  };
+
+  const confirmDeletePlan = () => {
+    if (!deletePlanId) return;
+    try {
+      trainingPlans.deletePlan(deletePlanId);
+      setPlans(plans.filter(p => p.id !== deletePlanId));
+      if (activePlan?.id === deletePlanId) {
+        setActivePlan(null);
       }
+    } catch (err) {
+      setError('Failed to delete plan');
     }
+    setDeletePlanId(null);
   };
 
   const handleAnalyzeAdherence = async () => {
@@ -650,6 +656,17 @@ export default function PlansPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deletePlanId !== null}
+        onOpenChange={(open) => !open && setDeletePlanId(null)}
+        title="Delete Training Plan"
+        description="Are you sure you want to delete this training plan? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeletePlan}
+        variant="destructive"
+      />
     </div>
   );
 }

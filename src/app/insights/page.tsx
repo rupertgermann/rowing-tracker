@@ -44,7 +44,8 @@ export default function InsightsPage() {
     deleteInsight,
     refreshInsights,
     lastAnalyzed,
-    isAnalyzable
+    isAnalyzable,
+    isGenerating
   } = useAIInsights();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -285,13 +286,17 @@ export default function InsightsPage() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center py-12">
-                    <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                      <Brain className="h-8 w-8 text-muted-foreground" />
-                    </div>
+                    {isGenerating ? (
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    ) : (
+                      <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <Brain className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
                     <h3 className="text-lg font-semibold mb-2">
                       {searchQuery || !selectedTypes.includes('all')
                         ? 'No Matching Insights'
-                        : isAnalyzable
+                        : isGenerating
                           ? 'Generating Insights...'
                           : 'No Current Insights'
                       }
@@ -299,7 +304,7 @@ export default function InsightsPage() {
                     <p className="text-muted-foreground max-w-md mx-auto">
                       {searchQuery || !selectedTypes.includes('all')
                         ? 'Try adjusting your search or filters.'
-                        : isAnalyzable
+                        : isGenerating
                           ? 'AI is analyzing your training data. This may take a moment.'
                           : 'Complete more sessions to receive personalized AI recommendations.'
                       }

@@ -1,10 +1,4 @@
-replace that ugly alert confirmation dialogs with something more modern - partly done.
--> alert is still present in "plans" module when deleting a plan, possible some other modules too
-
-- the chat window does not show confirmation when deleting a chat
+# notes 
 
 
-
-- add the "when will this award be achieved?  based on the session data and award criteria" prediction to the existing un-earned awards too
-
-
+- i need some kind of "garbage collection" for the items that are automatically added to the memory (training plans, ai-insights). make sure the memory manager marks deleted items in the list so i can identify them and remove them.
