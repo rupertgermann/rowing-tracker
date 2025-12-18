@@ -37,6 +37,7 @@ import {
   Download,
   Upload,
   History,
+  RotateCcw,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PlanAnalysisArchiveModal } from '@/components/PlanAnalysisArchiveModal';
@@ -52,6 +53,9 @@ export default function PlansPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showAnalysisArchive, setShowAnalysisArchive] = useState(false);
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
+  const [viewingPlan, setViewingPlan] = useState<TrainingPlan | null>(null);
+  const [editingPlan, setEditingPlan] = useState<TrainingPlan | null>(null);
+  const [resetPlanId, setResetPlanId] = useState<string | null>(null);
 
   // Form state for plan creation
   const [planForm, setPlanForm] = useState({
@@ -241,6 +245,61 @@ export default function PlansPage() {
       setError('Failed to delete plan');
     }
     setDeletePlanId(null);
+  };
+
+  const handleResetPlan = (planId: string) => {
+    setResetPlanId(planId);
+  };
+
+  const confirmResetPlan = () => {
+    if (!resetPlanId) return;
+    try {
+      trainingPlans.updatePlan(resetPlanId, {
+        status: 'draft',
+        startDate: undefined,
+        progress: {
+          completedWeeks: 0,
+          completedSessions: 0,
+          totalSessions: trainingPlans.getPlan(resetPlanId)?.progress.totalSessions || 0,
+          adherenceRate: 0
+        }
+      });
+      loadPlans();
+    } catch (err) {
+      setError('Failed to reset plan');
+    }
+    setResetPlanId(null);
+  };
+
+  const handleEditPlan = (plan: TrainingPlan) => {
+    setEditingPlan(plan);
+    setPlanForm({
+      title: plan.title,
+      description: plan.description,
+      goals: plan.goals.join(', '),
+      level: plan.level,
+      focus: plan.focus,
+      duration: plan.duration
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingPlan) return;
+    try {
+      trainingPlans.updatePlan(editingPlan.id, {
+        title: planForm.title,
+        description: planForm.description,
+        goals: planForm.goals.split(',').map(g => g.trim()).filter(g => g),
+        level: planForm.level,
+        focus: planForm.focus,
+        duration: planForm.duration
+      });
+      loadPlans();
+      setEditingPlan(null);
+      resetForm();
+    } catch (err) {
+      setError('Failed to update plan');
+    }
   };
 
   const handleAnalyzeAdherence = useCallback(() => {
@@ -689,16 +748,35 @@ Please provide:
                           Activate
                         </Button>
                       )}
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewingPlan(plan)}
+                        title="View plan details"
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditPlan(plan)}
+                        title="Edit plan"
+                      >
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleResetPlan(plan.id)}
+                        title="Reset progress"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleDeletePlan(plan.id)}
+                        title="Delete plan"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -721,6 +799,170 @@ Please provide:
         onConfirm={confirmDeletePlan}
         variant="destructive"
       />
+
+      <ConfirmDialog
+        open={resetPlanId !== null}
+        onOpenChange={(open) => !open && setResetPlanId(null)}
+        title="Reset Training Plan"
+        description="This will reset all progress and set the plan status back to 'Draft'. The weekly schedule will be preserved."
+        confirmLabel="Reset"
+        cancelLabel="Cancel"
+        onConfirm={confirmResetPlan}
+        variant="destructive"
+      />
+
+      {/* View Plan Modal */}
+      {viewingPlan && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>{viewingPlan.title}</CardTitle>
+                  <CardDescription>{viewingPlan.description}</CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setViewingPlan(null)}>
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Level</Label>
+                  <p className="font-medium capitalize">{viewingPlan.level}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Focus</Label>
+                  <p className="font-medium capitalize">{viewingPlan.focus.replace('_', ' ')}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Duration</Label>
+                  <p className="font-medium">{viewingPlan.duration} weeks</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <p className="font-medium capitalize">{viewingPlan.status}</p>
+                </div>
+              </div>
+              {viewingPlan.goals.length > 0 && (
+                <div>
+                  <Label className="text-muted-foreground">Goals</Label>
+                  <ul className="list-disc list-inside mt-1">
+                    {viewingPlan.goals.map((goal, i) => (
+                      <li key={i} className="text-sm">{goal}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div>
+                <Label className="text-muted-foreground">Progress</Label>
+                <div className="grid grid-cols-3 gap-4 mt-2">
+                  <div className="text-center p-2 bg-muted rounded">
+                    <div className="text-lg font-bold">{viewingPlan.progress.completedWeeks}/{viewingPlan.duration}</div>
+                    <div className="text-xs text-muted-foreground">Weeks</div>
+                  </div>
+                  <div className="text-center p-2 bg-muted rounded">
+                    <div className="text-lg font-bold">{viewingPlan.progress.completedSessions}/{viewingPlan.progress.totalSessions}</div>
+                    <div className="text-xs text-muted-foreground">Sessions</div>
+                  </div>
+                  <div className="text-center p-2 bg-muted rounded">
+                    <div className="text-lg font-bold">{viewingPlan.progress.adherenceRate.toFixed(0)}%</div>
+                    <div className="text-xs text-muted-foreground">Adherence</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Weekly Schedule ({viewingPlan.weeks.length} weeks)</Label>
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                  {viewingPlan.weeks.map((week) => (
+                    <div key={week.weekNumber} className="p-2 border rounded text-sm">
+                      <div className="font-medium">Week {week.weekNumber}: {week.focus}</div>
+                      <div className="text-muted-foreground">{week.sessions.length} sessions, {week.totalVolume} min total</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Plan Modal */}
+      {editingPlan && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg">
+            <CardHeader>
+              <CardTitle>Edit Training Plan</CardTitle>
+              <CardDescription>Update the plan details. Weekly schedule cannot be edited.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={planForm.title}
+                  onChange={(e) => setPlanForm({ ...planForm, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Input
+                  id="edit-description"
+                  value={planForm.description}
+                  onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-goals">Goals (comma-separated)</Label>
+                <Input
+                  id="edit-goals"
+                  value={planForm.goals}
+                  onChange={(e) => setPlanForm({ ...planForm, goals: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-level">Level</Label>
+                  <select
+                    id="edit-level"
+                    value={planForm.level}
+                    onChange={(e) => setPlanForm({ ...planForm, level: e.target.value as any })}
+                    className="w-full mt-1 p-2 border rounded-md"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-focus">Focus</Label>
+                  <select
+                    id="edit-focus"
+                    value={planForm.focus}
+                    onChange={(e) => setPlanForm({ ...planForm, focus: e.target.value as any })}
+                    className="w-full mt-1 p-2 border rounded-md"
+                  >
+                    <option value="general_fitness">General Fitness</option>
+                    <option value="endurance">Endurance</option>
+                    <option value="speed">Speed</option>
+                    <option value="strength">Strength</option>
+                    <option value="competition">Competition</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => { setEditingPlan(null); resetForm(); }}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit}>
+                  Save Changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <PlanAnalysisArchiveModal
         open={showAnalysisArchive}
