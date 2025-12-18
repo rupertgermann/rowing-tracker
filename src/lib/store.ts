@@ -70,6 +70,14 @@ export interface PendingChartExplanation {
   fullData?: string; // JSON stringified data
 }
 
+// Pending plan analysis data (for passing to chat)
+export interface PendingPlanAnalysis {
+  planId: string;
+  planTitle: string;
+  prompt: string;
+  planData?: string; // JSON stringified plan data
+}
+
 export type AIAwardSuggestionStatus = 'suggested' | 'approved' | 'earned';
 
 // Structured criteria for automatic evaluation
@@ -129,6 +137,7 @@ interface RowingStore {
   sessionAnalysisSettings: SessionAnalysisSettings;
   chartExplanations: Record<string, ChartExplanation>; // keyed by chartId
   pendingChartExplanation: PendingChartExplanation | null; // temporary storage for chat handoff
+  pendingPlanAnalysis: PendingPlanAnalysis | null; // temporary storage for plan analysis chat handoff
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -155,6 +164,8 @@ interface RowingStore {
   clearAllChartExplanations: () => void;
   setPendingChartExplanation: (data: PendingChartExplanation | null) => void;
   getPendingChartExplanation: () => PendingChartExplanation | null;
+  setPendingPlanAnalysis: (data: PendingPlanAnalysis | null) => void;
+  getPendingPlanAnalysis: () => PendingPlanAnalysis | null;
   
   // Computed getters
   getSessions: () => Session[];
@@ -592,6 +603,7 @@ export const useRowingStore = create<RowingStore>()(
       sessionAnalysisSettings: defaultSessionAnalysisSettings,
       chartExplanations: {},
       pendingChartExplanation: null,
+      pendingPlanAnalysis: null,
 
       // Actions
       addSessions: (newSessions) => {
@@ -886,6 +898,14 @@ export const useRowingStore = create<RowingStore>()(
 
       getPendingChartExplanation: () => {
         return get().pendingChartExplanation;
+      },
+
+      setPendingPlanAnalysis: (data) => {
+        set({ pendingPlanAnalysis: data });
+      },
+
+      getPendingPlanAnalysis: () => {
+        return get().pendingPlanAnalysis;
       },
 
       // Computed getters

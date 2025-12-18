@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,8 @@ import { cloudAI } from '@/lib/cloudAI';
 import { useRowingStore } from '@/lib/store';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { memoryStorage } from '@/lib/memoryStorage';
+import { chatStorage } from '@/lib/chatStorage';
+import { SettingsService } from '@/lib/settings';
 import {
   Calendar,
   Play,
@@ -32,19 +35,22 @@ import {
   Eye,
   Settings,
   Download,
-  Upload
+  Upload,
+  History,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { PlanAnalysisArchiveModal } from '@/components/PlanAnalysisArchiveModal';
 
 export default function PlansPage() {
-  const { getSessions } = useRowingStore();
+  const router = useRouter();
+  const { getSessions, setPendingPlanAnalysis } = useRowingStore();
   const [plans, setPlans] = useState<TrainingPlan[]>([]);
   const [activePlan, setActivePlan] = useState<TrainingPlan | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<TrainingWeek | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [adherenceAnalysis, setAdherenceAnalysis] = useState<string | null>(null);
+  const [showAnalysisArchive, setShowAnalysisArchive] = useState(false);
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
   // Form state for plan creation
@@ -228,22 +234,71 @@ export default function PlansPage() {
     setDeletePlanId(null);
   };
 
-  const handleAnalyzeAdherence = async () => {
-    if (!activePlan || !cloudAI.isConfigured()) return;
+  const handleAnalyzeAdherence = useCallback(() => {
+    if (!activePlan) return;
 
-    setIsLoading(true);
-    setError(null);
+    const userSessions = getSessions();
 
-    try {
-      const userSessions = getSessions();
-      const analysis = await cloudAI.analyzePlanAdherence(activePlan, userSessions);
-      setAdherenceAnalysis(analysis);
-    } catch (err) {
-      setError('Failed to analyze adherence');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // Build a comprehensive prompt with plan and session data
+    const planSummary = {
+      title: activePlan.title,
+      description: activePlan.description,
+      level: activePlan.level,
+      focus: activePlan.focus,
+      duration: activePlan.duration,
+      status: activePlan.status,
+      progress: activePlan.progress,
+      weeks: activePlan.weeks.map(week => ({
+        weekNumber: week.weekNumber,
+        sessions: week.sessions.map(s => ({
+          day: s.day,
+          type: s.type,
+          duration: s.duration,
+          intensity: s.intensity,
+          description: s.description
+        }))
+      }))
+    };
+
+    // Get recent sessions for context (last 30 days or last 20 sessions)
+    const recentSessions = userSessions
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 20)
+      .map(s => ({
+        date: new Date(s.timestamp).toISOString().split('T')[0],
+        distance: s.distance,
+        duration: s.duration,
+        avgPower: s.avgPower,
+        avgSplit: s.avgSplit,
+        avgStrokeRate: s.avgStrokeRate
+      }));
+
+    const prompt = `Please analyze my progress on my training plan "${activePlan.title}".
+
+**Training Plan Details:**
+${JSON.stringify(planSummary, null, 2)}
+
+**My Recent Rowing Sessions (last ${recentSessions.length} sessions):**
+${JSON.stringify(recentSessions, null, 2)}
+
+Please provide:
+1. An assessment of how well I'm following the plan
+2. Areas where I'm doing well
+3. Areas that need improvement
+4. Specific recommendations for the coming week
+5. Any adjustments to the plan based on my actual performance`;
+
+    // Store pending plan analysis data for chat handoff
+    setPendingPlanAnalysis({
+      planId: activePlan.id,
+      planTitle: activePlan.title,
+      prompt,
+      planData: JSON.stringify(planSummary, null, 2)
+    });
+
+    // Navigate to chat
+    router.push('/chat?fromPlanAnalysis=true');
+  }, [activePlan, getSessions, setPendingPlanAnalysis, router]);
 
   const resetForm = () => {
     setPlanForm({
@@ -461,6 +516,9 @@ export default function PlansPage() {
                   <TrendingUp className="h-4 w-4 mr-2" />
                   Analyze Progress
                 </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowAnalysisArchive(true)}>
+                  <History className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -491,16 +549,6 @@ export default function PlansPage() {
                 <div className="text-sm text-muted-foreground">Goals</div>
               </div>
             </div>
-
-            {/* Adherence Analysis */}
-            {adherenceAnalysis && (
-              <Alert className="mb-4">
-                <TrendingUp className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="whitespace-pre-wrap">{adherenceAnalysis}</div>
-                </AlertDescription>
-              </Alert>
-            )}
 
             {/* Week Navigation */}
             <div className="space-y-4">
@@ -663,6 +711,13 @@ export default function PlansPage() {
         cancelLabel="Cancel"
         onConfirm={confirmDeletePlan}
         variant="destructive"
+      />
+
+      <PlanAnalysisArchiveModal
+        open={showAnalysisArchive}
+        onOpenChange={setShowAnalysisArchive}
+        planId={activePlan?.id}
+        planTitle={activePlan?.title}
       />
     </div>
   );

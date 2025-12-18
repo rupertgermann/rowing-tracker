@@ -39,7 +39,7 @@ import { settings } from '@/lib/settings';
 export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation } = useRowingStore();
+  const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation, getPendingPlanAnalysis, setPendingPlanAnalysis: clearPendingPlanAnalysis } = useRowingStore();
   
   const {
     currentSession,
@@ -69,7 +69,7 @@ export default function ChatPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation' | 'plan_analysis'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
   const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string; chartTitle: string } | null>(null);
@@ -80,13 +80,13 @@ export default function ChatPage() {
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
 
-  // Handle chart explanation from store - create session and pre-fill input with attachments
+  // Handle chart explanation or plan analysis from store - create session and pre-fill input
   useEffect(() => {
-    if (initialPromptProcessedRef.current) return;
-    
     const fromChart = searchParams.get('fromChart');
+    const fromPlanAnalysis = searchParams.get('fromPlanAnalysis');
     
-    if (fromChart && isAIConfigured) {
+    // Handle chart explanation
+    if (fromChart && isAIConfigured && !initialPromptProcessedRef.current) {
       const pendingData = getPendingChartExplanation();
       
       if (pendingData) {
@@ -129,8 +129,33 @@ export default function ChatPage() {
           router.replace('/chat', { scroll: false });
         }
       }
+      return;
     }
-  }, [searchParams, isAIConfigured, createSession, router, getPendingChartExplanation, clearPendingChartExplanation]);
+    
+    // Handle plan analysis
+    if (fromPlanAnalysis && isAIConfigured && !initialPromptProcessedRef.current) {
+      const pendingData = getPendingPlanAnalysis();
+      
+      if (pendingData) {
+        initialPromptProcessedRef.current = true;
+        
+        // Create a new session with the plan title and plan_analysis category
+        const sessionTitle = `Plan Analysis: ${pendingData.planTitle}`;
+        const newSession = createSession(sessionTitle, 'plan_analysis', pendingData.planId);
+        
+        if (newSession) {
+          // Pre-fill the input field with the prompt
+          setMessageInput(pendingData.prompt);
+          
+          // Clear pending data from store
+          clearPendingPlanAnalysis(null);
+          
+          // Clear URL params without triggering navigation
+          router.replace('/chat', { scroll: false });
+        }
+      }
+    }
+  }, [searchParams, isAIConfigured, createSession, router, getPendingChartExplanation, clearPendingChartExplanation, getPendingPlanAnalysis, clearPendingPlanAnalysis]);
 
   // Handle session URL parameter - switch to specific chat session
   useEffect(() => {
@@ -637,6 +662,16 @@ export default function ChatPage() {
               >
                 Explains ({sessions.filter(s => s.category === 'explanation').length})
               </button>
+              <button
+                onClick={() => setCategoryFilter('plan_analysis')}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                  categoryFilter === 'plan_analysis'
+                    ? 'bg-background shadow-sm'
+                    : 'hover:bg-background/50'
+                }`}
+              >
+                Plans ({sessions.filter(s => s.category === 'plan_analysis').length})
+              </button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto scrollbar-none">
@@ -662,10 +697,14 @@ export default function ChatPage() {
             ) : filteredSessions.length === 0 ? (
               <div className="text-center py-8">
                 <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-medium mb-2">No {categoryFilter === 'explanation' ? 'Explanations' : 'Chats'} Yet</h3>
+                <h3 className="font-medium mb-2">
+                  No {categoryFilter === 'explanation' ? 'Explanations' : categoryFilter === 'plan_analysis' ? 'Plan Analyses' : 'Chats'} Yet
+                </h3>
                 <p className="text-sm text-muted-foreground">
                   {categoryFilter === 'explanation' 
                     ? 'Click "Explain" on any chart to create an explanation.'
+                    : categoryFilter === 'plan_analysis'
+                    ? 'Click "Analyze Progress" on your active training plan.'
                     : 'Start a new chat with your AI rowing coach.'}
                 </p>
               </div>

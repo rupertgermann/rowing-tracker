@@ -67,7 +67,7 @@ export class ChatStorageService {
   }
 
   // Create new session
-  createSession(title?: string, category?: 'chat' | 'explanation', chartId?: string): ChatSession {
+  createSession(title?: string, category?: 'chat' | 'explanation' | 'plan_analysis', chartId?: string): ChatSession {
     const newSession: ChatSession = {
       id: this.generateId(),
       title: title || this.generateSessionTitle(),
@@ -218,6 +218,19 @@ export class ChatStorageService {
       console.error('Failed to import sessions:', error);
       return { success: false, imported: 0 };
     }
+  }
+
+  // Get plan analysis sessions for a specific plan
+  getPlanAnalysisSessions(planId?: string): ChatSession[] {
+    const sessions = this.getSessions();
+    const planAnalysisSessions = sessions.filter(s => s.category === 'plan_analysis');
+    
+    if (planId) {
+      // Filter by planId stored in chartId field (reusing existing field)
+      return planAnalysisSessions.filter(s => s.chartId === planId);
+    }
+    
+    return planAnalysisSessions;
   }
 
   // Private helper methods
