@@ -26,6 +26,7 @@ import {
   Calendar,
   FileSearch,
   Paperclip,
+  AlertTriangle,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatDate, formatSessionDate } from '@/lib/dateTimeUtils';
@@ -68,14 +69,15 @@ interface DocumentCardProps {
   onView: (id: string) => void;
   onViewText: (doc: MemoryDocument) => void;
   onAttach?: (doc: MemoryDocument) => void;
+  isOrphaned?: boolean;
 }
 
-function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: DocumentCardProps) {
+function DocumentCard({ document, onDelete, onView, onViewText, onAttach, isOrphaned }: DocumentCardProps) {
   const config = documentTypeConfig[document.type];
   const Icon = config.icon;
 
   return (
-    <div className="group relative flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+    <div className={`group relative flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors ${isOrphaned ? 'border-orange-500/50 bg-orange-500/5' : ''}`}>
       {/* Icon */}
       <div className={`flex-shrink-0 p-2 rounded-lg ${config.color}`}>
         <Icon className="h-5 w-5" />
@@ -88,6 +90,12 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach }: Docu
           {document.status === 'active' && (
             <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/20">
               Active
+            </Badge>
+          )}
+          {isOrphaned && (
+            <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-500 border-orange-500/20 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Orphaned
             </Badge>
           )}
         </div>
@@ -329,6 +337,8 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
     getDocumentUrl,
     exportMemory,
     clearError,
+    isOrphanedDocument,
+    orphanedDocuments,
   } = useMemory();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -493,16 +503,33 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
               </p>
             </div>
           ) : (
-            filteredDocuments.map(doc => (
-              <DocumentCard
-                key={doc.id}
-                document={doc}
-                onDelete={handleDelete}
-                onView={handleView}
-                onViewText={handleViewText}
-                onAttach={onAttachToChat}
-              />
-            ))
+            <>
+              {/* Orphaned documents warning */}
+              {orphanedDocuments.length > 0 && typeFilter === 'all' && !searchQuery && (
+                <div className="mb-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                  <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      {orphanedDocuments.length} orphaned document{orphanedDocuments.length !== 1 ? 's' : ''} found
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    These documents reference deleted training plans or old insights. You can safely remove them.
+                  </p>
+                </div>
+              )}
+              {filteredDocuments.map(doc => (
+                <DocumentCard
+                  key={doc.id}
+                  document={doc}
+                  onDelete={handleDelete}
+                  onView={handleView}
+                  onViewText={handleViewText}
+                  onAttach={onAttachToChat}
+                  isOrphaned={isOrphanedDocument(doc)}
+                />
+              ))}
+            </>
           )}
         </div>
 

@@ -447,7 +447,7 @@ export default function PlansPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 pb-4">
                   <Play className="h-5 w-5 text-blue-600" />
                   {activePlan.title}
                 </CardTitle>
@@ -602,7 +602,7 @@ export default function PlansPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 pb-4">
                         {plan.title}
                         {plan.id === activePlan?.id && (
                           <Play className="h-4 w-4 text-blue-600" />

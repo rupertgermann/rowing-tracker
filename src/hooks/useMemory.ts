@@ -6,6 +6,7 @@ import {
   MEMORY_CONFIG 
 } from '@/lib/memoryStorage';
 import { processDocument, processPDF, processImage } from '@/lib/documentProcessor';
+import { trainingPlans } from '@/lib/trainingPlans';
 
 export interface MemoryState {
   documents: MemoryDocument[];
@@ -230,12 +231,46 @@ export function useMemory() {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  // Check if a document is orphaned (source data no longer exists)
+  const isOrphanedDocument = useCallback((doc: MemoryDocument): boolean => {
+    if (doc.source !== 'system') return false;
+
+    if (doc.type === 'training_plan') {
+      // Check if the training plan still exists
+      const planId = memoryStorage.getTrainingPlanId(doc);
+      if (planId) {
+        const existingPlans = trainingPlans.getPlans();
+        return !existingPlans.some(p => p.id === planId);
+      }
+      // If no planId stored, check by name matching
+      const existingPlans = trainingPlans.getPlans();
+      const planTitle = doc.name.replace('Training Plan: ', '');
+      return !existingPlans.some(p => p.title === planTitle);
+    }
+
+    // For insights, we can't easily check if they're orphaned without
+    // accessing the insights storage, so we'll mark old ones (>30 days)
+    if (doc.type === 'insight') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return new Date(doc.uploadedAt) < thirtyDaysAgo;
+    }
+
+    return false;
+  }, []);
+
+  // Get orphaned documents
+  const getOrphanedDocuments = useCallback((): MemoryDocument[] => {
+    return state.documents.filter(isOrphanedDocument);
+  }, [state.documents, isOrphanedDocument]);
+
   // Computed values
   const userDocuments = state.documents.filter(d => d.source === 'user');
   const systemDocuments = state.documents.filter(d => d.source === 'system');
   const activeTrainingPlan = state.documents.find(
     d => d.type === 'training_plan' && d.status === 'active'
   );
+  const orphanedDocuments = getOrphanedDocuments();
 
   return {
     // State
@@ -262,6 +297,8 @@ export function useMemory() {
     userDocuments,
     systemDocuments,
     activeTrainingPlan,
+    orphanedDocuments,
+    isOrphanedDocument,
     hasDocuments: state.documents.length > 0,
     isQuotaExceeded: storageStats 
       ? storageStats.remainingQuota < MEMORY_CONFIG.maxFileSize 

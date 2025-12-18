@@ -295,6 +295,26 @@ class MemoryStorageService {
   }
 
   /**
+   * Check if a training plan memory document is orphaned (no longer exists in trainingPlans storage).
+   * Returns the plan ID if found in content, or null if not a training plan.
+   */
+  getTrainingPlanId(doc: MemoryDocument): string | null {
+    if (doc.type !== 'training_plan') return null;
+    return (doc.content as { planId?: string })?.planId || null;
+  }
+
+  /**
+   * Check if an insight memory document is orphaned.
+   * Returns the insight IDs if found in content, or null if not an insight.
+   */
+  getInsightIds(doc: MemoryDocument): string[] | null {
+    if (doc.type !== 'insight') return null;
+    const content = doc.content as { insights?: Array<{ id?: string }> };
+    if (!content?.insights) return null;
+    return content.insights.map(i => i.id).filter((id): id is string => !!id);
+  }
+
+  /**
    * Keep only the latest N insights in memory, deleting older ones.
    * Called automatically after adding a new insight.
    */
