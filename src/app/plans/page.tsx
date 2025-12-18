@@ -154,6 +154,15 @@ export default function PlansPage() {
 
   const handleActivatePlan = async (planId: string) => {
     try {
+      // First, update the currently active plan's status to 'paused'
+      const currentActivePlan = trainingPlans.getActivePlan();
+      if (currentActivePlan && currentActivePlan.id !== planId) {
+        trainingPlans.updatePlan(currentActivePlan.id, {
+          status: 'paused'
+        });
+      }
+
+      // Set the new plan as active
       trainingPlans.setActivePlan(planId);
       const plan = trainingPlans.getPlan(planId);
       if (plan) {
