@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useMemo, useState, useEffect } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { motion } from "framer-motion"
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
@@ -16,6 +16,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { ChevronDown, ChevronUp } from "lucide-react"
+
+// Central configuration for collapsed message height and behavior
+const COLLAPSED_MESSAGE_HEIGHT = 190
+const COLLAPSE_THRESHOLDS = {
+  CHARS: 300,
+  LINES: 5,
+}
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -143,48 +150,48 @@ export interface ChatMessageProps extends Message {
 
 // Helper function to determine if content should be auto-collapsed
 const shouldAutoCollapse = (content: string): boolean => {
-  // Auto-collapse if content is longer than 300 characters or has more than 5 lines
-  const characterThreshold = 300
-  const lineThreshold = 5
-  
-  const hasLongContent = content.length > characterThreshold
-  const hasManyLines = content.split('\n').length > lineThreshold
+  // Auto-collapse if content is longer than configured thresholds
+  const hasLongContent = content.length > COLLAPSE_THRESHOLDS.CHARS
+  const hasManyLines = content.split('\n').length > COLLAPSE_THRESHOLDS.LINES
   
   return hasLongContent || hasManyLines
 }
 
-// Helper function to get first 5 lines of content for collapsed view
-const getCollapsedContent = (content: string): string => {
-  const lines = content.split('\n')
-  const previewLines: string[] = []
-  
-  for (let i = 0; i < lines.length && previewLines.length < 5; i++) {
-    const line = lines[i]
-    
-    // Skip empty lines at the start
-    if (previewLines.length === 0 && line.trim() === '') continue
-    
-    previewLines.push(line)
-  }
-  
-  return previewLines.join('\n')
-}
-
 // Collapsible content component for long user messages
 const CollapsibleMessage: React.FC<{
+  id: string
   content: string
   children: React.ReactNode
   isUser: boolean
   animation: Animation
   actions?: React.ReactNode
-}> = ({ content, children, isUser, animation, actions }) => {
-  const [isOpen, setIsOpen] = useState(false) // Always start collapsed for better UX
+}> = ({ id, content, children, isUser, animation, actions }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [hasLoadedState, setHasLoadedState] = useState(false)
+
+  // Load state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem(`chat_message_collapsed_${id}`)
+    if (savedState !== null) {
+      setIsOpen(savedState === 'true')
+    }
+    setHasLoadedState(true)
+  }, [id])
+
+  // Save state to localStorage when it changes
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    localStorage.setItem(`chat_message_collapsed_${id}`, String(open))
+  }
+
+  // Don't render animation until we've loaded the state to prevent jumping
+  if (!hasLoadedState) return null
 
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <Collapsible
         open={isOpen}
-        onOpenChange={setIsOpen}
+        onOpenChange={handleOpenChange}
         className={cn(
           "group flex w-full max-w-full flex-col",
           isUser ? "items-end" : "items-start"
@@ -197,24 +204,13 @@ const CollapsibleMessage: React.FC<{
               animate={isOpen ? "open" : "closed"}
               variants={{
                 open: { height: "auto", opacity: 1 },
-                closed: { height: "auto", opacity: 1 },
+                closed: { height: COLLAPSED_MESSAGE_HEIGHT, opacity: 1 },
               }}
               transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
               className="overflow-hidden"
             >
-              <div>
-                {isOpen ? (
-                  children
-                ) : (
-                  <div>
-                    <MarkdownRenderer>{getCollapsedContent(content)}</MarkdownRenderer>
-                    {!isOpen && (
-                      <div className="mt-2 text-xs text-muted-foreground italic">
-                        [Message collapsed - click "Show all" to view complete content]
-                      </div>
-                    )}
-                  </div>
-                )}
+              <div className={isOpen ? "" : "mask-gradient-b"}>
+                {children}
               </div>
             </motion.div>
           </CollapsibleContent>
@@ -256,6 +252,7 @@ const CollapsibleMessage: React.FC<{
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
+  id,
   role,
   content,
   createdAt,
@@ -285,6 +282,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     if (shouldAutoCollapse(content)) {
       return (
         <CollapsibleMessage
+          id={id}
           content={content}
           isUser={isUser}
           animation={animation}
@@ -358,6 +356,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           return (
             <CollapsibleMessage
               key={`text-${index}`}
+              id={`${id}-part-${index}`}
               content={part.text}
               isUser={isUser}
               animation={animation}
