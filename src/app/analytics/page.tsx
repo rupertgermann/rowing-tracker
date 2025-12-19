@@ -628,6 +628,8 @@ ${explainChartPrompt}`;
   // Prepare chart data for different metrics (with smoothing)
   const prepareChartDataWithSmoothing = useCallback((sessions: any[], metric: ChartMetric, smoothing: SmoothingOption) => {
     const baseData = sessions
+      .slice()
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map(session => ({
         date: session._formattedDate ?? formatChartDate(new Date(session.timestamp)),
         [metric]: getMetricValue(session, metric),
@@ -728,18 +730,21 @@ ${explainChartPrompt}`;
 
   // Prepare scatter plot data for correlations
   const scatterPlotData = useMemo(() => {
-    return filteredSessions.map(session => ({
-      sessionId: session.id,
-      date: formatChartDate(new Date(session.timestamp)),
-      distance: session.distance,
-      duration: session.duration,
-      durationMinutes: Math.round(session.duration / 60),
-      power: session.avgPower,
-      pace: session.avgSplit,
-      strokeRate: session.avgStrokeRate,
-      energy: session.energy,
-      strokeLength: session.avgStrokeLength,
-    }));
+    return filteredSessions
+      .slice()
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .map(session => ({
+        sessionId: session.id,
+        date: formatChartDate(new Date(session.timestamp)),
+        distance: session.distance,
+        duration: session.duration,
+        durationMinutes: Math.round(session.duration / 60),
+        power: session.avgPower,
+        pace: session.avgSplit,
+        strokeRate: session.avgStrokeRate,
+        energy: session.energy,
+        strokeLength: session.avgStrokeLength,
+      }));
   }, [filteredSessions]);
 
   // Custom scatter tooltip component
