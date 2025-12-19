@@ -185,7 +185,11 @@ const CollapsibleMessage: React.FC<{
       <Collapsible
         open={isOpen}
         onOpenChange={setIsOpen}
-        className="group w-full"
+        className={cn(
+          "group flex max-w-full flex-col",
+          isUser ? "items-end self-end" : "items-start self-start",
+          "sm:max-w-[70%]"
+        )}
       >
         <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
           <CollapsibleContent forceMount>
@@ -217,7 +221,12 @@ const CollapsibleMessage: React.FC<{
           </CollapsibleContent>
           
           {shouldAutoCollapse(content) && (
-            <div className="mt-2 flex justify-center">
+            <div
+              className={cn(
+                "mt-2 flex w-full",
+                isUser ? "justify-end" : "justify-start"
+              )}
+            >
               <CollapsibleTrigger asChild>
                 <button className="flex items-center gap-1 rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground hover:bg-background hover:text-foreground border shadow-sm transition-colors">
                   {isOpen ? (
