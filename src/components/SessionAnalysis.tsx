@@ -68,7 +68,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                   : entry.name.includes('Length')
                     ? `${entry.value}m`
                     : Math.round(entry.value)}
-              {entry.unit}
             </span>
           </div>
         ))}
@@ -657,8 +656,8 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Stroke Length Consistency</CardTitle>
-                  <CardDescription>Distance covered per stroke (meters)</CardDescription>
+                  <CardTitle>Distance Per Stroke</CardTitle>
+                  <CardDescription>Boat distance covered per stroke (meters)</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -672,8 +671,8 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                   </Button>
                   <ExplainChartButton
                     chartId={`session-${sessionId}-stroke-length`}
-                    chartTitle="Stroke Length Consistency"
-                    chartDescription="This chart shows the distance covered per stroke (meters) throughout this rowing session."
+                    chartTitle="Distance Per Stroke"
+                    chartDescription="This chart shows the boat distance covered per stroke (meters) throughout this rowing session. Note: This is not the same as drive length/handle travel."
                     dataContext={getChartDataContext('stroke-length')}
                     fullData={enrichedData}
                     variant="compact"
