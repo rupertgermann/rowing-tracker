@@ -71,6 +71,39 @@ export default function PlansPage() {
     loadPlans();
   }, []);
 
+  // Auto-select current week when active plan changes
+  useEffect(() => {
+    if (activePlan && activePlan.weeks.length > 0) {
+      // Try to restore selected week from localStorage
+      const savedWeekId = localStorage.getItem(`selectedWeek_${activePlan.id}`);
+      if (savedWeekId) {
+        const savedWeek = activePlan.weeks.find(w => w.id === savedWeekId);
+        if (savedWeek) {
+          setSelectedWeek(savedWeek);
+          return;
+        }
+      }
+      
+      // Try to get current week based on start date
+      const currentWeek = trainingPlans.getCurrentWeek();
+      if (currentWeek) {
+        setSelectedWeek(currentWeek);
+      } else {
+        // Fallback to first week if no current week found
+        setSelectedWeek(activePlan.weeks[0]);
+      }
+    } else {
+      setSelectedWeek(null);
+    }
+  }, [activePlan]);
+
+  // Save selected week to localStorage when it changes
+  useEffect(() => {
+    if (selectedWeek && activePlan) {
+      localStorage.setItem(`selectedWeek_${activePlan.id}`, selectedWeek.id);
+    }
+  }, [selectedWeek, activePlan]);
+
   const loadPlans = () => {
     try {
       const allPlans = trainingPlans.getPlans();
@@ -223,7 +256,25 @@ export default function PlansPage() {
       const recentSession = userSessions[0]; // Assuming sessions are sorted by date
 
       trainingPlans.completeSession(planId, weekId, sessionId, recentSession);
-      loadPlans(); // Reload to get updated progress
+      
+      // Update local state immediately for better UX
+      if (activePlan && activePlan.id === planId) {
+        const updatedActivePlan = trainingPlans.getPlan(planId);
+        if (updatedActivePlan) {
+          setActivePlan(updatedActivePlan);
+          // Update selected week if it's the one being modified
+          if (selectedWeek && selectedWeek.id === weekId) {
+            const updatedWeek = updatedActivePlan.weeks.find(w => w.id === weekId);
+            if (updatedWeek) {
+              setSelectedWeek(updatedWeek);
+            }
+          }
+        }
+      }
+      
+      // Update plans list
+      const updatedPlans = trainingPlans.getPlans();
+      setPlans(updatedPlans);
     } catch (err) {
       setError('Failed to complete session');
     }
