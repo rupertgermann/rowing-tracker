@@ -197,7 +197,7 @@ const CollapsibleMessage: React.FC<{
           isUser ? "items-end" : "items-start"
         )}
       >
-        <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
+        <div className={cn(chatBubbleVariants({ isUser, animation }), "relative pb-0")}>
           <CollapsibleContent forceMount>
             <motion.div
               initial={false}
@@ -209,35 +209,39 @@ const CollapsibleMessage: React.FC<{
               transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
               className="overflow-hidden"
             >
-              <div className={isOpen ? "" : "mask-gradient-b"}>
-                {children}
-              </div>
+              {children}
             </motion.div>
           </CollapsibleContent>
           
           {shouldAutoCollapse(content) && (
-            <div
-              className={cn(
-                "mt-2 flex w-full",
-                isUser ? "justify-end" : "justify-start"
-              )}
-            >
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-1 rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground hover:bg-background hover:text-foreground border shadow-sm transition-colors">
-                  {isOpen ? (
-                    <>
-                      <ChevronUp className="h-3 w-3" />
-                      <span>Collapse</span>
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-3 w-3" />
-                      <span>Show all</span>
-                    </>
+            <>
+              {!isOpen ? (
+                <div
+                  className={cn(
+                    "absolute bottom-0 left-0 right-0 flex h-16 items-end justify-center rounded-b-lg bg-gradient-to-t pb-2",
+                    isUser 
+                      ? "from-primary via-primary/80 to-transparent" 
+                      : "from-muted via-muted/80 to-transparent"
                   )}
-                </button>
-              </CollapsibleTrigger>
-            </div>
+                >
+                  <CollapsibleTrigger asChild>
+                    <button className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-background/20 transition-colors">
+                      <ChevronDown className="h-5 w-5" />
+                      <span className="sr-only">Show all</span>
+                    </button>
+                  </CollapsibleTrigger>
+                </div>
+              ) : (
+                <div className="mt-2 flex w-full justify-center pb-2">
+                  <CollapsibleTrigger asChild>
+                    <button className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-background/20 transition-colors">
+                      <ChevronUp className="h-5 w-5" />
+                      <span className="sr-only">Collapse</span>
+                    </button>
+                  </CollapsibleTrigger>
+                </div>
+              )}
+            </>
           )}
           
           {actions ? (

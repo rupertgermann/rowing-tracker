@@ -135,20 +135,10 @@
 
 /* Gradient mask for collapsed content */
 .mask-gradient-b {
-  mask-image: linear-gradient(to bottom, 
-    black 0%, 
-    black 60%, 
-    rgba(0, 0, 0, 0.8) 75%, 
-    rgba(0, 0, 0, 0.6) 85%, 
-    rgba(0, 0, 0, 0.4) 95%, 
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(to bottom, 
-    black 0%, 
-    black 60%, 
-    rgba(0, 0, 0, 0.8) 75%, 
-    rgba(0, 0, 0, 0.6) 85%, 
-    rgba(0, 0, 0, 0.4) 95%, 
-    transparent 100%
-  );
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
 }

@@ -454,6 +454,8 @@ function ChatPageContent() {
       "What's my average pace trend?",
       "Show me my training history",
       "give me the Detailed stroke analysis for my latest session.",
+      "list the documents in memory",
+      "what training plans do I have?"
     ];
     
     const userPreferences = settings.getUserPreferences();
