@@ -15,6 +15,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -140,6 +141,112 @@ export interface ChatMessageProps extends Message {
   actions?: React.ReactNode
 }
 
+// Helper function to determine if content should be auto-collapsed
+const shouldAutoCollapse = (content: string): boolean => {
+  // Auto-collapse if content is longer than 300 characters or has more than 5 lines
+  const characterThreshold = 300
+  const lineThreshold = 5
+  
+  const hasLongContent = content.length > characterThreshold
+  const hasManyLines = content.split('\n').length > lineThreshold
+  
+  return hasLongContent || hasManyLines
+}
+
+// Helper function to get first 5 lines of content for collapsed view
+const getCollapsedContent = (content: string): string => {
+  const lines = content.split('\n')
+  const previewLines: string[] = []
+  
+  for (let i = 0; i < lines.length && previewLines.length < 5; i++) {
+    const line = lines[i]
+    
+    // Skip empty lines at the start
+    if (previewLines.length === 0 && line.trim() === '') continue
+    
+    previewLines.push(line)
+  }
+  
+  return previewLines.join('\n')
+}
+
+// Collapsible content component for long user messages
+const CollapsibleMessage: React.FC<{
+  content: string
+  children: React.ReactNode
+  isUser: boolean
+  animation: Animation
+  actions?: React.ReactNode
+}> = ({ content, children, isUser, animation, actions }) => {
+  const [isOpen, setIsOpen] = useState(false) // Always start collapsed for better UX
+
+  return (
+    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+      <Collapsible
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        className="group w-full"
+      >
+        <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
+          <CollapsibleContent forceMount>
+            <motion.div
+              initial={false}
+              animate={isOpen ? "open" : "closed"}
+              variants={{
+                open: { height: "auto", opacity: 1 },
+                closed: { height: "auto", opacity: 1 },
+              }}
+              transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
+              className="overflow-hidden"
+            >
+              <div>
+                {isOpen ? (
+                  children
+                ) : (
+                  <div>
+                    <MarkdownRenderer>{getCollapsedContent(content)}</MarkdownRenderer>
+                    {!isOpen && (
+                      <div className="mt-2 text-xs text-muted-foreground italic">
+                        [Message collapsed - click "Show all" to view complete content]
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </CollapsibleContent>
+          
+          {shouldAutoCollapse(content) && (
+            <div className="mt-2 flex justify-center">
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-1 rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground hover:bg-background hover:text-foreground border shadow-sm transition-colors">
+                  {isOpen ? (
+                    <>
+                      <ChevronUp className="h-3 w-3" />
+                      <span>Collapse</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3" />
+                      <span>Show all</span>
+                    </>
+                  )}
+                </button>
+              </CollapsibleTrigger>
+            </div>
+          )}
+          
+          {actions ? (
+            <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+              {actions}
+            </div>
+          ) : null}
+        </div>
+      </Collapsible>
+    </div>
+  )
+}
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   role,
   content,
@@ -166,6 +273,39 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   const formattedTime = createdAt ? formatTime(createdAt) : undefined
 
   if (isUser) {
+    // Use collapsible for long user messages
+    if (shouldAutoCollapse(content)) {
+      return (
+        <CollapsibleMessage
+          content={content}
+          isUser={isUser}
+          animation={animation}
+          actions={actions}
+        >
+          {files ? (
+            <div className="mb-1 flex flex-wrap gap-2">
+              {files.map((file, index) => {
+                return <FilePreview file={file} key={index} />
+              })}
+            </div>
+          ) : null}
+          <MarkdownRenderer>{content}</MarkdownRenderer>
+          {showTimeStamp && createdAt ? (
+            <time
+              dateTime={createdAt.toISOString()}
+              className={cn(
+                "mt-1 block px-1 text-xs opacity-50",
+                animation !== "none" && "duration-500 animate-in fade-in-0"
+              )}
+            >
+              {formattedTime}
+            </time>
+          ) : null}
+        </CollapsibleMessage>
+      )
+    }
+
+    // Regular user message display for short messages
     return (
       <div
         className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
@@ -178,8 +318,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         ) : null}
 
-        <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+        <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
           <MarkdownRenderer>{content}</MarkdownRenderer>
+          {actions ? (
+            <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+              {actions}
+            </div>
+          ) : null}
         </div>
 
         {showTimeStamp && createdAt ? (
@@ -200,6 +345,32 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   if (parts && parts.length > 0) {
     return parts.map((part, index) => {
       if (part.type === "text") {
+        // Use collapsible for long user messages only
+        if (isUser && shouldAutoCollapse(part.text)) {
+          return (
+            <CollapsibleMessage
+              key={`text-${index}`}
+              content={part.text}
+              isUser={isUser}
+              animation={animation}
+              actions={actions}
+            >
+              <MarkdownRenderer>{part.text}</MarkdownRenderer>
+              {showTimeStamp && createdAt ? (
+                <time
+                  dateTime={createdAt.toISOString()}
+                  className={cn(
+                    "mt-1 block px-1 text-xs opacity-50",
+                    animation !== "none" && "duration-500 animate-in fade-in-0"
+                  )}
+                >
+                  {formattedTime}
+                </time>
+              ) : null}
+            </CollapsibleMessage>
+          )
+        }
+
         return (
           <div
             className={cn(
@@ -208,7 +379,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             )}
             key={`text-${index}`}
           >
-            <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+            <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
               <MarkdownRenderer>{part.text}</MarkdownRenderer>
               {actions ? (
                 <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
@@ -248,9 +419,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return <ToolCall toolInvocations={toolInvocations} />
   }
 
+  
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+      <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
         <MarkdownRenderer>{content}</MarkdownRenderer>
         {actions ? (
           <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">

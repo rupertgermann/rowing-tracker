@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ import { FileAttachment } from '@/lib/cloudAI';
 import { blobToDataUrl } from '@/lib/documentProcessor';
 import { settings } from '@/lib/settings';
 
-export default function ChatPage() {
+function ChatPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation, getPendingPlanAnalysis, setPendingPlanAnalysis: clearPendingPlanAnalysis } = useRowingStore();
@@ -942,5 +942,13 @@ export default function ChatPage() {
         variant="destructive"
       />
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto p-4 h-screen flex flex-col items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
+      <ChatPageContent />
+    </Suspense>
   );
 }
