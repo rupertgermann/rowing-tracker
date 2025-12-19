@@ -154,7 +154,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
   // Calculate segments based on selected size
   const segments = useMemo(() => calculateSegments(enrichedData, segmentSize), [enrichedData, segmentSize]);
 
-  const performanceSummary = useMemo(() => calculatePerformanceSummary(enrichedData, segments), [enrichedData, segments]);
+  const performanceSummary = useMemo(() => calculatePerformanceSummary(enrichedData, segments, segmentSize), [enrichedData, segments, segmentSize]);
 
   // Combine rolling data for charts
   const rollingData = useMemo(() => {
@@ -335,7 +335,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Best 500m</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Best {segmentSize}m</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">{formatSplit(performanceSummary.best500mSplit)}</div>
@@ -343,7 +343,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Worst 500m</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Worst {segmentSize}m</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">{formatSplit(performanceSummary.worst500mSplit)}</div>
@@ -359,7 +359,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Most Consistent 500m</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Most Consistent {segmentSize}m</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">Segment {performanceSummary.mostConsistent500m}</div>
