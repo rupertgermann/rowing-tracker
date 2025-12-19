@@ -18,7 +18,7 @@ import {
 import { ChevronDown, ChevronUp } from "lucide-react"
 
 // Central configuration for collapsed message height and behavior
-const COLLAPSED_MESSAGE_HEIGHT = 190
+const COLLAPSED_MESSAGE_HEIGHT = 250
 const COLLAPSE_THRESHOLDS = {
   CHARS: 300,
   LINES: 5,
