@@ -98,7 +98,7 @@ export const calculateSegments = (data: StrokeData[], segmentDistance: number = 
     if (segmentStrokes.length === 0) continue;
 
     const avgPower = segmentStrokes.reduce((sum, s) => sum + s.power, 0) / segmentStrokes.length;
-    const avgSplit = segmentStrokes.reduce((sum, s) => sum + s.split, 0) / segmentStrokes.length;
+    const avgSplit = (segmentStrokes.reduce((sum, s) => sum + s.split, 0) / segmentStrokes.length) * (segmentDistance / 500);
     const avgSPM = segmentStrokes.reduce((sum, s) => sum + s.strokeRate, 0) / segmentStrokes.length;
     const avgStrokeLength = segmentStrokes.reduce((sum, s) => sum + (s.strokeLength || 0), 0) / segmentStrokes.length;
     const duration = segmentStrokes[segmentStrokes.length - 1].time - segmentStrokes[0].time;
@@ -121,7 +121,7 @@ export const calculateSegments = (data: StrokeData[], segmentDistance: number = 
 };
 
 // Calculate performance summary statistics
-export const calculatePerformanceSummary = (data: StrokeData[], segments: SegmentData[]): PerformanceSummary => {
+export const calculatePerformanceSummary = (data: StrokeData[], segments: SegmentData[], segmentSize: number = 500): PerformanceSummary => {
   if (!data || data.length === 0) {
     return {
       best500mSplit: 0,
@@ -133,8 +133,8 @@ export const calculatePerformanceSummary = (data: StrokeData[], segments: Segmen
     };
   }
 
-  // Best/Worst 500m segments
-  const fullSegments = segments.filter(s => s.distance >= 400); // Near-full segments only
+  // Best/Worst segments based on current segment size
+  const fullSegments = segments.filter(s => s.distance >= segmentSize * 0.8); // Near-full segments only (80% threshold)
   const bestSegment = fullSegments.reduce((best, current) => 
     current.avgSplit < best.avgSplit ? current : best, fullSegments[0] || { avgSplit: 0 }
   );
@@ -148,7 +148,7 @@ export const calculatePerformanceSummary = (data: StrokeData[], segments: Segmen
     current.power > max ? current.power : max, 0
   );
 
-  // Most consistent 500m (lowest power variance)
+  // Most consistent segment (lowest power variance)
   const segmentVariances = fullSegments.map(segment => {
     const segmentStrokes = data.filter(d => d.distance > segment.startDistance && d.distance <= segment.endDistance);
     const powers = segmentStrokes.map(s => s.power);
