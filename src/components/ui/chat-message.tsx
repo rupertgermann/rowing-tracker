@@ -186,9 +186,8 @@ const CollapsibleMessage: React.FC<{
         open={isOpen}
         onOpenChange={setIsOpen}
         className={cn(
-          "group flex max-w-full flex-col",
-          isUser ? "items-end self-end" : "items-start self-start",
-          "sm:max-w-[70%]"
+          "group flex w-full max-w-full flex-col",
+          isUser ? "items-end" : "items-start"
         )}
       >
         <div className={cn(chatBubbleVariants({ isUser, animation }), "relative")}>
