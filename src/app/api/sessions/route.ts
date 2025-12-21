@@ -70,15 +70,18 @@ export async function POST(req: Request) {
           timestamp: new Date(sessionData.timestamp),
           distance: sessionData.distance,
           duration: sessionData.duration,
-          avgPace: sessionData.avgPace || null,
-          avgSplit: sessionData.avgSplit || null,
-          avgStrokeRate: sessionData.avgStrokeRate || null,
-          avgHeartRate: sessionData.avgHeartRate || null,
-          avgPower: sessionData.avgPower || null,
-          totalCalories: sessionData.totalCalories || null,
-          sessionType: sessionData.sessionType || 'steady_state',
-          notes: sessionData.notes || null,
-          strokeData: sessionData.strokeData || null,
+          energy: sessionData.energy || 0,
+          strokeCount: sessionData.strokeCount || 0,
+          avgPower: sessionData.avgPower || 0,
+          maxPower: sessionData.maxPower || 0,
+          wattPerKg: sessionData.wattPerKg || 0,
+          avgSplit: sessionData.avgSplit || 0,
+          minSplit: sessionData.minSplit || 0,
+          avgWork: sessionData.avgWork || 0,
+          avgStrokeLength: sessionData.avgStrokeLength || 0,
+          avgStrokeRate: sessionData.avgStrokeRate || 0,
+          maxStrokeRate: sessionData.maxStrokeRate || 0,
+          sourceFile: sessionData.sourceFile || null,
         },
       });
       created.push(createdSession);
@@ -90,8 +93,9 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Error creating sessions:", error);
+    console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
-      { error: "Failed to create sessions" },
+      { error: "Failed to create sessions", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

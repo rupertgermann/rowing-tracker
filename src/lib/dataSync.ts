@@ -16,14 +16,20 @@ export interface SyncResult {
  */
 export async function fetchSessionsFromDB(): Promise<Session[]> {
   try {
+    console.log('[SYNC] Fetching sessions from /api/sessions');
     const response = await fetch('/api/sessions');
+    console.log('[SYNC] Response status:', response.status);
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[SYNC] Failed to fetch sessions:', errorText);
       throw new Error('Failed to fetch sessions');
     }
     const data = await response.json();
+    console.log('[SYNC] Fetched sessions:', data.sessions?.length || 0);
     return data.sessions || [];
   } catch (error) {
-    console.error('Error fetching sessions:', error);
+    console.error('[SYNC] Error fetching sessions:', error);
     return [];
   }
 }
@@ -33,20 +39,26 @@ export async function fetchSessionsFromDB(): Promise<Session[]> {
  */
 export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult> {
   try {
+    console.log('[SYNC] Saving', sessions.length, 'sessions to database');
     const response = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessions }),
     });
 
+    console.log('[SYNC] Save response status:', response.status);
+
     if (!response.ok) {
       const error = await response.json();
+      console.error('[SYNC] Save failed:', error);
       return { success: false, error: error.error || 'Failed to save sessions' };
     }
 
+    const result = await response.json();
+    console.log('[SYNC] Save successful:', result);
     return { success: true };
   } catch (error) {
-    console.error('Error saving sessions:', error);
+    console.error('[SYNC] Error saving sessions:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

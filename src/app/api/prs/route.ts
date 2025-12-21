@@ -73,17 +73,17 @@ export async function POST(req: Request) {
       });
 
       if (existing) {
-        const shouldUpdate = prData.recordType === 'time' 
-          ? prData.value < existing.value
-          : prData.value > existing.value;
+        const shouldUpdate = prData.value < existing.bestTime;
 
-        if (shouldUpdate) {
+        if (shouldUpdate && prData.sessionId) {
           const updatedPR = await prisma.personalRecord.update({
             where: { id: existing.id },
             data: {
-              value: prData.value,
+              bestTime: prData.value,
+              bestPace: prData.bestPace || existing.bestPace,
+              avgPower: prData.avgPower || existing.avgPower,
               achievedAt: new Date(prData.achievedAt),
-              sessionId: prData.sessionId || null,
+              sessionId: prData.sessionId,
             },
           });
           updated.push(updatedPR);
@@ -91,17 +91,21 @@ export async function POST(req: Request) {
           updated.push(existing);
         }
       } else {
-        const createdPR = await prisma.personalRecord.create({
-          data: {
-            userId: session.user.id,
-            distance: prData.distance,
-            value: prData.value,
-            recordType: prData.recordType || 'time',
-            achievedAt: new Date(prData.achievedAt),
-            sessionId: prData.sessionId || null,
-          },
-        });
-        updated.push(createdPR);
+        // Only create PR if we have a sessionId
+        if (prData.sessionId) {
+          const createdPR = await prisma.personalRecord.create({
+            data: {
+              userId: session.user.id,
+              distance: prData.distance,
+              bestTime: prData.value,
+              bestPace: prData.bestPace || 0,
+              avgPower: prData.avgPower || 0,
+              achievedAt: new Date(prData.achievedAt),
+              sessionId: prData.sessionId,
+            },
+          });
+          updated.push(createdPR);
+        }
       }
     }
 

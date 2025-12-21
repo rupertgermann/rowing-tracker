@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { Session, SessionStats, PersonalRecord, SessionFilters, StrokeData } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
+import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB } from '@/lib/dataSync';
 
 // Chart configuration types
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
@@ -183,6 +183,9 @@ interface RowingStore {
   // Computed getters
   getSessions: () => Session[];
   getFilteredSessions: () => Session[];
+  
+  // Database sync
+  initializeFromDB: () => Promise<void>;
   getStats: () => SessionStats;
   getPersonalRecords: () => PersonalRecord[];
   getSessionById: (id: string) => Session | undefined;
@@ -601,9 +604,7 @@ function filterAndSortSessions(sessions: Session[], filters: SessionFilters): Se
   return filtered;
 }
 
-export const useRowingStore = create<RowingStore>()(
-  persist(
-    (set, get) => ({
+export const useRowingStore = create<RowingStore>()((set, get) => ({
       sessions: [],
       personalRecords: [],
       earnedAwards: [],
@@ -621,14 +622,47 @@ export const useRowingStore = create<RowingStore>()(
 
       // Actions
       addSessions: (newSessions) => {
+        console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
+        
+        // Save to database first (async, non-blocking)
+        const existingIds = new Set(get().sessions.map(s => s.id));
+        const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
+        
+        console.log('[STORE] Unique new sessions:', uniqueNewSessions.length);
+        
+        if (uniqueNewSessions.length > 0) {
+          console.log('[STORE] Saving sessions to database...');
+          saveSessionsToDB(uniqueNewSessions)
+            .then(result => {
+              console.log('[STORE] Save result:', result);
+            })
+            .catch(err => {
+              console.error('[STORE] Failed to save sessions to database:', err);
+            });
+        }
+        
         set((state) => {
-          const existingIds = new Set(state.sessions.map(s => s.id));
-          const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
-          
           const updatedSessions = [...state.sessions, ...uniqueNewSessions];
           const updatedRecords = calculatePersonalRecords(updatedSessions);
+          
+          // Save PRs to database
+          savePRsToDB(updatedRecords.map(pr => ({
+            distance: pr.distance,
+            value: pr.bestTime,
+            recordType: 'time',
+            achievedAt: pr.date,
+            sessionId: pr.sessionId
+          }))).catch(err => {
+            console.error('Failed to save PRs to database:', err);
+          });
+          
           // Recompute award dates based on when conditions first became true
           const recomputedAwards = computeAllEarnedAwards(updatedSessions);
+          
+          // Save awards to database
+          saveAwardsToDB(recomputedAwards).catch(err => {
+            console.error('Failed to save awards to database:', err);
+          });
           
           // Check AI awards for automatic completion
           const updatedAIAwards = checkAIAwards(updatedSessions, state.aiAwardSuggestions);
@@ -952,46 +986,50 @@ export const useRowingStore = create<RowingStore>()(
 
       getChartSettings: () => {
         return get().chartSettings;
-      }
-    }),
-    {
-      name: 'rowing-tracker-storage',
-      storage: createJSONStorage(() => localStorage),
-      // Only persist essential data, not computed values
-      partialize: (state) => ({
-        sessions: state.sessions,
-        filters: state.filters,
-        chartSettings: state.chartSettings,
-        dashboardSettings: state.dashboardSettings,
-        sessionsViewSettings: state.sessionsViewSettings,
-        sessionAnalysisSettings: state.sessionAnalysisSettings,
-        earnedAwards: state.earnedAwards,
-        aiAwardSuggestions: state.aiAwardSuggestions,
-        chartExplanations: state.chartExplanations
-      }),
-      // Convert string timestamps back to Date objects on rehydrate
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Convert timestamps from strings to Date objects
-          state.sessions = state.sessions.map(session => ({
-            ...session,
-            timestamp: new Date(session.timestamp)
-          }));
-          // Re-compute personal records
-          state.personalRecords = calculatePersonalRecords(state.sessions);
-          
-          // Rehydrate awards dates
-          state.earnedAwards = computeAllEarnedAwards(state.sessions);
+      },
 
-          // Rehydrate AI award suggestion dates
-          state.aiAwardSuggestions = (state.aiAwardSuggestions || []).map((s: any) => ({
+      // Initialize store from database
+      initializeFromDB: async () => {
+        try {
+          console.log('[STORE] initializeFromDB called');
+          const data = await initializeStoreFromDB();
+          
+          console.log('[STORE] Fetched from DB:', {
+            sessions: data.sessions.length,
+            prs: data.personalRecords.length,
+            awards: data.earnedAwards.length
+          });
+          
+          // Convert timestamps to Date objects
+          const sessions = data.sessions.map((s: any) => ({
             ...s,
-            suggestedAt: s.suggestedAt ? new Date(s.suggestedAt) : new Date(),
-            targetDate: s.targetDate ? new Date(s.targetDate) : undefined,
-            approvedAt: s.approvedAt ? new Date(s.approvedAt) : undefined
+            timestamp: new Date(s.timestamp)
           }));
+          
+          // Calculate PRs from sessions
+          const personalRecords = calculatePersonalRecords(sessions);
+          
+          // Convert database awards to app format
+          const earnedAwards = data.earnedAwards.map((a: any) => ({
+            awardId: a.awardId,
+            earnedAt: new Date(a.earnedAt)
+          }));
+          
+          console.log('[STORE] Setting state with:', {
+            sessions: sessions.length,
+            prs: personalRecords.length,
+            awards: earnedAwards.length
+          });
+          
+          set({
+            sessions,
+            personalRecords,
+            earnedAwards
+          });
+          
+          console.log('[STORE] State updated successfully');
+        } catch (error) {
+          console.error('[STORE] Failed to initialize from database:', error);
         }
       }
-    }
-  )
-);
+    }));
