@@ -17,6 +17,7 @@ import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { formatChartDate, formatSessionDate, formatDateOnly, formatTime } from '@/lib/dateTimeUtils';
 import { chartTheme } from '@/lib/chartUtils';
 import { CloudInsight } from '@/lib/cloudAI';
+import { MigrationPrompt } from '@/components/MigrationPrompt';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
@@ -408,6 +409,8 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+        <MigrationPrompt />
+        
         {!mounted ? (
           // Enhanced loading placeholder
           <div className="animate-pulse">

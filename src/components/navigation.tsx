@@ -23,12 +23,7 @@ const navigation = [
   { name: 'Personal Records', href: '/prs', icon: Trophy },
   { name: 'Training Plans', href: '/plans', icon: Target },
   { name: 'AI Coach', href: '/chat', icon: MessageCircle },
-  { name: 'Settings', href: '/settings', icon: SettingsIcon },
   { name: 'Upload', href: '/upload', icon: Upload },
-];
-
-const adminNavigation = [
-  { name: 'Admin Panel', href: '/admin', icon: UserCircle },
 ];
 
 export function Navigation() {
@@ -77,31 +72,6 @@ export function Navigation() {
                 </Button>
               );
             })}
-            
-            {/* Admin Navigation */}
-            {session?.user?.role === 'admin' && adminNavigation.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Button
-                  key={item.name}
-                  asChild
-                  variant={isActive ? 'default' : 'ghost'}
-                  size="sm"
-                  className="border-red-500/50"
-                >
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'flex items-center space-x-2',
-                      isActive && 'bg-red-500 text-white hover:bg-red-600'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.name}</span>
-                  </Link>
-                </Button>
-              );
-            })}
 
             {/* User Menu */}
             {status === 'authenticated' && session?.user && (
@@ -118,9 +88,26 @@ export function Navigation() {
                   <DropdownMenuItem asChild>
                     <Link href="/profile" className="flex items-center cursor-pointer">
                       <User className="mr-2 h-4 w-4" />
-                      <span>Edit Profile</span>
+                      <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center cursor-pointer">
+                      <SettingsIcon className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  {session.user.role === 'admin' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="flex items-center cursor-pointer text-red-400">
+                          <UserCircle className="mr-2 h-4 w-4" />
+                          <span>Admin Panel</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -140,7 +127,7 @@ export function Navigation() {
                     <UserCircle className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>{session.user.name || session.user.email}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
@@ -149,6 +136,24 @@ export function Navigation() {
                       <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="cursor-pointer">
+                      <SettingsIcon className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  {session.user.role === 'admin' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="cursor-pointer text-red-400">
+                          <UserCircle className="mr-2 h-4 w-4" />
+                          <span>Admin Panel</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
