@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import EmailProvider from "next-auth/providers/email";
 import { prisma } from "@/lib/db/prisma";
 import bcrypt from "bcryptjs";
 
@@ -24,9 +25,13 @@ declare module "next-auth/jwt" {
 }
 
 export const authOptions: NextAuthOptions = {
-  // Note: PrismaAdapter is not compatible with JWT strategy for credentials provider
-  // We handle user creation manually in the register API route
+  adapter: PrismaAdapter(prisma),
   providers: [
+    // Email verification (magic link)
+    EmailProvider({
+      server: process.env.EMAIL_SERVER,
+      from: process.env.EMAIL_FROM,
+    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -44,6 +49,11 @@ export const authOptions: NextAuthOptions = {
 
         if (!user || !user.passwordHash) {
           return null;
+        }
+
+        // Check if email is verified for password login
+        if (!user.emailVerified) {
+          throw new Error("Please verify your email before logging in");
         }
 
         const isValid = await bcrypt.compare(

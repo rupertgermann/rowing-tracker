@@ -40,12 +40,13 @@ export async function POST(req: Request) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user (email not verified yet)
     const user = await prisma.user.create({
       data: {
         email,
         name,
-        passwordHash
+        passwordHash,
+        emailVerified: null // Will be set when user clicks verification link
       }
     });
 
@@ -56,10 +57,15 @@ export async function POST(req: Request) {
       }
     });
 
+    // Send verification email
+    const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-request?email=${encodeURIComponent(email)}`;
+    
     return NextResponse.json({
       id: user.id,
       email: user.email,
-      name: user.name
+      name: user.name,
+      message: "Account created! Please check your email to verify your account.",
+      verificationRequired: true
     });
   } catch (error) {
     console.error("Registration error:", error);

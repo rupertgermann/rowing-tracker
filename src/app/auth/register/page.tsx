@@ -52,21 +52,9 @@ export default function RegisterPage() {
         return;
       }
 
-      // Auto sign in after registration
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-        callbackUrl: "/dashboard"
-      });
-
-      if (result?.ok) {
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        // Registration succeeded but sign in failed - redirect to login
-        router.push("/auth/login?registered=true");
-      }
+      // Show success message and redirect to verification page
+      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+      router.refresh();
     } catch {
       setErrorMessage("An error occurred. Please try again.");
       setIsLoading(false);
