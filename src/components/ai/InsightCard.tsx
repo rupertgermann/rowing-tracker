@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Insight } from '@/lib/aiAnalysis';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { useInsightFeedback } from '@/hooks/useAIInsights';
+import { chatStorage } from '@/lib/chatStorage';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -18,10 +19,12 @@ import {
   Cloud,
   Brain,
   Archive,
-  Trash2
+  Trash2,
+  History
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ExplainInsightButton } from '@/components/ExplainInsightButton';
+import { InsightDiscussionArchiveModal } from '@/components/InsightDiscussionArchiveModal';
 
 // Helper function to safely format dates from insights
 const formatInsightDate = (dateGenerated: Date | string): string => {
@@ -48,9 +51,17 @@ interface InsightCardProps {
 
 export function InsightCard({ insight, onFeedback, isArchived = false, onArchive, onDelete }: InsightCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDiscussionArchive, setShowDiscussionArchive] = useState(false);
+  const [discussionCount, setDiscussionCount] = useState(0);
   const { recordFeedback, getFeedback } = useInsightFeedback();
   const existingFeedback = getFeedback(insight.id);
   const isCloudInsight = 'confidence' in insight && insight.id && insight.id.startsWith('cloud-');
+
+  // Check for existing discussions
+  useEffect(() => {
+    const discussions = chatStorage.getInsightDiscussionSessions(insight.id);
+    setDiscussionCount(discussions.length);
+  }, [insight.id]);
 
   const getInsightIcon = () => {
     const type = insight.type;
@@ -233,8 +244,20 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
                 </Button>
               )}
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
               <ExplainInsightButton insight={insight} variant="inline" />
+              {discussionCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDiscussionArchive(true)}
+                  className="h-6 px-2 text-xs hover:text-blue-600"
+                  title={`View ${discussionCount} discussion${discussionCount > 1 ? 's' : ''}`}
+                >
+                  <History className="h-3 w-3 mr-1" />
+                  {discussionCount}
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -256,6 +279,13 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
         cancelLabel="Cancel"
         onConfirm={confirmDelete}
         variant="destructive"
+      />
+
+      <InsightDiscussionArchiveModal
+        open={showDiscussionArchive}
+        onOpenChange={setShowDiscussionArchive}
+        insightId={insight.id}
+        insightTitle={insight.title}
       />
     </Card>
   );

@@ -233,6 +233,19 @@ export class ChatStorageService {
     return planAnalysisSessions;
   }
 
+  // Get insight discussion sessions for a specific insight
+  getInsightDiscussionSessions(insightId?: string): ChatSession[] {
+    const sessions = this.getSessions();
+    const insightDiscussionSessions = sessions.filter(s => s.category === 'insight_discussion');
+    
+    if (insightId) {
+      // Filter by insightId stored in chartId field (reusing existing field)
+      return insightDiscussionSessions.filter(s => s.chartId === insightId);
+    }
+    
+    return insightDiscussionSessions;
+  }
+
   // Private helper methods
   private saveSessions(sessions: ChatSession[]): void {
     try {
