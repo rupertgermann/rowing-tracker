@@ -27,6 +27,10 @@ const navigation = [
   { name: 'Upload', href: '/upload', icon: Upload },
 ];
 
+const adminNavigation = [
+  { name: 'Admin Panel', href: '/admin', icon: UserCircle },
+];
+
 export function Navigation() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -65,6 +69,31 @@ export function Navigation() {
                     className={cn(
                       'flex items-center space-x-2',
                       isActive && 'bg-primary text-primary-foreground'
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                </Button>
+              );
+            })}
+            
+            {/* Admin Navigation */}
+            {session?.user?.role === 'admin' && adminNavigation.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Button
+                  key={item.name}
+                  asChild
+                  variant={isActive ? 'default' : 'ghost'}
+                  size="sm"
+                  className="border-red-500/50"
+                >
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'flex items-center space-x-2',
+                      isActive && 'bg-red-500 text-white hover:bg-red-600'
                     )}
                   >
                     <item.icon className="h-4 w-4" />

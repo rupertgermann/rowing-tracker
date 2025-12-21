@@ -14,13 +14,19 @@ declare module "next-auth" {
       email?: string | null;
       name?: string | null;
       image?: string | null;
+      role?: string;
     };
+  }
+  
+  interface User {
+    role?: string;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
+    role?: string;
   }
 }
 
@@ -51,8 +57,8 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Check if email is verified for password login
-        if (!user.emailVerified) {
+        // Check if email is verified for password login (skip in development)
+        if (!user.emailVerified && process.env.NODE_ENV === "production") {
           throw new Error("Please verify your email before logging in");
         }
 
@@ -69,7 +75,8 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          image: user.image
+          image: user.image,
+          role: user.role
         };
       }
     }),
@@ -94,12 +101,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
+        session.user.role = token.role;
       }
       return session;
     }

@@ -98,7 +98,7 @@ export default function LoginPage() {
         <Button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
         >
           {isLoading ? (
             <>
@@ -109,6 +109,15 @@ export default function LoginPage() {
             "Sign In"
           )}
         </Button>
+
+        <div className="text-center">
+          <Link 
+            href="/auth/forgot-password" 
+            className="text-sm text-blue-400 hover:text-blue-300"
+          >
+            Forgot your password?
+          </Link>
+        </div>
       </form>
 
       <div className="mt-6 text-center">
