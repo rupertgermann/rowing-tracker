@@ -24,7 +24,8 @@ declare module "next-auth/jwt" {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Note: PrismaAdapter is not compatible with JWT strategy for credentials provider
+  // We handle user creation manually in the register API route
   providers: [
     CredentialsProvider({
       name: "credentials",
