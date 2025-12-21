@@ -6,7 +6,7 @@ A stunning web application to visualize SmartRow CSV exports with beautiful anal
 
 ## Overview
 
-Rowing Tracker is a modern, AI-powered web app built specifically for rowers who use SmartRow equipment. Upload your CSV exports and unlock the power of artificial intelligence to analyze your performance, generate personalized training plans, and receive expert coaching insights—all while maintaining complete privacy with local data storage.
+Rowing Tracker is a modern, AI-powered web app built specifically for rowers who use SmartRow equipment. Upload your CSV exports and unlock the power of artificial intelligence to analyze your performance, generate personalized training plans, and receive expert coaching insights. With multi-user support and secure authentication, each rower gets their own private workspace with data stored in PostgreSQL (local or cloud).
 
 ## Features
 
@@ -37,11 +37,22 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Stroke-by-Stroke Analysis**: Upload SmartRow stroke exports to unlock power/rhythm distributions, stroke-length consistency, and technique maps for every stroke
 - **Personal Records**: Automatic tracking of your best times and performances across all distances
 
-### 💾 Data & Privacy
+### 🔐 Multi-User & Authentication
+
+- **Secure Authentication**: Email/password login with email verification (double opt-in)
+- **Magic Link Login**: Passwordless authentication via email
+- **Google OAuth**: Optional sign-in with Google (when configured)
+- **User Profiles**: Manage your account, change password, and update profile information
+- **Data Isolation**: Each user's data is completely isolated and private
+
+### 💾 Data & Storage
 
 - **CSV Import**: Simple drag-and-drop upload for SmartRow CSV files
-- **Local Storage**: Your data stays private and is stored locally in your browser
-- **Memory System**: Upload and store PDFs and images in IndexedDB for AI analysis
+- **PostgreSQL Database**: Robust, scalable data storage with full ACID compliance
+- **Local Development**: Docker-based PostgreSQL for easy local development
+- **Cloud Ready**: Supabase support for production deployments
+- **Memory System**: Upload and store PDFs and images for AI analysis
+- **Data Privacy**: Your data is encrypted and isolated per user
 
 ### 🎨 User Experience
 
@@ -67,11 +78,15 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Components**: shadcn/ui
 - **Charts**: Recharts
 - **AI Integration**: OpenAI API
+- **Authentication**: NextAuth.js v4
+- **Database**: PostgreSQL with Prisma ORM v7
 - **State Management**: Zustand with persist middleware
 - **Storage**: 
-  - `localStorage` for sessions and settings
-  - `IndexedDB` (via idb) for large files and documents
+  - PostgreSQL for user data, sessions, plans, and achievements
+  - File system for award images
 - **CSV Parsing**: papaparse
+- **Email**: Nodemailer with Mailpit (local) or SMTP (production)
+- **Development**: Docker Compose for local services
 
 ## Quick Start
 
@@ -79,7 +94,9 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 - Node.js 18+ 
 - npm or yarn
+- Docker & Docker Compose (for local development)
 - OpenAI API Key (optional, for AI features)
+- PostgreSQL database (local via Docker or Supabase)
 
 ### Installation
 
@@ -94,23 +111,50 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
    npm install
    ```
 
-3. **Run the development server**
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and configure:
+   - `DATABASE_URL` - PostgreSQL connection string
+   - `NEXTAUTH_SECRET` - Generate with `openssl rand -base64 32`
+   - `NEXTAUTH_URL` - Your app URL (http://localhost:3000 for local)
+   - `EMAIL_SERVER` - SMTP server for emails (smtp://localhost:1025 for local)
+   - `EMAIL_FROM` - Sender email address
+
+4. **Start local services (PostgreSQL + Mailpit)**
+   ```bash
+   docker-compose up -d
+   ```
+   This starts:
+   - PostgreSQL on port 5432
+   - Mailpit SMTP on port 1025
+   - Mailpit Web UI on http://localhost:8025
+
+5. **Run database migrations**
+   ```bash
+   npm run db:migrate
+   ```
+
+6. **Run the development server**
    ```bash
    npm run dev
    ```
 
-4. **Open your browser**
+7. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-5. **Configure AI (Optional)**
+8. **Create an account**
+   - Click "Register" to create your account
+   - Check Mailpit (http://localhost:8025) for verification email
+   - Click the verification link
+   - Sign in with your credentials
+
+9. **Configure AI (Optional)**
    - Go to Settings → AI Coach
    - Enter your OpenAI API Key to enable Chat and Training Plans
-   - (New) Add your Personal Context to inform the AI about medical conditions, preferences, or goals:
-     - Write or paste information directly in the text area
-     - Select documents from your memory (PDFs, notes you've uploaded to the AI Coach)
-     - Click "Generate AI Context" to condense it into coaching instructions
-     - The generated context is automatically injected into all AI features
-   - Customize the AI prompts used for chat, insights, and training plans in the Advanced Configuration section (each prompt has a reset-to-default button)
+   - Add your Personal Context to inform the AI about medical conditions, preferences, or goals
+   - Customize the AI prompts in the Advanced Configuration section
 
 ## SmartRow CSV Export Guide
 
@@ -156,6 +200,66 @@ Your CSV must include these columns:
 - Average stroke rate (SPM)
 - Maximum stroke rate (SPM)
 
+## Deployment
+
+### Supabase (Production)
+
+1. **Create a Supabase project**
+   - Go to [supabase.com](https://supabase.com)
+   - Create a new project
+   - Note your project URL and database password
+
+2. **Configure environment variables**
+   ```bash
+   # In your .env or deployment platform
+   DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true"
+   DIRECT_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
+   NEXTAUTH_SECRET="your-production-secret"
+   NEXTAUTH_URL="https://yourdomain.com"
+   EMAIL_SERVER="smtp://your-smtp-server:587"
+   EMAIL_FROM="noreply@yourdomain.com"
+   ```
+
+3. **Run migrations**
+   ```bash
+   npm run db:migrate
+   ```
+
+4. **Deploy to Vercel/Netlify**
+   - Connect your repository
+   - Add environment variables
+   - Deploy!
+
+### Database Management
+
+Available npm scripts:
+
+```bash
+# Start local Docker services
+npm run docker:up
+
+# Stop local Docker services
+npm run docker:down
+
+# Generate Prisma client
+npm run db:generate
+
+# Run migrations
+npm run db:migrate
+
+# Create a new migration
+npm run db:migrate:create
+
+# Reset database (WARNING: deletes all data)
+npm run db:reset
+
+# Open Prisma Studio (database GUI)
+npm run db:studio
+
+# Push schema without migration (dev only)
+npm run db:push
+```
+
 ## Architecture Overview
 
 ```
@@ -169,41 +273,66 @@ rowing-tracker/
 │   │   ├── analytics/     # Advanced analytics
 │   │   ├── chat/          # AI Coach chat
 │   │   ├── plans/         # Training plans
+│   │   ├── profile/       # User profile
 │   │   └── settings/      # App settings
+│   ├── api/               # API routes
+│   │   ├── auth/          # NextAuth endpoints
+│   │   └── user/          # User management
+│   ├── auth/              # Auth pages
+│   │   ├── login/         # Login page
+│   │   ├── register/      # Registration
+│   │   └── verify-email/  # Email verification
 │   ├── layout.tsx         # Root layout
 │   └── globals.css        # Global styles
 ├── components/            # Reusable UI components
 ├── lib/                   # Utility functions
+│   ├── auth.ts            # NextAuth configuration
+│   ├── db/                # Database
+│   │   └── prisma.ts      # Prisma client
 │   ├── csvParser.ts       # CSV parsing logic
 │   ├── store.ts           # Zustand state management
-│   ├── memoryStorage.ts   # IndexedDB storage wrapper
 │   ├── cloudAI.ts         # OpenAI integration
 │   └── trainingPlans.ts   # Plan generation logic
+├── prisma/                # Database schema
+│   └── schema.prisma      # Prisma schema
 ├── types/                 # TypeScript type definitions
 │   └── session.ts         # Session interface
 └── docs/                  # Documentation
-    ├── prd.md             # Product requirements
-    └── design-system.md   # Design guidelines
+    ├── DATABASE_SCHEMA.md # Database documentation
+    └── *.md               # Other docs
 ```
 
 ### Data Flow
 
-1. **Upload**: User drops CSV file → papaparse processes → validation
-2. **Storage**: 
-   - Sessions/Settings → Zustand store → localStorage persistence
-   - Documents/Images → MemoryService → IndexedDB
-3. **Display**: Components read from store → calculate metrics → render charts
-4. **Analysis**: Real-time PR calculations, trend analysis, aggregations
-5. **AI Features**: Context retrieved from Store/Memory → sent to OpenAI → response streamed
+1. **Authentication**: User registers/logs in → NextAuth validates → JWT session created
+2. **Upload**: User drops CSV file → papaparse processes → validation → saved to PostgreSQL
+3. **Storage**: 
+   - User data, sessions, plans → PostgreSQL via Prisma
+   - Award images → File system
+   - Client state → Zustand store (ephemeral)
+4. **Display**: Components fetch from database → calculate metrics → render charts
+5. **Analysis**: Real-time PR calculations, trend analysis, aggregations
+6. **AI Features**: Context retrieved from database → sent to OpenAI → response streamed
+7. **Data Isolation**: All queries filtered by authenticated user ID
 
 ## Development
 
 ### Available Scripts
 
+**Development:**
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint
+
+**Database:**
+- `npm run docker:up` - Start PostgreSQL & Mailpit
+- `npm run docker:down` - Stop Docker services
+- `npm run db:generate` - Generate Prisma client
+- `npm run db:migrate` - Run migrations
+- `npm run db:studio` - Open Prisma Studio
+- `npm run db:push` - Push schema (dev only)
+- `npm run db:reset` - Reset database
 
 ### Project Structure
 
@@ -224,32 +353,51 @@ npx shadcn@latest add button card table badge
 
 ## Data Model
 
-```typescript
-interface Session {
-  id: string;
-  timestamp: Date;
-  distance: number;        // meters
-  duration: number;        // seconds
-  energy: number;          // kCal
-  strokeCount: number;
-  avgPower: number;        // watts
-  maxPower: number;
-  wattPerKg: number;
-  avgSplit: number;        // seconds per 500m
-  minSplit: number;
-  avgWork: number;         // joules
-  avgStrokeLength: number; // meters
-  avgStrokeRate: number;   // SPM
-  maxStrokeRate: number;
-}
-```
+The app uses PostgreSQL with Prisma ORM. Key models:
+
+**User Management:**
+- `User` - User accounts with authentication
+- `Account` - OAuth provider accounts
+- `AuthSession` - Active sessions
+- `VerificationToken` - Email verification tokens
+- `UserSettings` - User preferences and configuration
+- `UserApiKey` - Encrypted API keys (OpenAI, etc.)
+
+**Rowing Data:**
+- `RowingSession` - Workout sessions with metrics
+- `StrokeData` - Stroke-by-stroke analysis data
+- `PersonalRecord` - Best performances per distance
+
+**Achievements:**
+- `EarnedAward` - Unlocked achievements
+- `AIAwardSuggestion` - AI-suggested custom awards
+- `GeneratedAchievement` - AI-generated award stories/images
+
+**Training:**
+- `TrainingPlan` - Multi-week training programs
+- `TrainingWeek` - Weekly training structure
+- `TrainingSession` - Individual planned workouts
+- `TrainingSessionLink` - Links planned to actual sessions
+
+**AI & Memory:**
+- `ChatSession` - AI coach conversations
+- `ChatMessage` - Individual chat messages
+- `AIInsight` - Generated performance insights
+- `MemoryDocument` - Uploaded PDFs/images for AI context
+- `MemoryBlob` - Binary data storage
+- `ChartExplanation` - Cached chart explanations
+
+See `prisma/schema.prisma` for complete schema or `docs/DATABASE_SCHEMA.md` for detailed documentation.
 
 ## Privacy & Data
 
-- **Local Storage**: All data is stored locally in your browser
-- **No Servers**: No data is sent to external servers
-- **Privacy First**: Your workout data remains private
-- **Export**: You can export your data at any time (future feature)
+- **User Isolation**: Each user's data is completely isolated in the database
+- **Secure Authentication**: Passwords hashed with bcrypt, JWT sessions
+- **Email Verification**: Double opt-in ensures account ownership
+- **Data Encryption**: Sensitive data encrypted at rest (database level)
+- **Privacy First**: Your workout data is never shared with other users
+- **GDPR Ready**: User data can be exported or deleted on request
+- **API Keys**: OpenAI keys encrypted in database, never exposed to client
 
 ## Browser Support
 
