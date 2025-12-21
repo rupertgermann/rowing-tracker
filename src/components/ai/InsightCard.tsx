@@ -21,6 +21,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ExplainInsightButton } from '@/components/ExplainInsightButton';
 
 // Helper function to safely format dates from insights
 const formatInsightDate = (dateGenerated: Date | string): string => {
@@ -231,6 +232,9 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
                   Delete
                 </Button>
               )}
+            </div>
+            <div className="ml-auto">
+              <ExplainInsightButton insight={insight} variant="inline" />
             </div>
           </div>
         )}

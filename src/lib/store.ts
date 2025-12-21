@@ -78,6 +78,16 @@ export interface PendingPlanAnalysis {
   planData?: string; // JSON stringified plan data
 }
 
+// Pending insight discussion data (for passing to chat)
+export interface PendingInsight {
+  insightId: string;
+  insightTitle: string;
+  insightDescription: string;
+  insightType: string;
+  priority: string;
+  prompt: string;
+}
+
 export type AIAwardSuggestionStatus = 'suggested' | 'approved' | 'earned';
 
 // Structured criteria for automatic evaluation
@@ -138,6 +148,7 @@ interface RowingStore {
   chartExplanations: Record<string, ChartExplanation>; // keyed by chartId
   pendingChartExplanation: PendingChartExplanation | null; // temporary storage for chat handoff
   pendingPlanAnalysis: PendingPlanAnalysis | null; // temporary storage for plan analysis chat handoff
+  pendingInsight: PendingInsight | null; // temporary storage for insight discussion chat handoff
   
   // Actions
   addSessions: (sessions: Session[]) => void;
@@ -166,6 +177,8 @@ interface RowingStore {
   getPendingChartExplanation: () => PendingChartExplanation | null;
   setPendingPlanAnalysis: (data: PendingPlanAnalysis | null) => void;
   getPendingPlanAnalysis: () => PendingPlanAnalysis | null;
+  setPendingInsight: (data: PendingInsight | null) => void;
+  getPendingInsight: () => PendingInsight | null;
   
   // Computed getters
   getSessions: () => Session[];
@@ -604,6 +617,7 @@ export const useRowingStore = create<RowingStore>()(
       chartExplanations: {},
       pendingChartExplanation: null,
       pendingPlanAnalysis: null,
+      pendingInsight: null,
 
       // Actions
       addSessions: (newSessions) => {
@@ -906,6 +920,14 @@ export const useRowingStore = create<RowingStore>()(
 
       getPendingPlanAnalysis: () => {
         return get().pendingPlanAnalysis;
+      },
+
+      setPendingInsight: (data) => {
+        set({ pendingInsight: data });
+      },
+
+      getPendingInsight: () => {
+        return get().pendingInsight;
       },
 
       // Computed getters

@@ -39,7 +39,7 @@ import { settings } from '@/lib/settings';
 function ChatPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation, getPendingPlanAnalysis, setPendingPlanAnalysis: clearPendingPlanAnalysis } = useRowingStore();
+  const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation, getPendingPlanAnalysis, setPendingPlanAnalysis: clearPendingPlanAnalysis, getPendingInsight, setPendingInsight } = useRowingStore();
   
   const {
     currentSession,
@@ -80,10 +80,11 @@ function ChatPageContent() {
   // Memory hook for document count badge and uploading attachments
   const { documents: memoryDocuments, uploadDocument } = useMemory();
 
-  // Handle chart explanation or plan analysis from store - create session and pre-fill input
+  // Handle chart explanation, plan analysis, or insight discussion from store - create session and pre-fill input
   useEffect(() => {
     const fromChart = searchParams.get('fromChart');
     const fromPlanAnalysis = searchParams.get('fromPlanAnalysis');
+    const fromInsight = searchParams.get('fromInsight');
     
     // Handle chart explanation
     if (fromChart && isAIConfigured && !initialPromptProcessedRef.current) {
@@ -154,8 +155,33 @@ function ChatPageContent() {
           router.replace('/chat', { scroll: false });
         }
       }
+      return;
     }
-  }, [searchParams, isAIConfigured, createSession, router, getPendingChartExplanation, clearPendingChartExplanation, getPendingPlanAnalysis, clearPendingPlanAnalysis]);
+
+    // Handle insight discussion
+    if (fromInsight && isAIConfigured && !initialPromptProcessedRef.current) {
+      const pendingData = getPendingInsight();
+      
+      if (pendingData) {
+        initialPromptProcessedRef.current = true;
+        
+        // Create a new session with the insight title and explanation category
+        const sessionTitle = `Discuss: ${pendingData.insightTitle}`;
+        const newSession = createSession(sessionTitle, 'explanation', pendingData.insightId);
+        
+        if (newSession) {
+          // Pre-fill the input field with the prompt
+          setMessageInput(pendingData.prompt);
+          
+          // Clear pending data from store
+          setPendingInsight(null);
+          
+          // Clear URL params without triggering navigation
+          router.replace('/chat', { scroll: false });
+        }
+      }
+    }
+  }, [searchParams, isAIConfigured, createSession, router, getPendingChartExplanation, clearPendingChartExplanation, getPendingPlanAnalysis, clearPendingPlanAnalysis, getPendingInsight, setPendingInsight]);
 
   // Handle session URL parameter - switch to specific chat session
   useEffect(() => {
