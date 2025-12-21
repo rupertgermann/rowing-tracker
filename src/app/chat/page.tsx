@@ -928,6 +928,20 @@ function ChatPageContent() {
                         Back to insights
                       </Button>
                     )}
+                    {/* Link back to plans for plan analysis sessions */}
+                    {currentSession.category === 'plan_analysis' && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 mt-1 text-xs"
+                        onClick={() => {
+                          router.push('/plans');
+                        }}
+                      >
+                        <ArrowLeft className="h-3 w-3 mr-1" />
+                        Back to plan
+                      </Button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={isAIConfigured ? "default" : "secondary"}>
