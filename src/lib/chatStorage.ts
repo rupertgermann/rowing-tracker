@@ -67,7 +67,7 @@ export class ChatStorageService {
   }
 
   // Create new session
-  createSession(title?: string, category?: 'chat' | 'explanation' | 'plan_analysis', chartId?: string): ChatSession {
+  createSession(title?: string, category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion', chartId?: string): ChatSession {
     const newSession: ChatSession = {
       id: this.generateId(),
       title: title || this.generateSessionTitle(),

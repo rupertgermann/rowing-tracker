@@ -27,6 +27,9 @@ import {
   Brain,
   BarChart3,
   ArrowLeft,
+  HelpCircle,
+  Calendar,
+  Lightbulb,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { MemoryManager } from '@/components/MemoryManager';
@@ -69,7 +72,7 @@ function ChatPageContent() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation' | 'plan_analysis'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
   const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string; chartTitle: string } | null>(null);
@@ -165,9 +168,9 @@ function ChatPageContent() {
       if (pendingData) {
         initialPromptProcessedRef.current = true;
         
-        // Create a new session with the insight title and explanation category
+        // Create a new session with the insight title and insight_discussion category
         const sessionTitle = `Discuss: ${pendingData.insightTitle}`;
-        const newSession = createSession(sessionTitle, 'explanation', pendingData.insightId);
+        const newSession = createSession(sessionTitle, 'insight_discussion', pendingData.insightId);
         
         if (newSession) {
           // Pre-fill the input field with the prompt
@@ -662,43 +665,58 @@ function ChatPageContent() {
             <div className="flex gap-1 p-1 bg-muted rounded-lg">
               <button
                 onClick={() => setCategoryFilter('all')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
                   categoryFilter === 'all'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
                 }`}
+                title={`All (${sessions.length})`}
               >
-                All ({sessions.length})
+                <MessageCircle className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setCategoryFilter('chat')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
                   categoryFilter === 'chat'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
                 }`}
+                title={`Chats (${sessions.filter(s => (s.category || 'chat') === 'chat').length})`}
               >
-                Chats ({sessions.filter(s => (s.category || 'chat') === 'chat').length})
+                <Bot className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setCategoryFilter('explanation')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
                   categoryFilter === 'explanation'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
                 }`}
+                title={`Explains (${sessions.filter(s => s.category === 'explanation').length})`}
               >
-                Explains ({sessions.filter(s => s.category === 'explanation').length})
+                <HelpCircle className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setCategoryFilter('plan_analysis')}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
                   categoryFilter === 'plan_analysis'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
                 }`}
+                title={`Plans (${sessions.filter(s => s.category === 'plan_analysis').length})`}
               >
-                Plans ({sessions.filter(s => s.category === 'plan_analysis').length})
+                <Calendar className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCategoryFilter('insight_discussion')}
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
+                  categoryFilter === 'insight_discussion'
+                    ? 'bg-background shadow-sm'
+                    : 'hover:bg-background/50'
+                }`}
+                title={`Insights (${sessions.filter(s => s.category === 'insight_discussion').length})`}
+              >
+                <Lightbulb className="h-4 w-4" />
               </button>
             </div>
           </CardHeader>
@@ -726,13 +744,15 @@ function ChatPageContent() {
               <div className="text-center py-8">
                 <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-medium mb-2">
-                  No {categoryFilter === 'explanation' ? 'Explanations' : categoryFilter === 'plan_analysis' ? 'Plan Analyses' : 'Chats'} Yet
+                  No {categoryFilter === 'explanation' ? 'Explanations' : categoryFilter === 'plan_analysis' ? 'Plan Analyses' : categoryFilter === 'insight_discussion' ? 'Insight Discussions' : 'Chats'} Yet
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {categoryFilter === 'explanation' 
                     ? 'Click "Explain" on any chart to create an explanation.'
                     : categoryFilter === 'plan_analysis'
                     ? 'Click "Analyze Progress" on your active training plan.'
+                    : categoryFilter === 'insight_discussion'
+                    ? 'Click "Discuss" on any AI insight to start a discussion.'
                     : 'Start a new chat with your AI rowing coach.'}
                 </p>
               </div>
@@ -786,7 +806,16 @@ function ChatPageContent() {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm truncate flex items-center gap-1.5">
                               {session.category === 'explanation' && (
-                                <BarChart3 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                <HelpCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                              )}
+                              {session.category === 'plan_analysis' && (
+                                <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                              )}
+                              {session.category === 'insight_discussion' && (
+                                <Lightbulb className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                              )}
+                              {(!session.category || session.category === 'chat') && (
+                                <Bot className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                               )}
                               {session.title}
                             </div>
@@ -883,6 +912,20 @@ function ChatPageContent() {
                       >
                         <ArrowLeft className="h-3 w-3 mr-1" />
                         Back to chart
+                      </Button>
+                    )}
+                    {/* Link back to insights for insight discussion sessions */}
+                    {currentSession.category === 'insight_discussion' && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 mt-1 text-xs"
+                        onClick={() => {
+                          router.push('/insights');
+                        }}
+                      >
+                        <ArrowLeft className="h-3 w-3 mr-1" />
+                        Back to insights
                       </Button>
                     )}
                   </div>
