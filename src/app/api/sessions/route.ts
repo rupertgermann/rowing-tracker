@@ -22,6 +22,13 @@ export async function GET() {
       where: {
         userId: session.user.id,
       },
+      include: {
+        strokeData: {
+          orderBy: {
+            strokeIndex: 'asc',
+          },
+        },
+      },
       orderBy: {
         timestamp: 'desc',
       },
@@ -64,27 +71,99 @@ export async function POST(req: Request) {
     const created = [];
 
     for (const sessionData of newSessions) {
-      const createdSession = await prisma.rowingSession.create({
-        data: {
+      // Check if session already exists (for updates)
+      const existing = await prisma.rowingSession.findFirst({
+        where: {
+          id: sessionData.id,
           userId: session.user.id,
-          timestamp: new Date(sessionData.timestamp),
-          distance: sessionData.distance,
-          duration: sessionData.duration,
-          energy: sessionData.energy || 0,
-          strokeCount: sessionData.strokeCount || 0,
-          avgPower: sessionData.avgPower || 0,
-          maxPower: sessionData.maxPower || 0,
-          wattPerKg: sessionData.wattPerKg || 0,
-          avgSplit: sessionData.avgSplit || 0,
-          minSplit: sessionData.minSplit || 0,
-          avgWork: sessionData.avgWork || 0,
-          avgStrokeLength: sessionData.avgStrokeLength || 0,
-          avgStrokeRate: sessionData.avgStrokeRate || 0,
-          maxStrokeRate: sessionData.maxStrokeRate || 0,
-          sourceFile: sessionData.sourceFile || null,
         },
       });
-      created.push(createdSession);
+
+      let sessionRecord;
+
+      if (existing) {
+        // Update existing session
+        console.log(`[SESSIONS API] Updating existing session ${sessionData.id}`);
+        
+        sessionRecord = await prisma.rowingSession.update({
+          where: { id: existing.id },
+          data: {
+            timestamp: new Date(sessionData.timestamp),
+            distance: sessionData.distance,
+            duration: sessionData.duration,
+            energy: sessionData.energy || 0,
+            strokeCount: sessionData.strokeCount || 0,
+            avgPower: sessionData.avgPower || 0,
+            maxPower: sessionData.maxPower || 0,
+            wattPerKg: sessionData.wattPerKg || 0,
+            avgSplit: sessionData.avgSplit || 0,
+            minSplit: sessionData.minSplit || 0,
+            avgWork: sessionData.avgWork || 0,
+            avgStrokeLength: sessionData.avgStrokeLength || 0,
+            avgStrokeRate: sessionData.avgStrokeRate || 0,
+            maxStrokeRate: sessionData.maxStrokeRate || 0,
+            sourceFile: sessionData.sourceFile || null,
+          },
+        });
+
+        // Delete existing stroke data before adding new
+        if (sessionData.strokeData && Array.isArray(sessionData.strokeData)) {
+          await prisma.strokeData.deleteMany({
+            where: { sessionId: existing.id },
+          });
+        }
+      } else {
+        // Create new session
+        console.log(`[SESSIONS API] Creating new session`);
+        
+        sessionRecord = await prisma.rowingSession.create({
+          data: {
+            userId: session.user.id,
+            timestamp: new Date(sessionData.timestamp),
+            distance: sessionData.distance,
+            duration: sessionData.duration,
+            energy: sessionData.energy || 0,
+            strokeCount: sessionData.strokeCount || 0,
+            avgPower: sessionData.avgPower || 0,
+            maxPower: sessionData.maxPower || 0,
+            wattPerKg: sessionData.wattPerKg || 0,
+            avgSplit: sessionData.avgSplit || 0,
+            minSplit: sessionData.minSplit || 0,
+            avgWork: sessionData.avgWork || 0,
+            avgStrokeLength: sessionData.avgStrokeLength || 0,
+            avgStrokeRate: sessionData.avgStrokeRate || 0,
+            maxStrokeRate: sessionData.maxStrokeRate || 0,
+            sourceFile: sessionData.sourceFile || null,
+          },
+        });
+      }
+
+      // Save stroke data if present
+      if (sessionData.strokeData && Array.isArray(sessionData.strokeData)) {
+        console.log(`[SESSIONS API] Saving ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
+        
+        for (const stroke of sessionData.strokeData) {
+          await prisma.strokeData.create({
+            data: {
+              sessionId: sessionRecord.id,
+              strokeIndex: stroke.strokeIndex,
+              time: stroke.time,
+              timestamp: stroke.timestamp,
+              distance: stroke.distance,
+              work: stroke.work,
+              power: stroke.power,
+              avgPower: stroke.avgPower,
+              split: stroke.split,
+              avgSplit: stroke.avgSplit,
+              strokeRate: stroke.strokeRate,
+              heartRate: stroke.heartRate || null,
+              strokeLength: stroke.strokeLength || null,
+            },
+          });
+        }
+      }
+
+      created.push(sessionRecord);
     }
 
     return NextResponse.json({ 

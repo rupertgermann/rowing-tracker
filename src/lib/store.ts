@@ -739,7 +739,27 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         });
       },
 
-      updateSession: (updatedSession) => {
+      updateSession: async (updatedSession) => {
+        console.log('[STORE] updateSession called with session:', updatedSession.id);
+        console.log('[STORE] Has stroke data:', !!updatedSession.strokeData, 'Count:', updatedSession.strokeData?.length);
+        
+        // Save to database
+        try {
+          const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessions: [updatedSession] }),
+          });
+          
+          if (!response.ok) {
+            console.error('[STORE] Failed to save updated session to database');
+          } else {
+            console.log('[STORE] Successfully saved updated session with stroke data to database');
+          }
+        } catch (error) {
+          console.error('[STORE] Error saving updated session:', error);
+        }
+        
         set((state) => {
           const updatedSessions = state.sessions.map(s => 
             s.id === updatedSession.id ? updatedSession : s

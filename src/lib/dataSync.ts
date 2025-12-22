@@ -144,19 +144,281 @@ export async function saveAwardsToDB(awards: EarnedAward[]): Promise<SyncResult>
 }
 
 /**
+ * Fetch training plans from database
+ */
+export async function fetchTrainingPlansFromDB(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/training-plans');
+    if (!response.ok) {
+      throw new Error('Failed to fetch training plans');
+    }
+    const data = await response.json();
+    return data.plans || [];
+  } catch (error) {
+    console.error('Error fetching training plans:', error);
+    return [];
+  }
+}
+
+/**
+ * Save training plans to database
+ */
+export async function saveTrainingPlansToDB(plans: any[]): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/training-plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plans }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save training plans' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving training plans:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Fetch AI insights from database
+ */
+export async function fetchInsightsFromDB(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/insights');
+    if (!response.ok) {
+      throw new Error('Failed to fetch insights');
+    }
+    const data = await response.json();
+    return data.insights || [];
+  } catch (error) {
+    console.error('Error fetching insights:', error);
+    return [];
+  }
+}
+
+/**
+ * Save AI insights to database
+ */
+export async function saveInsightsToDB(insights: any[]): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ insights }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save insights' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving insights:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Fetch chat sessions from database
+ */
+export async function fetchChatSessionsFromDB(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/chat');
+    if (!response.ok) {
+      throw new Error('Failed to fetch chat sessions');
+    }
+    const data = await response.json();
+    return data.chatSessions || [];
+  } catch (error) {
+    console.error('Error fetching chat sessions:', error);
+    return [];
+  }
+}
+
+/**
+ * Save chat sessions to database
+ */
+export async function saveChatSessionsToDB(chatSessions: any[]): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatSessions }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save chat sessions' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving chat sessions:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Fetch user settings from database
+ */
+export async function fetchSettingsFromDB(): Promise<any> {
+  try {
+    const response = await fetch('/api/settings');
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
+    const data = await response.json();
+    return data.settings || null;
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    return null;
+  }
+}
+
+/**
+ * Save user settings to database
+ */
+export async function saveSettingsToDB(settings: any): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save settings' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Fetch generated achievements from database
+ */
+export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/generated-achievements');
+    if (!response.ok) {
+      throw new Error('Failed to fetch generated achievements');
+    }
+    const data = await response.json();
+    return data.achievements || [];
+  } catch (error) {
+    console.error('Error fetching generated achievements:', error);
+    return [];
+  }
+}
+
+/**
+ * Save generated achievements to database
+ */
+export async function saveGeneratedAchievementsToDB(achievements: any[]): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/generated-achievements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ achievements }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save generated achievements' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving generated achievements:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Fetch memory documents from database
+ */
+export async function fetchMemoryDocumentsFromDB(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/memory');
+    if (!response.ok) {
+      throw new Error('Failed to fetch memory documents');
+    }
+    const data = await response.json();
+    return data.documents || [];
+  } catch (error) {
+    console.error('Error fetching memory documents:', error);
+    return [];
+  }
+}
+
+/**
+ * Save memory documents to database
+ */
+export async function saveMemoryDocumentsToDB(documents: any[]): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documents }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save memory documents' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving memory documents:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
  * Initialize store with data from database
  * Call this when user logs in or app loads
  */
 export async function initializeStoreFromDB() {
-  const [sessions, prs, awards] = await Promise.all([
+  const [
+    sessions, 
+    prs, 
+    awards, 
+    trainingPlans, 
+    insights, 
+    chatSessions, 
+    settings,
+    generatedAchievements,
+    memoryDocuments
+  ] = await Promise.all([
     fetchSessionsFromDB(),
     fetchPRsFromDB(),
     fetchAwardsFromDB(),
+    fetchTrainingPlansFromDB(),
+    fetchInsightsFromDB(),
+    fetchChatSessionsFromDB(),
+    fetchSettingsFromDB(),
+    fetchGeneratedAchievementsFromDB(),
+    fetchMemoryDocumentsFromDB(),
   ]);
 
   return {
     sessions,
     personalRecords: prs,
     earnedAwards: awards,
+    trainingPlans,
+    insights,
+    chatSessions,
+    settings,
+    generatedAchievements,
+    memoryDocuments,
   };
 }
