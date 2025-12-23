@@ -35,7 +35,7 @@ interface InsightCache {
 
 const CACHE_KEY = 'rowing_ai_insights_cache';
 const ARCHIVE_KEY = 'rowing_ai_insights_archive';
-const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days - only regenerate if sessions change
 const AUTO_ARCHIVE_DAYS = 30; // Archive insights older than 30 days
 
 // Generate cache key based on session data
