@@ -23,14 +23,16 @@ export function useSettings() {
         const dbSettings = await fetchSettingsFromDB();
         
         if (dbSettings) {
+          console.log('[useSettings] Loaded from database:', dbSettings);
           setSettings(dbSettings as Settings);
         } else {
           // Fallback to localStorage
+          console.log('[useSettings] Database returned null, falling back to localStorage');
           const localSettings = settingsService.getSettings();
           setSettings(localSettings);
         }
       } catch (err) {
-        console.error('Error loading settings:', err);
+        console.error('[useSettings] Error loading settings:', err);
         // Fallback to localStorage on error
         const localSettings = settingsService.getSettings();
         setSettings(localSettings);
@@ -41,7 +43,7 @@ export function useSettings() {
     };
 
     loadSettings();
-  }, []);
+  }, [settingsService]);
 
   // Save settings to both database and localStorage
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {

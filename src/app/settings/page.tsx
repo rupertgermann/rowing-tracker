@@ -80,7 +80,14 @@ type SettingsCategory =
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('userPreferences');
-  const [settingsData, setSettingsData] = useState<Settings | null>(null);
+  // Initialize with localStorage defaults to prevent null errors
+  const [settingsData, setSettingsData] = useState<Settings>(() => {
+    try {
+      return settings.getSettings();
+    } catch {
+      return settings.getSettings();
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
