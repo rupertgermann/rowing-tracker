@@ -281,6 +281,46 @@ export async function saveChartSettingsToDB(chartSettings: any): Promise<SyncRes
 }
 
 /**
+ * Fetch AI insights archive from database
+ */
+export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/insights?archived=true');
+    if (!response.ok) {
+      throw new Error('Failed to fetch archived insights');
+    }
+    const data = await response.json();
+    return data.insights || [];
+  } catch (error) {
+    console.error('Error fetching archived insights:', error);
+    return [];
+  }
+}
+
+/**
+ * Save AI insights archive to database
+ */
+export async function saveArchivedInsightsToDB(insights: any[]): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ insights, archived: true }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save archived insights' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving archived insights:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
  * Save chat sessions to database
  */
 export async function saveChatSessionsToDB(chatSessions: any[]): Promise<SyncResult> {

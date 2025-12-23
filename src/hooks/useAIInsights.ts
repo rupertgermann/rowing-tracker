@@ -5,7 +5,7 @@ import { aiAnalysis, Insight, TrendData, TrainingLoadData, AnomalyData } from '@
 import { cloudAI, CloudInsight } from '@/lib/cloudAI';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 import { memoryStorage } from '@/lib/memoryStorage';
-import { fetchInsightsFromDB, saveInsightsToDB } from '@/lib/dataSync';
+import { fetchInsightsFromDB, saveInsightsToDB, fetchArchivedInsightsFromDB, saveArchivedInsightsToDB } from '@/lib/dataSync';
 
 export interface AIInsightData {
   insights: (Insight | CloudInsight)[];
@@ -168,7 +168,6 @@ const getStaleInsightsForArchiving = (): (Insight | CloudInsight)[] => {
 
 // Save insights to cache (archives old insights before overwriting)
 const saveCachedInsights = async (sessions: Session[], usingCloudAI: boolean, data: AIInsightData): Promise<void> => {
-  // Guard against SSR/non-browser environments
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return;
   }
@@ -271,7 +270,20 @@ const getArchivedInsights = (): (Insight | CloudInsight)[] => {
 
   try {
     const archived = localStorage.getItem(ARCHIVE_KEY);
-    if (!archived) return [];
+    if (!archived) {
+      // Try to load from database as fallback (async, but return empty for now)
+      fetchArchivedInsightsFromDB()
+        .then(dbInsights => {
+          if (dbInsights && dbInsights.length > 0) {
+            console.log('[useAIInsights] Loaded', dbInsights.length, 'archived insights from database');
+            localStorage.setItem(ARCHIVE_KEY, JSON.stringify(dbInsights));
+          }
+        })
+        .catch(err => {
+          console.warn('[useAIInsights] Failed to load archived insights from database:', err);
+        });
+      return [];
+    }
 
     const parsed = JSON.parse(archived);
 
@@ -313,6 +325,19 @@ const saveArchivedInsights = (archivedInsights: (Insight | CloudInsight)[]): voi
 
   try {
     localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archivedInsights));
+    
+    // Persist to database in the background (non-blocking)
+    saveArchivedInsightsToDB(archivedInsights)
+      .then(result => {
+        if (!result.success) {
+          console.warn('[useAIInsights] Failed to save archived insights to database:', result.error);
+        } else {
+          console.log('[useAIInsights] Archived insights saved to database');
+        }
+      })
+      .catch(err => {
+        console.warn('[useAIInsights] Error saving archived insights to database:', err);
+      });
   } catch (error) {
     console.warn('Failed to save archived insights:', error);
   }
