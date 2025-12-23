@@ -982,7 +982,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
         model: this.mapModel(useCaseConfig.model),
         reasoning: useCaseConfig.reasoning,
         verbosity: useCaseConfig.verbosity,
-        maxTokens: this.aiSettings?.maxTokens || 1500,
+        maxTokens: this.aiSettings?.maxTokens || 4000,
         jsonSchema: {
           name: "insights",
           schema: {

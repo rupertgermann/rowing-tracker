@@ -1584,7 +1584,7 @@ export default function SettingsPage() {
                         min="100"
                         max="16000"
                         value={settingsData.aiSettings.maxTokens}
-                        onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
+                        onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 4000 })}
                         className="mt-1"
                       />
                       <p className="text-xs text-muted-foreground mt-1">

@@ -179,3 +179,68 @@ export async function POST(req: Request) {
     );
   }
 }
+
+/**
+ * DELETE /api/sessions
+ * Delete a session for the authenticated user
+ */
+export async function DELETE(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const sessionId = searchParams.get('id');
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Verify the session belongs to the user before deleting
+    const existingSession = await prisma.rowingSession.findFirst({
+      where: {
+        id: sessionId,
+        userId: session.user.id,
+      },
+    });
+
+    if (!existingSession) {
+      return NextResponse.json(
+        { error: "Session not found" },
+        { status: 404 }
+      );
+    }
+
+    // Delete stroke data first (cascade should handle this, but being explicit)
+    await prisma.strokeData.deleteMany({
+      where: { sessionId },
+    });
+
+    // Delete the session
+    await prisma.rowingSession.delete({
+      where: { id: sessionId },
+    });
+
+    console.log(`[SESSIONS API] Deleted session ${sessionId}`);
+
+    return NextResponse.json({ 
+      success: true,
+      sessionId 
+    });
+  } catch (error) {
+    console.error("Error deleting session:", error);
+    return NextResponse.json(
+      { error: "Failed to delete session" },
+      { status: 500 }
+    );
+  }
+}

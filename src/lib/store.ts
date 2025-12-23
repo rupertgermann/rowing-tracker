@@ -645,6 +645,13 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           const updatedSessions = [...state.sessions, ...uniqueNewSessions];
           const updatedRecords = calculatePersonalRecords(updatedSessions);
           
+          // Invalidate AI insights cache when session count changes
+          // Cache key validation in useAIInsights will detect the change and regenerate
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            console.log('[STORE] Invalidating AI insights cache due to new sessions added');
+            localStorage.removeItem('rowing_ai_insights_cache');
+          }
+          
           // Save PRs to database
           savePRsToDB(updatedRecords.map(pr => ({
             distance: pr.distance,
@@ -709,6 +716,13 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       },
 
       clearSessions: () => {
+        // Invalidate AI insights cache when sessions are cleared
+        // Cache key validation in useAIInsights will detect the change and regenerate
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          console.log('[STORE] Invalidating AI insights cache due to sessions cleared');
+          localStorage.removeItem('rowing_ai_insights_cache');
+        }
+        
         set({
           sessions: [],
           personalRecords: [],
@@ -727,10 +741,39 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         set({ filters: defaultFilters });
       },
 
-      deleteSession: (sessionId) => {
+      deleteSession: async (sessionId) => {
+        console.log('[STORE] deleteSession called for:', sessionId);
+        
+        // Delete from database first
+        try {
+          const response = await fetch(`/api/sessions?id=${sessionId}`, {
+            method: 'DELETE',
+          });
+          
+          if (!response.ok) {
+            console.error('[STORE] Failed to delete session from database');
+            const error = await response.json();
+            console.error('[STORE] Error:', error);
+            return;
+          }
+          
+          console.log('[STORE] Successfully deleted session from database');
+        } catch (error) {
+          console.error('[STORE] Error deleting session from database:', error);
+          return;
+        }
+        
+        // Update local state
         set((state) => {
           const updatedSessions = state.sessions.filter(s => s.id !== sessionId);
           const updatedRecords = calculatePersonalRecords(updatedSessions);
+          
+          // Invalidate AI insights cache when session count changes
+          // Cache key validation in useAIInsights will detect the change and regenerate
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            console.log('[STORE] Invalidating AI insights cache due to session deletion');
+            localStorage.removeItem('rowing_ai_insights_cache');
+          }
           
           return {
             sessions: updatedSessions,

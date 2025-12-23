@@ -33,7 +33,7 @@ export async function GET() {
       config: settings || {
         aiConfig: null,
         cloudAIEnabled: false,
-        maxTokens: 1500,
+        maxTokens: 4000,
       }
     });
   } catch (error) {
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         userId: session.user.id,
         aiConfig: configData.aiConfig,
         cloudAIEnabled: configData.cloudAIEnabled || false,
-        maxTokens: configData.maxTokens || 1500,
+        maxTokens: configData.maxTokens || 4000,
       },
       select: {
         aiConfig: true,

@@ -321,6 +321,27 @@ export async function saveArchivedInsightsToDB(insights: any[]): Promise<SyncRes
 }
 
 /**
+ * Delete all AI insights from database (for cache invalidation)
+ */
+export async function deleteAllInsightsFromDB(): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/insights', {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to delete insights' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting insights:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
  * Save chat sessions to database
  */
 export async function saveChatSessionsToDB(chatSessions: any[]): Promise<SyncResult> {

@@ -187,7 +187,7 @@ export class SettingsService {
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
-      maxTokens: 1500,
+      maxTokens: 4000,
 
       // Per-use-case configurations with smart defaults
       chat: {

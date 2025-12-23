@@ -129,7 +129,7 @@ export async function POST(req: Request) {
 
 /**
  * DELETE /api/insights
- * Delete an insight
+ * Delete insight(s) - single insight by ID or all insights for cache invalidation
  */
 export async function DELETE(req: Request) {
   try {
@@ -142,14 +142,28 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const { insightId } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { insightId } = body;
 
-    await prisma.aIInsight.delete({
-      where: {
-        id: insightId,
-        userId: session.user.id,
-      },
-    });
+    if (insightId) {
+      // Delete single insight
+      await prisma.aIInsight.delete({
+        where: {
+          id: insightId,
+          userId: session.user.id,
+        },
+      });
+      console.log(`[INSIGHTS API] Deleted insight ${insightId}`);
+    } else {
+      // Delete all insights for cache invalidation
+      const result = await prisma.aIInsight.deleteMany({
+        where: {
+          userId: session.user.id,
+          archived: false, // Only delete non-archived insights
+        },
+      });
+      console.log(`[INSIGHTS API] Deleted ${result.count} insights for cache invalidation`);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
