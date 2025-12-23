@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters, StrokeData } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
-import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB } from '@/lib/dataSync';
+import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, fetchChartSettingsFromDB, saveChartSettingsToDB } from '@/lib/dataSync';
 
 // Chart configuration types
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
@@ -775,9 +775,26 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       },
 
       updateChartSettings: (newSettings) => {
-        set((state) => ({
-          chartSettings: { ...state.chartSettings, ...newSettings }
-        }));
+        set((state) => {
+          const updatedChartSettings = { ...state.chartSettings, ...newSettings };
+          
+          // Persist to database (async, non-blocking)
+          saveChartSettingsToDB(updatedChartSettings)
+            .then(result => {
+              if (!result.success) {
+                console.error('[STORE] Failed to save chart settings:', result.error);
+              } else {
+                console.log('[STORE] Chart settings saved to database');
+              }
+            })
+            .catch(err => {
+              console.error('[STORE] Error saving chart settings to database:', err);
+            });
+          
+          return {
+            chartSettings: updatedChartSettings
+          };
+        });
       },
 
       resetChartSettings: () => {
@@ -1017,7 +1034,8 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           console.log('[STORE] Fetched from DB:', {
             sessions: data.sessions.length,
             prs: data.personalRecords.length,
-            awards: data.earnedAwards.length
+            awards: data.earnedAwards.length,
+            chartSettings: data.chartSettings ? 'found' : 'not found'
           });
           
           // Convert timestamps to Date objects
@@ -1035,16 +1053,21 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             earnedAt: new Date(a.earnedAt)
           }));
           
+          // Load chart settings from database, or use defaults
+          const chartSettings = data.chartSettings || defaultChartSettings;
+          
           console.log('[STORE] Setting state with:', {
             sessions: sessions.length,
             prs: personalRecords.length,
-            awards: earnedAwards.length
+            awards: earnedAwards.length,
+            chartSettings: 'loaded'
           });
           
           set({
             sessions,
             personalRecords,
-            earnedAwards
+            earnedAwards,
+            chartSettings
           });
           
           console.log('[STORE] State updated successfully');

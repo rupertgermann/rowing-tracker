@@ -241,6 +241,46 @@ export async function fetchChatSessionsFromDB(): Promise<any[]> {
 }
 
 /**
+ * Fetch chart settings from database
+ */
+export async function fetchChartSettingsFromDB(): Promise<any | null> {
+  try {
+    const response = await fetch('/api/settings');
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
+    const data = await response.json();
+    return data.settings?.chartSettings || null;
+  } catch (error) {
+    console.error('Error fetching chart settings:', error);
+    return null;
+  }
+}
+
+/**
+ * Save chart settings to database
+ */
+export async function saveChartSettingsToDB(chartSettings: any): Promise<SyncResult> {
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chartSettings }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || 'Failed to save chart settings' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving chart settings:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
  * Save chat sessions to database
  */
 export async function saveChatSessionsToDB(chatSessions: any[]): Promise<SyncResult> {
@@ -397,7 +437,8 @@ export async function initializeStoreFromDB() {
     chatSessions, 
     settings,
     generatedAchievements,
-    memoryDocuments
+    memoryDocuments,
+    chartSettings
   ] = await Promise.all([
     fetchSessionsFromDB(),
     fetchPRsFromDB(),
@@ -408,6 +449,7 @@ export async function initializeStoreFromDB() {
     fetchSettingsFromDB(),
     fetchGeneratedAchievementsFromDB(),
     fetchMemoryDocumentsFromDB(),
+    fetchChartSettingsFromDB(),
   ]);
 
   return {
@@ -420,5 +462,6 @@ export async function initializeStoreFromDB() {
     settings,
     generatedAchievements,
     memoryDocuments,
+    chartSettings,
   };
 }
