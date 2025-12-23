@@ -78,7 +78,6 @@ export async function POST(req: Request) {
             userId: session.user.id,
             awardId: awardData.awardId,
             earnedAt: new Date(awardData.earnedAt),
-            sessionId: awardData.sessionId || null,
           },
         });
         created.push(createdAward);

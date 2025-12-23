@@ -656,7 +656,8 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           savePRsToDB(updatedRecords.map(pr => ({
             distance: pr.distance,
             value: pr.bestTime,
-            recordType: 'time',
+            bestPace: pr.bestPace,
+            avgPower: pr.avgPower,
             achievedAt: pr.date,
             sessionId: pr.sessionId
           }))).catch(err => {

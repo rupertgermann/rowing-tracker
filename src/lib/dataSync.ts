@@ -80,10 +80,20 @@ export async function fetchPRsFromDB(): Promise<PersonalRecord[]> {
   }
 }
 
+// API format for saving PRs (different from PersonalRecord type)
+interface PRSaveData {
+  distance: number;
+  value: number;
+  bestPace?: number;
+  avgPower?: number;
+  achievedAt: Date;
+  sessionId: string;
+}
+
 /**
  * Save personal records to database
  */
-export async function savePRsToDB(prs: PersonalRecord[]): Promise<SyncResult> {
+export async function savePRsToDB(prs: PRSaveData[]): Promise<SyncResult> {
   try {
     const response = await fetch('/api/prs', {
       method: 'POST',

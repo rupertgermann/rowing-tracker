@@ -64,11 +64,11 @@ export async function POST(req: Request) {
     const updated = [];
 
     for (const prData of newPRs) {
+      // Find existing PR by userId and distance (unique constraint)
       const existing = await prisma.personalRecord.findFirst({
         where: {
           userId: session.user.id,
           distance: prData.distance,
-          recordType: prData.recordType || 'time',
         },
       });
 
