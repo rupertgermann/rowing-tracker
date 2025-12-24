@@ -3,7 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Waves } from "lucide-react";
+import { AlertCircle, Waves, Loader2 } from "lucide-react";
+import { Suspense } from "react";
 
 const errorMessages: Record<string, string> = {
   Configuration: "There is a problem with the server configuration.",
@@ -13,7 +14,7 @@ const errorMessages: Record<string, string> = {
   CredentialsSignin: "Invalid email or password.",
 };
 
-export default function AuthErrorPage() {
+function AuthErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error") || "Default";
   const errorMessage = errorMessages[error] || errorMessages.Default;
@@ -52,5 +53,20 @@ export default function AuthErrorPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8 shadow-xl">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AuthErrorContent />
+    </Suspense>
   );
 }

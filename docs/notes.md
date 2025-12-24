@@ -1,7 +1,7 @@
 # notes 
 
 - check if the functions for getting sessions and training plans to the chat context still work as expected after moving storage from local to database
-
+- linking existing "explain" chat do charts does not work anymore
 
 ## Task: Fix orphaned training plan detection
 - I see already deleted training plans in the memory manager (Coach memory) in chat. check if we have garbage collection / orphaned memories detection and make sure it works reliably?

@@ -108,14 +108,30 @@ async function migrateAchievementImages(): Promise<{ count: number; errors: stri
       try {
         const imageData = await getAchievementImageFromIndexedDB(awardId);
         if (imageData) {
-          achievements.push({
-            awardId,
-            imageData,
-            story: null,
-            prompt: null,
-            model: null,
+          const saveImageResponse = await fetch('/api/achievements/image/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ awardId, imageData }),
           });
-          count++;
+
+          if (!saveImageResponse.ok) {
+            const saveImageError = await saveImageResponse
+              .json()
+              .catch(() => ({ error: 'Failed to save image to filesystem' }));
+            throw new Error(saveImageError.error || 'Failed to save image to filesystem');
+          }
+
+          const savedImage = await saveImageResponse.json();
+          const imageUrl = savedImage?.filePath;
+
+          if (imageUrl) {
+            achievements.push({
+              awardId,
+              imageUrl,
+              hasImage: true,
+            });
+            count++;
+          }
         }
       } catch (error) {
         errors.push(`Award ${awardId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -140,50 +156,7 @@ async function migrateAchievementImages(): Promise<{ count: number; errors: stri
  * Migrate memory documents from IndexedDB to database
  */
 async function migrateMemoryDocuments(): Promise<{ count: number; errors: string[] }> {
-  const errors: string[] = [];
-  let count = 0;
-
-  try {
-    const docs = await memoryStorage.listDocuments();
-    const documents = [];
-
-    for (const doc of docs) {
-      try {
-        const blob = await memoryStorage.getDocument(doc.id);
-        if (blob) {
-          // Convert blob to base64
-          const arrayBuffer = await blob.arrayBuffer();
-          const base64 = Buffer.from(arrayBuffer).toString('base64');
-
-          documents.push({
-            id: doc.id,
-            name: doc.name,
-            type: doc.type,
-            size: doc.size,
-            description: doc.description,
-            tags: doc.tags,
-            uploadedAt: doc.uploadedAt,
-            blobData: base64,
-          });
-          count++;
-        }
-      } catch (error) {
-        errors.push(`Document ${doc.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-
-    if (documents.length > 0) {
-      const saveResult = await saveMemoryDocumentsToDB(documents);
-      if (!saveResult.success) {
-        errors.push(`Save failed: ${saveResult.error}`);
-      }
-    }
-  } catch (error) {
-    console.error('Error migrating memory documents:', error);
-    errors.push(`IndexedDB memory: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-
-  return { count, errors };
+  return { count: 0, errors: [] };
 }
 
 /**

@@ -43,7 +43,6 @@ export async function POST(req: Request) {
             userId: session.user.id,
             awardId: localAward.awardId,
             earnedAt: new Date(localAward.earnedAt),
-            sessionId: null, // Can't link to old localStorage session
           },
         });
 

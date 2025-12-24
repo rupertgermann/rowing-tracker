@@ -29,38 +29,59 @@ export async function POST(req: Request) {
           where: {
             userId: session.user.id,
             distance: localPR.distance,
-            recordType: localPR.recordType || 'time',
           },
         });
 
         if (existing) {
           // Update if the local PR is better
-          const shouldUpdate = localPR.recordType === 'time' 
-            ? localPR.value < existing.value
-            : localPR.value > existing.value;
+          let shouldUpdate = false;
+          const updateData: any = {
+            achievedAt: new Date(localPR.achievedAt),
+            sessionId: null, // Can't link to old localStorage session
+          };
+
+          // Update based on record type
+          if (localPR.recordType === 'time' && localPR.value < existing.bestTime) {
+            updateData.bestTime = localPR.value;
+            shouldUpdate = true;
+          } else if (localPR.recordType === 'pace' && localPR.value < existing.bestPace) {
+            updateData.bestPace = localPR.value;
+            shouldUpdate = true;
+          } else if (localPR.recordType === 'power' && localPR.value > existing.avgPower) {
+            updateData.avgPower = localPR.value;
+            shouldUpdate = true;
+          }
 
           if (shouldUpdate) {
             await prisma.personalRecord.update({
               where: { id: existing.id },
-              data: {
-                value: localPR.value,
-                achievedAt: new Date(localPR.achievedAt),
-                sessionId: null, // Can't link to old localStorage session
-              },
+              data: updateData,
             });
             migratedCount++;
           }
         } else {
           // Create new PR
+          const createData: any = {
+            userId: session.user.id,
+            distance: localPR.distance,
+            achievedAt: new Date(localPR.achievedAt),
+            sessionId: null,
+          };
+
+          // Set value based on record type
+          if (localPR.recordType === 'time') {
+            createData.bestTime = localPR.value;
+          } else if (localPR.recordType === 'pace') {
+            createData.bestPace = localPR.value;
+          } else if (localPR.recordType === 'power') {
+            createData.avgPower = localPR.value;
+          } else {
+            // Default to time if no record type specified
+            createData.bestTime = localPR.value;
+          }
+
           await prisma.personalRecord.create({
-            data: {
-              userId: session.user.id,
-              distance: localPR.distance,
-              value: localPR.value,
-              recordType: localPR.recordType || 'time',
-              achievedAt: new Date(localPR.achievedAt),
-              sessionId: null,
-            },
+            data: createData,
           });
           migratedCount++;
         }

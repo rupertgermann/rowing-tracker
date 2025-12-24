@@ -24,12 +24,12 @@ export async function POST(req: Request) {
 
     for (const localPlan of plans) {
       try {
-        // Check if plan already exists (by name and start date)
+        // Check if plan already exists (by title and start date)
         const existing = await prisma.trainingPlan.findFirst({
           where: {
             userId: session.user.id,
-            name: localPlan.name,
-            startDate: new Date(localPlan.startDate),
+            title: localPlan.name,
+            startDate: localPlan.startDate ? new Date(localPlan.startDate) : null,
           },
         });
 
@@ -39,44 +39,19 @@ export async function POST(req: Request) {
         }
 
         // Create plan
-        const plan = await prisma.trainingPlan.create({
+        await prisma.trainingPlan.create({
           data: {
             userId: session.user.id,
-            name: localPlan.name,
-            description: localPlan.description || null,
-            startDate: new Date(localPlan.startDate),
-            endDate: localPlan.endDate ? new Date(localPlan.endDate) : null,
-            goalDistance: localPlan.goalDistance || null,
-            goalTime: localPlan.goalTime || null,
-            status: localPlan.status || 'active',
+            title: localPlan.name,
+            description: localPlan.description || "",
+            goals: [],
+            duration: 0,
+            level: "beginner",
+            focus: "general",
+            status: localPlan.status || "active",
+            startDate: localPlan.startDate ? new Date(localPlan.startDate) : null,
           },
         });
-
-        // Migrate workouts if they exist
-        if (localPlan.workouts && Array.isArray(localPlan.workouts)) {
-          for (const workout of localPlan.workouts) {
-            try {
-              await prisma.workout.create({
-                data: {
-                  planId: plan.id,
-                  name: workout.name,
-                  description: workout.description || null,
-                  scheduledDate: new Date(workout.scheduledDate),
-                  distance: workout.distance || null,
-                  duration: workout.duration || null,
-                  targetPace: workout.targetPace || null,
-                  targetHeartRate: workout.targetHeartRate || null,
-                  workoutType: workout.workoutType || 'steady_state',
-                  completed: workout.completed || false,
-                  completedAt: workout.completedAt ? new Date(workout.completedAt) : null,
-                  sessionId: null,
-                },
-              });
-            } catch (error) {
-              console.error(`Error migrating workout ${workout.name}:`, error);
-            }
-          }
-        }
 
         migratedCount++;
       } catch (error) {

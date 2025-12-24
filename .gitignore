@@ -51,3 +51,6 @@ prisma/*.db-journal
 # Docker volumes (local data)
 postgres_data/
 pgadmin_data/
+
+# App runtime storage (local data)
+storage/

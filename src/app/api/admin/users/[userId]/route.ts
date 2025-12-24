@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import { prisma } from "@/lib/db/prisma";
 import bcrypt from "bcryptjs";
@@ -16,15 +16,17 @@ const updateUserSchema = z.object({
  * Get user details (admin only)
  */
 export async function GET(
-  req: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  context: { params: Promise<{ userId: string }> }
 ) {
   const adminCheck = await requireAdmin();
   if (adminCheck) return adminCheck;
 
+  const { userId } = await context.params;
+
   try {
     const user = await prisma.user.findUnique({
-      where: { id: params.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -68,11 +70,13 @@ export async function GET(
  * Update user (admin only)
  */
 export async function PATCH(
-  req: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  context: { params: Promise<{ userId: string }> }
 ) {
   const adminCheck = await requireAdmin();
   if (adminCheck) return adminCheck;
+
+  const { userId } = await context.params;
 
   try {
     const body = await req.json();
@@ -89,7 +93,7 @@ export async function PATCH(
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.userId }
+      where: { id: userId }
     });
 
     if (!existingUser) {
@@ -112,7 +116,7 @@ export async function PATCH(
 
     // Update user
     const updatedUser = await prisma.user.update({
-      where: { id: params.userId },
+      where: { id: userId },
       data: updateData,
       select: {
         id: true,
@@ -142,16 +146,18 @@ export async function PATCH(
  * Delete user and all their data (admin only)
  */
 export async function DELETE(
-  req: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  context: { params: Promise<{ userId: string }> }
 ) {
   const adminCheck = await requireAdmin();
   if (adminCheck) return adminCheck;
 
+  const { userId } = await context.params;
+
   try {
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: params.userId }
+      where: { id: userId }
     });
 
     if (!user) {
@@ -171,7 +177,7 @@ export async function DELETE(
 
     // Delete user (cascade will delete all related data)
     await prisma.user.delete({
-      where: { id: params.userId }
+      where: { id: userId }
     });
 
     return NextResponse.json({ 
