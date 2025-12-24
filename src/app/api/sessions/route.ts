@@ -71,13 +71,31 @@ export async function POST(req: Request) {
     const created = [];
 
     for (const sessionData of newSessions) {
+      const normalizedTimestamp = new Date(sessionData.timestamp);
+
       // Check if session already exists (for updates)
-      const existing = await prisma.rowingSession.findFirst({
-        where: {
-          id: sessionData.id,
-          userId: session.user.id,
-        },
-      });
+      // 1) Prefer matching by id (stable across re-imports if client keeps it)
+      // 2) Fallback to matching by the DB unique constraint (userId, timestamp, distance)
+      const existingById = sessionData.id
+        ? await prisma.rowingSession.findFirst({
+            where: {
+              id: sessionData.id,
+              userId: session.user.id,
+            },
+          })
+        : null;
+
+      const existingByUnique = !existingById
+        ? await prisma.rowingSession.findFirst({
+            where: {
+              userId: session.user.id,
+              timestamp: normalizedTimestamp,
+              distance: sessionData.distance,
+            },
+          })
+        : null;
+
+      const existing = existingById || existingByUnique;
 
       let sessionRecord;
 
@@ -88,7 +106,7 @@ export async function POST(req: Request) {
         sessionRecord = await prisma.rowingSession.update({
           where: { id: existing.id },
           data: {
-            timestamp: new Date(sessionData.timestamp),
+            timestamp: normalizedTimestamp,
             distance: sessionData.distance,
             duration: sessionData.duration,
             energy: sessionData.energy || 0,
@@ -115,27 +133,72 @@ export async function POST(req: Request) {
       } else {
         // Create new session
         console.log(`[SESSIONS API] Creating new session`);
-        
-        sessionRecord = await prisma.rowingSession.create({
-          data: {
-            userId: session.user.id,
-            timestamp: new Date(sessionData.timestamp),
-            distance: sessionData.distance,
-            duration: sessionData.duration,
-            energy: sessionData.energy || 0,
-            strokeCount: sessionData.strokeCount || 0,
-            avgPower: sessionData.avgPower || 0,
-            maxPower: sessionData.maxPower || 0,
-            wattPerKg: sessionData.wattPerKg || 0,
-            avgSplit: sessionData.avgSplit || 0,
-            minSplit: sessionData.minSplit || 0,
-            avgWork: sessionData.avgWork || 0,
-            avgStrokeLength: sessionData.avgStrokeLength || 0,
-            avgStrokeRate: sessionData.avgStrokeRate || 0,
-            maxStrokeRate: sessionData.maxStrokeRate || 0,
-            sourceFile: sessionData.sourceFile || null,
-          },
-        });
+
+        try {
+          sessionRecord = await prisma.rowingSession.create({
+            data: {
+              userId: session.user.id,
+              timestamp: normalizedTimestamp,
+              distance: sessionData.distance,
+              duration: sessionData.duration,
+              energy: sessionData.energy || 0,
+              strokeCount: sessionData.strokeCount || 0,
+              avgPower: sessionData.avgPower || 0,
+              maxPower: sessionData.maxPower || 0,
+              wattPerKg: sessionData.wattPerKg || 0,
+              avgSplit: sessionData.avgSplit || 0,
+              minSplit: sessionData.minSplit || 0,
+              avgWork: sessionData.avgWork || 0,
+              avgStrokeLength: sessionData.avgStrokeLength || 0,
+              avgStrokeRate: sessionData.avgStrokeRate || 0,
+              maxStrokeRate: sessionData.maxStrokeRate || 0,
+              sourceFile: sessionData.sourceFile || null,
+            },
+          });
+        } catch (err: any) {
+          // Handle race/duplicate imports gracefully
+          if (err?.code === 'P2002') {
+            const dupe = await prisma.rowingSession.findFirst({
+              where: {
+                userId: session.user.id,
+                timestamp: normalizedTimestamp,
+                distance: sessionData.distance,
+              },
+            });
+
+            if (!dupe) {
+              throw err;
+            }
+
+            console.log(`[SESSIONS API] Duplicate detected, updating existing session ${dupe.id}`);
+            sessionRecord = await prisma.rowingSession.update({
+              where: { id: dupe.id },
+              data: {
+                duration: sessionData.duration,
+                energy: sessionData.energy || 0,
+                strokeCount: sessionData.strokeCount || 0,
+                avgPower: sessionData.avgPower || 0,
+                maxPower: sessionData.maxPower || 0,
+                wattPerKg: sessionData.wattPerKg || 0,
+                avgSplit: sessionData.avgSplit || 0,
+                minSplit: sessionData.minSplit || 0,
+                avgWork: sessionData.avgWork || 0,
+                avgStrokeLength: sessionData.avgStrokeLength || 0,
+                avgStrokeRate: sessionData.avgStrokeRate || 0,
+                maxStrokeRate: sessionData.maxStrokeRate || 0,
+                sourceFile: sessionData.sourceFile || null,
+              },
+            });
+
+            if (sessionData.strokeData && Array.isArray(sessionData.strokeData)) {
+              await prisma.strokeData.deleteMany({
+                where: { sessionId: dupe.id },
+              });
+            }
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Save stroke data if present
