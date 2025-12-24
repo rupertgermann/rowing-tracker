@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,10 +28,12 @@ const navigation = [
 
 export function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session, status } = useSession();
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/auth/login' });
+    await signOut({ redirect: false });
+    router.push('/auth/login');
   };
 
   return (
