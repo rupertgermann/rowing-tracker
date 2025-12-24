@@ -31,21 +31,20 @@ export async function GET(req: Request) {
     },
   });
 
-  const docAny = doc as any;
-  if (!docAny || !docAny.filePath) {
+  if (!doc || !doc.filePath) {
     return new Response(JSON.stringify({ error: "Document not found" }), {
       status: 404,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  const fullPath = path.join(process.cwd(), "storage", docAny.filePath);
+  const fullPath = path.join(process.cwd(), "storage", doc.filePath);
   const buffer = await readFile(fullPath);
 
   return new Response(buffer, {
     headers: {
-      "Content-Type": docAny.mimeType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${String(docAny.name || '').replace(/\"/g, "")}"`,
+      "Content-Type": doc.mimeType || "application/octet-stream",
+      "Content-Disposition": `inline; filename="${String(doc.name || '').replace(/\"/g, "")}"`,
     },
   });
 }

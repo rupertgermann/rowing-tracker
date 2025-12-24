@@ -399,18 +399,9 @@ model MemoryDocument {
   uploadedAt    DateTime @default(now())
 
   user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blob MemoryBlob?
 
   @@index([userId])
   @@index([userId, type])
-}
-
-model MemoryBlob {
-  id         String @id @default(cuid())
-  documentId String @unique
-  data       Bytes
-
-  document MemoryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================================

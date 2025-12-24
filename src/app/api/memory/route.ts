@@ -160,9 +160,8 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    const existingAny = existing as any;
-    if (existingAny.filePath) {
-      const fullPath = path.join(process.cwd(), "storage", existingAny.filePath);
+    if (existing.filePath) {
+      const fullPath = path.join(process.cwd(), "storage", existing.filePath);
       await rm(fullPath, { force: true });
     }
 

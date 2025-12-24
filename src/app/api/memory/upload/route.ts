@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
     const updated = await prisma.memoryDocument.update({
       where: { id: created.id },
-      data: { filePath } as any,
+      data: { filePath },
     });
 
     return NextResponse.json({ document: updated });
