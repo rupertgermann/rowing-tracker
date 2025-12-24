@@ -390,6 +390,7 @@ model MemoryDocument {
   source        String
   mimeType      String
   size          Int
+  filePath      String?
   description   String?  @db.Text
   extractedText String?  @db.Text
   tags          String[]

@@ -134,36 +134,17 @@ export const useAchievementStore = create<AchievementStore>()(
       name: 'rowing-achievement-generator',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Images are stored as files in public/assets/awards/
-        // We persist the file path (imageUrl) and hasImage flag
-        generatedAchievements: Object.fromEntries(
-          Object.entries(state.generatedAchievements).map(([key, achievement]) => [
-            key,
-            {
-              ...achievement,
-              // Keep imageUrl if it's a file path (starts with /), otherwise clear it
-              imageUrl: achievement.imageUrl?.startsWith('/') ? achievement.imageUrl : undefined,
-              // Keep hasImage flag to know if we need to check filesystem
-              hasImage: Boolean(achievement.imageUrl || achievement.hasImage)
-            }
-          ])
-        ),
-        settings: state.settings
+        // DB is source of truth for generated achievements. Persist only settings locally.
+        settings: state.settings,
+        selectedAchievementId: state.selectedAchievementId,
+        isGalleryOpen: state.isGalleryOpen,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Convert date strings back to Date objects
-          Object.keys(state.generatedAchievements).forEach(key => {
-            const achievement = state.generatedAchievements[key];
-            if (achievement.earnedAt) {
-              achievement.earnedAt = new Date(achievement.earnedAt);
-            }
-            if (achievement.generatedAt) {
-              achievement.generatedAt = new Date(achievement.generatedAt);
-            }
-          });
+          // Ensure we don't carry over stale generated achievements from localStorage
+          state.generatedAchievements = {};
         }
-      }
+      },
     }
   )
 );

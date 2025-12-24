@@ -18,6 +18,7 @@ export interface MemoryDocument {
   source: 'user' | 'system';
   mimeType: string;
   size: number;
+  filePath?: string;
   uploadedAt: Date;
   description?: string;
   extractedText?: string;
@@ -105,6 +106,17 @@ class MemoryStorageService {
     await this.initPromise;
   }
 
+  private async fetchDocumentsFromDB(): Promise<MemoryDocument[]> {
+    const res = await fetch('/api/memory');
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || 'Failed to fetch memory documents');
+    }
+    const data = await res.json();
+    const docs = (data.documents || []) as any[];
+    return docs.map((d) => this.deserializeDocument(d));
+  }
+
   // ============================================================================
   // Document CRUD Operations
   // ============================================================================
@@ -113,46 +125,30 @@ class MemoryStorageService {
     file: File,
     options?: { description?: string; tags?: string[] }
   ): Promise<MemoryDocument> {
-    await this.initDB();
-
     // Validate file
     const validation = this.validateFile(file);
     if (!validation.valid) {
       throw new Error(validation.error);
     }
 
-    // Check storage quota
-    const currentSize = await this.getTotalSize();
-    if (currentSize + file.size > MEMORY_CONFIG.maxTotalStorage) {
-      throw new Error(
-        `Storage quota exceeded. Available: ${this.formatBytes(MEMORY_CONFIG.maxTotalStorage - currentSize)}`
-      );
+    const form = new FormData();
+    form.set('file', file);
+    if (options?.description) form.set('description', options.description);
+    if (options?.tags?.length) form.set('tags', options.tags.join(','));
+    form.set('uploadedAt', new Date().toISOString());
+
+    const res = await fetch('/api/memory/upload', {
+      method: 'POST',
+      body: form,
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || 'Failed to upload document');
     }
 
-    const id = this.generateId();
-    const type = this.getDocumentType(file.type);
-    const arrayBuffer = await file.arrayBuffer();
-
-    const document: MemoryDocument = {
-      id,
-      name: file.name,
-      type,
-      source: 'user',
-      mimeType: file.type,
-      size: file.size,
-      uploadedAt: new Date(),
-      description: options?.description,
-      tags: options?.tags,
-    };
-
-    // Store blob in IndexedDB
-    if (this.db) {
-      await this.db.put(BLOB_STORE_NAME, arrayBuffer, id);
-      await this.db.put(STORE_NAME, document);
-    }
-
-    this.updateMetadata();
-    return document;
+    const data = await res.json();
+    return this.deserializeDocument(data.document);
   }
 
   async addSystemDocument(
@@ -161,87 +157,96 @@ class MemoryStorageService {
     content: Record<string, unknown>,
     options?: { description?: string; status?: 'active' | 'archived' }
   ): Promise<MemoryDocument> {
-    await this.initDB();
-
     // For training plans, archive existing active plans
     if (type === 'training_plan' && options?.status === 'active') {
       await this.archiveActivePlans();
     }
 
-    const id = this.generateId();
     const contentString = JSON.stringify(content);
+    const uploadedAt = new Date();
 
-    const document: MemoryDocument = {
-      id,
-      name,
-      type,
-      source: 'system',
-      mimeType: 'application/json',
-      size: new Blob([contentString]).size,
-      uploadedAt: new Date(),
-      description: options?.description,
-      content,
-      status: options?.status,
-      extractedText: contentString, // For searchability
-    };
+    const res = await fetch('/api/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        documents: [
+          {
+            name,
+            type,
+            source: 'system',
+            mimeType: 'application/json',
+            size: new Blob([contentString]).size,
+            description: options?.description,
+            tags: [],
+            content,
+            status: options?.status,
+            extractedText: contentString,
+            uploadedAt: uploadedAt.toISOString(),
+          },
+        ],
+      }),
+    });
 
-    if (this.db) {
-      await this.db.put(STORE_NAME, document);
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || 'Failed to save system document');
     }
 
-    this.updateMetadata();
-    return document;
+    const data = await res.json();
+    const docs = data.documents || [];
+    if (docs.length === 0) {
+      throw new Error('Failed to save system document');
+    }
+
+    return this.deserializeDocument(docs[0]);
   }
 
   async getDocument(id: string): Promise<MemoryDocument | null> {
-    await this.initDB();
-    if (!this.db) return null;
-
-    const doc = await this.db.get(STORE_NAME, id);
-    return doc ? this.deserializeDocument(doc) : null;
+    const docs = await this.fetchDocumentsFromDB();
+    return docs.find((d: MemoryDocument) => d.id === id) || null;
   }
 
   async getDocumentBlob(id: string): Promise<ArrayBuffer | null> {
-    await this.initDB();
-    if (!this.db) return null;
-
-    return await this.db.get(BLOB_STORE_NAME, id);
+    const res = await fetch(`/api/memory/file?documentId=${encodeURIComponent(id)}`);
+    if (!res.ok) {
+      return null;
+    }
+    return await res.arrayBuffer();
   }
 
   async getAllDocuments(): Promise<MemoryDocument[]> {
-    await this.initDB();
-    if (!this.db) return [];
-
-    const docs = await this.db.getAll(STORE_NAME);
-    return docs.map(doc => this.deserializeDocument(doc));
+    return await this.fetchDocumentsFromDB();
   }
 
   async updateDocument(
     id: string,
     updates: Partial<Pick<MemoryDocument, 'name' | 'description' | 'tags' | 'status' | 'extractedText'>>
   ): Promise<MemoryDocument | null> {
-    await this.initDB();
-    if (!this.db) return null;
+    const res = await fetch('/api/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        documents: [{ id, ...updates }],
+      }),
+    });
 
-    const doc = await this.db.get(STORE_NAME, id);
-    if (!doc) return null;
+    if (!res.ok) {
+      return null;
+    }
 
-    const updatedDoc = { ...doc, ...updates };
-    await this.db.put(STORE_NAME, updatedDoc);
-    this.updateMetadata();
-
-    return this.deserializeDocument(updatedDoc);
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.length > 0 ? this.deserializeDocument(docs[0]) : null;
   }
 
   async deleteDocument(id: string): Promise<boolean> {
-    await this.initDB();
-    if (!this.db) return false;
-
     try {
-      await this.db.delete(STORE_NAME, id);
-      await this.db.delete(BLOB_STORE_NAME, id);
-      this.updateMetadata();
-      return true;
+      const res = await fetch('/api/memory', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: id }),
+      });
+      return res.ok;
     } catch (error) {
       console.error('Failed to delete document:', error);
       return false;
@@ -265,19 +270,13 @@ class MemoryStorageService {
   }
 
   async filterByType(type: MemoryDocumentType): Promise<MemoryDocument[]> {
-    await this.initDB();
-    if (!this.db) return [];
-
-    const docs = await this.db.getAllFromIndex(STORE_NAME, 'type', type);
-    return docs.map(doc => this.deserializeDocument(doc));
+    const docs = await this.fetchDocumentsFromDB();
+    return docs.filter(d => d.type === type);
   }
 
   async filterBySource(source: 'user' | 'system'): Promise<MemoryDocument[]> {
-    await this.initDB();
-    if (!this.db) return [];
-
-    const docs = await this.db.getAllFromIndex(STORE_NAME, 'source', source);
-    return docs.map(doc => this.deserializeDocument(doc));
+    const docs = await this.fetchDocumentsFromDB();
+    return docs.filter(d => d.source === source);
   }
 
   async getActiveTrainingPlan(): Promise<MemoryDocument | null> {
@@ -383,12 +382,11 @@ class MemoryStorageService {
   }
 
   async clearAll(): Promise<void> {
-    await this.initDB();
-    if (!this.db) return;
-
-    await this.db.clear(STORE_NAME);
-    await this.db.clear(BLOB_STORE_NAME);
-    this.updateMetadata();
+    // DB is source of truth; clear via API
+    const docs = await this.getAllDocuments();
+    for (const d of docs) {
+      await this.deleteDocument(d.id);
+    }
   }
 
   // ============================================================================

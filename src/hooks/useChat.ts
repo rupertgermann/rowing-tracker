@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { cloudAI, ChatMessage, ChatSession, FileAttachment } from '@/lib/cloudAI';
-import { chatStorage } from '@/lib/chatStorage';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 
 export interface ChatState {
@@ -12,6 +11,44 @@ export interface ChatState {
   searchQuery: string;
   searchResults: { session: ChatSession; message: ChatMessage }[];
   isSearching: boolean;
+}
+
+const CURRENT_SESSION_KEY = 'rowing_ai_current_session';
+
+function getStoredCurrentSessionId(): string | null {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(CURRENT_SESSION_KEY);
+}
+
+function setStoredCurrentSessionId(sessionId: string | null): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  if (!sessionId) {
+    localStorage.removeItem(CURRENT_SESSION_KEY);
+    return;
+  }
+  localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
+}
+
+function dbSessionToChatSession(s: any): ChatSession {
+  return {
+    id: s.id,
+    title: s.title,
+    messages: [],
+    createdAt: new Date(s.createdAt),
+    updatedAt: new Date(s.updatedAt),
+    category: s.category,
+    chartId: s.chartId || undefined,
+  };
+}
+
+function dbMessageToChatMessage(m: any, sessionId: string): ChatMessage {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    timestamp: new Date(m.timestamp),
+    sessionId,
+  };
 }
 
 export function useChat() {
@@ -33,64 +70,125 @@ export function useChat() {
     initializeCloudAIFromSettings();
   }, []);
 
-  const loadSessions = useCallback(() => {
+  const loadSessions = useCallback(async () => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const sessions = chatStorage.getSessions();
-      const currentSessionId = chatStorage.getCurrentSessionId();
-      const currentSession = currentSessionId ? chatStorage.getSession(currentSessionId) : null;
+      const res = await fetch('/api/chat');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to load chat sessions');
+      }
+
+      const data = await res.json();
+      const sessions = (data.chatSessions || []).map(dbSessionToChatSession);
+
+      const storedId = getStoredCurrentSessionId();
+      const nextCurrent = storedId ? sessions.find((s: ChatSession) => s.id === storedId) || null : null;
 
       setState(prev => ({
         ...prev,
         sessions,
-        currentSession
+        currentSession: nextCurrent,
+        isLoading: false,
       }));
+
+      if (nextCurrent) {
+        const messagesRes = await fetch(`/api/chat?sessionId=${encodeURIComponent(nextCurrent.id)}&limit=200`);
+        if (messagesRes.ok) {
+          const msgData = await messagesRes.json();
+          const msgs = (msgData.messages || []).map((m: any) => dbMessageToChatMessage(m, nextCurrent.id));
+          setState(prev => ({
+            ...prev,
+            currentSession: prev.currentSession ? { ...prev.currentSession, messages: msgs } : prev.currentSession,
+          }));
+        }
+      }
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: 'Failed to load chat sessions'
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to load chat sessions'
       }));
     }
   }, []);
 
   // Create new session
-  const createSession = useCallback((title?: string, category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion', chartId?: string) => {
+  const createSession = useCallback(async (title?: string, category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion', chartId?: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const newSession = chatStorage.createSession(title, category, chartId);
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'createSession',
+          title,
+          category,
+          chartId,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to create new session');
+      }
+
+      const data = await res.json();
+      const newSession = dbSessionToChatSession(data.session);
+
+      setStoredCurrentSessionId(newSession.id);
       setState(prev => ({
         ...prev,
         sessions: [newSession, ...prev.sessions],
-        currentSession: newSession,
-        error: null
+        currentSession: { ...newSession, messages: [] },
+        isLoading: false,
+        error: null,
       }));
+
       return newSession;
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: 'Failed to create new session'
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to create new session'
       }));
       return null;
     }
   }, []);
 
   // Switch to existing session
-  const switchSession = useCallback((sessionId: string) => {
+  const switchSession = useCallback(async (sessionId: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const session = chatStorage.getSession(sessionId);
-      if (session) {
-        chatStorage.setCurrentSessionId(sessionId);
-        setState(prev => ({
-          ...prev,
-          currentSession: session,
-          error: null
-        }));
+      const found = state.sessions.find(s => s.id === sessionId);
+      if (!found) {
+        throw new Error('Session not found');
       }
+
+      setStoredCurrentSessionId(sessionId);
+
+      const res = await fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}&limit=200`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to load messages');
+      }
+
+      const data = await res.json();
+      const messages = (data.messages || []).map((m: any) => dbMessageToChatMessage(m, sessionId));
+
+      setState(prev => ({
+        ...prev,
+        currentSession: { ...found, messages },
+        isLoading: false,
+        error: null,
+      }));
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: 'Failed to switch session'
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to switch session'
       }));
     }
-  }, []);
+  }, [state.sessions]);
 
   // Send message to AI
   const sendMessage = useCallback(async (content: string, attachments?: FileAttachment[]) => {
@@ -109,19 +207,36 @@ export function useChat() {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Add user message
-      const userMessage = chatStorage.addMessage(state.currentSession.id, {
-        role: 'user',
-        content: content.trim()
+      // Append user message (DB)
+      const userMsgRes = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'appendMessage',
+          sessionId: state.currentSession.id,
+          message: {
+            role: 'user',
+            content: content.trim(),
+          },
+        }),
       });
 
-      // Update state with user message
+      if (!userMsgRes.ok) {
+        const data = await userMsgRes.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to save message');
+      }
+
+      const userMsgData = await userMsgRes.json();
+      const userMessage = dbMessageToChatMessage(userMsgData.message, state.currentSession.id);
+
       setState(prev => ({
         ...prev,
-        currentSession: prev.currentSession ? {
-          ...prev.currentSession,
-          messages: [...prev.currentSession.messages, userMessage]
-        } : null
+        currentSession: prev.currentSession
+          ? {
+              ...prev.currentSession,
+              messages: [...prev.currentSession.messages, userMessage],
+            }
+          : null
       }));
 
       // Create placeholder assistant message
@@ -185,11 +300,26 @@ export function useChat() {
 
       // Add AI response (only if not empty)
       if (aiResponse.content && aiResponse.content.trim()) {
-        const assistantMessage = chatStorage.addMessage(state.currentSession.id, {
-          role: 'assistant',
-          content: aiResponse.content,
-          responseId: aiResponse.responseId
+        const assistantMsgRes = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'appendMessage',
+            sessionId: state.currentSession.id,
+            message: {
+              role: 'assistant',
+              content: aiResponse.content,
+            },
+          }),
         });
+
+        if (!assistantMsgRes.ok) {
+          const data = await assistantMsgRes.json().catch(() => null);
+          throw new Error(data?.error || 'Failed to save assistant message');
+        }
+
+        const assistantMsgData = await assistantMsgRes.json();
+        const assistantMessage = dbMessageToChatMessage(assistantMsgData.message, state.currentSession.id);
 
         // Update state with AI response (replace placeholder)
         setState(prev => ({
@@ -226,35 +356,49 @@ export function useChat() {
 
   // Update session title
   const updateSessionTitle = useCallback((sessionId: string, title: string) => {
-    try {
-      chatStorage.updateSessionTitle(sessionId, title);
-      setState(prev => ({
-        ...prev,
-        sessions: prev.sessions.map(session =>
-          session.id === sessionId ? { ...session, title } : session
-        ),
-        currentSession: prev.currentSession?.id === sessionId
-          ? { ...prev.currentSession, title }
-          : prev.currentSession
-      }));
-    } catch (error) {
+    setState(prev => ({
+      ...prev,
+      sessions: prev.sessions.map(session =>
+        session.id === sessionId ? { ...session, title } : session
+      ),
+      currentSession: prev.currentSession?.id === sessionId
+        ? { ...prev.currentSession, title }
+        : prev.currentSession
+    }));
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'updateSession', sessionId, title }),
+    }).catch(() => {
       setState(prev => ({
         ...prev,
         error: 'Failed to update session title'
       }));
-    }
+    });
   }, []);
 
   // Delete session
-  const deleteSession = useCallback((sessionId: string) => {
+  const deleteSession = useCallback(async (sessionId: string) => {
     try {
-      chatStorage.deleteSession(sessionId);
-      // Clean up any chart explanations that reference this session
+      const res = await fetch('/api/chat', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatSessionId: sessionId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to delete session');
+      }
+
       removeChartExplanationsBySessionId(sessionId);
       setState(prev => {
         const newSessions = prev.sessions.filter(s => s.id !== sessionId);
         const newCurrentSession = prev.currentSession?.id === sessionId ? null : prev.currentSession;
-
+        if (prev.currentSession?.id === sessionId) {
+          setStoredCurrentSessionId(null);
+        }
         return {
           ...prev,
           sessions: newSessions,
@@ -264,29 +408,49 @@ export function useChat() {
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: 'Failed to delete session'
+        error: error instanceof Error ? error.message : 'Failed to delete session'
       }));
     }
   }, [removeChartExplanationsBySessionId]);
 
   // Search messages
-  const searchMessages = useCallback((query: string) => {
-    setState(prev => ({ ...prev, isSearching: true }));
+  const searchMessages = useCallback(async (query: string) => {
+    setState(prev => ({ ...prev, isSearching: true, searchQuery: query }));
 
     try {
-      const results = chatStorage.searchMessages(query);
+      if (!query.trim()) {
+        setState(prev => ({
+          ...prev,
+          isSearching: false,
+          searchResults: [],
+          error: null,
+        }));
+        return;
+      }
+
+      const res = await fetch(`/api/chat?search=${encodeURIComponent(query.trim())}&limit=50`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to search messages');
+      }
+
+      const data = await res.json();
+      const results = (data.results || []).map((r: any) => ({
+        session: dbSessionToChatSession(r.session),
+        message: dbMessageToChatMessage(r.message, r.session.id),
+      }));
+
       setState(prev => ({
         ...prev,
-        searchQuery: query,
         searchResults: results,
         isSearching: false,
-        error: null
+        error: null,
       }));
     } catch (error) {
       setState(prev => ({
         ...prev,
         isSearching: false,
-        error: 'Failed to search messages'
+        error: error instanceof Error ? error.message : 'Failed to search messages'
       }));
     }
   }, []);
@@ -302,10 +466,20 @@ export function useChat() {
   }, []);
 
   // Clear all sessions
-  const clearAllSessions = useCallback(() => {
+  const clearAllSessions = useCallback(async () => {
     try {
-      chatStorage.clearAllSessions();
-      // Also clear all chart explanations since their linked sessions are gone
+      const res = await fetch('/api/chat', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to clear sessions');
+      }
+
+      setStoredCurrentSessionId(null);
       clearAllChartExplanations();
       setState(prev => ({
         ...prev,
@@ -316,46 +490,28 @@ export function useChat() {
     } catch (error) {
       setState(prev => ({
         ...prev,
-        error: 'Failed to clear sessions'
+        error: error instanceof Error ? error.message : 'Failed to clear sessions'
       }));
     }
   }, [clearAllChartExplanations]);
 
   // Export sessions
   const exportSessions = useCallback(() => {
-    try {
-      return chatStorage.exportSessions();
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: 'Failed to export sessions'
-      }));
-      return null;
-    }
+    setState(prev => ({
+      ...prev,
+      error: 'Export is not available in DB-backed mode'
+    }));
+    return null;
   }, []);
 
   // Import sessions
   const importSessions = useCallback((jsonData: string) => {
-    try {
-      const result = chatStorage.importSessions(jsonData);
-      if (result.success) {
-        loadSessions(); // Reload sessions
-        setState(prev => ({ ...prev, error: null }));
-      } else {
-        setState(prev => ({
-          ...prev,
-          error: 'Failed to import sessions'
-        }));
-      }
-      return result;
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: 'Failed to import sessions'
-      }));
-      return { success: false, imported: 0 };
-    }
-  }, [loadSessions]);
+    setState(prev => ({
+      ...prev,
+      error: 'Import is not available (DB is the source of truth)'
+    }));
+    return { success: false, imported: 0 };
+  }, []);
 
   // Clear error
   const clearError = useCallback(() => {
@@ -387,6 +543,12 @@ export function useChat() {
     isAIConfigured,
     hasSessions: state.sessions.length > 0,
     currentSessionMessages: state.currentSession?.messages || [],
-    sessionStats: chatStorage.getSessionStats()
+    sessionStats: {
+      totalSessions: state.sessions.length,
+      totalMessages: state.sessions.reduce((sum, s) => sum + (s.messages?.length || 0), 0),
+      lastActivity: state.sessions.length > 0
+        ? new Date(Math.max(...state.sessions.map(s => s.updatedAt.getTime())))
+        : null
+    }
   };
 }

@@ -61,6 +61,10 @@ export async function POST(req: Request) {
     const savedAchievements = [];
 
     for (const achData of achievements) {
+      if (!achData?.awardId) {
+        continue;
+      }
+
       // Check if achievement exists
       const existing = await prisma.generatedAchievement.findFirst({
         where: {
@@ -74,10 +78,11 @@ export async function POST(req: Request) {
         const updated = await prisma.generatedAchievement.update({
           where: { id: existing.id },
           data: {
-            imageData: achData.imageData,
-            story: achData.story,
-            prompt: achData.prompt,
-            model: achData.model,
+            story: achData.story ?? undefined,
+            imageUrl: achData.imageUrl ?? undefined,
+            hasImage: achData.hasImage ?? undefined,
+            earnedAt: achData.earnedAt ? new Date(achData.earnedAt) : undefined,
+            generatedAt: achData.generatedAt ? new Date(achData.generatedAt) : undefined,
           },
         });
         savedAchievements.push(updated);
@@ -87,10 +92,10 @@ export async function POST(req: Request) {
           data: {
             userId: session.user.id,
             awardId: achData.awardId,
-            imageData: achData.imageData,
-            story: achData.story,
-            prompt: achData.prompt,
-            model: achData.model,
+            story: achData.story ?? null,
+            imageUrl: achData.imageUrl ?? null,
+            hasImage: Boolean(achData.hasImage) || Boolean(achData.imageUrl),
+            earnedAt: achData.earnedAt ? new Date(achData.earnedAt) : null,
             generatedAt: achData.generatedAt ? new Date(achData.generatedAt) : new Date(),
           },
         });

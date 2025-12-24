@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { rm } from "fs/promises";
+import path from "path";
 
 /**
  * GET /api/memory
@@ -21,9 +23,6 @@ export async function GET() {
     const documents = await prisma.memoryDocument.findMany({
       where: {
         userId: session.user.id,
-      },
-      include: {
-        blob: true,
       },
       orderBy: {
         uploadedAt: 'desc',
@@ -80,27 +79,17 @@ export async function POST(req: Request) {
         const updated = await prisma.memoryDocument.update({
           where: { id: existing.id },
           data: {
-            name: docData.name,
-            type: docData.type,
-            size: docData.size,
-            description: docData.description,
-            tags: docData.tags,
+            ...(docData.name !== undefined ? { name: docData.name } : {}),
+            ...(docData.type !== undefined ? { type: docData.type } : {}),
+            ...(docData.mimeType !== undefined ? { mimeType: docData.mimeType } : {}),
+            ...(docData.size !== undefined ? { size: docData.size } : {}),
+            ...(docData.description !== undefined ? { description: docData.description } : {}),
+            ...(docData.extractedText !== undefined ? { extractedText: docData.extractedText } : {}),
+            ...(docData.tags !== undefined ? { tags: docData.tags } : {}),
+            ...(docData.content !== undefined ? { content: docData.content } : {}),
+            ...(docData.status !== undefined ? { status: docData.status } : {}),
           },
         });
-
-        // Update blob if provided
-        if (docData.blobData) {
-          await prisma.memoryBlob.upsert({
-            where: { documentId: existing.id },
-            update: {
-              data: Buffer.from(docData.blobData, 'base64'),
-            },
-            create: {
-              documentId: existing.id,
-              data: Buffer.from(docData.blobData, 'base64'),
-            },
-          });
-        }
 
         savedDocuments.push(updated);
       } else {
@@ -110,22 +99,17 @@ export async function POST(req: Request) {
             userId: session.user.id,
             name: docData.name,
             type: docData.type,
+            source: docData.source || 'user',
+            mimeType: docData.mimeType || 'application/octet-stream',
             size: docData.size,
             description: docData.description,
-            tags: docData.tags,
+            extractedText: docData.extractedText,
+            tags: docData.tags || [],
+            content: docData.content,
+            status: docData.status,
             uploadedAt: docData.uploadedAt ? new Date(docData.uploadedAt) : new Date(),
           },
         });
-
-        // Create blob if provided
-        if (docData.blobData) {
-          await prisma.memoryBlob.create({
-            data: {
-              documentId: created.id,
-              data: Buffer.from(docData.blobData, 'base64'),
-            },
-          });
-        }
 
         savedDocuments.push(created);
       }
@@ -160,6 +144,27 @@ export async function DELETE(req: Request) {
     }
 
     const { documentId } = await req.json();
+
+    if (!documentId) {
+      return NextResponse.json({ error: "Document ID is required" }, { status: 400 });
+    }
+
+    const existing = await prisma.memoryDocument.findFirst({
+      where: {
+        id: documentId,
+        userId: session.user.id,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    }
+
+    const existingAny = existing as any;
+    if (existingAny.filePath) {
+      const fullPath = path.join(process.cwd(), "storage", existingAny.filePath);
+      await rm(fullPath, { force: true });
+    }
 
     await prisma.memoryDocument.delete({
       where: {

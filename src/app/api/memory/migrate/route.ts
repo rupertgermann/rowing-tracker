@@ -66,22 +66,9 @@ export async function POST(req: Request) {
           },
         });
 
-        // Create blob if provided
-        if (docData.blobData) {
-          try {
-            await prisma.memoryBlob.create({
-              data: {
-                documentId: created.id,
-                data: Buffer.from(docData.blobData, 'base64'),
-              },
-            });
-          } catch (blobError) {
-            console.error(`Failed to create blob for document ${docData.id}:`, blobError);
-            errors.push(`Blob for ${docData.id}: ${blobError instanceof Error ? blobError.message : 'Unknown error'}`);
-            failed++;
-            continue;
-          }
-        }
+        // NOTE: Blob migration is no longer supported. Files are stored in filesystem/object storage,
+        // and only metadata is stored in the database.
+        void created;
 
         migrated++;
       } catch (error) {
@@ -128,13 +115,10 @@ export async function GET() {
       },
     });
 
-    // Count blobs in database
-    const blobCount = await prisma.memoryBlob.count();
-
     return NextResponse.json({
       success: true,
       documentCount,
-      blobCount,
+      blobCount: 0,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
