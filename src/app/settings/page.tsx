@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
+import { deleteAllInsightsFromDB } from '@/lib/dataSync';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_CHAT_SYSTEM_PROMPT,
@@ -167,6 +169,10 @@ export default function SettingsPage() {
     defaultValue: string;
   } | null>(null);
   const [promptEditorValue, setPromptEditorValue] = useState('');
+
+  // Clear data confirmation dialog state
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
+  const [dataCategoryToClear, setDataCategoryToClear] = useState<'sessions' | 'chatHistory' | 'trainingPlans' | 'insightsArchive' | null>(null);
 
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
@@ -343,17 +349,48 @@ export default function SettingsPage() {
     setSuccessMessage('Settings reset to defaults');
   };
 
-  const clearDataCategory = (category: 'sessions' | 'chatHistory' | 'trainingPlans') => {
-    if (confirm(`Are you sure you want to clear all ${category}? This cannot be undone.`)) {
-      settings.clearDataCategory(category);
+  const clearDataCategory = async (category: 'sessions' | 'chatHistory' | 'trainingPlans' | 'insightsArchive') => {
+    // Set the category and show dialog instead of using confirm()
+    setDataCategoryToClear(category);
+    setShowClearDataConfirm(true);
+  };
+
+  const executeClearDataCategory = async () => {
+    if (!dataCategoryToClear) return;
+
+    try {
+      // Handle insightsArchive separately since it's not in settings
+      if (dataCategoryToClear === 'insightsArchive') {
+        // Clear from localStorage
+        localStorage.removeItem('rowing_ai_insights_archive');
+        
+        // Also clear from database
+        try {
+          await deleteAllInsightsFromDB();
+        } catch (error) {
+          console.warn('Failed to clear insights archive from database:', error);
+        }
+        
+        setSuccessMessage(`${dataCategoryToClear} cleared successfully`);
+        setShowClearDataConfirm(false);
+        setDataCategoryToClear(null);
+        return;
+      }
+
+      settings.clearDataCategory(dataCategoryToClear);
 
       // Also clear from Zustand store if clearing sessions
-      if (category === 'sessions') {
+      if (dataCategoryToClear === 'sessions') {
         const { useRowingStore } = require('@/lib/store');
         useRowingStore.getState().clearSessions();
       }
 
-      setSuccessMessage(`${category} cleared successfully`);
+      setSuccessMessage(`${dataCategoryToClear} cleared successfully`);
+    } catch (error) {
+      setErrorMessage(`Failed to clear ${dataCategoryToClear}`);
+    } finally {
+      setShowClearDataConfirm(false);
+      setDataCategoryToClear(null);
     }
   };
 
@@ -601,7 +638,7 @@ export default function SettingsPage() {
             <CardDescription>Permanently remove stored data</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button
                 variant="outline"
                 onClick={() => clearDataCategory('sessions')}
@@ -627,6 +664,15 @@ export default function SettingsPage() {
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear Training Plans
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => clearDataCategory('insightsArchive')}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear Insights Archive
               </Button>
             </div>
           </CardContent>
@@ -2189,6 +2235,18 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Clear Data Confirmation Dialog */}
+      <ConfirmDialog
+        open={showClearDataConfirm}
+        onOpenChange={setShowClearDataConfirm}
+        title={`Clear ${dataCategoryToClear}?`}
+        description={`Are you sure you want to clear all ${dataCategoryToClear}? This action cannot be undone and will permanently remove all stored data.`}
+        confirmLabel="Clear"
+        cancelLabel="Cancel"
+        onConfirm={executeClearDataCategory}
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -497,9 +497,9 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     });
   }, []);
 
-  const getLocalAnalysis = (sessionData: Session[]) => {
+  const getLocalAnalysis = async (sessionData: Session[]) => {
     try {
-      const insights = aiAnalysis.generateInsights(sessionData);
+      const insights = await aiAnalysis.generateInsights(sessionData);
       const trends = [
         aiAnalysis.analyzeTrend(sessionData, 'avgSplit'),
         aiAnalysis.analyzeTrend(sessionData, 'avgPower'),
@@ -608,12 +608,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         setCloudAIError(errorMessage);
 
         // Fallback to local analysis
-        return getLocalAnalysis(sessions);
+        const localResult = await getLocalAnalysis(sessions);
+        return localResult;
       }
     }
 
     // Use local analysis
-    return getLocalAnalysis(sessions);
+    const localResult = await getLocalAnalysis(sessions);
+    return localResult;
   }, [sessions, initializeCloudAI]);
 
   // Run analysis when sessions change or refresh is triggered
@@ -668,7 +670,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       } catch (error) {
         console.error('Analysis error:', error);
         if (isMounted) {
-          setData(getLocalAnalysis(sessions));
+          const localResult = await getLocalAnalysis(sessions);
+          setData(localResult);
         }
       }
     };
