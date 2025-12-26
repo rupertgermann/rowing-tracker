@@ -1890,9 +1890,9 @@ Be specific and actionable. Only include information relevant to rowing training
         'gpt-5.2': 'gpt-5.1' // Fallback
       };
       
-      // Map UseCaseConfig reasoning to ApiRequestConfig reasoning (minimal -> none)
+      // Map UseCaseConfig reasoning to ApiRequestConfig reasoning
       const reasoningMap: Record<string, 'none' | 'low' | 'medium' | 'high'> = {
-        'minimal': 'none',
+        'none': 'none',
         'low': 'low',
         'medium': 'medium',
         'high': 'high'

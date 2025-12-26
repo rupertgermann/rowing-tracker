@@ -210,7 +210,9 @@ const Dashboard = () => {
     deleteInsight,
     isArchivedView,
     setIsArchivedView,
-    isGenerating
+    isGenerating,
+    cloudAIError,
+    isCloudAIConfigured
   } = useAIInsights();
 
   useEffect(() => {
@@ -731,11 +733,21 @@ const Dashboard = () => {
                               <Brain className="h-8 w-8 text-muted-foreground" />
                             </div>
                             <h3 className="text-lg font-semibold text-foreground mb-2">
-                              No Current Insights
+                              {cloudAIError && !isCloudAIConfigured ? 'AI Not Configured' : 'No Current Insights'}
                             </h3>
                             <p className="text-muted-foreground mb-4">
-                              Click Refresh to generate new personalized insights.
+                              {cloudAIError && !isCloudAIConfigured 
+                                ? cloudAIError 
+                                : 'Click Refresh to generate new personalized insights.'
+                              }
                             </p>
+                            {cloudAIError && !isCloudAIConfigured && (
+                              <Button variant="outline" size="sm" asChild className="mb-4">
+                                <Link href="/settings#aiSettings">
+                                  Configure AI Settings
+                                </Link>
+                              </Button>
+                            )}
                           </>
                         )}
                         {(archivedInsights?.length || 0) > 0 && (
@@ -761,14 +773,25 @@ const Dashboard = () => {
                       <Brain className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">
-                      AI Insights Coming Soon
+                      {cloudAIError && !isCloudAIConfigured ? 'AI Not Configured' : 'AI Insights Coming Soon'}
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Complete at least 5 sessions to unlock personalized AI recommendations and insights.
+                      {cloudAIError && !isCloudAIConfigured 
+                        ? cloudAIError 
+                        : 'Complete at least 5 sessions to unlock personalized AI recommendations and insights.'
+                      }
                     </p>
-                    <div className="text-sm text-muted-foreground">
-                      Sessions needed: {sessions.length}/5
-                    </div>
+                    {cloudAIError && !isCloudAIConfigured ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href="/settings#aiSettings">
+                          Configure AI Settings
+                        </Link>
+                      </Button>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Sessions needed: {sessions.length}/5
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

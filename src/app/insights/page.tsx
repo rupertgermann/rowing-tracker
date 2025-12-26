@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,7 +46,9 @@ export default function InsightsPage() {
     refreshInsights,
     lastAnalyzed,
     isAnalyzable,
-    isGenerating
+    isGenerating,
+    cloudAIError,
+    isCloudAIConfigured
   } = useAIInsights();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -298,7 +301,9 @@ export default function InsightsPage() {
                         ? 'No Matching Insights'
                         : isGenerating
                           ? 'Generating Insights...'
-                          : 'No Current Insights'
+                          : cloudAIError && !isCloudAIConfigured
+                            ? 'AI Not Configured'
+                            : 'No Current Insights'
                       }
                     </h3>
                     <p className="text-muted-foreground max-w-md mx-auto">
@@ -306,9 +311,20 @@ export default function InsightsPage() {
                         ? 'Try adjusting your search or filters.'
                         : isGenerating
                           ? 'AI is analyzing your training data. This may take a moment.'
-                          : 'Complete more sessions to receive personalized AI recommendations.'
+                          : cloudAIError && !isCloudAIConfigured
+                            ? cloudAIError
+                            : 'Complete more sessions to receive personalized AI recommendations.'
                       }
                     </p>
+                    {cloudAIError && !isCloudAIConfigured && (
+                      <div className="mt-4">
+                        <Button variant="outline" asChild>
+                          <Link href="/settings#aiSettings">
+                            Configure AI Settings
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

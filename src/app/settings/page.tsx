@@ -1195,7 +1195,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
-                          value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
+                          value={settingsData.aiSettings.chat?.reasoning || 'none'}
                           onChange={(e) => saveSettings('aiSettings', {
                             chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
                           })}

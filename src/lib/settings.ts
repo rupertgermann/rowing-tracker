@@ -68,7 +68,7 @@ export interface PrivacySettings {
 }
 
 export interface UseCaseConfig {
-  reasoning: 'minimal' | 'low' | 'medium' | 'high';
+  reasoning: 'none' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
   model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' | 'gpt-5.2';
 }
@@ -191,7 +191,7 @@ export class SettingsService {
 
       // Per-use-case configurations with smart defaults
       chat: {
-        reasoning: 'minimal',      // Ultra-fast responses (compatible with all models)
+        reasoning: 'none',          // Ultra-fast responses (compatible with all models)
         verbosity: 'medium',       // Natural conversation
         model: 'gpt-5-mini'        // Good balance of speed and quality
       },

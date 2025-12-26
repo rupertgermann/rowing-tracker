@@ -550,6 +550,22 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     const isCloudAIConfigured = initializeCloudAI();
     const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
 
+    // If AI is not configured, return special state with no insights but still show archived insights
+    if (!isCloudAIConfigured) {
+      return {
+        insights: [],
+        trends: [],
+        trainingLoad: null,
+        anomalies: [],
+        isAnalyzable: false,
+        lastAnalyzed: null,
+        usingCloudAI: false,
+        cloudAIError: 'AI connection not configured. Please configure AI settings to generate insights.',
+        isCloudAIConfigured: false,
+        isGenerating: false
+      };
+    }
+
     if (!isAnalyzable) {
       return {
         insights: [],

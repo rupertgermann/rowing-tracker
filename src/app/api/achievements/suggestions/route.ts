@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AWARDS } from '@/lib/awards';
 
-type ReasoningSetting = 'minimal' | 'low' | 'medium' | 'high';
+type ReasoningSetting = 'none' | 'low' | 'medium' | 'high';
 
 type VerbositySetting = 'low' | 'medium' | 'high';
 
@@ -61,10 +61,7 @@ function extractResponseTextOrJson(data: any): { kind: 'text' | 'json'; value: s
   return null;
 }
 
-function mapReasoningEffort(model: string, reasoning: ReasoningSetting): 'none' | 'minimal' | 'low' | 'medium' | 'high' {
-  if (reasoning === 'minimal') {
-    return model === 'gpt-5.1' ? 'none' : 'minimal';
-  }
+function mapReasoningEffort(model: string, reasoning: ReasoningSetting): 'none' | 'low' | 'medium' | 'high' {
   return reasoning;
 }
 
