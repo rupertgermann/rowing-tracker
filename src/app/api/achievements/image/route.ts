@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SettingsService } from '@/lib/settings';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,20 +8,9 @@ export async function POST(request: NextRequest) {
       title, 
       description, 
       customPrompt, 
-      apiKey, 
-      size = '1024x1024',
-      quality = 'auto',  // auto, high, medium, low
-      model = 'gpt-image-1',  // gpt-image-1, gpt-image-1-mini, gpt-image-1.5
+      apiKey,
       story
     } = body;
-
-    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
-    if (!allowedSizes.includes(size)) {
-      return NextResponse.json(
-        { error: `Invalid size. Supported values: ${allowedSizes.join(', ')}` },
-        { status: 400 }
-      );
-    }
 
     if (!title || !description) {
       return NextResponse.json(
@@ -36,6 +26,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 401 }
+      );
+    }
+
+    // Load AI settings from database
+    const settings = SettingsService.getInstance();
+    const aiSettings = settings.getAISettings();
+    const size = aiSettings.achievementImageSize;
+    const quality = aiSettings.achievementImageQuality;
+    const model = aiSettings.achievementImageModel;
+
+    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+    if (!allowedSizes.includes(size)) {
+      return NextResponse.json(
+        { error: `Invalid size. Supported values: ${allowedSizes.join(', ')}` },
+        { status: 400 }
       );
     }
 
