@@ -315,7 +315,7 @@ export function AchievementGallery({
         generatedAt: new Date()
       });
 
-      await saveGeneratedAchievementsToDB([
+      const saveResult = await saveGeneratedAchievementsToDB([
         {
           awardId: currentAward.id,
           story: data.story,
@@ -323,6 +323,13 @@ export function AchievementGallery({
           generatedAt: new Date(),
         },
       ]);
+      
+      if (!saveResult.success) {
+        console.error('[AchievementGallery] Failed to save story to DB:', saveResult.error);
+        setError(`Failed to save: ${saveResult.error}`);
+      } else {
+        console.log('[AchievementGallery] Story saved successfully to DB');
+      }
       
       return data.story;
     } catch (err) {
@@ -408,7 +415,7 @@ export function AchievementGallery({
         });
       }
 
-      await saveGeneratedAchievementsToDB([
+      const saveResult = await saveGeneratedAchievementsToDB([
         {
           awardId: currentAward.id,
           imageUrl: filePath,
@@ -417,6 +424,13 @@ export function AchievementGallery({
           generatedAt: new Date(),
         },
       ]);
+      
+      if (!saveResult.success) {
+        console.error('[AchievementGallery] Failed to save image to DB:', saveResult.error);
+        setError(`Failed to save: ${saveResult.error}`);
+      } else {
+        console.log('[AchievementGallery] Image saved successfully to DB');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate image');
     } finally {

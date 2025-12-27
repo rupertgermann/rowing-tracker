@@ -418,15 +418,24 @@ export async function saveSettingsToDB(settings: any): Promise<SyncResult> {
  * Fetch generated achievements from database
  */
 export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
+  console.log('[DATA SYNC] Fetching achievements from DB');
+  
   try {
     const response = await fetch('/api/generated-achievements');
+    console.log('[DATA SYNC] Fetch response status:', response.status);
+    
     if (!response.ok) {
+      const error = await response.json();
+      console.error('[DATA SYNC] Fetch failed:', error);
       throw new Error('Failed to fetch generated achievements');
     }
+    
     const data = await response.json();
+    console.log('[DATA SYNC] Fetched achievements:', data.achievements?.length || 0, 'items');
+    console.log('[DATA SYNC] Achievement data:', JSON.stringify(data.achievements, null, 2));
     return data.achievements || [];
   } catch (error) {
-    console.error('Error fetching generated achievements:', error);
+    console.error('[DATA SYNC] Error fetching generated achievements:', error);
     return [];
   }
 }
@@ -435,6 +444,9 @@ export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
  * Save generated achievements to database
  */
 export async function saveGeneratedAchievementsToDB(achievements: any[]): Promise<SyncResult> {
+  console.log('[DATA SYNC] Saving achievements to DB:', achievements.length, 'items');
+  console.log('[DATA SYNC] Achievement data:', JSON.stringify(achievements, null, 2));
+  
   try {
     const response = await fetch('/api/generated-achievements', {
       method: 'POST',
@@ -442,14 +454,19 @@ export async function saveGeneratedAchievementsToDB(achievements: any[]): Promis
       body: JSON.stringify({ achievements }),
     });
 
+    console.log('[DATA SYNC] Save response status:', response.status);
+    
     if (!response.ok) {
       const error = await response.json();
+      console.error('[DATA SYNC] Save failed:', error);
       return { success: false, error: error.error || 'Failed to save generated achievements' };
     }
 
+    const result = await response.json();
+    console.log('[DATA SYNC] Save successful:', result);
     return { success: true };
   } catch (error) {
-    console.error('Error saving generated achievements:', error);
+    console.error('[DATA SYNC] Error saving generated achievements:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

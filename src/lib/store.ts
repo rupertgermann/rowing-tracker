@@ -1079,6 +1079,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             sessions: data.sessions.length,
             prs: data.personalRecords.length,
             awards: data.earnedAwards.length,
+            generatedAchievements: data.generatedAchievements.length,
             chartSettings: data.chartSettings ? 'found' : 'not found'
           });
           
@@ -1096,6 +1097,29 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             awardId: a.awardId,
             earnedAt: new Date(a.earnedAt)
           }));
+          
+          // Load generated achievements into the achievement store
+          if (data.generatedAchievements && data.generatedAchievements.length > 0) {
+            console.log('[STORE] Loading generated achievements into store...');
+            const useAchievementStore = await import('@/lib/achievementStore').then(m => m.useAchievementStore);
+            const { setGeneratedAchievement } = useAchievementStore.getState();
+            
+            for (const achievement of data.generatedAchievements) {
+              if (achievement?.awardId) {
+                setGeneratedAchievement(achievement.awardId, {
+                  awardId: achievement.awardId,
+                  title: '', // Will be filled by gallery when needed
+                  description: '', // Will be filled by gallery when needed
+                  earnedAt: achievement.earnedAt ? new Date(achievement.earnedAt) : undefined,
+                  story: achievement.story || undefined,
+                  imageUrl: achievement.imageUrl || undefined,
+                  hasImage: Boolean(achievement.hasImage) || Boolean(achievement.imageUrl),
+                  generatedAt: achievement.generatedAt ? new Date(achievement.generatedAt) : undefined,
+                });
+              }
+            }
+            console.log('[STORE] Loaded', data.generatedAchievements.length, 'generated achievements');
+          }
           
           // Load chart settings from database, or use defaults
           const chartSettings = data.chartSettings || defaultChartSettings;
@@ -1118,5 +1142,5 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         } catch (error) {
           console.error('[STORE] Failed to initialize from database:', error);
         }
-      }
+      },
     }));
