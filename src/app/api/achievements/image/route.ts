@@ -32,11 +32,16 @@ export async function POST(request: NextRequest) {
     // Load AI settings from database
     const settings = SettingsService.getInstance();
     const aiSettings = settings.getAISettings();
-    const size = aiSettings.achievementImageSize;
+    let size = aiSettings.achievementImageSize;
     const quality = aiSettings.achievementImageQuality;
     const model = aiSettings.achievementImageModel;
 
-    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+    // Handle 'auto' size - default to 1024x1024
+    if (size === 'auto') {
+      size = '1024x1024';
+    }
+
+    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024'];
     if (!allowedSizes.includes(size)) {
       return NextResponse.json(
         { error: `Invalid size. Supported values: ${allowedSizes.join(', ')}` },
@@ -46,6 +51,13 @@ export async function POST(request: NextRequest) {
 
     // Build the image prompt
     const isDev = process.env.NODE_ENV === 'development';
+    
+    if (isDev) {
+      console.log('Achievement Image Generation Settings:');
+      console.log('- Model:', model);
+      console.log('- Size:', size);
+      console.log('- Quality:', quality);
+    }
 
     const defaultPrompt = `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
 
@@ -86,6 +98,21 @@ Style guidelines:
     }
     if (isDev) console.log('finalPrompt:', prompt);
 
+    // Prepare request body
+    const requestBody = {
+      model: model,
+      prompt: prompt,
+      n: 1,
+      size: size,
+      quality: quality,
+      response_format: 'b64_json'
+    };
+
+    if (isDev) {
+      console.log('OpenAI Image API Request Body:');
+      console.log(JSON.stringify(requestBody, null, 2));
+    }
+
     // Call OpenAI Image API with GPT image models
     // See: https://platform.openai.com/docs/api-reference/images/create
     const response = await fetch('https://api.openai.com/v1/images/generations', {
@@ -94,28 +121,29 @@ Style guidelines:
         'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: model,
-        prompt: prompt,
-        n: 1,
-        size: size,
-        // quality parameter: 'auto' (default), 'high', 'medium', 'low' for GPT image models
-        quality: quality,
-        // GPT image models return b64_json by default, output_format controls the format
-        output_format: 'png'
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI Image API error:', errorText);
       return NextResponse.json(
-        { error: `OpenAI API error: ${response.status}` },
+        { error: `OpenAI API error: ${response.status}. ${errorText}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
+    
+    if (isDev) {
+      console.log('OpenAI Image API Response (metadata):');
+      console.log('- Data array length:', data.data?.length);
+      if (data.data?.[0]) {
+        console.log('- Has b64_json:', !!data.data[0].b64_json);
+        console.log('- Has url:', !!data.data[0].url);
+        console.log('- Revised prompt length:', data.data[0].revised_prompt?.length);
+      }
+    }
     
     // Extract the image data
     if (!data.data || data.data.length === 0) {
@@ -129,10 +157,23 @@ Style guidelines:
     const imageUrl = `data:image/png;base64,${imageData.b64_json}`;
     const revisedPrompt = imageData.revised_prompt;
 
+    if (isDev) {
+      console.log('Successfully generated image');
+      console.log('- Sent model:', model);
+      console.log('- Sent size:', size);
+      console.log('- Sent quality:', quality);
+    }
+
     return NextResponse.json({ 
       imageUrl,
       revisedPrompt,
-      sentPrompt: prompt
+      sentPrompt: prompt,
+      // Include metadata for debugging
+      metadata: {
+        model: model,
+        size: size,
+        quality: quality
+      }
     });
   } catch (error) {
     console.error('Achievement image generation error:', error);
