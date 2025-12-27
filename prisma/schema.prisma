@@ -416,7 +416,7 @@ model UserSettings {
   dateFormat            String   @default("MM/DD/YYYY")
   timeFormat            String   @default("24h")
   language              String   @default("en")
-  timeZone              String?
+  timeZone              String?  @default("UTC")
   defaultChartType      String   @default("line")
   animationsEnabled     Boolean  @default(true)
   showPromptSuggestions Boolean  @default(true)
@@ -443,6 +443,8 @@ model UserSettings {
   sessionAnalysisSettings Json?
   chartSettings         Json?
   analyticsSettings     Json?
+  sessionsRevision      Int      @default(0)
+  insightsRevision      Int      @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

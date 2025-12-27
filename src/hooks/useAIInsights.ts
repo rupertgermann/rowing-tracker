@@ -165,11 +165,41 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isArchivedView, setIsArchivedView] = useState(false);
   const dbLoadedRef = useRef(false);
+  const analysisInFlightRef = useRef(false);
 
   // Load archived insights state
   const [archivedInsightsState, setArchivedInsightsState] = useState<(Insight | CloudInsight)[]>([]);
   const [archivedLoaded, setArchivedLoaded] = useState(false);
   const [dbInsightsLoaded, setDbInsightsLoaded] = useState(false);
+
+  const [revisions, setRevisions] = useState<{ sessionsRevision: number; insightsRevision: number } | null>(null);
+  const revisionsLoadedRef = useRef(false);
+
+  // Load revision markers from DB on mount (reload-stable)
+  useEffect(() => {
+    if (revisionsLoadedRef.current) return;
+    revisionsLoadedRef.current = true;
+
+    const loadRevisions = async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) {
+          setRevisions({ sessionsRevision: 0, insightsRevision: 0 });
+          return;
+        }
+        const data = await res.json();
+        const s = data?.settings;
+        setRevisions({
+          sessionsRevision: typeof s?.sessionsRevision === 'number' ? s.sessionsRevision : 0,
+          insightsRevision: typeof s?.insightsRevision === 'number' ? s.insightsRevision : 0,
+        });
+      } catch {
+        setRevisions({ sessionsRevision: 0, insightsRevision: 0 });
+      }
+    };
+
+    loadRevisions();
+  }, []);
 
   // DB-first: Load insights from database on mount
   useEffect(() => {
@@ -504,10 +534,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     let isMounted = true;
 
     const runAnalysis = async () => {
+      if (analysisInFlightRef.current) return;
+
+      const sessionsChanged = revisions ? revisions.sessionsRevision !== revisions.insightsRevision : null;
+
       console.log('[INSIGHTS] Analysis triggered:', {
         forceRefresh,
         sessionCount: sessions.length,
-        sessionsChanged: sessions.length > 0
+        sessionsChanged
       });
 
       // Don't run analysis if we have no sessions yet (avoid race condition during initial load)
@@ -516,7 +550,21 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         return;
       }
 
+      // Wait until DB insights + revision markers are loaded so we can make a correct decision.
+      if (!dbInsightsLoaded || revisions === null) {
+        return;
+      }
+
+      // If insights in DB are already up-to-date with the current sessions dataset, do not regenerate on reload.
+      const insightsAreCurrent = revisions.sessionsRevision === revisions.insightsRevision;
+
+      if (!forceRefresh && insightsAreCurrent) {
+        return;
+      }
+
       try {
+        analysisInFlightRef.current = true;
+
         // No local caching: always rely on DB + in-memory state
         let currentArchived = archivedInsightsState;
 
@@ -530,15 +578,28 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           };
 
           // Persist insights to DB (source of truth)
-          if (updatedResult.insights && updatedResult.insights.length > 0) {
-            saveInsightsToDB(updatedResult.insights)
-              .catch(err => console.warn('[useAIInsights] Failed to save insights to database:', err));
-          }
+          saveInsightsToDB(updatedResult.insights || [], { markAsCurrent: true })
+            .catch(err => console.warn('[useAIInsights] Failed to save insights to database:', err));
 
           // Sync insights to memory for AI coach access (async, non-blocking)
           syncInsightsToMemory(updatedResult.insights, updatedResult.usingCloudAI);
 
           setData(updatedResult);
+
+          // Refresh revision markers after a successful generation so future reloads don't retrigger.
+          try {
+            const res = await fetch('/api/settings');
+            if (res.ok) {
+              const newData = await res.json();
+              const s = newData?.settings;
+              setRevisions({
+                sessionsRevision: typeof s?.sessionsRevision === 'number' ? s.sessionsRevision : 0,
+                insightsRevision: typeof s?.insightsRevision === 'number' ? s.insightsRevision : 0,
+              });
+            }
+          } catch {
+            // ignore
+          }
         }
       } catch (error) {
         console.error('Analysis error:', error);
@@ -546,6 +607,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           const localResult = await getLocalAnalysis(sessions);
           setData(localResult);
         }
+      } finally {
+        analysisInFlightRef.current = false;
       }
     };
 
@@ -554,7 +617,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     return () => {
       isMounted = false;
     };
-  }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI, archivedInsightsState, isArchivedView]);
+  }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI, archivedInsightsState, isArchivedView, dbInsightsLoaded, revisions, data.insights]);
 
   // Compute isAnalyzable directly from sessions count to ensure it's always accurate
   // (not dependent on async analysis completing)
