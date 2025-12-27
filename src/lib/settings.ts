@@ -378,11 +378,30 @@ Be specific and actionable. Only include information relevant to rowing training
       const dbSettings = data.settings;
 
       if (dbSettings) {
+        // Get current localStorage settings to preserve sensitive data like API key
+        const currentLocalSettings = localStorage.getItem(this.STORAGE_KEY);
+        let currentApiKey = '';
+        
+        if (currentLocalSettings) {
+          try {
+            const parsed = JSON.parse(currentLocalSettings);
+            currentApiKey = parsed.aiSettings?.openaiApiKey || '';
+          } catch (e) {
+            console.warn('[SETTINGS] Failed to parse current localStorage settings');
+          }
+        }
+        
         // Transform DB settings to app format and cache in localStorage
         const appSettings = this.transformDBToAppSettings(dbSettings);
         const migrated = this.migrateSettings(appSettings);
+        
+        // Preserve API key from localStorage (never stored in DB)
+        if (currentApiKey) {
+          migrated.aiSettings.openaiApiKey = currentApiKey;
+        }
+        
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
-        console.log('[SETTINGS] Loaded from database and cached in localStorage');
+        console.log('[SETTINGS] Loaded from database and cached in localStorage (API key preserved locally)');
       } else {
         // No DB settings, check if we have localStorage settings to sync up
         const localSettings = localStorage.getItem(this.STORAGE_KEY);
@@ -441,7 +460,8 @@ Be specific and actionable. Only include information relevant to rowing training
       aiSettings: {
         ...this.defaultSettings.aiSettings,
         cloudAIEnabled: dbSettings.cloudAIEnabled || false,
-        openaiApiKey: '', // API key is stored separately via UserApiKey model
+        // Note: openaiApiKey is NOT loaded from DB - it's kept local only
+        // Will be preserved from localStorage if present
         maxTokens: dbSettings.maxTokens || 4000,
         userProfileContext: dbSettings.userProfileContext || '',
         userProfileRawInput: dbSettings.userProfileRawInput || '',
