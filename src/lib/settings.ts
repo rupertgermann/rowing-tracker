@@ -480,20 +480,15 @@ Be specific and actionable. Only include information relevant to rowing training
   private async syncToDatabase(settings: Settings): Promise<void> {
     // Check if user is authenticated before syncing
     // We do this by checking if the session cookie exists
-    const cookies = document.cookie;
-    const hasSession = cookies.includes('next-auth.session-token') || 
-                       cookies.includes('__Secure-next-auth.session-token');
-    
-    console.log('[SETTINGS] syncToDatabase called - hasSession:', hasSession, 'cookies:', cookies.substring(0, 100));
+    const hasSession = document.cookie.includes('next-auth.session-token') || 
+                       document.cookie.includes('__Secure-next-auth.session-token');
     
     if (!hasSession) {
       // User is not authenticated, skip database sync silently
-      console.log('[SETTINGS] Skipping database sync - user not authenticated');
       return;
     }
 
     try {
-      console.log('[SETTINGS] Proceeding with database sync');
       const dbPayload = this.transformAppToDBSettings(settings);
       const response = await fetch('/api/settings', {
         method: 'POST',
