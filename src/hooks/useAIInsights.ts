@@ -19,6 +19,7 @@ export interface AIInsightData {
   isCloudAIConfigured: boolean;
   isGenerating: boolean;
   refreshInsights?: () => void;
+  refreshArchivedInsights?: () => Promise<void>;
   archivedInsights?: (Insight | CloudInsight)[];
   archiveInsight?: (insightId: string) => void;
   unarchiveInsight?: (insightId: string) => void;
@@ -548,6 +549,32 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     }
   }, []);
 
+  // Refresh archived insights from database (for after clearing archive)
+  const refreshArchivedInsights = useCallback(async () => {
+    try {
+      console.log('[INSIGHTS] Refreshing archived insights from database...');
+      const { archived } = await fetchInsightsFromDatabase();
+      
+      // Update localStorage cache
+      if (archived.length > 0) {
+        localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
+      } else {
+        localStorage.removeItem(ARCHIVE_KEY);
+      }
+      
+      // Update state
+      setArchivedInsightsState(archived);
+      setData(prevData => ({
+        ...prevData,
+        archivedInsights: archived
+      }));
+      
+      console.log('[INSIGHTS] Refreshed', archived.length, 'archived insights from database');
+    } catch (error) {
+      console.error('[INSIGHTS] Failed to refresh archived insights:', error);
+    }
+  }, []);
+
   // Set archived view function
   const setIsArchivedViewCallback = useCallback((isArchived: boolean) => {
     setIsArchivedView(isArchived);
@@ -804,6 +831,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     isGenerating: isAnalyzing,
     archivedInsights,
     refreshInsights,
+    refreshArchivedInsights,
     archiveInsight: archiveInsightCallback,
     unarchiveInsight: unarchiveInsightCallback,
     deleteInsight: deleteInsightCallback,

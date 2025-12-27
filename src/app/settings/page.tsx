@@ -20,6 +20,7 @@ import {
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
 import { deleteAllInsightsFromDB } from '@/lib/dataSync';
+import { useAIInsights } from '@/hooks/useAIInsights';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   DEFAULT_SYSTEM_PROMPT,
@@ -93,6 +94,9 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Get refreshArchivedInsights from useAIInsights hook
+  const { refreshArchivedInsights } = useAIInsights();
 
   // Toast component for overlay notifications
   const Toast = ({ message, type, onExit }: { message: string; type: 'success' | 'error'; onExit: () => void }) => {
@@ -385,6 +389,15 @@ export default function SettingsPage() {
             throw new Error(result.error || 'Failed to clear database');
           }
           console.log('[SETTINGS DEBUG] Database clear successful');
+          
+          // Refresh archived insights from DB to update UI
+          console.log('[SETTINGS DEBUG] Refreshing archived insights from DB...');
+          if (refreshArchivedInsights) {
+            await refreshArchivedInsights();
+            console.log('[SETTINGS DEBUG] Archived insights refreshed');
+          } else {
+            console.warn('[SETTINGS DEBUG] refreshArchivedInsights not available');
+          }
         } catch (error) {
           console.warn('[SETTINGS DEBUG] Failed to clear insights archive from database:', error);
           setErrorMessage(`Failed to clear from database: ${error instanceof Error ? error.message : 'Unknown error'}`);
