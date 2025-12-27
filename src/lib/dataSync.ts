@@ -16,9 +16,7 @@ export interface SyncResult {
  */
 export async function fetchSessionsFromDB(): Promise<Session[]> {
   try {
-    console.log('[SYNC] Fetching sessions from /api/sessions');
     const response = await fetch('/api/sessions');
-    console.log('[SYNC] Response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -26,7 +24,6 @@ export async function fetchSessionsFromDB(): Promise<Session[]> {
       throw new Error('Failed to fetch sessions');
     }
     const data = await response.json();
-    console.log('[SYNC] Fetched sessions:', data.sessions?.length || 0);
     return data.sessions || [];
   } catch (error) {
     console.error('[SYNC] Error fetching sessions:', error);
@@ -39,14 +36,12 @@ export async function fetchSessionsFromDB(): Promise<Session[]> {
  */
 export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult> {
   try {
-    console.log('[SYNC] Saving', sessions.length, 'sessions to database');
     const response = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessions }),
     });
 
-    console.log('[SYNC] Save response status:', response.status);
 
     if (!response.ok) {
       const error = await response.json();
@@ -55,7 +50,6 @@ export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult>
     }
 
     const result = await response.json();
-    console.log('[SYNC] Save successful:', result);
     return { success: true };
   } catch (error) {
     console.error('[SYNC] Error saving sessions:', error);
@@ -301,7 +295,6 @@ export async function saveChartSettingsToDB(chartSettings: any): Promise<SyncRes
  */
 export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
   try {
-    console.log('[DATA SYNC DEBUG] Fetching archived insights from database...');
     const response = await fetch('/api/insights');
     if (!response.ok) {
       throw new Error('Failed to fetch archived insights');
@@ -309,7 +302,6 @@ export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
     const data = await response.json();
     const allInsights = data.insights || [];
     const archivedInsights = allInsights.filter((insight: any) => insight.archived);
-    console.log('[DATA SYNC DEBUG] Fetched', allInsights.length, 'total insights,', archivedInsights.length, 'archived');
     return archivedInsights;
   } catch (error) {
     console.error('[DATA SYNC DEBUG] Error fetching archived insights:', error);
@@ -430,11 +422,9 @@ export async function saveSettingsToDB(settings: any): Promise<SyncResult> {
  * Fetch generated achievements from database
  */
 export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
-  console.log('[DATA SYNC] Fetching achievements from DB');
   
   try {
     const response = await fetch('/api/generated-achievements');
-    console.log('[DATA SYNC] Fetch response status:', response.status);
     
     if (!response.ok) {
       const error = await response.json();
@@ -443,8 +433,6 @@ export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
     }
     
     const data = await response.json();
-    console.log('[DATA SYNC] Fetched achievements:', data.achievements?.length || 0, 'items');
-    console.log('[DATA SYNC] Achievement data:', JSON.stringify(data.achievements, null, 2));
     return data.achievements || [];
   } catch (error) {
     console.error('[DATA SYNC] Error fetching generated achievements:', error);
@@ -456,8 +444,6 @@ export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
  * Save generated achievements to database
  */
 export async function saveGeneratedAchievementsToDB(achievements: any[]): Promise<SyncResult> {
-  console.log('[DATA SYNC] Saving achievements to DB:', achievements.length, 'items');
-  console.log('[DATA SYNC] Achievement data:', JSON.stringify(achievements, null, 2));
   
   try {
     const response = await fetch('/api/generated-achievements', {
@@ -466,7 +452,6 @@ export async function saveGeneratedAchievementsToDB(achievements: any[]): Promis
       body: JSON.stringify({ achievements }),
     });
 
-    console.log('[DATA SYNC] Save response status:', response.status);
     
     if (!response.ok) {
       const error = await response.json();
@@ -475,7 +460,6 @@ export async function saveGeneratedAchievementsToDB(achievements: any[]): Promis
     }
 
     const result = await response.json();
-    console.log('[DATA SYNC] Save successful:', result);
     return { success: true };
   } catch (error) {
     console.error('[DATA SYNC] Error saving generated achievements:', error);

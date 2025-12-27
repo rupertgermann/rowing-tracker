@@ -99,11 +99,9 @@ const deleteInsightFromDB = async (insightId: string): Promise<void> => {
 // Fetch insights from database (DB-first pattern)
 const fetchInsightsFromDatabase = async (): Promise<{ active: (Insight | CloudInsight)[], archived: (Insight | CloudInsight)[] }> => {
   try {
-    console.log('[INSIGHTS DB] Fetching insights from database...');
     const dbInsights = await fetchInsightsFromDB();
     
     if (!dbInsights || dbInsights.length === 0) {
-      console.log('[INSIGHTS DB] No insights in database');
       return { active: [], archived: [] };
     }
     
@@ -124,7 +122,6 @@ const fetchInsightsFromDatabase = async (): Promise<{ active: (Insight | CloudIn
       }
     });
     
-    console.log('[INSIGHTS DB] Loaded', active.length, 'active and', archived.length, 'archived insights from DB');
     return { active, archived };
   } catch (error) {
     console.error('[INSIGHTS DB] Error fetching insights:', error);
@@ -208,7 +205,6 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
     const loadFromDB = async () => {
       try {
-        console.log('[INSIGHTS] Loading insights from database (DB-first)...');
         const { active, archived } = await fetchInsightsFromDatabase();
         
         setArchivedInsightsState(archived);
@@ -217,7 +213,6 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         
         // If we have active insights from DB, use them
         if (active.length > 0) {
-          console.log('[INSIGHTS] Using', active.length, 'active insights from DB');
           setData(prev => ({
             ...prev,
             insights: active,
@@ -356,7 +351,6 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   // Refresh archived insights from database (for after clearing archive)
   const refreshArchivedInsights = useCallback(async () => {
     try {
-      console.log('[INSIGHTS] Refreshing archived insights from database...');
       const { archived } = await fetchInsightsFromDatabase();
       
       // Update state
@@ -366,7 +360,6 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         archivedInsights: archived
       }));
       
-      console.log('[INSIGHTS] Refreshed', archived.length, 'archived insights from database');
     } catch (error) {
       console.error('[INSIGHTS] Failed to refresh archived insights:', error);
     }
@@ -538,15 +531,9 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
       const sessionsChanged = revisions ? revisions.sessionsRevision !== revisions.insightsRevision : null;
 
-      console.log('[INSIGHTS] Analysis triggered:', {
-        forceRefresh,
-        sessionCount: sessions.length,
-        sessionsChanged
-      });
 
       // Don't run analysis if we have no sessions yet (avoid race condition during initial load)
       if (sessions.length === 0) {
-        console.log('[INSIGHTS] No sessions loaded yet - skipping');
         return;
       }
 
@@ -555,10 +542,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         return;
       }
 
+      // Check if we have any active (non-archived) insights
+      const hasActiveInsights = data.insights && data.insights.length > 0;
+
       // If insights in DB are already up-to-date with the current sessions dataset, do not regenerate on reload.
       const insightsAreCurrent = revisions.sessionsRevision === revisions.insightsRevision;
 
-      if (!forceRefresh && insightsAreCurrent) {
+      // Skip regeneration only if: not forced, revisions match, AND we have active insights
+      if (!forceRefresh && insightsAreCurrent && hasActiveInsights) {
         return;
       }
 

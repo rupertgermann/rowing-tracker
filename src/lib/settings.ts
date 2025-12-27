@@ -366,7 +366,6 @@ Be specific and actionable. Only include information relevant to rowing training
     }
 
     try {
-      console.log('[SETTINGS] Initializing from database...');
       const response = await fetch('/api/settings');
       
       if (!response.ok) {
@@ -402,12 +401,10 @@ Be specific and actionable. Only include information relevant to rowing training
         }
         
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
-        console.log('[SETTINGS] Loaded from database and cached in localStorage (API key preserved locally)');
       } else {
         // No DB settings, check if we have localStorage settings to sync up
         const localSettings = localStorage.getItem(this.STORAGE_KEY);
         if (localSettings) {
-          console.log('[SETTINGS] No DB settings found, syncing localStorage to DB');
           const parsed = JSON.parse(localSettings);
           await this.syncToDatabase(parsed);
         }
@@ -499,7 +496,6 @@ Be specific and actionable. Only include information relevant to rowing training
       if (!response.ok) {
         console.error('[SETTINGS] Failed to sync to database');
       } else {
-        console.log('[SETTINGS] Synced to database');
       }
     } catch (error) {
       console.error('[SETTINGS] Error syncing to database:', error);

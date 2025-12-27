@@ -8,15 +8,12 @@ import { prisma } from "@/lib/db/prisma";
  * Fetch all generated achievements (AI-generated award images/stories)
  */
 export async function GET() {
-  console.log('[API] GET /api/generated-achievements - Request received');
   
   try {
     // Test database connection
     await prisma.$connect();
-    console.log('[API] Database connected successfully');
     
     const session = await getServerSession(authOptions);
-    console.log('[API] Session:', session?.user?.id ? `User ${session.user.id}` : 'No session');
     
     if (!session?.user?.id) {
       console.error('[API] Unauthorized - no user session');
@@ -32,8 +29,6 @@ export async function GET() {
       },
     });
 
-    console.log('[API] Found achievements:', achievements.length, 'items for user', session.user.id);
-    console.log('[API] Achievement data:', JSON.stringify(achievements, null, 2));
 
     return NextResponse.json({ achievements });
   } catch (error) {
@@ -50,11 +45,9 @@ export async function GET() {
  * Create or update generated achievements
  */
 export async function POST(req: Request) {
-  console.log('[API] POST /api/generated-achievements - Request received');
   
   try {
     const session = await getServerSession(authOptions);
-    console.log('[API] Session:', session?.user?.id ? `User ${session.user.id}` : 'No session');
     
     if (!session?.user?.id) {
       console.error('[API] Unauthorized - no user session');
@@ -76,8 +69,6 @@ export async function POST(req: Request) {
       );
     }
     
-    console.log('[API] Received achievements:', achievements?.length || 0, 'items');
-    console.log('[API] Achievement data:', JSON.stringify(achievements, null, 2));
 
     if (!Array.isArray(achievements)) {
       console.error('[API] Achievements is not an array:', typeof achievements);
@@ -91,11 +82,9 @@ export async function POST(req: Request) {
 
     for (const achData of achievements) {
       if (!achData?.awardId) {
-        console.log('[API] Skipping achievement without awardId');
         continue;
       }
 
-      console.log('[API] Processing achievement:', achData.awardId);
 
       try {
         // Check if achievement exists
@@ -106,11 +95,9 @@ export async function POST(req: Request) {
           },
         });
 
-        console.log('[API] Existing achievement:', existing ? 'Yes' : 'No');
 
         if (existing) {
           // Update existing achievement
-          console.log('[API] Updating existing achievement');
           const updated = await prisma.generatedAchievement.update({
             where: { id: existing.id },
             data: {
@@ -121,11 +108,9 @@ export async function POST(req: Request) {
               generatedAt: achData.generatedAt ? new Date(achData.generatedAt) : undefined,
             },
           });
-          console.log('[API] Updated achievement:', updated.id);
           savedAchievements.push(updated);
         } else {
           // Create new achievement
-          console.log('[API] Creating new achievement');
           const created = await prisma.generatedAchievement.create({
             data: {
               userId: session.user.id,
@@ -137,7 +122,6 @@ export async function POST(req: Request) {
               generatedAt: achData.generatedAt ? new Date(achData.generatedAt) : new Date(),
             },
           });
-          console.log('[API] Created achievement:', created.id);
           savedAchievements.push(created);
         }
       } catch (dbError) {
@@ -147,7 +131,6 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log('[API] Saved', savedAchievements.length, 'achievements to database');
 
     return NextResponse.json({ 
       achievements: savedAchievements,

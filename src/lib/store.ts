@@ -1052,16 +1052,8 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       // Initialize store from database
       initializeFromDB: async () => {
         try {
-          console.log('[STORE] initializeFromDB called');
           const data = await initializeStoreFromDB();
           
-          console.log('[STORE] Fetched from DB:', {
-            sessions: data.sessions.length,
-            prs: data.personalRecords.length,
-            awards: data.earnedAwards.length,
-            generatedAchievements: data.generatedAchievements.length,
-            chartSettings: data.chartSettings ? 'found' : 'not found'
-          });
           
           // Convert timestamps to Date objects
           const sessions = data.sessions.map((s: any) => ({
@@ -1080,7 +1072,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           
           // Load generated achievements into the achievement store
           if (data.generatedAchievements && data.generatedAchievements.length > 0) {
-            console.log('[STORE] Loading generated achievements into store...');
             const useAchievementStore = await import('@/lib/achievementStore').then(m => m.useAchievementStore);
             const { setGeneratedAchievement } = useAchievementStore.getState();
             
@@ -1098,18 +1089,11 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
                 });
               }
             }
-            console.log('[STORE] Loaded', data.generatedAchievements.length, 'generated achievements');
           }
           
           // Load chart settings from database, or use defaults
           const chartSettings = data.chartSettings || defaultChartSettings;
           
-          console.log('[STORE] Setting state with:', {
-            sessions: sessions.length,
-            prs: personalRecords.length,
-            awards: earnedAwards.length,
-            chartSettings: 'loaded'
-          });
           
           set({
             sessions,
@@ -1118,7 +1102,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             chartSettings
           });
           
-          console.log('[STORE] State updated successfully');
         } catch (error) {
           console.error('[STORE] Failed to initialize from database:', error);
         }
