@@ -99,6 +99,7 @@ export interface AISettings {
   achievementImageModel: 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
   achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
+  achievementImageColors: 'classic' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean'; // color palette
 
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description
@@ -266,6 +267,7 @@ Be brief and direct. No fluff.`,
       achievementImageModel: 'gpt-image-1',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',
+      achievementImageColors: 'classic',
 
       // Achievement generator prompts
       achievementStoryPrompt: `You are a creative writer crafting inspiring achievement stories for rowers. 
@@ -293,7 +295,7 @@ Description: {description}
 Style guidelines:
 - Modern, clean design with elegant typography
 - Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
-- Use a color palette of deep blues, golds, and whites
+- Use a color palette of {colors}
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately

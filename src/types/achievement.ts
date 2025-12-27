@@ -53,7 +53,7 @@ Description: {description}
 Style guidelines:
 - Modern, clean design with elegant typography
 - Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
-- Use a color palette of deep blues, golds, and whites
+- Use a color palette of {colors}
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately

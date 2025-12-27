@@ -35,6 +35,7 @@ import {
   DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
   DEFAULT_ACHIEVEMENT_STORY_PROMPT
 } from '@/types/achievement';
+import { ACHIEVEMENT_COLOR_PALETTES } from '@/lib/achievementColors';
 import {
   migrateImagesFromIndexedDB,
   getAllAchievementImageIdsFromIndexedDB
@@ -273,6 +274,9 @@ export default function SettingsPage() {
     value: string,
     defaultValue: string
   ) => {
+    console.log('[Settings] Opening prompt editor for:', key);
+    console.log('[Settings] Current value preview:', value.substring(0, 200));
+    console.log('[Settings] Default value preview:', defaultValue.substring(0, 200));
     setEditingPrompt({ key, label, description, value, defaultValue });
     setPromptEditorValue(value);
     setPromptEditorOpen(true);
@@ -280,6 +284,10 @@ export default function SettingsPage() {
 
   const savePromptFromEditor = () => {
     if (editingPrompt) {
+      console.log('[Settings] Saving prompt:', editingPrompt.key);
+      console.log('[Settings] Prompt value length:', promptEditorValue.length);
+      console.log('[Settings] Prompt preview:', promptEditorValue.substring(0, 200));
+      
       // Special handling for userProfileRawInput - also update local state
       if (editingPrompt.key === 'userProfileRawInput') {
         setProfileRawInput(promptEditorValue);
@@ -297,6 +305,7 @@ export default function SettingsPage() {
   };
 
   const saveSettings = async (category: SettingsCategory, updates: any) => {
+    console.log('[Settings] saveSettings called:', category, updates);
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -319,13 +328,17 @@ export default function SettingsPage() {
           settings.updatePrivacySettings(updates);
           break;
         case 'aiSettings':
+          console.log('[Settings] Updating AI settings with:', updates);
           settings.updateAISettings(updates);
+          console.log('[Settings] AI settings updated');
           break;
       }
 
       loadSettings();
+      console.log('[Settings] Settings reloaded');
       setSuccessMessage('Settings saved successfully');
     } catch (error) {
+      console.error('[Settings] Error saving settings:', error);
       setErrorMessage('Failed to save settings');
     } finally {
       setIsLoading(false);
@@ -1565,6 +1578,57 @@ export default function SettingsPage() {
                             </option>
                           ))}
                         </select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Achievement Image Colors */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        Color Palette
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Choose the color scheme for achievement certificate images
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {ACHIEVEMENT_COLOR_PALETTES.map((palette) => (
+                          <button
+                            key={palette.value}
+                            onClick={() => saveSettings('aiSettings', { achievementImageColors: palette.value })}
+                            className={`relative p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+                              settingsData.aiSettings.achievementImageColors === palette.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex gap-1 mt-1">
+                                {palette.colors.map((color, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="w-4 h-4 rounded-full border border-gray-300"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm mb-1">{palette.label}</div>
+                                <div className="text-xs text-muted-foreground line-clamp-2">
+                                  {palette.description}
+                                </div>
+                              </div>
+                            </div>
+                            {settingsData.aiSettings.achievementImageColors === palette.value && (
+                              <div className="absolute top-2 right-2">
+                                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                              </div>
+                            )}
+                          </button>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>

@@ -142,7 +142,6 @@ export function AchievementCard({
       const requestBody = {
         title: award.title,
         description: award.description,
-        customPrompt: aiSettings.achievementImagePrompt,
         apiKey: aiSettings.openaiApiKey || undefined,
         model: aiSettings.achievementImageModel,
         quality: aiSettings.achievementImageQuality,

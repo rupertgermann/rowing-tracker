@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SettingsService } from '@/lib/settings';
+import { getColorPalettePrompt } from '@/lib/achievementColors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -6,7 +8,6 @@ export async function POST(request: NextRequest) {
     const { 
       title, 
       description, 
-      customPrompt, 
       apiKey, 
       size = '1024x1024',
       quality = 'auto',  // auto, high, medium, low
@@ -42,25 +43,38 @@ export async function POST(request: NextRequest) {
     // Build the image prompt
     const isDev = process.env.NODE_ENV === 'development';
 
-    const defaultPrompt = `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
+    // Load AI settings to get selected color palette and prompt template
+    const settings = SettingsService.getInstance();
+    const aiSettings = settings.getAISettings();
+    const colorPalette = getColorPalettePrompt(aiSettings.achievementImageColors || 'classic');
+    
+    // Always use the current prompt from settings
+    const promptTemplate = aiSettings.achievementImagePrompt;
 
-Achievement: {title}
-Description: {description}
+    if (isDev) {
+      console.log('[ImageGen] Selected color palette:', aiSettings.achievementImageColors);
+      console.log('[ImageGen] Color prompt text:', colorPalette);
+      console.log('[ImageGen] Using prompt from settings');
+      console.log('[ImageGen] Prompt template preview:', promptTemplate.substring(0, 300));
+      console.log('[ImageGen] Has {colors} placeholder:', promptTemplate.includes('{colors}'));
+      console.log('[ImageGen] Has old hardcoded colors:', promptTemplate.includes('deep blues, golds, and whites'));
+    }
 
-Style guidelines:
-- Modern, clean design with elegant typography
-- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
-- Use a color palette of deep blues, golds, and whites
-- Denim and gold meld, Shield in tradition's curve, unfolds boldly,  Innovative weave in era. 
-- Include decorative elements suggesting achievement (laurels, ribbons, stars)
-- The image should feel prestigious and celebratory
-- Do NOT include any text - the text will be overlaid separately
-- Aspect ratio: square (1:1)
-- High quality, suitable for display`;
-
-    let prompt = (customPrompt || defaultPrompt)
+    // Build prompt from current settings, replacing placeholders
+    let prompt = promptTemplate
       .replace('{title}', title)
-      .replace('{description}', description);
+      .replace('{description}', description)
+      .replace(/{colors}/gi, colorPalette);
+
+    // Also replace any old hardcoded color text (for backward compatibility)
+    prompt = prompt.replace(
+      /Use a color palette of .+$/gim,
+      `Use a color palette of ${colorPalette}`
+    );
+
+    if (isDev) {
+      console.log('[ImageGen] Final prompt after replacements:', prompt.substring(0, 400));
+    }
 
     // Ensure the award title is visible on the certificate/card
     prompt += `\n\nClearly render the award title "${title}" on the certificate/card in the foreground so it is readable and prominent.`;
