@@ -121,6 +121,10 @@ export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
   private readonly CURRENT_VERSION = '1.4.0'; // Condensed explainChartPrompt - max 6 lines per section
+  private dbInitialized = false;
+  private initPromise: Promise<void> | null = null;
+  private syncTimeout: NodeJS.Timeout | null = null;
+  private lastSyncedData: string = '';
 
   private defaultSettings: Settings = {
     userPreferences: {
@@ -334,6 +338,205 @@ Be specific and actionable. Only include information relevant to rowing training
 
   private constructor() { }
 
+  /**
+   * Initialize settings from database (DB-first pattern)
+   * This should be called on app load to ensure DB is source of truth
+   * localStorage is used only as a synchronous cache after initialization
+   */
+  async initializeFromDB(): Promise<void> {
+    // Prevent multiple simultaneous initializations
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    if (this.dbInitialized) {
+      return;
+    }
+
+    this.initPromise = this._doInitializeFromDB();
+    await this.initPromise;
+    this.initPromise = null;
+  }
+
+  private async _doInitializeFromDB(): Promise<void> {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
+    try {
+      console.log('[SETTINGS] Initializing from database...');
+      const response = await fetch('/api/settings');
+      
+      if (!response.ok) {
+        console.warn('[SETTINGS] Failed to fetch from DB, using localStorage');
+        this.dbInitialized = true;
+        return;
+      }
+
+      const data = await response.json();
+      const dbSettings = data.settings;
+
+      if (dbSettings) {
+        // Transform DB settings to app format and cache in localStorage
+        const appSettings = this.transformDBToAppSettings(dbSettings);
+        const migrated = this.migrateSettings(appSettings);
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
+        console.log('[SETTINGS] Loaded from database and cached in localStorage');
+      } else {
+        // No DB settings, check if we have localStorage settings to sync up
+        const localSettings = localStorage.getItem(this.STORAGE_KEY);
+        if (localSettings) {
+          console.log('[SETTINGS] No DB settings found, syncing localStorage to DB');
+          const parsed = JSON.parse(localSettings);
+          await this.syncToDatabase(parsed);
+        }
+      }
+
+      this.dbInitialized = true;
+    } catch (error) {
+      console.error('[SETTINGS] Error initializing from database:', error);
+      this.dbInitialized = true; // Mark as initialized to prevent retry loops
+    }
+  }
+
+  /**
+   * Transform database settings format to app Settings format
+   */
+  private transformDBToAppSettings(dbSettings: any): Settings {
+    return {
+      userPreferences: {
+        theme: dbSettings.theme || 'system',
+        units: dbSettings.units || 'metric',
+        dateFormat: dbSettings.dateFormat || 'MM/DD/YYYY',
+        timeFormat: dbSettings.timeFormat || '24h',
+        language: dbSettings.language || 'en',
+        timeZone: dbSettings.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        defaultChartType: dbSettings.defaultChartType || 'line',
+        animationsEnabled: dbSettings.animationsEnabled !== false,
+        showPromptSuggestions: dbSettings.showPromptSuggestions !== false,
+        customPrompts: dbSettings.customPrompts || []
+      },
+      dataManagement: this.defaultSettings.dataManagement,
+      trainingSettings: {
+        ...this.defaultSettings.trainingSettings,
+        defaultTrainingZones: dbSettings.trainingZones || this.defaultSettings.trainingSettings.defaultTrainingZones,
+        preferredMetrics: dbSettings.preferredMetrics || this.defaultSettings.trainingSettings.preferredMetrics,
+        weeklyGoal: {
+          type: dbSettings.weeklyGoalType || 'sessions',
+          target: dbSettings.weeklyGoalTarget || 3
+        },
+        restDayAlerts: dbSettings.restDayAlerts !== false,
+        adaptationEnabled: dbSettings.adaptationEnabled !== false
+      },
+      notificationSettings: {
+        sessionReminders: dbSettings.sessionReminders || false,
+        weeklyProgress: dbSettings.weeklyProgress !== false,
+        achievementAlerts: dbSettings.achievementAlerts !== false,
+        planReminders: dbSettings.planReminders !== false,
+        adherenceAlerts: dbSettings.adherenceAlerts !== false,
+        emailNotifications: this.defaultSettings.notificationSettings.emailNotifications
+      },
+      privacySettings: this.defaultSettings.privacySettings,
+      aiSettings: {
+        ...this.defaultSettings.aiSettings,
+        cloudAIEnabled: dbSettings.cloudAIEnabled || false,
+        openaiApiKey: '', // API key is stored separately via UserApiKey model
+        maxTokens: dbSettings.maxTokens || 4000,
+        userProfileContext: dbSettings.userProfileContext || '',
+        userProfileRawInput: dbSettings.userProfileRawInput || '',
+        ...(dbSettings.aiConfig || {}),
+        ...(dbSettings.customPromptsAi || {})
+      },
+      version: this.CURRENT_VERSION,
+      updatedAt: new Date(dbSettings.updatedAt || Date.now())
+    };
+  }
+
+  /**
+   * Sync settings to database (async, non-blocking)
+   */
+  private async syncToDatabase(settings: Settings): Promise<void> {
+    try {
+      const dbPayload = this.transformAppToDBSettings(settings);
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dbPayload)
+      });
+
+      if (!response.ok) {
+        console.error('[SETTINGS] Failed to sync to database');
+      } else {
+        console.log('[SETTINGS] Synced to database');
+      }
+    } catch (error) {
+      console.error('[SETTINGS] Error syncing to database:', error);
+    }
+  }
+
+  /**
+   * Transform app Settings format to database format
+   */
+  private transformAppToDBSettings(settings: Settings): any {
+    return {
+      theme: settings.userPreferences.theme,
+      units: settings.userPreferences.units,
+      dateFormat: settings.userPreferences.dateFormat,
+      timeFormat: settings.userPreferences.timeFormat,
+      language: settings.userPreferences.language,
+      timeZone: settings.userPreferences.timeZone,
+      defaultChartType: settings.userPreferences.defaultChartType,
+      animationsEnabled: settings.userPreferences.animationsEnabled,
+      showPromptSuggestions: settings.userPreferences.showPromptSuggestions,
+      customPrompts: settings.userPreferences.customPrompts,
+      trainingZones: settings.trainingSettings.defaultTrainingZones,
+      preferredMetrics: settings.trainingSettings.preferredMetrics,
+      weeklyGoalType: settings.trainingSettings.weeklyGoal.type,
+      weeklyGoalTarget: settings.trainingSettings.weeklyGoal.target,
+      restDayAlerts: settings.trainingSettings.restDayAlerts,
+      adaptationEnabled: settings.trainingSettings.adaptationEnabled,
+      sessionReminders: settings.notificationSettings.sessionReminders,
+      weeklyProgress: settings.notificationSettings.weeklyProgress,
+      achievementAlerts: settings.notificationSettings.achievementAlerts,
+      planReminders: settings.notificationSettings.planReminders,
+      adherenceAlerts: settings.notificationSettings.adherenceAlerts,
+      cloudAIEnabled: settings.aiSettings.cloudAIEnabled,
+      maxTokens: settings.aiSettings.maxTokens,
+      userProfileContext: settings.aiSettings.userProfileContext,
+      userProfileRawInput: settings.aiSettings.userProfileRawInput,
+      aiConfig: {
+        chat: settings.aiSettings.chat,
+        insights: settings.aiSettings.insights,
+        trainingPlans: settings.aiSettings.trainingPlans,
+        awardSuggestions: settings.aiSettings.awardSuggestions,
+        achievementText: settings.aiSettings.achievementText,
+        achievementImageModel: settings.aiSettings.achievementImageModel,
+        achievementImageQuality: settings.aiSettings.achievementImageQuality,
+        achievementImageSize: settings.aiSettings.achievementImageSize,
+        userProfileGeneration: settings.aiSettings.userProfileGeneration
+      },
+      customPromptsAi: {
+        systemPrompt: settings.aiSettings.systemPrompt,
+        chatSystemPrompt: settings.aiSettings.chatSystemPrompt,
+        planGenerationPrompt: settings.aiSettings.planGenerationPrompt,
+        insightsPrompt: settings.aiSettings.insightsPrompt,
+        explainChartPrompt: settings.aiSettings.explainChartPrompt,
+        awardSuggestionsPrompt: settings.aiSettings.awardSuggestionsPrompt,
+        achievementStoryPrompt: settings.aiSettings.achievementStoryPrompt,
+        achievementImagePrompt: settings.aiSettings.achievementImagePrompt,
+        userProfilePrompt: settings.aiSettings.userProfilePrompt
+      }
+    };
+  }
+
+  /**
+   * Check if settings have been initialized from DB
+   */
+  isInitialized(): boolean {
+    return this.dbInitialized;
+  }
+
   static getInstance(): SettingsService {
     if (!SettingsService.instance) {
       SettingsService.instance = new SettingsService();
@@ -356,7 +559,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
       const settings = JSON.parse(stored);
       const migrated = this.migrateSettings(settings);
-      this.saveSettings(migrated, { dispatchEvent: false });
+      this.saveSettings(migrated);
       return migrated;
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -569,20 +772,36 @@ Be specific and actionable. Only include information relevant to rowing training
     keysToRemove.forEach(key => localStorage.removeItem(key));
   }
 
-  // Private helper methods
-  private saveSettings(settings: Settings, options?: { dispatchEvent?: boolean }): void {
-    try {
-      // Guard against SSR/non-browser environments
-      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-        return;
-      }
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
-      if (options?.dispatchEvent !== false) {
-        window.dispatchEvent(new Event('rowing_app_settings_updated'));
-      }
-    } catch (error) {
-      console.error('Failed to save settings:', error);
+  /**
+   * Save settings to localStorage and sync to database (debounced)
+   */
+  private saveSettings(settings: Settings): void {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
+    this.debouncedSyncToDatabase(settings);
+  }
+
+  /**
+   * Debounced sync to database to prevent excessive API calls
+   */
+  private debouncedSyncToDatabase(settings: Settings): void {
+    // Clear existing timeout
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
     }
+
+    // Create string representation to compare with last synced data
+    const currentData = JSON.stringify(settings);
+    
+    // Skip if data hasn't changed
+    if (currentData === this.lastSyncedData) {
+      return;
+    }
+
+    // Set new timeout
+    this.syncTimeout = setTimeout(async () => {
+      await this.syncToDatabase(settings);
+      this.lastSyncedData = currentData;
+    }, 1000); // 1 second debounce
   }
 
   private migrateSettings(settings: any): Settings {

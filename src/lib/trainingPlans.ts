@@ -98,7 +98,26 @@ export class TrainingPlansService {
   // Get active training plan
   async getActivePlan(): Promise<TrainingPlan | null> {
     try {
-      const activePlanId = localStorage.getItem(this.ACTIVE_PLAN_KEY);
+      // Try localStorage cache first
+      let activePlanId = localStorage.getItem(this.ACTIVE_PLAN_KEY);
+      
+      // If not in localStorage, check DB (via settings)
+      if (!activePlanId) {
+        try {
+          const response = await fetch('/api/settings');
+          if (response.ok) {
+            const data = await response.json();
+            activePlanId = data.settings?.dashboardSettings?.activePlanId || null;
+            if (activePlanId) {
+              // Cache in localStorage
+              localStorage.setItem(this.ACTIVE_PLAN_KEY, activePlanId);
+            }
+          }
+        } catch (e) {
+          console.warn('[TRAINING PLANS] Failed to fetch active plan from DB');
+        }
+      }
+      
       if (!activePlanId) return null;
       
       const plan = await this.getPlan(activePlanId);
@@ -110,8 +129,40 @@ export class TrainingPlansService {
   }
 
   // Set active training plan
-  setActivePlan(planId: string): void {
+  async setActivePlan(planId: string): Promise<void> {
+    // Cache in localStorage for synchronous access
     localStorage.setItem(this.ACTIVE_PLAN_KEY, planId);
+    
+    // Sync to database (non-blocking)
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dashboardSettings: { activePlanId: planId }
+        })
+      });
+      console.log('[TRAINING PLANS] Active plan synced to DB:', planId);
+    } catch (error) {
+      console.error('[TRAINING PLANS] Failed to sync active plan to DB:', error);
+    }
+  }
+  
+  // Clear active training plan
+  async clearActivePlan(): Promise<void> {
+    localStorage.removeItem(this.ACTIVE_PLAN_KEY);
+    
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dashboardSettings: { activePlanId: null }
+        })
+      });
+    } catch (error) {
+      console.error('[TRAINING PLANS] Failed to clear active plan in DB:', error);
+    }
   }
 
   // Get plan by ID
@@ -172,7 +223,7 @@ export class TrainingPlansService {
     // If deleted plan was active, clear active plan
     const activePlan = await this.getActivePlan();
     if (activePlan?.id === planId) {
-      localStorage.removeItem(this.ACTIVE_PLAN_KEY);
+      await this.clearActivePlan();
     }
   }
 
