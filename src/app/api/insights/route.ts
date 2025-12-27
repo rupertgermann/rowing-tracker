@@ -143,7 +143,7 @@ export async function DELETE(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { insightId } = body;
+    const { insightId, archivedOnly } = body;
 
     if (insightId) {
       // Delete single insight
@@ -154,6 +154,15 @@ export async function DELETE(req: Request) {
         },
       });
       console.log(`[INSIGHTS API] Deleted insight ${insightId}`);
+    } else if (archivedOnly) {
+      // Delete only archived insights (for "Clear Insights Archive" functionality)
+      const result = await prisma.aIInsight.deleteMany({
+        where: {
+          userId: session.user.id,
+          archived: true, // Only delete archived insights
+        },
+      });
+      console.log(`[INSIGHTS API] Deleted ${result.count} archived insights`);
     } else {
       // Delete all insights for cache invalidation
       const result = await prisma.aIInsight.deleteMany({

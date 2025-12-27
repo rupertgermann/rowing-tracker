@@ -240,23 +240,32 @@ const addToArchive = (existing: (Insight | CloudInsight)[], newItems: (Insight |
 const getArchivedInsights = (): (Insight | CloudInsight)[] => {
   // Guard against SSR/non-browser environments
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    console.log('[ARCHIVE DEBUG] No window/localStorage - returning empty');
     return [];
   }
 
   try {
+    console.log('[ARCHIVE DEBUG] Checking localStorage for archived insights...');
     const archived = localStorage.getItem(ARCHIVE_KEY);
+    console.log('[ARCHIVE DEBUG] localStorage archived insights:', archived ? 'FOUND' : 'NOT FOUND');
+    
     if (!archived) {
+      console.log('[ARCHIVE DEBUG] No archived insights in localStorage, scheduling DB load...');
       // Schedule database load in background without blocking cache validation
       setTimeout(() => {
+        console.log('[ARCHIVE DEBUG] Loading archived insights from database...');
         fetchArchivedInsightsFromDB()
           .then(dbInsights => {
+            console.log('[ARCHIVE DEBUG] Database returned', dbInsights?.length || 0, 'archived insights');
             if (dbInsights && dbInsights.length > 0) {
-              console.log('[useAIInsights] Loaded', dbInsights.length, 'archived insights from database');
+              console.log('[ARCHIVE DEBUG] WARNING: Repopulating localStorage with', dbInsights.length, 'archived insights from DB');
               localStorage.setItem(ARCHIVE_KEY, JSON.stringify(dbInsights));
+            } else {
+              console.log('[ARCHIVE DEBUG] No archived insights found in database');
             }
           })
           .catch(err => {
-            console.warn('[useAIInsights] Failed to load archived insights from database:', err);
+            console.warn('[ARCHIVE DEBUG] Failed to load archived insights from database:', err);
           });
       }, 100); // Small delay to not interfere with current operation
       return [];

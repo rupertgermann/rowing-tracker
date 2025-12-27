@@ -295,14 +295,18 @@ export async function saveChartSettingsToDB(chartSettings: any): Promise<SyncRes
  */
 export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
   try {
-    const response = await fetch('/api/insights?archived=true');
+    console.log('[DATA SYNC DEBUG] Fetching archived insights from database...');
+    const response = await fetch('/api/insights');
     if (!response.ok) {
       throw new Error('Failed to fetch archived insights');
     }
     const data = await response.json();
-    return data.insights || [];
+    const allInsights = data.insights || [];
+    const archivedInsights = allInsights.filter((insight: any) => insight.archived);
+    console.log('[DATA SYNC DEBUG] Fetched', allInsights.length, 'total insights,', archivedInsights.length, 'archived');
+    return archivedInsights;
   } catch (error) {
-    console.error('Error fetching archived insights:', error);
+    console.error('[DATA SYNC DEBUG] Error fetching archived insights:', error);
     return [];
   }
 }
@@ -337,6 +341,8 @@ export async function deleteAllInsightsFromDB(): Promise<SyncResult> {
   try {
     const response = await fetch('/api/insights', {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archivedOnly: true }),
     });
 
     if (!response.ok) {
