@@ -58,8 +58,6 @@ Style guidelines:
 - Aspect ratio: square (1:1)
 - High quality, suitable for display`;
 
-    if (isDev) console.log('defaultPrompt:', defaultPrompt);
-
     let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
       .replace('{description}', description);
@@ -69,16 +67,11 @@ Style guidelines:
 
     // If a story already exists, include it for better coherence and background alignment
     const storyText = typeof story === 'string' ? story.trim() : '';
-    if (isDev) {
-      console.log('image route incoming story (raw type/len):', typeof story, story?.length ?? 'n/a');
-      console.log('image route storyText length after trim:', storyText.length);
-    }
     if (storyText) {
       prompt += `\n\nHere is the achievement story to keep visual consistency:\n${storyText}\n\nCreate the background so it visually reflects the mood, setting, and key imagery from this story. Place the award certificate/card clearly in the foreground in front of that story-inspired background.`;
     } else {
       prompt += `\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement.`;
     }
-    if (isDev) console.log('finalPrompt:', prompt);
 
     // Call OpenAI Image API with GPT image models
     // See: https://platform.openai.com/docs/api-reference/images/create

@@ -327,8 +327,6 @@ export function AchievementGallery({
       if (!saveResult.success) {
         console.error('[AchievementGallery] Failed to save story to DB:', saveResult.error);
         setError(`Failed to save: ${saveResult.error}`);
-      } else {
-        console.log('[AchievementGallery] Story saved successfully to DB');
       }
       
       return data.story;
@@ -364,13 +362,6 @@ export function AchievementGallery({
         // If a story already exists, pass it for better coherence
         story: storyToUse
       };
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[AchievementGallery] image request body', {
-          ...requestBody,
-          storyPreview: requestBody.story?.slice?.(0, 120) || null,
-          hasStory: Boolean(requestBody.story)
-        });
-      }
 
       const response = await fetch('/api/achievements/image', {
         method: 'POST',
@@ -428,8 +419,6 @@ export function AchievementGallery({
       if (!saveResult.success) {
         console.error('[AchievementGallery] Failed to save image to DB:', saveResult.error);
         setError(`Failed to save: ${saveResult.error}`);
-      } else {
-        console.log('[AchievementGallery] Image saved successfully to DB');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate image');

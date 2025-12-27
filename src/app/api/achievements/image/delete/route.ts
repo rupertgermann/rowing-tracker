@@ -27,16 +27,11 @@ async function clearNextImageCache(): Promise<boolean> {
     if (existsSync(cachePath)) {
       try {
         await rm(cachePath, { recursive: true, force: true });
-        console.log(`[ImageDelete] Cleared Next.js cache: ${cachePath}`);
         cleared = true;
       } catch (error) {
         console.error(`[ImageDelete] Error clearing cache at ${cachePath}:`, error);
       }
     }
-  }
-  
-  if (!cleared) {
-    console.log('[ImageDelete] No cache directories found to clear');
   }
   
   return cleared;
