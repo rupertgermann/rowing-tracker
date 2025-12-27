@@ -36,7 +36,7 @@ interface InsightCache {
 
 const CACHE_KEY = 'rowing_ai_insights_cache';
 const ARCHIVE_KEY = 'rowing_ai_insights_archive';
-const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days - only regenerate if sessions change
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const AUTO_ARCHIVE_DAYS = 30; // Archive insights older than 30 days
 
 // Generate cache key based on session data
@@ -59,7 +59,6 @@ const generateCacheKey = (sessions: Session[], usingCloudAI: boolean): string =>
     .toString(36);
 
   const cacheKey = `${sessionCount}-${lastSessionTimestamp}-${usingCloudAI}-${sessionIdsHash}`;
-  console.log('[useAIInsights] Generated cache key:', cacheKey);
   return cacheKey;
 };
 
@@ -67,13 +66,14 @@ const generateCacheKey = (sessions: Session[], usingCloudAI: boolean): string =>
 const getCachedInsights = (sessions: Session[], usingCloudAI: boolean): AIInsightData | null => {
   // Guard against SSR/non-browser environments
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    console.log('[CACHE] No window/localStorage - returning null');
     return null;
   }
 
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (!cached) {
-      console.log('[useAIInsights] No localStorage cache found');
+      console.log('[CACHE] No cached insights found');
       return null;
     }
 
@@ -84,15 +84,27 @@ const getCachedInsights = (sessions: Session[], usingCloudAI: boolean): AIInsigh
     const isExpired = Date.now() - cache.timestamp > CACHE_EXPIRY_MS;
     const isKeyMatch = cache.cacheKey === currentCacheKey;
 
-    console.log('[useAIInsights] Cache check - key match:', isKeyMatch, ', expired:', isExpired);
+    console.log('[CACHE] Check:', {
+      cachedKey: cache.cacheKey,
+      currentKey: currentCacheKey,
+      isKeyMatch,
+      isExpired,
+      cacheAge: Date.now() - cache.timestamp,
+      expiryMs: CACHE_EXPIRY_MS
+    });
 
     if (!isExpired && isKeyMatch) {
-      console.log('[useAIInsights] ✅ Using valid localStorage cache');
+      console.log('[CACHE] ✅ Using valid cache');
       // Convert timestamp back to Date object
       return {
         ...cache.data,
         lastAnalyzed: cache.data.lastAnalyzed ? new Date(cache.data.lastAnalyzed) : null
       };
+    } else {
+      console.log('[CACHE] ❌ Cache invalid:', {
+        keyMatch: isKeyMatch,
+        expired: isExpired
+      });
     }
   } catch (error) {
     console.warn('Failed to read cached insights:', error);
@@ -145,19 +157,24 @@ const saveCachedInsights = (sessions: Session[], usingCloudAI: boolean, data: AI
       }
     }
 
+    const cacheKey = generateCacheKey(sessions, usingCloudAI);
     const cache: InsightCache = {
       data,
-      cacheKey: generateCacheKey(sessions, usingCloudAI),
+      cacheKey,
       timestamp: Date.now()
     };
+
+    console.log('[CACHE] Saving insights:', {
+      cacheKey,
+      insightCount: data.insights.length,
+      timestamp: cache.timestamp
+    });
 
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 
     // Persist insights to database for permanent storage (async, non-blocking)
     if (data.insights && data.insights.length > 0) {
-      console.log('[useAIInsights] Saving insights to database:', data.insights.length);
       saveInsightsToDB(data.insights)
-        .then(() => console.log('[useAIInsights] Insights saved to database'))
         .catch(err => console.warn('[useAIInsights] Failed to save insights to database:', err));
     }
 
@@ -229,17 +246,19 @@ const getArchivedInsights = (): (Insight | CloudInsight)[] => {
   try {
     const archived = localStorage.getItem(ARCHIVE_KEY);
     if (!archived) {
-      // Try to load from database as fallback (async, but return empty for now)
-      fetchArchivedInsightsFromDB()
-        .then(dbInsights => {
-          if (dbInsights && dbInsights.length > 0) {
-            console.log('[useAIInsights] Loaded', dbInsights.length, 'archived insights from database');
-            localStorage.setItem(ARCHIVE_KEY, JSON.stringify(dbInsights));
-          }
-        })
-        .catch(err => {
-          console.warn('[useAIInsights] Failed to load archived insights from database:', err);
-        });
+      // Schedule database load in background without blocking cache validation
+      setTimeout(() => {
+        fetchArchivedInsightsFromDB()
+          .then(dbInsights => {
+            if (dbInsights && dbInsights.length > 0) {
+              console.log('[useAIInsights] Loaded', dbInsights.length, 'archived insights from database');
+              localStorage.setItem(ARCHIVE_KEY, JSON.stringify(dbInsights));
+            }
+          })
+          .catch(err => {
+            console.warn('[useAIInsights] Failed to load archived insights from database:', err);
+          });
+      }, 100); // Small delay to not interfere with current operation
       return [];
     }
 
@@ -639,9 +658,22 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     let isMounted = true;
 
     const runAnalysis = async () => {
+      console.log('[INSIGHTS] Analysis triggered:', {
+        forceRefresh,
+        sessionCount: sessions.length,
+        sessionsChanged: sessions.length > 0
+      });
+
+      // Don't run analysis if we have no sessions yet (avoid race condition during initial load)
+      if (sessions.length === 0) {
+        console.log('[INSIGHTS] No sessions loaded yet - skipping');
+        return;
+      }
+
       try {
         // Check cache first (unless force refresh)
         if (!forceRefresh) {
+          console.log('[INSIGHTS] Checking cache...');
           const isCloudAIConfigured = initializeCloudAI();
           const isAIAvailableForUse = isCloudAIConfigured && isAIAvailable();
           const usingCloudAI = isAIAvailableForUse;
@@ -649,11 +681,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
           const cachedData = getCachedInsights(sessions, usingCloudAI);
           
           if (cachedData) {
+            console.log('[INSIGHTS] ✅ Using cached data - no regeneration');
             if (isMounted) {
               setData(cachedData);
             }
             return;
           }
+        } else {
+          console.log('[INSIGHTS] Force refresh - skipping cache');
         }
 
         // Archive stale cached insights BEFORE generating new ones
