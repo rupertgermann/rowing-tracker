@@ -645,13 +645,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           const updatedSessions = [...state.sessions, ...uniqueNewSessions];
           const updatedRecords = calculatePersonalRecords(updatedSessions);
           
-          // Invalidate AI insights cache when session count changes
-          // Cache key validation in useAIInsights will detect the change and regenerate
-          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-            console.log('[STORE] Invalidating AI insights cache due to new sessions added');
-            localStorage.removeItem('rowing_ai_insights_cache');
-          }
-          
           // Save PRs to database
           savePRsToDB(updatedRecords.map(pr => ({
             distance: pr.distance,
@@ -717,13 +710,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       },
 
       clearSessions: () => {
-        // Invalidate AI insights cache when sessions are cleared
-        // Cache key validation in useAIInsights will detect the change and regenerate
-        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-          console.log('[STORE] Invalidating AI insights cache due to sessions cleared');
-          localStorage.removeItem('rowing_ai_insights_cache');
-        }
-        
         set({
           sessions: [],
           personalRecords: [],
@@ -769,16 +755,10 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           const updatedSessions = state.sessions.filter(s => s.id !== sessionId);
           const updatedRecords = calculatePersonalRecords(updatedSessions);
           
-          // Invalidate AI insights cache when session count changes
-          // Cache key validation in useAIInsights will detect the change and regenerate
-          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-            console.log('[STORE] Invalidating AI insights cache due to session deletion');
-            localStorage.removeItem('rowing_ai_insights_cache');
-          }
-          
           return {
             sessions: updatedSessions,
-            personalRecords: updatedRecords
+            personalRecords: updatedRecords,
+            earnedAwards: state.earnedAwards,
           };
         });
       },

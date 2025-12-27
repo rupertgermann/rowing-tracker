@@ -237,6 +237,27 @@ export default function SettingsPage() {
     }
   };
 
+  const clearInsightsArchive = async () => {
+    setIsLoading(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const result = await deleteAllInsightsFromDB();
+      if (!result.success) {
+        setErrorMessage(result.error || 'Failed to clear insights archive');
+        return;
+      }
+
+      await refreshArchivedInsights?.();
+      setSuccessMessage('Insights archive cleared');
+    } catch (error) {
+      setErrorMessage('Failed to clear insights archive');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleResetPrompt = async (
     promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt' | 'explainChartPrompt' | 'awardSuggestionsPrompt',
     defaultValue: string
@@ -365,60 +386,9 @@ export default function SettingsPage() {
     try {
       // Handle insightsArchive separately since it's not in settings
       if (dataCategoryToClear === 'insightsArchive') {
-        console.log('[SETTINGS DEBUG] Starting insights archive clear...');
-        
-        // Check what exists before clearing
-        const beforeArchive = localStorage.getItem('rowing_ai_insights_archive');
-        const beforeCache = localStorage.getItem('rowing_ai_insights_cache');
-        console.log('[SETTINGS DEBUG] Before clear - Archive:', beforeArchive ? 'EXISTS (' + JSON.parse(beforeArchive).length + ' items)' : 'EMPTY');
-        console.log('[SETTINGS DEBUG] Before clear - Cache:', beforeCache ? 'EXISTS' : 'EMPTY');
-        
-        // Clear from localStorage
-        localStorage.removeItem('rowing_ai_insights_archive');
-        console.log('[SETTINGS DEBUG] Cleared localStorage archive');
-        
-        // DO NOT clear current insights cache - only archived ones
-        // localStorage.removeItem('rowing_ai_insights_cache');
-        console.log('[SETTINGS DEBUG] Preserved current insights cache');
-        
-        // Also clear from database
-        try {
-          console.log('[SETTINGS DEBUG] Clearing archived insights from database...');
-          const result = await deleteAllInsightsFromDB();
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to clear database');
-          }
-          console.log('[SETTINGS DEBUG] Database clear successful');
-          
-          // Refresh archived insights from DB to update UI
-          console.log('[SETTINGS DEBUG] Refreshing archived insights from DB...');
-          if (refreshArchivedInsights) {
-            await refreshArchivedInsights();
-            console.log('[SETTINGS DEBUG] Archived insights refreshed');
-          } else {
-            console.warn('[SETTINGS DEBUG] refreshArchivedInsights not available');
-          }
-        } catch (error) {
-          console.warn('[SETTINGS DEBUG] Failed to clear insights archive from database:', error);
-          setErrorMessage(`Failed to clear from database: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          return;
-        }
-        
-        // Verify what was cleared
-        const afterArchive = localStorage.getItem('rowing_ai_insights_archive');
-        const afterCache = localStorage.getItem('rowing_ai_insights_cache');
-        console.log('[SETTINGS DEBUG] After clear - Archive:', afterArchive ? 'STILL EXISTS' : 'CLEARED');
-        console.log('[SETTINGS DEBUG] After clear - Cache:', afterCache ? 'STILL EXISTS' : 'CLEARED');
-        
-        setSuccessMessage(`${dataCategoryToClear} cleared successfully`);
+        await clearInsightsArchive();
         setShowClearDataConfirm(false);
         setDataCategoryToClear(null);
-        
-        // Trigger a page refresh to update the archived insights count
-        setTimeout(() => {
-          console.log('[SETTINGS DEBUG] Reloading page to verify clear...');
-          window.location.reload();
-        }, 1000);
         return;
       }
 
