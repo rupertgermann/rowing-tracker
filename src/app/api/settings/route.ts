@@ -144,8 +144,6 @@ export async function POST(req: Request) {
         maxTokens: settingsData.maxTokens || 4000,
         userProfileContext: settingsData.userProfileContext,
         userProfileRawInput: settingsData.userProfileRawInput,
-        sessionsRevision: settingsData.sessionsRevision || 0,
-        insightsRevision: settingsData.insightsRevision || 0,
       },
     });
 

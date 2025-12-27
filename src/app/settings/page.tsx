@@ -274,9 +274,6 @@ export default function SettingsPage() {
     value: string,
     defaultValue: string
   ) => {
-    console.log('[Settings] Opening prompt editor for:', key);
-    console.log('[Settings] Current value preview:', value.substring(0, 200));
-    console.log('[Settings] Default value preview:', defaultValue.substring(0, 200));
     setEditingPrompt({ key, label, description, value, defaultValue });
     setPromptEditorValue(value);
     setPromptEditorOpen(true);
@@ -284,10 +281,6 @@ export default function SettingsPage() {
 
   const savePromptFromEditor = () => {
     if (editingPrompt) {
-      console.log('[Settings] Saving prompt:', editingPrompt.key);
-      console.log('[Settings] Prompt value length:', promptEditorValue.length);
-      console.log('[Settings] Prompt preview:', promptEditorValue.substring(0, 200));
-      
       // Special handling for userProfileRawInput - also update local state
       if (editingPrompt.key === 'userProfileRawInput') {
         setProfileRawInput(promptEditorValue);
@@ -305,7 +298,6 @@ export default function SettingsPage() {
   };
 
   const saveSettings = async (category: SettingsCategory, updates: any) => {
-    console.log('[Settings] saveSettings called:', category, updates);
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -328,17 +320,13 @@ export default function SettingsPage() {
           settings.updatePrivacySettings(updates);
           break;
         case 'aiSettings':
-          console.log('[Settings] Updating AI settings with:', updates);
           settings.updateAISettings(updates);
-          console.log('[Settings] AI settings updated');
           break;
       }
 
       loadSettings();
-      console.log('[Settings] Settings reloaded');
       setSuccessMessage('Settings saved successfully');
     } catch (error) {
-      console.error('[Settings] Error saving settings:', error);
       setErrorMessage('Failed to save settings');
     } finally {
       setIsLoading(false);

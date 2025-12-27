@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
     const { 
       title, 
       description, 
+      customPrompt, 
       apiKey, 
       size = '1024x1024',
       quality = 'auto',  // auto, high, medium, low
@@ -43,38 +44,31 @@ export async function POST(request: NextRequest) {
     // Build the image prompt
     const isDev = process.env.NODE_ENV === 'development';
 
-    // Load AI settings to get selected color palette and prompt template
+    // Load AI settings to get selected color palette
     const settings = SettingsService.getInstance();
     const aiSettings = settings.getAISettings();
     const colorPalette = getColorPalettePrompt(aiSettings.achievementImageColors || 'classic');
-    
-    // Always use the current prompt from settings
-    const promptTemplate = aiSettings.achievementImagePrompt;
 
-    if (isDev) {
-      console.log('[ImageGen] Selected color palette:', aiSettings.achievementImageColors);
-      console.log('[ImageGen] Color prompt text:', colorPalette);
-      console.log('[ImageGen] Using prompt from settings');
-      console.log('[ImageGen] Prompt template preview:', promptTemplate.substring(0, 300));
-      console.log('[ImageGen] Has {colors} placeholder:', promptTemplate.includes('{colors}'));
-      console.log('[ImageGen] Has old hardcoded colors:', promptTemplate.includes('deep blues, golds, and whites'));
-    }
+    const defaultPrompt = `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
 
-    // Build prompt from current settings, replacing placeholders
-    let prompt = promptTemplate
+Achievement: {title}
+Description: {description}
+
+Style guidelines:
+- Modern, clean design with elegant typography
+- Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
+- Use a color palette of ${colorPalette}
+- Include decorative elements suggesting achievement (laurels, ribbons, stars)
+- The image should feel prestigious and celebratory
+- Do NOT include any text - the text will be overlaid separately
+- Aspect ratio: square (1:1)
+- High quality, suitable for display`;
+
+    let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
       .replace('{description}', description)
-      .replace(/{colors}/gi, colorPalette);
-
-    // Also replace any old hardcoded color text (for backward compatibility)
-    prompt = prompt.replace(
-      /Use a color palette of .+$/gim,
-      `Use a color palette of ${colorPalette}`
-    );
-
-    if (isDev) {
-      console.log('[ImageGen] Final prompt after replacements:', prompt.substring(0, 400));
-    }
+      // Replace any hardcoded color palette with the user's selected colors
+      .replace(/Use a color palette of [^\n]+/i, `Use a color palette of ${colorPalette}`);
 
     // Ensure the award title is visible on the certificate/card
     prompt += `\n\nClearly render the award title "${title}" on the certificate/card in the foreground so it is readable and prominent.`;

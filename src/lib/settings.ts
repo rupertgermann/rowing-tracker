@@ -295,7 +295,7 @@ Description: {description}
 Style guidelines:
 - Modern, clean design with elegant typography
 - Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
-- Use a color palette of {colors}
+- Use a color palette of deep blues, golds, and whites
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately
@@ -393,6 +393,10 @@ Be specific and actionable. Only include information relevant to rowing training
           }
         }
         
+        // Check if aiConfig is missing achievementImageColors BEFORE transformation
+        const dbAiConfig = dbSettings.aiConfig as any;
+        const needsColorFieldMigration = !dbAiConfig?.achievementImageColors;
+        
         // Transform DB settings to app format and cache in localStorage
         const appSettings = this.transformDBToAppSettings(dbSettings);
         const migrated = this.migrateSettings(appSettings);
@@ -403,6 +407,12 @@ Be specific and actionable. Only include information relevant to rowing training
         }
         
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
+        
+        // If achievementImageColors was missing from DB, trigger a save to populate it
+        if (needsColorFieldMigration) {
+          // Trigger an immediate sync to add the missing field to the database
+          setTimeout(() => this.syncToDatabase(migrated), 100);
+        }
       } else {
         // No DB settings, check if we have localStorage settings to sync up
         const localSettings = localStorage.getItem(this.STORAGE_KEY);
@@ -477,16 +487,6 @@ Be specific and actionable. Only include information relevant to rowing training
    * Sync settings to database (async, non-blocking)
    */
   private async syncToDatabase(settings: Settings): Promise<void> {
-    // Check if user is authenticated before syncing
-    // We do this by checking if the session cookie exists
-    const hasSession = document.cookie.includes('next-auth.session-token') || 
-                       document.cookie.includes('__Secure-next-auth.session-token');
-    
-    if (!hasSession) {
-      // User is not authenticated, skip database sync silently
-      return;
-    }
-
     try {
       const dbPayload = this.transformAppToDBSettings(settings);
       const response = await fetch('/api/settings', {
@@ -496,8 +496,11 @@ Be specific and actionable. Only include information relevant to rowing training
       });
 
       if (!response.ok) {
+        // If unauthorized, the API will return 401 and we can skip silently
+        if (response.status === 401) {
+          return;
+        }
         console.error('[SETTINGS] Failed to sync to database');
-      } else {
       }
     } catch (error) {
       console.error('[SETTINGS] Error syncing to database:', error);
@@ -543,6 +546,7 @@ Be specific and actionable. Only include information relevant to rowing training
         achievementImageModel: settings.aiSettings.achievementImageModel,
         achievementImageQuality: settings.aiSettings.achievementImageQuality,
         achievementImageSize: settings.aiSettings.achievementImageSize,
+        achievementImageColors: settings.aiSettings.achievementImageColors,
         userProfileGeneration: settings.aiSettings.userProfileGeneration
       },
       customPromptsAi: {
@@ -871,7 +875,12 @@ Be specific and actionable. Only include information relevant to rowing training
           insights: this.defaultSettings.aiSettings.insights,
           trainingPlans: this.defaultSettings.aiSettings.trainingPlans,
           awardSuggestions: this.defaultSettings.aiSettings.awardSuggestions,
-          awardSuggestionsPrompt: oldAiSettings.awardSuggestionsPrompt ?? this.defaultSettings.aiSettings.awardSuggestionsPrompt
+          awardSuggestionsPrompt: oldAiSettings.awardSuggestionsPrompt ?? this.defaultSettings.aiSettings.awardSuggestionsPrompt,
+          // Preserve achievement image settings
+          achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+          achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+          achievementImageColors: oldAiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
         };
       } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model || oldAiSettings.awardSuggestions?.model) {
         migratedSettings.aiSettings = {
@@ -885,7 +894,8 @@ Be specific and actionable. Only include information relevant to rowing training
           // Preserve achievement image settings that user may have configured
           achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
           achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
-          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+          achievementImageColors: oldAiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
         };
       } else {
         // New format - just ensure all nested properties exist
@@ -899,7 +909,8 @@ Be specific and actionable. Only include information relevant to rowing training
           // Preserve achievement image settings that user may have configured
           achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
           achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
-          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+          achievementImageColors: oldAiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
         };
       }
     } else {
@@ -939,7 +950,8 @@ Be specific and actionable. Only include information relevant to rowing training
             // Preserve achievement image settings that user may have configured
             achievementImageModel: migratedSettings.aiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
             achievementImageQuality: migratedSettings.aiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
-            achievementImageSize: migratedSettings.aiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize
+            achievementImageSize: migratedSettings.aiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+            achievementImageColors: migratedSettings.aiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
           };
         }
 

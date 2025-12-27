@@ -354,6 +354,7 @@ export function AchievementGallery({
       const requestBody = {
         title: currentAward.title,
         description: currentAward.description,
+        customPrompt: aiSettings.achievementImagePrompt,
         apiKey: aiSettings.openaiApiKey || undefined,
         model: aiSettings.achievementImageModel,
         quality: aiSettings.achievementImageQuality,
