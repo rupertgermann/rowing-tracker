@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Award } from '@/lib/awards';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { settings } from '@/lib/settings';
+import { saveGeneratedAchievementsToDB } from '@/lib/dataSync';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -108,6 +109,13 @@ export function AchievementCard({
         generatedAt: new Date()
       });
       
+      // Persist to database
+      await saveGeneratedAchievementsToDB([{
+        awardId: award.id,
+        story: data.story,
+        earnedAt: earnedAt || new Date(),
+      }]);
+      
       return data.story;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate story');
@@ -168,6 +176,14 @@ export function AchievementCard({
         imagePrompt: data.revisedPrompt,
         generatedAt: new Date()
       });
+      
+      // Persist to database
+      await saveGeneratedAchievementsToDB([{
+        awardId: award.id,
+        imageUrl: data.imageUrl,
+        hasImage: true,
+        earnedAt: earnedAt || new Date(),
+      }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate image');
     } finally {

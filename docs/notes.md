@@ -2,7 +2,7 @@
 
 
 - linking existing "explain" chat do charts does not work anymore
-
+- selected segments in Segment Analysis are not stored. they should be stored persistent in the database in the same way as "Select Charts to Display" (ond other chart related settings)
 
 - achivement texts and images seem to be not stored correctly. when i reload the prs page they are gone 
 
