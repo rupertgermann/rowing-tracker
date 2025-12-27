@@ -1,6 +1,7 @@
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
 
 // Settings types and interfaces
+// VERSION: 2024-12-27-v2 - Added auth check before DB sync
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'system';
   units: 'metric' | 'imperial';
@@ -477,7 +478,22 @@ Be specific and actionable. Only include information relevant to rowing training
    * Sync settings to database (async, non-blocking)
    */
   private async syncToDatabase(settings: Settings): Promise<void> {
+    // Check if user is authenticated before syncing
+    // We do this by checking if the session cookie exists
+    const cookies = document.cookie;
+    const hasSession = cookies.includes('next-auth.session-token') || 
+                       cookies.includes('__Secure-next-auth.session-token');
+    
+    console.log('[SETTINGS] syncToDatabase called - hasSession:', hasSession, 'cookies:', cookies.substring(0, 100));
+    
+    if (!hasSession) {
+      // User is not authenticated, skip database sync silently
+      console.log('[SETTINGS] Skipping database sync - user not authenticated');
+      return;
+    }
+
     try {
+      console.log('[SETTINGS] Proceeding with database sync');
       const dbPayload = this.transformAppToDBSettings(settings);
       const response = await fetch('/api/settings', {
         method: 'POST',
