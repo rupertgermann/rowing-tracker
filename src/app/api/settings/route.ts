@@ -37,6 +37,8 @@ export async function GET() {
           animationsEnabled: true,
           cloudAIEnabled: false,
           maxTokens: 4000,
+          sessionsRevision: 0,
+          insightsRevision: 0,
           userProfileContext: null,
           userProfileRawInput: null,
           aiConfig: null,
@@ -107,6 +109,10 @@ export async function POST(req: Request) {
     if (settingsData.maxTokens !== undefined) updateData.maxTokens = settingsData.maxTokens;
     if (settingsData.aiConfig !== undefined) updateData.aiConfig = settingsData.aiConfig;
     if (settingsData.customPromptsAi !== undefined) updateData.customPromptsAi = settingsData.customPromptsAi;
+
+    // Revision markers (used for cache invalidation)
+    if (settingsData.sessionsRevision !== undefined) updateData.sessionsRevision = settingsData.sessionsRevision;
+    if (settingsData.insightsRevision !== undefined) updateData.insightsRevision = settingsData.insightsRevision;
     
     // User profile context
     if (settingsData.userProfileContext !== undefined) updateData.userProfileContext = settingsData.userProfileContext;
@@ -138,6 +144,8 @@ export async function POST(req: Request) {
         maxTokens: settingsData.maxTokens || 4000,
         userProfileContext: settingsData.userProfileContext,
         userProfileRawInput: settingsData.userProfileRawInput,
+        sessionsRevision: settingsData.sessionsRevision || 0,
+        insightsRevision: settingsData.insightsRevision || 0,
       },
     });
 

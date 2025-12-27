@@ -203,7 +203,10 @@ export async function fetchInsightsFromDB(): Promise<any[]> {
       throw new Error('Failed to fetch insights');
     }
     const data = await response.json();
-    return data.insights || [];
+    const insights = data.insights || [];
+    (insights as any).sessionsRevision = data.sessionsRevision ?? 0;
+    (insights as any).insightsRevision = data.insightsRevision ?? 0;
+    return insights;
   } catch (error) {
     console.error('Error fetching insights:', error);
     return [];
@@ -213,12 +216,15 @@ export async function fetchInsightsFromDB(): Promise<any[]> {
 /**
  * Save AI insights to database
  */
-export async function saveInsightsToDB(insights: any[]): Promise<SyncResult> {
+export async function saveInsightsToDB(
+  insights: any[],
+  options?: { markAsCurrent?: boolean }
+): Promise<SyncResult> {
   try {
     const response = await fetch('/api/insights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ insights }),
+      body: JSON.stringify({ insights, markAsCurrent: Boolean(options?.markAsCurrent) }),
     });
 
     if (!response.ok) {

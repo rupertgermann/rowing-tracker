@@ -69,6 +69,7 @@ export async function POST(req: Request) {
     }
 
     const created = [];
+    let createdAnyNewSession = false;
 
     for (const sessionData of newSessions) {
       const normalizedTimestamp = new Date(sessionData.timestamp);
@@ -155,6 +156,7 @@ export async function POST(req: Request) {
               sourceFile: sessionData.sourceFile || null,
             },
           });
+          createdAnyNewSession = true;
         } catch (err: any) {
           // Handle race/duplicate imports gracefully
           if (err?.code === 'P2002') {
@@ -229,6 +231,29 @@ export async function POST(req: Request) {
       created.push(sessionRecord);
     }
 
+    const shouldBumpSessionsRevision = createdAnyNewSession || newSessions.length > 1;
+    if (shouldBumpSessionsRevision) {
+      await prisma.userSettings.upsert({
+        where: { userId: session.user.id },
+        update: {
+          sessionsRevision: { increment: 1 },
+        },
+        create: {
+          userId: session.user.id,
+          theme: 'system',
+          units: 'metric',
+          dateFormat: 'MM/DD/YYYY',
+          timeFormat: '24h',
+          language: 'en',
+          defaultChartType: 'line',
+          animationsEnabled: true,
+          cloudAIEnabled: false,
+          maxTokens: 4000,
+          sessionsRevision: 1,
+        },
+      });
+    }
+
     return NextResponse.json({ 
       sessions: created,
       count: created.length 
@@ -293,9 +318,29 @@ export async function DELETE(req: Request) {
       where: { id: sessionId },
     });
 
+    await prisma.userSettings.upsert({
+      where: { userId: session.user.id },
+      update: {
+        sessionsRevision: { increment: 1 },
+      },
+      create: {
+        userId: session.user.id,
+        theme: 'system',
+        units: 'metric',
+        dateFormat: 'MM/DD/YYYY',
+        timeFormat: '24h',
+        language: 'en',
+        defaultChartType: 'line',
+        animationsEnabled: true,
+        cloudAIEnabled: false,
+        maxTokens: 4000,
+        sessionsRevision: 1,
+      },
+    });
+
     console.log(`[SESSIONS API] Deleted session ${sessionId}`);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       sessionId 
     });

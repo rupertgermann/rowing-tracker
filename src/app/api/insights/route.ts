@@ -27,7 +27,16 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ insights });
+    const settings = await prisma.userSettings.findUnique({
+      where: { userId: session.user.id },
+      select: { sessionsRevision: true, insightsRevision: true },
+    });
+
+    return NextResponse.json({
+      insights,
+      sessionsRevision: settings?.sessionsRevision ?? 0,
+      insightsRevision: settings?.insightsRevision ?? 0,
+    });
   } catch (error) {
     console.error("Error fetching insights:", error);
     return NextResponse.json(
@@ -52,7 +61,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { insights } = await req.json();
+    const { insights, markAsCurrent } = await req.json();
 
     if (!Array.isArray(insights)) {
       return NextResponse.json(
@@ -112,6 +121,33 @@ export async function POST(req: Request) {
         });
         savedInsights.push(created);
       }
+    }
+
+    if (markAsCurrent) {
+      const settings = await prisma.userSettings.findUnique({
+        where: { userId: session.user.id },
+        select: { sessionsRevision: true },
+      });
+
+      await prisma.userSettings.upsert({
+        where: { userId: session.user.id },
+        update: {
+          insightsRevision: settings?.sessionsRevision ?? 0,
+        },
+        create: {
+          userId: session.user.id,
+          theme: 'system',
+          units: 'metric',
+          dateFormat: 'MM/DD/YYYY',
+          timeFormat: '24h',
+          language: 'en',
+          defaultChartType: 'line',
+          animationsEnabled: true,
+          cloudAIEnabled: false,
+          maxTokens: 4000,
+          insightsRevision: settings?.sessionsRevision ?? 0,
+        },
+      });
     }
 
     return NextResponse.json({ 
