@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SettingsService } from '@/lib/settings';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +7,10 @@ export async function POST(request: NextRequest) {
       title, 
       description, 
       customPrompt, 
-      apiKey,
+      apiKey, 
+      size = '1024x1024',
+      quality = 'auto',  // auto, high, medium, low
+      model = 'gpt-image-1',  // gpt-image-1, gpt-image-1-mini, gpt-image-1.5
       story
     } = body;
 
@@ -29,19 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load AI settings from database
-    const settings = SettingsService.getInstance();
-    const aiSettings = settings.getAISettings();
-    let size = aiSettings.achievementImageSize;
-    const quality = aiSettings.achievementImageQuality;
-    const model = aiSettings.achievementImageModel;
-
-    // Handle 'auto' size - default to 1024x1024
-    if (size === 'auto') {
-      size = '1024x1024';
-    }
-
-    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024'];
+    const allowedSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
     if (!allowedSizes.includes(size)) {
       return NextResponse.json(
         { error: `Invalid size. Supported values: ${allowedSizes.join(', ')}` },
@@ -51,13 +41,6 @@ export async function POST(request: NextRequest) {
 
     // Build the image prompt
     const isDev = process.env.NODE_ENV === 'development';
-    
-    if (isDev) {
-      console.log('Achievement Image Generation Settings:');
-      console.log('- Model:', model);
-      console.log('- Size:', size);
-      console.log('- Quality:', quality);
-    }
 
     const defaultPrompt = `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
 
@@ -72,9 +55,8 @@ Style guidelines:
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately
-- Aspect ratio award: Square 1:1
-- Aspect ratio for the whole image: lanscape
-- good quality, suitable for display`;
+- Aspect ratio: square (1:1)
+- High quality, suitable for display`;
 
     if (isDev) console.log('defaultPrompt:', defaultPrompt);
 
@@ -98,21 +80,6 @@ Style guidelines:
     }
     if (isDev) console.log('finalPrompt:', prompt);
 
-    // Prepare request body
-    const requestBody = {
-      model: model,
-      prompt: prompt,
-      n: 1,
-      size: size,
-      quality: quality,
-      response_format: 'b64_json'
-    };
-
-    if (isDev) {
-      console.log('OpenAI Image API Request Body:');
-      console.log(JSON.stringify(requestBody, null, 2));
-    }
-
     // Call OpenAI Image API with GPT image models
     // See: https://platform.openai.com/docs/api-reference/images/create
     const response = await fetch('https://api.openai.com/v1/images/generations', {
@@ -121,29 +88,28 @@ Style guidelines:
         'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        model: model,
+        prompt: prompt,
+        n: 1,
+        size: size,
+        // quality parameter: 'auto' (default), 'high', 'medium', 'low' for GPT image models
+        quality: quality,
+        // GPT image models return b64_json by default, output_format controls the format
+        output_format: 'png'
+      })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI Image API error:', errorText);
       return NextResponse.json(
-        { error: `OpenAI API error: ${response.status}. ${errorText}` },
+        { error: `OpenAI API error: ${response.status}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    
-    if (isDev) {
-      console.log('OpenAI Image API Response (metadata):');
-      console.log('- Data array length:', data.data?.length);
-      if (data.data?.[0]) {
-        console.log('- Has b64_json:', !!data.data[0].b64_json);
-        console.log('- Has url:', !!data.data[0].url);
-        console.log('- Revised prompt length:', data.data[0].revised_prompt?.length);
-      }
-    }
     
     // Extract the image data
     if (!data.data || data.data.length === 0) {
@@ -157,23 +123,10 @@ Style guidelines:
     const imageUrl = `data:image/png;base64,${imageData.b64_json}`;
     const revisedPrompt = imageData.revised_prompt;
 
-    if (isDev) {
-      console.log('Successfully generated image');
-      console.log('- Sent model:', model);
-      console.log('- Sent size:', size);
-      console.log('- Sent quality:', quality);
-    }
-
     return NextResponse.json({ 
       imageUrl,
       revisedPrompt,
-      sentPrompt: prompt,
-      // Include metadata for debugging
-      metadata: {
-        model: model,
-        size: size,
-        quality: quality
-      }
+      sentPrompt: prompt
     });
   } catch (error) {
     console.error('Achievement image generation error:', error);

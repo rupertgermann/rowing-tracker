@@ -633,7 +633,11 @@ Be specific and actionable. Only include information relevant to rowing training
           chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
           trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
-          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions }
+          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions },
+          // Preserve achievement image settings that user may have configured
+          achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+          achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize
         };
       } else {
         // New format - just ensure all nested properties exist
@@ -643,7 +647,11 @@ Be specific and actionable. Only include information relevant to rowing training
           chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
           trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
-          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions }
+          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions },
+          // Preserve achievement image settings that user may have configured
+          achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+          achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize
         };
       }
     } else {
@@ -679,7 +687,11 @@ Be specific and actionable. Only include information relevant to rowing training
             awardSuggestions: {
               ...this.defaultSettings.aiSettings.awardSuggestions,
               ...migratedSettings.aiSettings.awardSuggestions
-            }
+            },
+            // Preserve achievement image settings that user may have configured
+            achievementImageModel: migratedSettings.aiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+            achievementImageQuality: migratedSettings.aiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+            achievementImageSize: migratedSettings.aiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize
           };
         }
 
