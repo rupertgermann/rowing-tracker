@@ -86,6 +86,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
   - File system for award images
 - **CSV Parsing**: papaparse
 - **Email**: Nodemailer with Mailpit (local) or SMTP (production)
+- **Rate Limiting**: Upstash Redis for API protection
 - **Development**: Docker Compose for local services
 
 ## Quick Start
@@ -121,6 +122,8 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
    - `NEXTAUTH_URL` - Your app URL (http://localhost:3000 for local)
    - `EMAIL_SERVER` - SMTP server for emails (smtp://localhost:1025 for local)
    - `EMAIL_FROM` - Sender email address
+   - `UPSTASH_REDIS_REST_URL` - Upstash Redis URL (optional, for rate limiting)
+   - `UPSTASH_REDIS_REST_TOKEN` - Upstash Redis token (optional, for rate limiting)
 
 4. **Start local services (PostgreSQL + Mailpit)**
    ```bash
@@ -218,6 +221,10 @@ Your CSV must include these columns:
    NEXTAUTH_URL="https://yourdomain.com"
    EMAIL_SERVER="smtp://your-smtp-server:587"
    EMAIL_FROM="noreply@yourdomain.com"
+
+   # Rate Limiting (recommended for production)
+   UPSTASH_REDIS_REST_URL="https://your-redis.upstash.io"
+   UPSTASH_REDIS_REST_TOKEN="your-upstash-token"
    ```
 
 3. **Run migrations**
@@ -398,6 +405,46 @@ See `prisma/schema.prisma` for complete schema or `docs/DATABASE_SCHEMA.md` for 
 - **Privacy First**: Your workout data is never shared with other users
 - **GDPR Ready**: User data can be exported or deleted on request
 - **API Keys**: OpenAI keys encrypted in database, never exposed to client
+
+## API Rate Limiting
+
+The app includes built-in rate limiting using [Upstash Redis](https://upstash.com/) to protect against abuse and ensure fair usage.
+
+### Rate Limit Tiers
+
+| Endpoint Type | Limit | Description |
+|---------------|-------|-------------|
+| **General API** | 100 req/min | Standard API endpoints |
+| **Authentication** | 10 req/min | Login, register, password reset |
+| **AI/Chat** | 20 req/min | AI coach, chat endpoints |
+| **Upload** | 30 req/min | CSV file uploads |
+| **Sensitive** | 5 req/min | Account deletion, data export |
+
+### Configuration
+
+Rate limiting is optional but recommended for production. To enable:
+
+1. **Create an Upstash account** at [upstash.com](https://upstash.com)
+2. **Create a Redis database** (free tier available)
+3. **Add environment variables**:
+   ```bash
+   UPSTASH_REDIS_REST_URL="https://your-redis.upstash.io"
+   UPSTASH_REDIS_REST_TOKEN="your-token"
+   ```
+
+### Behavior
+
+- **When configured**: Requests exceeding limits receive a `429 Too Many Requests` response with `Retry-After` header
+- **When not configured**: Rate limiting is disabled (graceful degradation for development)
+- **Rate limit headers**: Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`
+
+### Protected Endpoints
+
+Rate limiting is applied to:
+- `/api/auth/register` - Prevents registration spam
+- `/api/chat` (POST) - Controls AI usage costs
+- `/api/user/delete` - Protects account deletion
+- `/api/user/export` - Prevents data export abuse
 
 ## Browser Support
 
