@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { settingsUpdateSchema } from "@/lib/validations/settings";
 
 /**
  * GET /api/settings
@@ -64,7 +65,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -72,10 +73,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const settingsData = await req.json();
+    const body = await req.json();
+
+    // Validate input with Zod
+    const result = settingsUpdateSchema.safeParse(body);
+    if (!result.success) {
+      const firstError = result.error.issues[0];
+      return NextResponse.json(
+        {
+          error: "Invalid settings data",
+          details: firstError?.message,
+          path: firstError?.path?.join(".")
+        },
+        { status: 400 }
+      );
+    }
+
+    const settingsData = result.data;
 
     // Build update object with only provided fields
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     
     // User preferences
     if (settingsData.theme !== undefined) updateData.theme = settingsData.theme;
