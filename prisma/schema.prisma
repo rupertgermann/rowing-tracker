@@ -117,6 +117,7 @@ model RowingSession {
   avgStrokeLength Float
   avgStrokeRate  Float
   maxStrokeRate  Float
+  consistencyScore Float?  // Pre-computed consistency score (0-100)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   importedAt     DateTime @default(now())

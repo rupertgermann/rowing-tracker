@@ -12,7 +12,9 @@
       "Bash(npx prisma migrate:*)",
       "Bash(npx prisma db pull:*)",
       "Bash(git checkout:*)",
-      "Bash(npx prisma db push:*)"
+      "Bash(npx prisma db push:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

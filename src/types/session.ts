@@ -19,6 +19,7 @@ export interface Session {
   avgStrokeLength: number; // meters
   avgStrokeRate: number;   // SPM
   maxStrokeRate: number;
+  consistencyScore?: number | null; // Pre-computed consistency score (0-100)
   strokeData?: StrokeData[]; // Optional detailed stroke data
 }
 

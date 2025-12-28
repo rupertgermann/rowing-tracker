@@ -18,6 +18,7 @@ import { useRowingStore, type AnalyticsChartSettings, type SmoothingOption } fro
 interface Session {
   id: string;
   timestamp: Date;
+  consistencyScore?: number | null; // Pre-computed consistency score (0-100)
   strokeData?: any[];
 }
 
@@ -190,17 +191,29 @@ export const ConsistencyScoreChart = ({
   const chartData = useMemo(() => {
     if (!filteredSessions.length) return [];
 
-    // Sort sessions by date and calculate consistency scores
+    // Sort sessions by date and use pre-computed consistency scores
     const sortedSessions = [...filteredSessions]
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .filter(session => session.strokeData && session.strokeData.length > 0)
+      // Filter to sessions that have a consistency score (pre-computed or can be computed)
+      .filter(session => {
+        // Has pre-computed score
+        if (session.consistencyScore !== null && session.consistencyScore !== undefined) {
+          return true;
+        }
+        // Fallback: has stroke data for on-demand computation
+        return session.strokeData && session.strokeData.length > 0;
+      })
       .map(session => {
-        const stats = calculateAdvancedStats(session.strokeData!);
+        // Use pre-computed score if available, otherwise compute on demand
+        const consistencyScore = (session.consistencyScore !== null && session.consistencyScore !== undefined)
+          ? session.consistencyScore
+          : calculateAdvancedStats(session.strokeData!).consistencyScore;
+
         return {
           date: formatChartDate(new Date(session.timestamp)),
           fullDate: session.timestamp,
           sessionId: session.id,
-          consistencyScore: stats.consistencyScore,
+          consistencyScore,
         };
       });
 

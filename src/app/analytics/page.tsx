@@ -27,6 +27,8 @@ import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { chatStorage } from '@/lib/chatStorage';
 import { ExplanationTooltip } from '@/components/ExplanationTooltip';
+import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area' | 'scatter';
@@ -240,6 +242,16 @@ const Analytics = () => {
   const router = useRouter();
   const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
 
+  // ========== LAZY LOADING - Fetch directly from API ==========
+  // This bypasses the store and loads data immediately from /api/analytics
+  const {
+    data: analyticsData,
+    isLoading: isAnalyticsLoading,
+    fromCache: analyticsFromCache,
+    refresh: refreshAnalytics,
+  } = useLazyAnalytics();
+  // ========== END LAZY LOADING ==========
+
   // Track validity of chart explanations (async check against DB)
   const [validExplanations, setValidExplanations] = useState<Record<string, boolean>>({});
 
@@ -276,8 +288,30 @@ const Analytics = () => {
   const isExplanationValid = useCallback((chartId: string) => {
     return validExplanations[chartId] ?? false;
   }, [validExplanations]);
-  const sessions = getSessions();
-  const stats = getStats();
+  
+  // Only load sessions from store if analytics data is not available
+  // This avoids loading large strokeData payloads unnecessarily
+  const sessions = analyticsData ? [] : getSessions();
+  const stats = analyticsData ? { 
+    totalDistance: analyticsData.summary.totalDistance,
+    totalTime: analyticsData.summary.totalDuration,
+    totalEnergy: analyticsData.summary.totalEnergy,
+    totalPower: analyticsData.summary.totalDistance > 0 ? analyticsData.summary.totalEnergy / (analyticsData.summary.totalDistance / 1000) : 0,
+    sessionCount: analyticsData.summary.sessionCount,
+  } : getStats();
+
+  // Create minimal sessions for ConsistencyScoreChart from analytics data
+  const sessionsForConsistencyChart = useMemo(() => {
+    if (analyticsData && analyticsData.chartData.consistencyScore && analyticsData.chartData.consistencyScore.length > 0) {
+      return analyticsData.chartData.consistencyScore.map(point => ({
+        id: point.sessionId,
+        timestamp: new Date(point.fullDate),
+        consistencyScore: point.value,
+        strokeData: undefined, // No strokeData needed, we have pre-computed score
+      }));
+    }
+    return sessions; // Fallback to full sessions when analytics not available
+  }, [analyticsData, sessions]);
 
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
@@ -383,8 +417,13 @@ const Analytics = () => {
 
   // Get all session dates for the date picker
   const availableDates = useMemo(() => {
+    // Use analytics API data for dates
+    if (analyticsData && analyticsData.availableDates.length > 0) {
+      return analyticsData.availableDates.map(d => new Date(d));
+    }
+    // Fallback to computed sessions
     return computedSessions.map(s => s._timestamp);
-  }, [computedSessions]);
+  }, [computedSessions, analyticsData]);
 
   // Handle anchor links to scroll to specific charts
   useEffect(() => {
@@ -566,7 +605,70 @@ ${explainChartPrompt}`;
   }, []);
 
   // Filter sessions based on custom date range (if set) or time range
+  // When using analytics data, filter based on chart data instead of full sessions
   const filteredSessions = useMemo(() => {
+    // If we have analytics data, create minimal session objects from chart data for filtering
+    if (analyticsData && analyticsData.chartData.distance && analyticsData.chartData.distance.length > 0) {
+      const distanceData = analyticsData.chartData.distance;
+      
+      // Create lookup maps for other metrics by sessionId
+      const paceMap = new Map(analyticsData.chartData.pace?.map(p => [p.sessionId, p.value]) || []);
+      const powerMap = new Map(analyticsData.chartData.power?.map(p => [p.sessionId, p.value]) || []);
+      const strokeRateMap = new Map(analyticsData.chartData.strokeRate?.map(p => [p.sessionId, p.value]) || []);
+      const energyMap = new Map(analyticsData.chartData.energy?.map(p => [p.sessionId, p.value]) || []);
+      const durationMap = new Map(analyticsData.chartData.duration?.map(p => [p.sessionId, p.value]) || []);
+      
+      return distanceData
+        .map(point => {
+          const timestamp = new Date(point.fullDate);
+          return {
+            id: point.sessionId,
+            timestamp: timestamp,
+            _timestamp: timestamp,
+            _timestampMs: timestamp.getTime(),
+            _formattedDate: point.date,
+            distance: point.value,
+            duration: durationMap.get(point.sessionId) || 0,
+            avgPower: powerMap.get(point.sessionId) || 0,
+            avgSplit: paceMap.get(point.sessionId) || 0,
+            energy: energyMap.get(point.sessionId) || 0,
+            avgStrokeRate: strokeRateMap.get(point.sessionId) || 0,
+            avgStrokeLength: 0,
+            maxStrokeRate: 0,
+            strokeCount: 0,
+            maxPower: 0,
+            minSplit: 0,
+            avgWork: 0,
+            wattPerKg: 0,
+          } as any; // Type assertion to avoid complex Session type issues
+        })
+        .filter(session => {
+          const sessionDate = session._timestamp;
+          
+          // If custom date range is set, use it
+          if (dateRange?.from) {
+            if (sessionDate < dateRange.from) return false;
+            if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
+              const endOfDay = new Date(dateRange.to);
+              endOfDay.setHours(23, 59, 59, 999);
+              if (sessionDate > endOfDay) return false;
+            }
+            return true;
+          }
+          
+          // Otherwise use the fixed time range
+          if (timeRange === 'all') return true;
+
+          const now = new Date();
+          const daysAgo = defaultTimeRangeOptions.find(option => option.value === timeRange)?.days;
+          if (!daysAgo) return true;
+
+          const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+          return session._timestampMs >= cutoffDate.getTime();
+        });
+    }
+    
+    // Fallback to computed sessions when analytics data not available
     return computedSessions.filter(session => {
       const sessionDate = session._timestamp;
       
@@ -594,7 +696,7 @@ ${explainChartPrompt}`;
       const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
       return session._timestampMs >= cutoffDate.getTime();
     });
-  }, [computedSessions, timeRange, dateRange]);
+  }, [computedSessions, timeRange, dateRange, analyticsData]);
 
   // Calculate filtered stats
   const filteredStats = useMemo(() => {
@@ -615,12 +717,12 @@ ${explainChartPrompt}`;
     ? filteredStats.totalPower / filteredStats.sessionCount
     : 0;
 
-  // Check if user has data
-  const hasData = sessions.length > 0;
-  const hasFilteredData = filteredSessions.length > 0;
+  // Check if user has data - primarily from lazy-loaded analytics
+  const hasData = (analyticsData?.sessionCount ?? 0) > 0 || sessions.length > 0;
+  const hasFilteredData = filteredSessions.length > 0 || (analyticsData?.sessionCount ?? 0) > 0;
 
   // Get metric value from session based on metric type
-  // Consistency score is computed lazily and cached to avoid blocking initial render
+  // Consistency score now uses pre-computed value from DB for fast rendering
   const getMetricValue = useCallback((session: any, metric: ChartMetric): number => {
     switch (metric) {
       case 'distance': return session.distance;
@@ -631,7 +733,12 @@ ${explainChartPrompt}`;
       case 'duration': return session.duration;
       case 'splitTime': return session.avgSplit; // For compatibility, though splitTime uses special rendering
       case 'consistencyScore': {
-        // Lazy computation with caching - only runs when chart is enabled
+        // Use pre-computed consistency score from DB (computed during session upload)
+        // Falls back to -1 if not available (e.g., old sessions before migration)
+        if (session.consistencyScore !== null && session.consistencyScore !== undefined) {
+          return session.consistencyScore;
+        }
+        // Fallback for old sessions: compute lazily if strokeData is available
         if (session.strokeData && session.strokeData.length > 0) {
           const cacheKey = session.id;
           const cached = consistencyCache.current.get(cacheKey);
@@ -699,11 +806,31 @@ ${explainChartPrompt}`;
   }, [chartSettings.enabledCharts]);
 
   const chartDataMap = useMemo(() => {
+    // Use analytics API data for fast rendering (bypasses store load)
+    if (analyticsData && analyticsData.sessionCount > 0) {
+      console.log('[Analytics] Using lazy-loaded chart data');
+      return orderedEnabledCharts.reduce((acc, metric) => {
+        const apiData = analyticsData.chartData[metric] || [];
+        // Apply smoothing
+        const withSmoothing = applySmoothingToData(apiData as ChartDataPoint[], smoothingValue);
+        // Convert to chart format
+        acc[metric] = withSmoothing.map((d: ChartDataPoint) => ({
+          date: d.date,
+          [metric]: d.value,
+          fullDate: d.fullDate,
+          sessionId: d.sessionId,
+          smoothedValue: d.smoothedValue
+        }));
+        return acc;
+      }, {} as Record<ChartMetric, any[]>);
+    }
+
+    // Fallback: compute from sessions if analytics not loaded
     return orderedEnabledCharts.reduce((acc, metric) => {
       acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, metric, smoothingValue) : [];
       return acc;
     }, {} as Record<ChartMetric, any[]>);
-  }, [filteredSessions, orderedEnabledCharts, hasFilteredData, smoothingValue, prepareChartDataWithSmoothing]);
+  }, [analyticsData, orderedEnabledCharts, smoothingValue, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing]);
 
   // Compute dynamic Y-axis domains for each metric (with 10% padding)
   const chartDomains = useMemo(() => {
@@ -738,8 +865,21 @@ ${explainChartPrompt}`;
 
   // Dedicated Split Time chart data for correlations section (always visible)
   const splitTimeChartData = useMemo(() => {
+    // Use analytics data if available
+    if (analyticsData && analyticsData.chartData.splitTime && analyticsData.chartData.splitTime.length > 0) {
+      const apiData = analyticsData.chartData.splitTime;
+      const withSmoothing = applySmoothingToData(apiData as ChartDataPoint[], smoothingValue);
+      return withSmoothing.map((d: ChartDataPoint) => ({
+        date: d.date,
+        splitTime: d.value,
+        fullDate: d.fullDate,
+        sessionId: d.sessionId,
+        smoothedValue: d.smoothedValue
+      }));
+    }
+    // Fallback to computed data
     return hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, 'splitTime', smoothingValue) : [];
-  }, [filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue]);
+  }, [analyticsData, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue]);
 
   // Handle chart data point click
   const handleChartClick = (data: any, chartData: any[]) => {
@@ -753,6 +893,11 @@ ${explainChartPrompt}`;
 
   // Prepare scatter plot data for correlations
   const scatterPlotData = useMemo(() => {
+    // Use analytics API data for scatter plot
+    if (analyticsData && analyticsData.scatterData.length > 0) {
+      return analyticsData.scatterData;
+    }
+    // Fallback to sessions
     return filteredSessions
       .slice()
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -768,7 +913,7 @@ ${explainChartPrompt}`;
         energy: session.energy,
         strokeLength: session.avgStrokeLength,
       }));
-  }, [filteredSessions]);
+  }, [filteredSessions, analyticsData]);
 
   // Custom scatter tooltip component
   const ScatterTooltip = ({ active, payload }: any) => {
@@ -938,8 +1083,8 @@ ${explainChartPrompt}`;
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        {!mounted ? (
-          // Enhanced loading placeholder
+        {!mounted || (isAnalyticsLoading && !analyticsData) ? (
+          // Enhanced loading placeholder - shown while analytics API loads
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded w-64 mb-2"></div>
             <div className="h-4 bg-muted rounded w-96 mb-8"></div>
@@ -990,14 +1135,27 @@ ${explainChartPrompt}`;
                   </h2>
                   <p className="text-muted-foreground">
                     Deep dive into your rowing performance metrics and trends
+                    {analyticsFromCache && <span className="ml-2 text-xs text-muted-foreground">(cached)</span>}
                   </p>
                 </div>
               </div>
-              <TimeRangeSelector
-                value={timeRange}
-                onChange={setTimeRange}
-                showLabel
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refreshAnalytics}
+                  disabled={isAnalyticsLoading}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isAnalyticsLoading ? 'animate-spin' : ''}`} />
+                  Refresh Data
+                </Button>
+                <TimeRangeSelector
+                  value={timeRange}
+                  onChange={setTimeRange}
+                  showLabel
+                />
+              </div>
             </div>
 
             {/* Key Metrics Summary */}
@@ -1166,7 +1324,7 @@ ${explainChartPrompt}`;
                         ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
                       >
                         <ConsistencyScoreChart
-                          sessions={sessions}
+                          sessions={sessionsForConsistencyChart}
                           chartType={chartSettings.chartType}
                           onExplainChart={handleExplainChart}
                           headerActions={

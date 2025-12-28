@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters, StrokeData } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
 import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, fetchChartSettingsFromDB, saveChartSettingsToDB } from '@/lib/dataSync';
+import { clearSessionsCache } from '@/lib/services/sessionsCache';
+import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 
 // Chart configuration types
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
@@ -625,6 +627,10 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       addSessions: (newSessions, options) => {
         console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
 
+        // Clear caches when adding new sessions (triggers refetch on next load)
+        clearSessionsCache();
+        clearAnalyticsCache();
+
         // Save to database first (async, non-blocking) - unless skipDbSave is true
         const existingIds = new Set(get().sessions.map(s => s.id));
         const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
@@ -733,7 +739,11 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
       deleteSession: async (sessionId) => {
         console.log('[STORE] deleteSession called for:', sessionId);
-        
+
+        // Clear caches (triggers refetch on next load)
+        clearSessionsCache();
+        clearAnalyticsCache();
+
         // Delete from database first
         try {
           const response = await fetch(`/api/sessions?id=${sessionId}`, {
@@ -769,6 +779,10 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       updateSession: async (updatedSession) => {
         console.log('[STORE] updateSession called with session:', updatedSession.id);
         console.log('[STORE] Has stroke data:', !!updatedSession.strokeData, 'Count:', updatedSession.strokeData?.length);
+
+        // Clear caches (triggers refetch on next load)
+        clearSessionsCache();
+        clearAnalyticsCache();
 
         // Save to database
         try {
