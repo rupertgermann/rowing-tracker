@@ -53,7 +53,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -61,7 +61,31 @@ export async function POST(req: Request) {
       );
     }
 
-    const { insights, markAsCurrent } = await req.json();
+    const body = await req.json();
+    const { insights, markAsCurrent, insightId, feedback } = body;
+
+    // Handle feedback update for a single insight
+    if (insightId && feedback) {
+      const updated = await prisma.aIInsight.updateMany({
+        where: {
+          id: insightId,
+          userId: session.user.id,
+        },
+        data: {
+          feedback,
+          feedbackAt: new Date(),
+        },
+      });
+
+      if (updated.count === 0) {
+        return NextResponse.json(
+          { error: "Insight not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    }
 
     if (!Array.isArray(insights)) {
       return NextResponse.json(

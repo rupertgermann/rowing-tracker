@@ -370,6 +370,8 @@ model AIInsight {
   archived      Boolean   @default(false)
   dateGenerated DateTime  @default(now())
   archivedAt    DateTime?
+  feedback      String?   // 'helpful' | 'not_helpful' | 'action_taken'
+  feedbackAt    DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

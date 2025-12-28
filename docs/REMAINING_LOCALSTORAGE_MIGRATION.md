@@ -52,38 +52,85 @@
 - `src/hooks/useDataSync.ts` - Initializes settings on app load
 - `src/lib/settingsSync.ts` - API retry logic utilities
 
-## Remaining Files to Fix
+## Status: AI Insights ✅ DONE
 
-### 3. AI Insights Cache ❌ TODO
-**File:** `hooks/useAIInsights.ts`
+**File:** `src/hooks/useAIInsights.ts`
 **API:** `/api/insights` ✅ EXISTS
-**Usage:** Cached AI-generated insights
-**Methods to update:**
-- `getCachedInsights()` - fetch from database
-- `cacheInsights()` - save to database
-- `getArchivedInsights()` - fetch from database
+- ✅ `fetchInsightsFromDatabase()` - fetches active and archived insights from DB
+- ✅ `saveInsightsToDB()` - saves insights to DB with revision tracking
+- ✅ `deleteInsightFromDB()` - deletes insights via API
+- ✅ `persistInsightUpdateToDB()` - updates individual insights (archive/unarchive)
+- ✅ Revision markers (sessionsRevision/insightsRevision) track if insights are current
+- ✅ `useInsightFeedback` hook now uses DB for feedback persistence
+- ✅ Added `feedback` and `feedbackAt` fields to AIInsight Prisma model
 
-### 4. Memory Storage ⚠️ PARTIAL
-**File:** `lib/memoryStorage.ts`
+**Key files:**
+- `src/hooks/useAIInsights.ts` - Main hook with DB integration
+- `src/app/api/insights/route.ts` - API with GET/POST/DELETE + feedback support
+- `src/lib/dataSync.ts` - `fetchInsightsFromDB()` and `saveInsightsToDB()` helpers
+- `prisma/schema.prisma` - AIInsight model with feedback fields
+
+## Status: Memory Storage ✅ DONE
+
+**File:** `src/lib/memoryStorage.ts`
 **API:** `/api/memory` ✅ EXISTS
-**Usage:** Uses IndexedDB for documents/blobs
-**Status:** API ready, needs integration
-**Note:** Already has database API, just needs to replace IndexedDB calls
+- ✅ `fetchDocumentsFromDB()` - fetches from `/api/memory` GET
+- ✅ `addDocument()` - uploads via `/api/memory/upload` POST
+- ✅ `addSystemDocument()` - saves via `/api/memory` POST
+- ✅ `getDocument()` / `getAllDocuments()` - fetch from DB
+- ✅ `getDocumentBlob()` - fetches via `/api/memory/file` GET
+- ✅ `updateDocument()` - updates via `/api/memory` POST
+- ✅ `deleteDocument()` - deletes via `/api/memory` DELETE
+- ✅ `importMemory()` - now uses DB API instead of IndexedDB
+- ✅ Removed unused IndexedDB initialization code
+- ✅ Removed localStorage metadata tracking
 
-### 5. Image Storage ⚠️ MIGRATION ONLY
-**File:** `lib/imageStorage.ts`
-**API:** `/api/generated-achievements` ✅ EXISTS
-**Usage:** Achievement images (IndexedDB → Database)
-**Status:** Migration functions exist, filesystem storage preferred
-**Note:** Keep filesystem storage, use database as backup
+**Key files:**
+- `src/lib/memoryStorage.ts` - Service (fully DB-backed)
+- `src/app/api/memory/route.ts` - GET/POST/DELETE for documents
+- `src/app/api/memory/upload/route.ts` - File uploads
+- `src/app/api/memory/file/route.ts` - File downloads
+
+## Status: Image Storage ✅ DONE
+
+**File:** `src/lib/imageStorage.ts`
+**APIs:**
+- `/api/achievements/image/save` - save image to filesystem
+- `/api/achievements/image/delete` - delete image from filesystem
+- `/api/generated-achievements` - CRUD for image metadata in database
+
+**Architecture:**
+- ✅ Image files stored on filesystem (`/public/assets/awards/`)
+- ✅ Image metadata stored in database (GeneratedAchievement model)
+- ✅ Main functions use filesystem + database (no localStorage/IndexedDB)
+- ✅ Legacy IndexedDB functions kept for one-time migration only (marked @deprecated)
+
+**Main Functions (Filesystem + DB):**
+- `storeAchievementImage()` - saves via `/api/achievements/image/save`
+- `getAchievementImage()` - checks filesystem via HEAD request
+- `deleteAchievementImage()` - deletes via `/api/achievements/image/delete`
+- `getAwardImagePath()` - returns public URL path
+
+**Legacy Migration Functions (IndexedDB → Filesystem):**
+- `migrateImagesFromIndexedDB()` - migrates all images
+- `getAchievementImageFromIndexedDB()` - reads from IndexedDB
+- `clearAllAchievementImagesFromIndexedDB()` - cleans up IndexedDB
+
+**Key files:**
+- `src/lib/imageStorage.ts` - Image storage service
+- `src/app/api/achievements/image/save/route.ts` - Save image API
+- `src/app/api/achievements/image/delete/route.ts` - Delete image API
+- `src/app/api/generated-achievements/route.ts` - Metadata CRUD API
+
+## All Migrations Complete! 🎉
 
 ## Integration Priority
 
 1. ~~**Chat Storage** (High) - Users actively use chat~~ ✅ DONE
 2. ~~**Settings Service** (High) - Critical for user experience~~ ✅ DONE
-3. **AI Insights** (Medium) - Important but can regenerate
-4. **Memory Storage** (Medium) - API ready, straightforward
-5. **Image Storage** (Low) - Migration already handled
+3. ~~**AI Insights** (Medium) - Important but can regenerate~~ ✅ DONE
+4. ~~**Memory Storage** (Medium) - API ready, straightforward~~ ✅ DONE
+5. ~~**Image Storage** (Low) - Filesystem + database~~ ✅ DONE
 
 ## Testing Checklist
 

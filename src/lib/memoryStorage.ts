@@ -1,5 +1,3 @@
-import { openDB, IDBPDatabase } from 'idb';
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -39,12 +37,6 @@ export interface MemoryStore {
 // Constants
 // ============================================================================
 
-const DB_NAME = 'rowing_memory_db';
-const DB_VERSION = 1;
-const STORE_NAME = 'documents';
-const BLOB_STORE_NAME = 'blobs';
-const METADATA_KEY = 'rowing_memory_metadata';
-
 export const MEMORY_CONFIG = {
   maxFileSize: 10 * 1024 * 1024,      // 10MB per file
   maxTotalStorage: 50 * 1024 * 1024,  // 50MB total
@@ -54,13 +46,11 @@ export const MEMORY_CONFIG = {
 } as const;
 
 // ============================================================================
-// Memory Storage Service
+// Memory Storage Service (DB-backed)
 // ============================================================================
 
 class MemoryStorageService {
   private static instance: MemoryStorageService;
-  private db: IDBPDatabase | null = null;
-  private initPromise: Promise<void> | null = null;
 
   private constructor() {}
 
@@ -69,41 +59,6 @@ class MemoryStorageService {
       MemoryStorageService.instance = new MemoryStorageService();
     }
     return MemoryStorageService.instance;
-  }
-
-  // Initialize IndexedDB
-  private async initDB(): Promise<void> {
-    if (this.db) return;
-    
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-
-    this.initPromise = (async () => {
-      try {
-        this.db = await openDB(DB_NAME, DB_VERSION, {
-          upgrade(db) {
-            // Store for document metadata
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-              const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-              store.createIndex('type', 'type');
-              store.createIndex('source', 'source');
-              store.createIndex('uploadedAt', 'uploadedAt');
-            }
-            // Store for large binary blobs
-            if (!db.objectStoreNames.contains(BLOB_STORE_NAME)) {
-              db.createObjectStore(BLOB_STORE_NAME);
-            }
-          },
-        });
-      } catch (error) {
-        console.error('Failed to initialize IndexedDB:', error);
-        throw error;
-      }
-    })();
-
-    await this.initPromise;
   }
 
   private async fetchDocumentsFromDB(): Promise<MemoryDocument[]> {
@@ -422,31 +377,49 @@ class MemoryStorageService {
         throw new Error('Invalid import data format');
       }
 
-      await this.initDB();
-      if (!this.db) throw new Error('Database not initialized');
+      // Get existing documents to avoid duplicates
+      const existingDocs = await this.fetchDocumentsFromDB();
+      const existingIds = new Set(existingDocs.map(d => d.id));
 
       let imported = 0;
 
       for (const doc of importData.documents) {
         // Skip if document already exists
-        const existing = await this.db.get(STORE_NAME, doc.id);
-        if (existing) continue;
+        if (existingIds.has(doc.id)) continue;
 
-        // Restore blob if available
-        if (importData.blobs?.[doc.id]) {
-          const blob = this.base64ToArrayBuffer(importData.blobs[doc.id]);
-          await this.db.put(BLOB_STORE_NAME, blob, doc.id);
+        // For user documents with blobs, we need to upload via the upload API
+        if (doc.source === 'user' && importData.blobs?.[doc.id]) {
+          const blobData = this.base64ToArrayBuffer(importData.blobs[doc.id]);
+          const file = new File([blobData], doc.name, { type: doc.mimeType });
+
+          try {
+            await this.addDocument(file, {
+              description: doc.description,
+              tags: doc.tags,
+            });
+            imported++;
+          } catch (error) {
+            console.warn(`Failed to import document ${doc.name}:`, error);
+          }
+        } else {
+          // For system documents, use the standard API
+          const res = await fetch('/api/memory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              documents: [{
+                ...doc,
+                uploadedAt: doc.uploadedAt,
+              }],
+            }),
+          });
+
+          if (res.ok) {
+            imported++;
+          }
         }
-
-        // Restore document
-        await this.db.put(STORE_NAME, {
-          ...doc,
-          uploadedAt: new Date(doc.uploadedAt),
-        });
-        imported++;
       }
 
-      this.updateMetadata();
       return { success: true, imported };
     } catch (error) {
       console.error('Failed to import memory:', error);
@@ -481,20 +454,6 @@ class MemoryStorageService {
     return { valid: true };
   }
 
-  private getDocumentType(mimeType: string): MemoryDocumentType {
-    if ((MEMORY_CONFIG.supportedImageTypes as readonly string[]).includes(mimeType)) {
-      return 'image';
-    }
-    if ((MEMORY_CONFIG.supportedPdfTypes as readonly string[]).includes(mimeType)) {
-      return 'pdf';
-    }
-    return 'note';
-  }
-
-  private generateId(): string {
-    return `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
   private deserializeDocument(doc: MemoryDocument): MemoryDocument {
     return {
       ...doc,
@@ -509,14 +468,6 @@ class MemoryStorageService {
         await this.updateDocument(plan.id, { status: 'archived' });
       }
     }
-  }
-
-  private updateMetadata(): void {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-    
-    localStorage.setItem(METADATA_KEY, JSON.stringify({
-      lastUpdated: new Date().toISOString(),
-    }));
   }
 
   private formatBytes(bytes: number): string {

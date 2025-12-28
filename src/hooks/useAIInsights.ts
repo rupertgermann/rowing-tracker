@@ -650,43 +650,67 @@ export async function getCloudInsights(sessions: Session[]): Promise<CloudInsigh
 }
 
 // Helper hook for insight feedback (supports both local and cloud insights)
+// Uses database for persistence with localStorage as fallback cache
 export function useInsightFeedback() {
-  const handleInsightFeedback = (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => {
-    // Guard against SSR/non-browser environments
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      return;
+  const [feedbackCache, setFeedbackCache] = useState<Record<string, string>>({});
+  const cacheLoadedRef = useRef(false);
+
+  // Load feedback from insights on mount (DB is source of truth)
+  useEffect(() => {
+    if (cacheLoadedRef.current) return;
+    cacheLoadedRef.current = true;
+
+    const loadFeedback = async () => {
+      try {
+        const { active, archived } = await fetchInsightsFromDatabase();
+        const allInsights = [...active, ...archived];
+        const cache: Record<string, string> = {};
+
+        allInsights.forEach((insight: any) => {
+          if (insight.feedback) {
+            cache[insight.id] = insight.feedback;
+          }
+        });
+
+        setFeedbackCache(cache);
+      } catch (error) {
+        console.warn('[useInsightFeedback] Failed to load feedback from DB:', error);
+      }
+    };
+
+    loadFeedback();
+  }, []);
+
+  const handleInsightFeedback = useCallback(async (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => {
+    // Update local cache immediately for better UX
+    setFeedbackCache(prev => ({ ...prev, [insightId]: feedback }));
+
+    // Persist to database
+    try {
+      const response = await fetch('/api/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ insightId, feedback }),
+      });
+
+      if (!response.ok) {
+        console.warn('[useInsightFeedback] Failed to save feedback to DB');
+      }
+    } catch (error) {
+      console.warn('[useInsightFeedback] Error saving feedback:', error);
     }
+  }, []);
 
-    // Store feedback in localStorage for future ML improvements
-    const feedbackKey = `insight_feedback_${insightId}`;
-    const existingFeedback = localStorage.getItem(feedbackKey);
+  const getInsightFeedback = useCallback((insightId: string) => {
+    const feedback = feedbackCache[insightId];
+    if (!feedback) return null;
 
-    if (!existingFeedback) {
-      const feedbackData = {
-        insightId,
-        feedback,
-        timestamp: new Date().toISOString(),
-        source: insightId.startsWith('cloud-') ? 'cloud-ai' : 'local-analysis'
-      };
-
-      localStorage.setItem(feedbackKey, JSON.stringify(feedbackData));
-
-      // In a real implementation, this would send feedback to a server
-      // for improving the AI recommendation algorithms
-    }
-  };
-
-  const getInsightFeedback = (insightId: string) => {
-    // Guard against SSR/non-browser environments
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      return null;
-    }
-
-    const feedbackKey = `insight_feedback_${insightId}`;
-    const feedbackData = localStorage.getItem(feedbackKey);
-
-    return feedbackData ? JSON.parse(feedbackData) : null;
-  };
+    return {
+      insightId,
+      feedback,
+      source: insightId.startsWith('cloud-') ? 'cloud-ai' : 'local-analysis'
+    };
+  }, [feedbackCache]);
 
   return {
     recordFeedback: handleInsightFeedback,
