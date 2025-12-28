@@ -291,9 +291,12 @@ export default function SettingsPage() {
     }
   };
 
-  const resetPromptInEditor = () => {
+  const resetPromptInEditor = async () => {
     if (editingPrompt) {
       setPromptEditorValue(editingPrompt.defaultValue);
+      // Save the default value to settings
+      await saveSettings('aiSettings', { [editingPrompt.key]: editingPrompt.defaultValue });
+      setSuccessMessage('Prompt reset to default');
     }
   };
 

@@ -61,7 +61,6 @@ Style guidelines:
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately
-- Aspect ratio: square (1:1)
 - High quality, suitable for display`;
 
     let prompt = (customPrompt || defaultPrompt)
