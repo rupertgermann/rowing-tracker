@@ -359,6 +359,7 @@ export function AchievementGallery({
         model: aiSettings.achievementImageModel,
         quality: aiSettings.achievementImageQuality,
         size: aiSettings.achievementImageSize,
+        colorPalette: aiSettings.achievementImageColors,
         // If a story already exists, pass it for better coherence
         story: storyToUse
       };

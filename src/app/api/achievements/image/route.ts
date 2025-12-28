@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SettingsService } from '@/lib/settings';
 import { getColorPalettePrompt } from '@/lib/achievementColors';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      title, 
-      description, 
-      customPrompt, 
-      apiKey, 
+    const {
+      title,
+      description,
+      customPrompt,
+      apiKey,
       size = '1024x1024',
       quality = 'auto',  // auto, high, medium, low
       model = 'gpt-image-1',  // gpt-image-1, gpt-image-1-mini, gpt-image-1.5
+      colorPalette = 'classic',  // Color palette sent from client
       story
     } = body;
 
@@ -42,12 +42,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the image prompt
-    const isDev = process.env.NODE_ENV === 'development';
+    const colorPrompt = getColorPalettePrompt(colorPalette);
 
-    // Load AI settings to get selected color palette
-    const settings = SettingsService.getInstance();
-    const aiSettings = settings.getAISettings();
-    const colorPalette = getColorPalettePrompt(aiSettings.achievementImageColors || 'classic');
+    // DEBUG: Log palette resolution
+    console.log('[ACHIEVEMENT-IMAGE] Palette debug:', {
+      receivedColorPalette: colorPalette,
+      resolvedColorPrompt: colorPrompt,
+      hasCustomPrompt: !!customPrompt,
+      customPromptPreview: customPrompt?.slice(0, 200),
+    });
 
     const defaultPrompt = `Create a stunning, celebratory achievement certificate/card image for a rowing accomplishment.
 
@@ -57,7 +60,7 @@ Description: {description}
 Style guidelines:
 - Modern, clean design with elegant typography
 - Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
-- Use a color palette of ${colorPalette}
+- Use a color palette of ${colorPrompt}
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately
@@ -66,8 +69,9 @@ Style guidelines:
     let prompt = (customPrompt || defaultPrompt)
       .replace('{title}', title)
       .replace('{description}', description)
-      // Replace any hardcoded color palette with the user's selected colors
-      .replace(/Use a color palette of [^\n]+/i, `Use a color palette of ${colorPalette}`);
+      // Replace color placeholders with the user's selected colors
+      .replace(/\(colors\)/gi, `Use a color palette of ${colorPrompt}`)
+      .replace(/Use a color palette of [^\n]+/i, `Use a color palette of ${colorPrompt}`);
 
     // Ensure the award title is visible on the certificate/card
     prompt += `\n\nClearly render the award title "${title}" on the certificate/card in the foreground so it is readable and prominent.`;
@@ -79,6 +83,10 @@ Style guidelines:
     } else {
       prompt += `\n\nPlace the award certificate/card clearly in the foreground, with a complementary background that feels appropriate for this achievement.`;
     }
+
+    // DEBUG: Log final prompt being sent to OpenAI
+    console.log('[ACHIEVEMENT-IMAGE] Final prompt being sent to OpenAI:\n', prompt);
+    console.log('[ACHIEVEMENT-IMAGE] ---END PROMPT---');
 
     // Call OpenAI Image API with GPT image models
     // See: https://platform.openai.com/docs/api-reference/images/create
