@@ -203,29 +203,30 @@ export async function POST(req: Request) {
         }
       }
 
-      // Save stroke data if present
-      if (sessionData.strokeData && Array.isArray(sessionData.strokeData)) {
-        console.log(`[SESSIONS API] Saving ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
-        
-        for (const stroke of sessionData.strokeData) {
-          await prisma.strokeData.create({
-            data: {
-              sessionId: sessionRecord.id,
-              strokeIndex: stroke.strokeIndex,
-              time: stroke.time,
-              timestamp: stroke.timestamp,
-              distance: stroke.distance,
-              work: stroke.work,
-              power: stroke.power,
-              avgPower: stroke.avgPower,
-              split: stroke.split,
-              avgSplit: stroke.avgSplit,
-              strokeRate: stroke.strokeRate,
-              heartRate: stroke.heartRate || null,
-              strokeLength: stroke.strokeLength || null,
-            },
-          });
-        }
+      // Save stroke data if present - use bulk insert for performance
+      if (sessionData.strokeData && Array.isArray(sessionData.strokeData) && sessionData.strokeData.length > 0) {
+        console.log(`[SESSIONS API] Bulk inserting ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
+
+        const strokeDataRecords = sessionData.strokeData.map((stroke: any) => ({
+          sessionId: sessionRecord.id,
+          strokeIndex: stroke.strokeIndex,
+          time: stroke.time,
+          timestamp: stroke.timestamp,
+          distance: stroke.distance,
+          work: stroke.work,
+          power: stroke.power,
+          avgPower: stroke.avgPower,
+          split: stroke.split,
+          avgSplit: stroke.avgSplit,
+          strokeRate: stroke.strokeRate,
+          heartRate: stroke.heartRate || null,
+          strokeLength: stroke.strokeLength || null,
+        }));
+
+        await prisma.strokeData.createMany({
+          data: strokeDataRecords,
+          skipDuplicates: true,
+        });
       }
 
       created.push(sessionRecord);

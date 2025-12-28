@@ -151,12 +151,13 @@ interface RowingStore {
   pendingInsight: PendingInsight | null; // temporary storage for insight discussion chat handoff
   
   // Actions
-  addSessions: (sessions: Session[]) => void;
+  addSessions: (sessions: Session[], options?: { skipDbSave?: boolean }) => void;
   clearSessions: () => void;
   updateFilters: (filters: Partial<SessionFilters>) => void;
   resetFilters: () => void;
   deleteSession: (sessionId: string) => void;
   updateSession: (updatedSession: Session) => void;
+  updateSessionsInStore: (sessions: Session[]) => void;  // Update local state only, no DB save
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
   dismissNewAward: () => void;
@@ -621,16 +622,16 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       pendingInsight: null,
 
       // Actions
-      addSessions: (newSessions) => {
+      addSessions: (newSessions, options) => {
         console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
-        
-        // Save to database first (async, non-blocking)
+
+        // Save to database first (async, non-blocking) - unless skipDbSave is true
         const existingIds = new Set(get().sessions.map(s => s.id));
         const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
-        
+
         console.log('[STORE] Unique new sessions:', uniqueNewSessions.length);
-        
-        if (uniqueNewSessions.length > 0) {
+
+        if (uniqueNewSessions.length > 0 && !options?.skipDbSave) {
           console.log('[STORE] Saving sessions to database...');
           saveSessionsToDB(uniqueNewSessions)
             .then(result => {
@@ -639,6 +640,8 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             .catch(err => {
               console.error('[STORE] Failed to save sessions to database:', err);
             });
+        } else if (options?.skipDbSave) {
+          console.log('[STORE] Skipping DB save (already saved)');
         }
         
         set((state) => {
@@ -766,7 +769,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       updateSession: async (updatedSession) => {
         console.log('[STORE] updateSession called with session:', updatedSession.id);
         console.log('[STORE] Has stroke data:', !!updatedSession.strokeData, 'Count:', updatedSession.strokeData?.length);
-        
+
         // Save to database
         try {
           const response = await fetch('/api/sessions', {
@@ -774,7 +777,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessions: [updatedSession] }),
           });
-          
+
           if (!response.ok) {
             console.error('[STORE] Failed to save updated session to database');
           } else {
@@ -783,14 +786,33 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         } catch (error) {
           console.error('[STORE] Error saving updated session:', error);
         }
-        
+
         set((state) => {
-          const updatedSessions = state.sessions.map(s => 
+          const updatedSessions = state.sessions.map(s =>
             s.id === updatedSession.id ? updatedSession : s
           );
           // Recalculate records in case this update improved something (unlikely for just adding strokeData, but good practice)
           const updatedRecords = calculatePersonalRecords(updatedSessions);
-          
+
+          return {
+            sessions: updatedSessions,
+            personalRecords: updatedRecords
+          };
+        });
+      },
+
+      // Update multiple sessions in local store only (no DB save)
+      // Used after bulk saves to sync local state
+      updateSessionsInStore: (sessionsToUpdate) => {
+        console.log('[STORE] updateSessionsInStore called with', sessionsToUpdate.length, 'sessions');
+
+        set((state) => {
+          const sessionMap = new Map(sessionsToUpdate.map(s => [s.id, s]));
+          const updatedSessions = state.sessions.map(s =>
+            sessionMap.has(s.id) ? sessionMap.get(s.id)! : s
+          );
+          const updatedRecords = calculatePersonalRecords(updatedSessions);
+
           return {
             sessions: updatedSessions,
             personalRecords: updatedRecords
