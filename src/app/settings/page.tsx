@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -448,6 +449,26 @@ export default function SettingsPage() {
             <option value="dark">Dark</option>
             <option value="system">System</option>
           </select>
+        </div>
+
+        <div>
+          <Label htmlFor="lightModeBrightness">
+            Light Mode Brightness: {settingsData.userPreferences.lightModeBrightness}%
+          </Label>
+          <div className="mt-2">
+            <Slider
+              id="lightModeBrightness"
+              value={[settingsData.userPreferences.lightModeBrightness]}
+              onValueChange={(value) => saveSettings('userPreferences', { lightModeBrightness: value[0] })}
+              min={50}
+              max={100}
+              step={5}
+              disabled={settingsData.userPreferences.theme === 'dark'}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Reduce brightness for a softer light mode appearance (only applies in light mode)
+          </p>
         </div>
 
         <div>

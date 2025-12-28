@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
+import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,7 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle } from 'lucide-react';
+import { settings } from '@/lib/settings';
+import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle, Sun, Moon, Monitor } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
@@ -25,6 +28,55 @@ const navigation = [
   { name: 'AI Coach', href: '/chat', icon: MessageCircle },
   { name: 'Upload', href: '/upload', icon: Upload },
 ];
+
+function ThemeToggle() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const cycleTheme = () => {
+    const currentTheme = theme || 'system';
+    let newTheme: 'light' | 'dark' | 'system';
+    
+    if (currentTheme === 'light') {
+      newTheme = 'dark';
+    } else if (currentTheme === 'dark') {
+      newTheme = 'system';
+    } else {
+      newTheme = 'light';
+    }
+    
+    setTheme(newTheme);
+    settings.updateUserPreferences({ theme: newTheme });
+  };
+
+  if (!mounted) {
+    return (
+      <Button variant="ghost" size="icon" className="h-9 w-9">
+        <Sun className="h-4 w-4" />
+      </Button>
+    );
+  }
+
+  const currentTheme = theme || 'system';
+  const Icon = currentTheme === 'light' ? Sun : currentTheme === 'dark' ? Moon : Monitor;
+  const label = currentTheme === 'light' ? 'Light' : currentTheme === 'dark' ? 'Dark' : 'System';
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={cycleTheme}
+      className="h-9 w-9"
+      title={`Theme: ${label} (click to cycle)`}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
+  );
+}
 
 export function Navigation() {
   const pathname = usePathname();
@@ -94,6 +146,9 @@ export function Navigation() {
               );
             })}
 
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
             {/* User Menu */}
             {status === 'authenticated' && session?.user && (
               <DropdownMenu>
@@ -141,6 +196,7 @@ export function Navigation() {
 
           {/* Mobile Navigation - User Menu */}
           <div className="md:hidden flex items-center space-x-2">
+            <ThemeToggle />
             {status === 'authenticated' && session?.user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

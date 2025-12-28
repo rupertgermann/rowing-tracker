@@ -4,6 +4,7 @@ import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
 // VERSION: 2024-12-27-v2 - Added auth check before DB sync
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'system';
+  lightModeBrightness: number; // 0-100, controls light mode brightness (100 = default bright, 0 = dimmed)
   units: 'metric' | 'imperial';
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
   timeFormat: '12h' | '24h';
@@ -131,6 +132,7 @@ export class SettingsService {
   private defaultSettings: Settings = {
     userPreferences: {
       theme: 'system',
+      lightModeBrightness: 100, // Default to full brightness
       units: 'metric',
       dateFormat: 'MM/DD/YYYY',
       timeFormat: '24h',
@@ -435,6 +437,7 @@ Be specific and actionable. Only include information relevant to rowing training
     return {
       userPreferences: {
         theme: dbSettings.theme || 'system',
+        lightModeBrightness: dbSettings.lightModeBrightness ?? 100,
         units: dbSettings.units || 'metric',
         dateFormat: dbSettings.dateFormat || 'MM/DD/YYYY',
         timeFormat: dbSettings.timeFormat || '24h',

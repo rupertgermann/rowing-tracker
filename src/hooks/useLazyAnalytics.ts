@@ -84,12 +84,14 @@ const emptyData: AnalyticsData = {
 };
 
 export function useLazyAnalytics(): UseLazyAnalyticsResult {
+  // Always start with null to match SSR, then load cache in useEffect
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const fetchedRef = useRef(false);
   const refreshCounter = useRef(0);
+  const initialLoadRef = useRef(false);
 
   const fetchData = useCallback(async (skipCache = false) => {
     console.log('[useLazyAnalytics] fetchData called, skipCache:', skipCache);
@@ -215,17 +217,50 @@ export function useLazyAnalytics(): UseLazyAnalyticsResult {
     }
   }, []);
 
-  // Initial fetch
+  // Initial load - try cache first, then fetch if needed
   useEffect(() => {
-    console.log('[useLazyAnalytics] useEffect triggered, fetchedRef.current:', fetchedRef.current, 'refreshCounter:', refreshCounter.current);
-    if (fetchedRef.current) {
-      console.log('[useLazyAnalytics] Already fetched, skipping');
-      return;
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    
+    console.log('[useLazyAnalytics] Initial load effect');
+    
+    // Try to load from cache immediately
+    const cached = getCachedAnalytics();
+    if (cached) {
+      console.log('[useLazyAnalytics] Loading from cache immediately');
+      setData({
+        chartData: cached.chartData as Record<ChartMetric, ChartDataPoint[]>,
+        summary: cached.summary,
+        scatterData: cached.scatterData,
+        availableDates: cached.availableDates,
+        sessionsRevision: cached.sessionsRevision,
+        sessionCount: cached.sessionCount,
+      });
+      setFromCache(true);
+      setIsLoading(false);
+      
+      // Validate in background
+      (async () => {
+        try {
+          const revResponse = await fetch('/api/sessions/list');
+          if (revResponse.ok) {
+            const revData = await revResponse.json();
+            if (cached.sessionsRevision !== revData.sessionsRevision || 
+                cached.sessionCount !== revData.count) {
+              console.log('[useLazyAnalytics] Cache stale, fetching fresh data...');
+              await fetchData(true);
+            }
+          }
+        } catch (e) {
+          console.log('[useLazyAnalytics] Background validation failed:', e);
+        }
+      })();
+    } else {
+      // No cache, fetch immediately
+      console.log('[useLazyAnalytics] No cache, fetching data...');
+      fetchData();
     }
-    console.log('[useLazyAnalytics] Setting fetchedRef to true and calling fetchData');
-    fetchedRef.current = true;
-    fetchData();
-  }, [fetchData, refreshCounter.current]);
+  }, [fetchData]);
 
   // Refresh function
   const refresh = useCallback(() => {

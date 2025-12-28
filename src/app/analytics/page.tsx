@@ -314,7 +314,6 @@ const Analytics = () => {
   }, [analyticsData, sessions]);
 
   const chartSettings = getChartSettings();
-  const [mounted, setMounted] = useState(false);
   
   // Refs for chart containers (for screenshot capture)
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -427,8 +426,6 @@ const Analytics = () => {
 
   // Handle anchor links to scroll to specific charts
   useEffect(() => {
-    if (!mounted) return;
-    
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1); // Remove the #
       if (hash && chartRefs.current[hash]) {
@@ -448,7 +445,7 @@ const Analytics = () => {
     // Listen for hash changes
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [mounted]);
+  }, []);
 
   // Helper function to capture chart screenshot and navigate to chat
   const handleExplainChart = useCallback(async (
@@ -599,10 +596,6 @@ ${explainChartPrompt}`;
     isArchivedView,
     setIsArchivedView
   } = useAIInsights();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Filter sessions based on custom date range (if set) or time range
   // When using analytics data, filter based on chart data instead of full sessions
@@ -1083,8 +1076,8 @@ ${explainChartPrompt}`;
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        {!mounted || (isAnalyticsLoading && !analyticsData) ? (
-          // Enhanced loading placeholder - shown while analytics API loads
+        {!analyticsData ? (
+          // Only show skeleton if we have NO data at all (not even cached)
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded w-64 mb-2"></div>
             <div className="h-4 bg-muted rounded w-96 mb-8"></div>
@@ -1100,7 +1093,7 @@ ${explainChartPrompt}`;
             <div className="h-8 bg-muted rounded w-48 mb-4"></div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {[1, 2].map(i => (
-                <div key={i} className="h-80 bg-muted rounded-lg"></div>
+                <div key={i} className="h-96 bg-muted rounded-lg"></div>
               ))}
             </div>
           </div>
