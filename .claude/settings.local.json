@@ -5,7 +5,10 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(npx prisma generate:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(tree:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)"
     ]
   }
 }
