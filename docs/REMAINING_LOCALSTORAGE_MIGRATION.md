@@ -33,16 +33,26 @@
 - `src/components/InsightDiscussionArchiveModal.tsx`
 - `src/components/ai/InsightCard.tsx`
 
-## Remaining Files to Fix
+## Status: Settings Service ✅ DONE
 
-### 2. Settings Service ❌ TODO  
 **File:** `src/lib/settings.ts`
 **API:** `/api/settings` ✅ EXISTS
-**Usage:** User preferences and configuration
-**Methods to update:**
-- `load()` - fetch from database
-- `save()` - save to database
-- Keep localStorage for cache/offline fallback
+- ✅ `initializeFromDB()` - fetches from database on app load
+- ✅ `syncToDatabase()` - syncs changes to database (debounced, 1s)
+- ✅ All `update*()` methods trigger DB sync automatically
+- ✅ `getSettings()` reads from localStorage cache (synchronous for performance)
+- ✅ `transformDBToAppSettings()` / `transformAppToDBSettings()` - proper format conversion
+- ✅ `useSettings` hook consolidated to use SettingsService
+- ✅ `useDataSync` hook initializes settings from DB on app load
+- ✅ localStorage used as cache for offline/performance
+
+**Key files:**
+- `src/lib/settings.ts` - Main service with DB sync
+- `src/hooks/useSettings.ts` - React hook using SettingsService
+- `src/hooks/useDataSync.ts` - Initializes settings on app load
+- `src/lib/settingsSync.ts` - API retry logic utilities
+
+## Remaining Files to Fix
 
 ### 3. AI Insights Cache ❌ TODO
 **File:** `hooks/useAIInsights.ts`
@@ -70,7 +80,7 @@
 ## Integration Priority
 
 1. ~~**Chat Storage** (High) - Users actively use chat~~ ✅ DONE
-2. **Settings Service** (High) - Critical for user experience
+2. ~~**Settings Service** (High) - Critical for user experience~~ ✅ DONE
 3. **AI Insights** (Medium) - Important but can regenerate
 4. **Memory Storage** (Medium) - API ready, straightforward
 5. **Image Storage** (Low) - Migration already handled
