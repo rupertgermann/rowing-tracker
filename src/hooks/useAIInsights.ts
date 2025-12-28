@@ -168,6 +168,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const [archivedInsightsState, setArchivedInsightsState] = useState<(Insight | CloudInsight)[]>([]);
   const [archivedLoaded, setArchivedLoaded] = useState(false);
   const [dbInsightsLoaded, setDbInsightsLoaded] = useState(false);
+  const [dbActiveInsightsCount, setDbActiveInsightsCount] = useState<number | null>(null); // Track DB-loaded active insights count
 
   const [revisions, setRevisions] = useState<{ sessionsRevision: number; insightsRevision: number } | null>(null);
   const revisionsLoadedRef = useRef(false);
@@ -206,11 +207,11 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     const loadFromDB = async () => {
       try {
         const { active, archived } = await fetchInsightsFromDatabase();
-        
+
         setArchivedInsightsState(archived);
         setArchivedLoaded(true);
-        setDbInsightsLoaded(true);
-        
+        setDbActiveInsightsCount(active.length); // Track how many active insights we loaded from DB
+
         // If we have active insights from DB, use them
         if (active.length > 0) {
           setData(prev => ({
@@ -220,10 +221,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
             lastAnalyzed: active[0]?.dateGenerated || null
           }));
         }
+
+        // Set dbInsightsLoaded AFTER all state updates
+        setDbInsightsLoaded(true);
       } catch (error) {
         console.error('[INSIGHTS] Error loading from DB:', error);
         setArchivedInsightsState([]);
         setArchivedLoaded(true);
+        setDbActiveInsightsCount(0);
         setDbInsightsLoaded(true);
       }
     };
@@ -293,6 +298,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       return prevData;
     });
 
+    // Reset DB active insights count to force regeneration
+    setDbActiveInsightsCount(0);
     setRefreshTrigger(prev => prev + 1);
   }, []);
 
@@ -470,8 +477,8 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     }
 
     // Try Cloud AI first if configured and available
+    // Note: Loading state (isAnalyzing) is now managed by runAnalysis for consistent behavior
     if (isAIAvailableForUse) {
-      setIsAnalyzing(true);
       try {
         // Initialize cloud AI with latest settings
         initializeCloudAI();
@@ -490,7 +497,6 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         const trainingLoad = aiAnalysis.calculateTrainingLoad(sessions);
         const anomalies = aiAnalysis.detectAnomalies(sessions);
 
-        setIsAnalyzing(false);
         setCloudAIError(null);
 
         return {
@@ -507,7 +513,6 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         };
       } catch (error) {
         console.error('Cloud AI failed, falling back to local analysis:', error);
-        setIsAnalyzing(false);
         const errorMessage = error instanceof Error ? error.message : 'Cloud AI error';
         setCloudAIError(errorMessage);
 
@@ -527,10 +532,9 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     let isMounted = true;
 
     const runAnalysis = async () => {
-      if (analysisInFlightRef.current) return;
-
-      const sessionsChanged = revisions ? revisions.sessionsRevision !== revisions.insightsRevision : null;
-
+      if (analysisInFlightRef.current) {
+        return;
+      }
 
       // Don't run analysis if we have no sessions yet (avoid race condition during initial load)
       if (sessions.length === 0) {
@@ -538,26 +542,56 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       }
 
       // Wait until DB insights + revision markers are loaded so we can make a correct decision.
-      if (!dbInsightsLoaded || revisions === null) {
+      if (!dbInsightsLoaded || revisions === null || dbActiveInsightsCount === null) {
         return;
       }
 
-      // Check if we have any active (non-archived) insights
-      const hasActiveInsights = data.insights && data.insights.length > 0;
+      // Check if we have any active (non-archived) insights from DB
+      // Use dbActiveInsightsCount (set during DB load) instead of data.insights to avoid stale state issues
+      const hasActiveInsightsInDB = dbActiveInsightsCount > 0;
 
       // If insights in DB are already up-to-date with the current sessions dataset, do not regenerate on reload.
       const insightsAreCurrent = revisions.sessionsRevision === revisions.insightsRevision;
 
-      // Skip regeneration only if: not forced, revisions match, AND we have active insights
-      if (!forceRefresh && insightsAreCurrent && hasActiveInsights) {
+      // Skip regeneration only if: not forced, revisions match, AND we have active insights in DB
+      if (!forceRefresh && insightsAreCurrent && hasActiveInsightsInDB) {
         return;
       }
 
-      try {
-        analysisInFlightRef.current = true;
+      // Set loading state IMMEDIATELY when we decide to regenerate (same as manual refresh flow)
+      setIsAnalyzing(true);
+      analysisInFlightRef.current = true;
 
-        // No local caching: always rely on DB + in-memory state
-        let currentArchived = archivedInsightsState;
+      // Calculate what needs to be archived (but DON'T update state yet - it's in effect dependencies)
+      let currentArchived = archivedInsightsState;
+      let insightsToArchive: typeof data.insights = [];
+      if (data.insights && data.insights.length > 0) {
+        const now = new Date();
+        insightsToArchive = data.insights.map(i => ({
+          ...i,
+          archived: true,
+          archivedAt: now.toISOString(),
+        }));
+
+        // Persist archived insights to DB (fire-and-forget, doesn't affect state)
+        for (const insight of insightsToArchive) {
+          persistInsightUpdateToDB(insight);
+        }
+
+        // Calculate new archived list (but don't set state yet!)
+        currentArchived = addToArchive(currentArchived, insightsToArchive);
+      }
+
+      // CRITICAL: Clear current insights immediately so UI shows loading state
+      // This mirrors what refreshInsights() does - it clears insights before triggering regeneration
+      // NOTE: We set archivedInsights in data but NOT archivedInsightsState to avoid effect re-run
+      setData(prev => ({
+        ...prev,
+        insights: [],
+        archivedInsights: currentArchived
+      }));
+
+      try {
 
         // Generate new insights
         const result = await performAnalysis();
@@ -568,12 +602,23 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
             isArchivedView
           };
 
-          // Persist insights to DB (source of truth)
-          saveInsightsToDB(updatedResult.insights || [], { markAsCurrent: true })
-            .catch(err => console.warn('[useAIInsights] Failed to save insights to database:', err));
+          // Persist insights to DB (source of truth) - AWAIT to ensure save completes
+          try {
+            await saveInsightsToDB(updatedResult.insights || [], { markAsCurrent: true });
+            // Update the DB active insights count so we don't regenerate on next check
+            setDbActiveInsightsCount(updatedResult.insights?.length || 0);
+          } catch (err) {
+            console.warn('[useAIInsights] Failed to save insights to database:', err);
+          }
 
           // Sync insights to memory for AI coach access (async, non-blocking)
           syncInsightsToMemory(updatedResult.insights, updatedResult.usingCloudAI);
+
+          // NOW update archivedInsightsState - after API completed, batched with other updates
+          // This prevents the effect from re-running mid-flight
+          if (insightsToArchive.length > 0) {
+            setArchivedInsightsState(currentArchived);
+          }
 
           setData(updatedResult);
 
@@ -596,10 +641,21 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         console.error('Analysis error:', error);
         if (isMounted) {
           const localResult = await getLocalAnalysis(sessions);
+
+          // IMPORTANT: Also save fallback results to DB with markAsCurrent to prevent re-regeneration
+          try {
+            await saveInsightsToDB(localResult.insights || [], { markAsCurrent: true });
+            setDbActiveInsightsCount(localResult.insights?.length || 0);
+          } catch (err) {
+            console.warn('[useAIInsights] Failed to save fallback insights to database:', err);
+          }
+
           setData(localResult);
         }
       } finally {
         analysisInFlightRef.current = false;
+        // Always reset loading state in finally block to ensure UI is never stuck
+        setIsAnalyzing(false);
       }
     };
 
@@ -608,7 +664,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     return () => {
       isMounted = false;
     };
-  }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI, archivedInsightsState, isArchivedView, dbInsightsLoaded, revisions, data.insights]);
+  }, [performAnalysis, sessions, refreshTrigger, forceRefresh, initializeCloudAI, archivedInsightsState, isArchivedView, dbInsightsLoaded, revisions, dbActiveInsightsCount]);
 
   // Compute isAnalyzable directly from sessions count to ensure it's always accurate
   // (not dependent on async analysis completing)
