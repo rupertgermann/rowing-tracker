@@ -57,10 +57,13 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
   const existingFeedback = getFeedback(insight.id);
   const isCloudInsight = 'confidence' in insight && insight.id && insight.id.startsWith('cloud-');
 
-  // Check for existing discussions
+  // Check for existing discussions (async)
   useEffect(() => {
-    const discussions = chatStorage.getInsightDiscussionSessions(insight.id);
-    setDiscussionCount(discussions.length);
+    const loadDiscussionCount = async () => {
+      const discussions = await chatStorage.getInsightDiscussionSessions(insight.id);
+      setDiscussionCount(discussions.length);
+    };
+    loadDiscussionCount();
   }, [insight.id]);
 
   const getInsightIcon = () => {

@@ -8,16 +8,32 @@
 - ✅ Replaced `savePlans()` with database save
 - ✅ All CRUD operations now use database
 
-## Remaining Files to Fix
+## Status: Chat Storage ✅ DONE
 
-### 1. Chat Storage ❌ TODO
 **File:** `src/lib/chatStorage.ts`
 **API:** `/api/chat` ✅ EXISTS
-**Usage:** Chat sessions and messages
-**Methods to update:**
-- `getSessions()` - fetch from database
-- `saveSessions()` - save to database
-- `getCurrentSessionId()` - keep in localStorage (UI state only)
+- ✅ Made all methods async
+- ✅ `getSessions()` - fetches from database with 30s cache
+- ✅ `getSession()` - fetches from database
+- ✅ `createSession()` - uses API
+- ✅ `addMessage()` - uses API
+- ✅ `updateSessionTitle()` - uses API
+- ✅ `deleteSession()` - uses API
+- ✅ `clearAllSessions()` - uses API
+- ✅ `searchMessages()` - uses API
+- ✅ `getPlanAnalysisSessions()` - fetches from database
+- ✅ `getInsightDiscussionSessions()` - fetches from database
+- ✅ `getCurrentSessionId()` - kept in localStorage (UI state only)
+- ✅ Updated all consumers to use async methods
+
+**Consumers updated:**
+- `src/components/ExplainChartButton.tsx`
+- `src/app/analytics/page.tsx`
+- `src/components/PlanAnalysisArchiveModal.tsx`
+- `src/components/InsightDiscussionArchiveModal.tsx`
+- `src/components/ai/InsightCard.tsx`
+
+## Remaining Files to Fix
 
 ### 2. Settings Service ❌ TODO  
 **File:** `src/lib/settings.ts`
@@ -53,7 +69,7 @@
 
 ## Integration Priority
 
-1. **Chat Storage** (High) - Users actively use chat
+1. ~~**Chat Storage** (High) - Users actively use chat~~ ✅ DONE
 2. **Settings Service** (High) - Critical for user experience
 3. **AI Insights** (Medium) - Important but can regenerate
 4. **Memory Storage** (Medium) - API ready, straightforward

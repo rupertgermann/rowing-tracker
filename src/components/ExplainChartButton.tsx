@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -29,17 +29,25 @@ export function ExplainChartButton({
 }: ExplainChartButtonProps) {
   const router = useRouter();
   const { chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
+  const [isExplanationValid, setIsExplanationValid] = useState(false);
 
-  // Check if explanation is valid (session still exists)
-  const isExplanationValid = useCallback(() => {
-    const explanation = chartExplanations[chartId];
-    if (!explanation) return false;
-    const session = chatStorage.getSession(explanation.chatSessionId);
-    if (!session) {
-      removeChartExplanationsBySessionId(explanation.chatSessionId);
-      return false;
-    }
-    return true;
+  // Check if explanation is valid (session still exists) - async
+  useEffect(() => {
+    const checkValidity = async () => {
+      const explanation = chartExplanations[chartId];
+      if (!explanation) {
+        setIsExplanationValid(false);
+        return;
+      }
+      const session = await chatStorage.getSession(explanation.chatSessionId);
+      if (!session) {
+        removeChartExplanationsBySessionId(explanation.chatSessionId);
+        setIsExplanationValid(false);
+        return;
+      }
+      setIsExplanationValid(true);
+    };
+    checkValidity();
   }, [chartExplanations, chartId, removeChartExplanationsBySessionId]);
 
   const handleExplainChart = useCallback(async () => {
@@ -67,7 +75,7 @@ ${explainChartPrompt}`;
   }, [chartId, chartTitle, chartDescription, dataContext, fullData, setPendingChartExplanation, router]);
 
   const explanation = chartExplanations[chartId];
-  const hasValidExplanation = isExplanationValid();
+  const hasValidExplanation = isExplanationValid;
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 
   return (

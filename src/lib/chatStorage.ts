@@ -1,13 +1,41 @@
 import { ChatMessage, ChatSession } from '@/lib/cloudAI';
 import { formatSessionDate } from '@/lib/dateTimeUtils';
 
+// Helper to convert DB session to ChatSession
+function dbSessionToChatSession(s: any): ChatSession {
+  return {
+    id: s.id,
+    title: s.title,
+    messages: s.messages?.map((m: any) => dbMessageToChatMessage(m, s.id)) || [],
+    createdAt: new Date(s.createdAt),
+    updatedAt: new Date(s.updatedAt),
+    category: s.category,
+    chartId: s.chartId || undefined,
+  };
+}
+
+// Helper to convert DB message to ChatMessage
+function dbMessageToChatMessage(m: any, sessionId: string): ChatMessage {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    timestamp: new Date(m.timestamp),
+    sessionId,
+  };
+}
+
 export class ChatStorageService {
   private static instance: ChatStorageService;
-  private readonly STORAGE_KEY = 'rowing_ai_chat_sessions';
   private readonly CURRENT_SESSION_KEY = 'rowing_ai_current_session';
-  
+
+  // In-memory cache for sessions (lightweight, without messages)
+  private sessionsCache: ChatSession[] | null = null;
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 30000; // 30 seconds
+
   private constructor() {}
-  
+
   static getInstance(): ChatStorageService {
     if (!ChatStorageService.instance) {
       ChatStorageService.instance = new ChatStorageService();
@@ -15,254 +43,304 @@ export class ChatStorageService {
     return ChatStorageService.instance;
   }
 
-  // Get all chat sessions
-  getSessions(): ChatSession[] {
+  // Invalidate the sessions cache
+  invalidateCache(): void {
+    this.sessionsCache = null;
+    this.cacheTimestamp = 0;
+  }
+
+  // Get all chat sessions from database
+  async getSessions(): Promise<ChatSession[]> {
     try {
-      // Guard against SSR/non-browser environments
-      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-        return [];
+      // Check cache first
+      const now = Date.now();
+      if (this.sessionsCache && (now - this.cacheTimestamp) < this.CACHE_TTL) {
+        return this.sessionsCache;
       }
-      
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (!stored) return [];
-      
-      const sessions = JSON.parse(stored);
-      return sessions.map((session: any) => ({
-        ...session,
-        createdAt: new Date(session.createdAt),
-        updatedAt: new Date(session.updatedAt),
-        messages: session.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }))
-      }));
+
+      const response = await fetch('/api/chat');
+      if (!response.ok) {
+        console.error('[CHAT STORAGE] Failed to fetch sessions:', response.status);
+        return this.sessionsCache || [];
+      }
+
+      const data = await response.json();
+      const sessions = (data.chatSessions || []).map(dbSessionToChatSession);
+
+      // Update cache
+      this.sessionsCache = sessions;
+      this.cacheTimestamp = now;
+
+      return sessions;
     } catch (error) {
-      console.error('Failed to load chat sessions:', error);
-      return [];
+      console.error('[CHAT STORAGE] Failed to load chat sessions:', error);
+      return this.sessionsCache || [];
     }
   }
 
-  // Get current session ID
+  // Get current session ID (UI state - stays in localStorage)
   getCurrentSessionId(): string | null {
-    // Guard against SSR/non-browser environments
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return null;
     }
     return localStorage.getItem(this.CURRENT_SESSION_KEY);
   }
 
-  // Set current session ID
+  // Set current session ID (UI state - stays in localStorage)
   setCurrentSessionId(sessionId: string): void {
-    // Guard against SSR/non-browser environments
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return;
     }
     localStorage.setItem(this.CURRENT_SESSION_KEY, sessionId);
   }
 
-  // Get session by ID
-  getSession(sessionId: string): ChatSession | null {
-    const sessions = this.getSessions();
-    return sessions.find(s => s.id === sessionId) || null;
-  }
+  // Get session by ID from database
+  async getSession(sessionId: string): Promise<ChatSession | null> {
+    try {
+      // First check if session exists in our list
+      const sessions = await this.getSessions();
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) return null;
 
-  // Create new session
-  createSession(title?: string, category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion', chartId?: string): ChatSession {
-    const newSession: ChatSession = {
-      id: this.generateId(),
-      title: title || this.generateSessionTitle(),
-      messages: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      category: category || 'chat',
-      chartId
-    };
+      // Fetch messages for this session
+      const response = await fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}&limit=200`);
+      if (!response.ok) {
+        console.error('[CHAT STORAGE] Failed to fetch session messages:', response.status);
+        return session; // Return session without messages
+      }
 
-    const sessions = this.getSessions();
-    sessions.unshift(newSession); // Add to beginning
-    this.saveSessions(sessions);
-    this.setCurrentSessionId(newSession.id);
+      const data = await response.json();
+      const messages = (data.messages || []).map((m: any) => dbMessageToChatMessage(m, sessionId));
 
-    return newSession;
-  }
-
-  // Add message to session
-  addMessage(sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp' | 'sessionId'>): ChatMessage {
-    const newMessage: ChatMessage = {
-      id: this.generateId(),
-      ...message,
-      timestamp: new Date(),
-      sessionId
-    };
-
-    const sessions = this.getSessions();
-    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
-    
-    if (sessionIndex === -1) {
-      throw new Error('Session not found');
+      return { ...session, messages };
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to load session:', error);
+      return null;
     }
-
-    sessions[sessionIndex].messages.push(newMessage);
-    sessions[sessionIndex].updatedAt = new Date();
-    
-    this.saveSessions(sessions);
-    return newMessage;
   }
 
-  // Update session title
-  updateSessionTitle(sessionId: string, title: string): void {
-    const sessions = this.getSessions();
-    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
-    
-    if (sessionIndex === -1) {
-      throw new Error('Session not found');
+  // Create new session via API
+  async createSession(title?: string, category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion', chartId?: string): Promise<ChatSession> {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'createSession',
+          title: title || this.generateSessionTitle(),
+          category: category || 'chat',
+          chartId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to create session');
+      }
+
+      const data = await response.json();
+      const newSession = dbSessionToChatSession(data.session);
+      newSession.messages = [];
+
+      // Invalidate cache and update current session
+      this.invalidateCache();
+      this.setCurrentSessionId(newSession.id);
+
+      return newSession;
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to create session:', error);
+      throw error;
     }
-
-    sessions[sessionIndex].title = title;
-    sessions[sessionIndex].updatedAt = new Date();
-    
-    this.saveSessions(sessions);
   }
 
-  // Delete session
-  deleteSession(sessionId: string): void {
-    const sessions = this.getSessions();
-    const filteredSessions = sessions.filter(s => s.id !== sessionId);
-    
-    this.saveSessions(filteredSessions);
+  // Add message to session via API
+  async addMessage(sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp' | 'sessionId'>): Promise<ChatMessage> {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'appendMessage',
+          sessionId,
+          message: {
+            role: message.role,
+            content: message.content,
+          },
+        }),
+      });
 
-    // If deleted session was current, clear current session
-    if (this.getCurrentSessionId() === sessionId) {
-      // Guard against SSR/non-browser environments
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to add message');
+      }
+
+      const data = await response.json();
+      const newMessage = dbMessageToChatMessage(data.message, sessionId);
+
+      // Invalidate cache
+      this.invalidateCache();
+
+      return newMessage;
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to add message:', error);
+      throw error;
+    }
+  }
+
+  // Update session title via API
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateSession',
+          sessionId,
+          title,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to update session title');
+      }
+
+      // Invalidate cache
+      this.invalidateCache();
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to update session title:', error);
+      throw error;
+    }
+  }
+
+  // Delete session via API
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatSessionId: sessionId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to delete session');
+      }
+
+      // Invalidate cache
+      this.invalidateCache();
+
+      // If deleted session was current, clear current session
+      if (this.getCurrentSessionId() === sessionId) {
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          localStorage.removeItem(this.CURRENT_SESSION_KEY);
+        }
+      }
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to delete session:', error);
+      throw error;
+    }
+  }
+
+  // Clear all sessions via API
+  async clearAllSessions(): Promise<void> {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to clear sessions');
+      }
+
+      // Invalidate cache and clear localStorage
+      this.invalidateCache();
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         localStorage.removeItem(this.CURRENT_SESSION_KEY);
       }
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to clear sessions:', error);
+      throw error;
     }
   }
 
-  // Clear all sessions
-  clearAllSessions(): void {
-    // Guard against SSR/non-browser environments
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      return;
+  // Search through all messages via API
+  async searchMessages(query: string): Promise<{ session: ChatSession; message: ChatMessage }[]> {
+    try {
+      if (!query.trim()) return [];
+
+      const response = await fetch(`/api/chat?search=${encodeURIComponent(query.trim())}&limit=50`);
+      if (!response.ok) {
+        console.error('[CHAT STORAGE] Failed to search messages:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      return (data.results || []).map((r: any) => ({
+        session: dbSessionToChatSession(r.session),
+        message: dbMessageToChatMessage(r.message, r.session.id),
+      }));
+    } catch (error) {
+      console.error('[CHAT STORAGE] Failed to search messages:', error);
+      return [];
     }
-    localStorage.removeItem(this.STORAGE_KEY);
-    localStorage.removeItem(this.CURRENT_SESSION_KEY);
   }
 
-  // Search through all messages
-  searchMessages(query: string): { session: ChatSession; message: ChatMessage }[] {
-    const sessions = this.getSessions();
-    const results: { session: ChatSession; message: ChatMessage }[] = [];
-
-    sessions.forEach(session => {
-      session.messages.forEach(message => {
-        if (message.content.toLowerCase().includes(query.toLowerCase())) {
-          results.push({ session, message });
-        }
-      });
-    });
-
-    return results;
-  }
-
-  // Get session statistics
-  getSessionStats(): { totalSessions: number; totalMessages: number; lastActivity: Date | null } {
-    const sessions = this.getSessions();
-    const totalMessages = sessions.reduce((sum, session) => sum + session.messages.length, 0);
-    const lastActivity = sessions.length > 0 
+  // Get session statistics (computed from cached sessions)
+  async getSessionStats(): Promise<{ totalSessions: number; totalMessages: number; lastActivity: Date | null }> {
+    const sessions = await this.getSessions();
+    const lastActivity = sessions.length > 0
       ? new Date(Math.max(...sessions.map(s => s.updatedAt.getTime())))
       : null;
 
     return {
       totalSessions: sessions.length,
-      totalMessages,
+      totalMessages: 0, // Messages are not loaded in list view
       lastActivity
     };
   }
 
-  // Export sessions for backup
-  exportSessions(): string {
-    const sessions = this.getSessions();
+  // Export sessions (deprecated - use API directly for backups)
+  async exportSessions(): Promise<string> {
+    console.warn('[CHAT STORAGE] Export is deprecated in DB-backed mode');
+    const sessions = await this.getSessions();
     return JSON.stringify(sessions, null, 2);
   }
 
-  // Import sessions from backup
-  importSessions(jsonData: string): { success: boolean; imported: number } {
-    try {
-      const sessions = JSON.parse(jsonData);
-      
-      if (!Array.isArray(sessions)) {
-        throw new Error('Invalid data format');
-      }
-
-      // Validate session structure
-      const validSessions = sessions.filter((session: any) => {
-        return session.id && session.title && Array.isArray(session.messages);
-      });
-
-      if (validSessions.length === 0) {
-        throw new Error('No valid sessions found');
-      }
-
-      // Merge with existing sessions (avoid duplicates)
-      const existingSessions = this.getSessions();
-      const existingIds = new Set(existingSessions.map(s => s.id));
-      const newSessions = validSessions.filter((s: any) => !existingIds.has(s.id));
-      
-      const allSessions = [...newSessions, ...existingSessions];
-      this.saveSessions(allSessions);
-
-      return { success: true, imported: newSessions.length };
-    } catch (error) {
-      console.error('Failed to import sessions:', error);
-      return { success: false, imported: 0 };
-    }
+  // Import sessions (deprecated - DB is source of truth)
+  async importSessions(_jsonData: string): Promise<{ success: boolean; imported: number }> {
+    console.warn('[CHAT STORAGE] Import is not supported in DB-backed mode');
+    return { success: false, imported: 0 };
   }
 
   // Get plan analysis sessions for a specific plan
-  getPlanAnalysisSessions(planId?: string): ChatSession[] {
-    const sessions = this.getSessions();
+  async getPlanAnalysisSessions(planId?: string): Promise<ChatSession[]> {
+    const sessions = await this.getSessions();
     const planAnalysisSessions = sessions.filter(s => s.category === 'plan_analysis');
-    
+
     if (planId) {
-      // Filter by planId stored in chartId field (reusing existing field)
       return planAnalysisSessions.filter(s => s.chartId === planId);
     }
-    
+
     return planAnalysisSessions;
   }
 
   // Get insight discussion sessions for a specific insight
-  getInsightDiscussionSessions(insightId?: string): ChatSession[] {
-    const sessions = this.getSessions();
+  async getInsightDiscussionSessions(insightId?: string): Promise<ChatSession[]> {
+    const sessions = await this.getSessions();
     const insightDiscussionSessions = sessions.filter(s => s.category === 'insight_discussion');
-    
+
     if (insightId) {
-      // Filter by insightId stored in chartId field (reusing existing field)
       return insightDiscussionSessions.filter(s => s.chartId === insightId);
     }
-    
+
     return insightDiscussionSessions;
   }
 
   // Private helper methods
-  private saveSessions(sessions: ChatSession[]): void {
-    try {
-      // Guard against SSR/non-browser environments
-      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-        return;
-      }
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
-    } catch (error) {
-      console.error('Failed to save chat sessions:', error);
-    }
-  }
-
-  private generateId(): string {
-    return `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
   private generateSessionTitle(): string {
     return `Chat ${formatSessionDate(new Date())}`;
   }

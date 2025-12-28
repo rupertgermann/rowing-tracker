@@ -240,19 +240,42 @@ const Analytics = () => {
   const router = useRouter();
   const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
 
-  // Helper to check if a chart explanation is valid (its chat session still exists)
-  const isExplanationValid = useCallback((chartId: string) => {
-    const explanation = chartExplanations[chartId];
-    if (!explanation) return false;
-    // Verify the linked chat session still exists
-    const session = chatStorage.getSession(explanation.chatSessionId);
-    if (!session) {
-      // Clean up orphaned explanation
-      removeChartExplanationsBySessionId(explanation.chatSessionId);
-      return false;
-    }
-    return true;
+  // Track validity of chart explanations (async check against DB)
+  const [validExplanations, setValidExplanations] = useState<Record<string, boolean>>({});
+
+  // Check validity of all chart explanations when they change
+  useEffect(() => {
+    const checkAllExplanations = async () => {
+      const chartIds = Object.keys(chartExplanations);
+      if (chartIds.length === 0) {
+        setValidExplanations({});
+        return;
+      }
+
+      // Fetch all sessions once for efficiency
+      const sessions = await chatStorage.getSessions();
+      const sessionIds = new Set(sessions.map(s => s.id));
+
+      const validityMap: Record<string, boolean> = {};
+      for (const chartId of chartIds) {
+        const explanation = chartExplanations[chartId];
+        if (explanation && sessionIds.has(explanation.chatSessionId)) {
+          validityMap[chartId] = true;
+        } else if (explanation) {
+          // Clean up orphaned explanation
+          removeChartExplanationsBySessionId(explanation.chatSessionId);
+          validityMap[chartId] = false;
+        }
+      }
+      setValidExplanations(validityMap);
+    };
+    checkAllExplanations();
   }, [chartExplanations, removeChartExplanationsBySessionId]);
+
+  // Helper to check if a chart explanation is valid
+  const isExplanationValid = useCallback((chartId: string) => {
+    return validExplanations[chartId] ?? false;
+  }, [validExplanations]);
   const sessions = getSessions();
   const stats = getStats();
 
