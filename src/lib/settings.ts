@@ -842,14 +842,14 @@ Be specific and actionable. Only include information relevant to rowing training
   private migrateSettings(settings: any): Settings {
     let migratedSettings = { ...settings };
 
-    // Ensure UserPreferences has customPrompts field
-    if (!migratedSettings.userPreferences?.customPrompts) {
-      migratedSettings.userPreferences = {
-        ...this.defaultSettings.userPreferences,
-        ...migratedSettings.userPreferences,
-        customPrompts: migratedSettings.userPreferences?.customPrompts || []
-      };
-    }
+    // Ensure UserPreferences has all required fields
+    migratedSettings.userPreferences = {
+      ...this.defaultSettings.userPreferences,
+      ...migratedSettings.userPreferences,
+      // Explicitly preserve lightModeBrightness if it exists, otherwise use default
+      lightModeBrightness: migratedSettings.userPreferences?.lightModeBrightness ?? this.defaultSettings.userPreferences.lightModeBrightness,
+      customPrompts: migratedSettings.userPreferences?.customPrompts || []
+    };
 
     // Handle AI settings migration from old flat structure to new nested structure
     if (settings.aiSettings) {

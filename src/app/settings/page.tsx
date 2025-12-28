@@ -454,7 +454,7 @@ export default function SettingsPage() {
               id="lightModeBrightness"
               value={[settingsData.userPreferences.lightModeBrightness]}
               onValueChange={(value) => saveSettings('userPreferences', { lightModeBrightness: value[0] })}
-              min={50}
+              min={30}
               max={100}
               step={5}
               disabled={settingsData.userPreferences.theme === 'dark'}
