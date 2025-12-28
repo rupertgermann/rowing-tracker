@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
+import { applyRateLimit } from "@/lib/rateLimit";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -11,6 +12,10 @@ const registerSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Rate limit: 10 requests per minute for auth endpoints
+    const rateLimitResponse = await applyRateLimit(req, null, "auth");
+    if (rateLimitResponse) return rateLimitResponse;
+
     const body = await req.json();
     
     // Validate input

@@ -32,6 +32,25 @@ export function Navigation() {
   const { data: session, status } = useSession();
 
   const handleLogout = async () => {
+    // Clear all app-specific localStorage to prevent stale data on next login
+    if (typeof window !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+          key.startsWith('rowing_') ||
+          key.startsWith('chat_message_collapsed_') ||
+          key.startsWith('selectedWeek_') ||
+          key.startsWith('aiInsightsFeedback_') ||
+          key === 'migrationDismissed' ||
+          key === 'migrationComplete'
+        )) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+
     await signOut({ redirect: false });
     router.push('/auth/login');
   };

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { applyRateLimit } from "@/lib/rateLimit";
 
 type ChatCategory = 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion';
 
@@ -166,13 +167,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    // Rate limit: 20 requests per minute for AI/chat endpoints
+    const rateLimitResponse = await applyRateLimit(req, session.user.id, "ai");
+    if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();
     const action = body?.action as string | undefined;
