@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { Session, SessionStats, PersonalRecord, SessionFilters, StrokeData } from '@/types/session';
+import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
-import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, fetchChartSettingsFromDB, saveChartSettingsToDB } from '@/lib/dataSync';
+import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB } from '@/lib/dataSync';
 import { clearSessionsCache } from '@/lib/services/sessionsCache';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 
@@ -1092,16 +1092,16 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           
           
           // Convert timestamps to Date objects
-          const sessions = data.sessions.map((s: any) => ({
+          const sessions = data.sessions.map((s: Record<string, unknown>) => ({
             ...s,
-            timestamp: new Date(s.timestamp)
+            timestamp: new Date(s.timestamp as string)
           }));
-          
+
           // Calculate PRs from sessions
-          const personalRecords = calculatePersonalRecords(sessions);
-          
+          const personalRecords = calculatePersonalRecords(sessions as Session[]);
+
           // Convert database awards to app format
-          const earnedAwards = data.earnedAwards.map((a: any) => ({
+          const earnedAwards = data.earnedAwards.map((a: { awardId: string; earnedAt: string }) => ({
             awardId: a.awardId,
             earnedAt: new Date(a.earnedAt)
           }));

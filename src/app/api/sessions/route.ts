@@ -191,9 +191,9 @@ export async function POST(req: Request) {
             },
           });
           createdAnyNewSession = true;
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Handle race/duplicate imports gracefully
-          if (err?.code === 'P2002') {
+          if ((err as { code?: string })?.code === 'P2002') {
             const dupe = await prisma.rowingSession.findFirst({
               where: {
                 userId: session.user.id,
@@ -242,7 +242,7 @@ export async function POST(req: Request) {
       if (sessionData.strokeData && Array.isArray(sessionData.strokeData) && sessionData.strokeData.length > 0) {
         console.log(`[SESSIONS API] Bulk inserting ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
 
-        const strokeDataRecords = sessionData.strokeData.map((stroke: any) => ({
+        const strokeDataRecords = sessionData.strokeData.map((stroke: Record<string, unknown>) => ({
           sessionId: sessionRecord.id,
           strokeIndex: stroke.strokeIndex,
           time: stroke.time,

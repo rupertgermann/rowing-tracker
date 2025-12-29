@@ -76,7 +76,7 @@ function calculateStats(sessions: Session[]): SessionStats {
   today.setHours(0, 0, 0, 0);
   
   // Check current streak from today backwards
-  let checkDate = new Date(today);
+  const checkDate = new Date(today);
   while (sessionDates.has(checkDate.toISOString().split('T')[0])) {
     currentStreak++;
     checkDate.setDate(checkDate.getDate() - 1);

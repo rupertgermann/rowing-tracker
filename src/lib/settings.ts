@@ -387,13 +387,13 @@ Be specific and actionable. Only include information relevant to rowing training
           try {
             const parsed = JSON.parse(currentLocalSettings);
             currentApiKey = parsed.aiSettings?.openaiApiKey || '';
-          } catch (e) {
+          } catch {
             console.warn('[SETTINGS] Failed to parse current localStorage settings');
           }
         }
         
         // Check if aiConfig is missing achievementImageColors BEFORE transformation
-        const dbAiConfig = dbSettings.aiConfig as any;
+        const dbAiConfig = dbSettings.aiConfig as Record<string, unknown> | null;
         const needsColorFieldMigration = !dbAiConfig?.achievementImageColors;
         
         // Transform DB settings to app format and cache in localStorage
@@ -431,7 +431,7 @@ Be specific and actionable. Only include information relevant to rowing training
   /**
    * Transform database settings format to app Settings format
    */
-  private transformDBToAppSettings(dbSettings: any): Settings {
+  private transformDBToAppSettings(dbSettings: Record<string, unknown>): Settings {
     return {
       userPreferences: {
         theme: dbSettings.theme || 'system',
@@ -515,7 +515,7 @@ Be specific and actionable. Only include information relevant to rowing training
   /**
    * Transform app Settings format to database format
    */
-  private transformAppToDBSettings(settings: Settings): any {
+  private transformAppToDBSettings(settings: Settings): Record<string, unknown> {
     return {
       theme: settings.userPreferences.theme,
       units: settings.userPreferences.units,
@@ -679,7 +679,7 @@ Be specific and actionable. Only include information relevant to rowing training
   // Reset settings
   resetCategory(category: keyof Omit<Settings, 'version' | 'updatedAt'>): void {
     const settings = this.getSettings();
-    settings[category] = { ...this.defaultSettings[category] } as any;
+    (settings[category] as unknown) = { ...this.defaultSettings[category] };
     settings.updatedAt = new Date();
     this.saveSettings(settings);
   }
@@ -711,7 +711,7 @@ Be specific and actionable. Only include information relevant to rowing training
       this.saveSettings(migrated);
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to import settings' };
     }
   }
@@ -745,7 +745,7 @@ Be specific and actionable. Only include information relevant to rowing training
             };
           }
         }
-      } catch (e) {
+      } catch {
         console.warn('[SETTINGS] Failed to fetch storage usage from API, falling back to local calculation');
       }
 
@@ -863,8 +863,8 @@ Be specific and actionable. Only include information relevant to rowing training
     }, 1000); // 1 second debounce
   }
 
-  private migrateSettings(settings: any): Settings {
-    let migratedSettings = { ...settings };
+  private migrateSettings(settings: Partial<Settings>): Settings {
+    const migratedSettings = { ...settings } as Settings;
 
     // Ensure UserPreferences has all required fields
     migratedSettings.userPreferences = {
@@ -995,14 +995,15 @@ Be specific and actionable. Only include information relevant to rowing training
     return migratedSettings;
   }
 
-  private validateSettings(settings: any): boolean {
+  private validateSettings(settings: unknown): boolean {
     try {
       // Basic structure validation
+      if (!settings || typeof settings !== 'object') return false;
       const requiredKeys = ['userPreferences', 'dataManagement', 'trainingSettings',
         'notificationSettings', 'privacySettings', 'aiSettings'];
 
-      return requiredKeys.every(key => key in settings);
-    } catch (error) {
+      return requiredKeys.every(key => key in (settings as Record<string, unknown>));
+    } catch {
       return false;
     }
   }

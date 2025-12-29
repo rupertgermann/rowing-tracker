@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Session } from '@/types/session';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ function formatPower(watts: number): string {
 }
 
 // Prepare chart data for distance over time
-function prepareChartData(sessions: any[]) {
+function prepareChartData(sessions: Session[]) {
   return sessions
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())

@@ -8,7 +8,6 @@ import { EarnedAward } from '@/lib/awards';
 import {
   getCachedSessions,
   cacheSessionsData,
-  clearSessionsCache,
 } from '@/lib/services/sessionsCache';
 
 export interface SyncResult {
@@ -211,7 +210,7 @@ export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult>
       return { success: false, error: error.error || 'Failed to save sessions' };
     }
 
-    const result = await response.json();
+    await response.json();
     return { success: true };
   } catch (error) {
     console.error('[SYNC] Error saving sessions:', error);
@@ -312,7 +311,7 @@ export async function saveAwardsToDB(awards: EarnedAward[]): Promise<SyncResult>
 /**
  * Fetch training plans from database
  */
-export async function fetchTrainingPlansFromDB(): Promise<any[]> {
+export async function fetchTrainingPlansFromDB(): Promise<Record<string, unknown>[]> {
   try {
     const response = await fetch('/api/training-plans');
     if (!response.ok) {
@@ -329,7 +328,7 @@ export async function fetchTrainingPlansFromDB(): Promise<any[]> {
 /**
  * Save training plans to database
  */
-export async function saveTrainingPlansToDB(plans: any[]): Promise<SyncResult> {
+export async function saveTrainingPlansToDB(plans: Record<string, unknown>[]): Promise<SyncResult> {
   try {
     const response = await fetch('/api/training-plans', {
       method: 'POST',
@@ -352,7 +351,7 @@ export async function saveTrainingPlansToDB(plans: any[]): Promise<SyncResult> {
 /**
  * Fetch AI insights from database
  */
-export async function fetchInsightsFromDB(): Promise<any[]> {
+export async function fetchInsightsFromDB(): Promise<Record<string, unknown>[] & { sessionsRevision?: number; insightsRevision?: number }> {
   try {
     const response = await fetch('/api/insights');
     if (!response.ok) {
@@ -360,8 +359,8 @@ export async function fetchInsightsFromDB(): Promise<any[]> {
     }
     const data = await response.json();
     const insights = data.insights || [];
-    (insights as any).sessionsRevision = data.sessionsRevision ?? 0;
-    (insights as any).insightsRevision = data.insightsRevision ?? 0;
+    (insights as Record<string, unknown>[] & { sessionsRevision?: number; insightsRevision?: number }).sessionsRevision = data.sessionsRevision ?? 0;
+    (insights as Record<string, unknown>[] & { sessionsRevision?: number; insightsRevision?: number }).insightsRevision = data.insightsRevision ?? 0;
     return insights;
   } catch (error) {
     console.error('Error fetching insights:', error);
@@ -373,7 +372,7 @@ export async function fetchInsightsFromDB(): Promise<any[]> {
  * Save AI insights to database
  */
 export async function saveInsightsToDB(
-  insights: any[],
+  insights: Record<string, unknown>[],
   options?: { markAsCurrent?: boolean }
 ): Promise<SyncResult> {
   try {
@@ -398,7 +397,7 @@ export async function saveInsightsToDB(
 /**
  * Fetch chat sessions from database
  */
-export async function fetchChatSessionsFromDB(): Promise<any[]> {
+export async function fetchChatSessionsFromDB(): Promise<Record<string, unknown>[]> {
   try {
     const response = await fetch('/api/chat');
     if (!response.ok) {
@@ -415,7 +414,7 @@ export async function fetchChatSessionsFromDB(): Promise<any[]> {
 /**
  * Fetch chart settings from database
  */
-export async function fetchChartSettingsFromDB(): Promise<any | null> {
+export async function fetchChartSettingsFromDB(): Promise<Record<string, unknown> | null> {
   try {
     const response = await fetch('/api/settings');
     if (!response.ok) {
@@ -432,7 +431,7 @@ export async function fetchChartSettingsFromDB(): Promise<any | null> {
 /**
  * Save chart settings to database
  */
-export async function saveChartSettingsToDB(chartSettings: any): Promise<SyncResult> {
+export async function saveChartSettingsToDB(chartSettings: Record<string, unknown>): Promise<SyncResult> {
   try {
     const response = await fetch('/api/settings', {
       method: 'POST',
@@ -455,7 +454,7 @@ export async function saveChartSettingsToDB(chartSettings: any): Promise<SyncRes
 /**
  * Fetch AI insights archive from database
  */
-export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
+export async function fetchArchivedInsightsFromDB(): Promise<Record<string, unknown>[]> {
   try {
     const response = await fetch('/api/insights');
     if (!response.ok) {
@@ -463,7 +462,7 @@ export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
     }
     const data = await response.json();
     const allInsights = data.insights || [];
-    const archivedInsights = allInsights.filter((insight: any) => insight.archived);
+    const archivedInsights = allInsights.filter((insight: Record<string, unknown>) => insight.archived);
     return archivedInsights;
   } catch (error) {
     console.error('[DATA SYNC DEBUG] Error fetching archived insights:', error);
@@ -474,7 +473,7 @@ export async function fetchArchivedInsightsFromDB(): Promise<any[]> {
 /**
  * Save AI insights archive to database
  */
-export async function saveArchivedInsightsToDB(insights: any[]): Promise<SyncResult> {
+export async function saveArchivedInsightsToDB(insights: Record<string, unknown>[]): Promise<SyncResult> {
   try {
     const response = await fetch('/api/insights', {
       method: 'POST',
@@ -520,7 +519,7 @@ export async function deleteAllInsightsFromDB(): Promise<SyncResult> {
 /**
  * Save chat sessions to database
  */
-export async function saveChatSessionsToDB(chatSessions: any[]): Promise<SyncResult> {
+export async function saveChatSessionsToDB(chatSessions: Record<string, unknown>[]): Promise<SyncResult> {
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',

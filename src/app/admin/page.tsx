@@ -75,8 +75,8 @@ export default function AdminDashboard() {
       setMessage({ type: 'success', text: "User deleted successfully" });
       fetchUsers();
       setSelectedUser(null);
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'An error occurred' });
     } finally {
       setActionLoading(false);
     }
@@ -104,8 +104,8 @@ export default function AdminDashboard() {
       setMessage({ type: 'success', text: "Password reset successfully" });
       setShowResetPassword(false);
       setNewPassword("");
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'An error occurred' });
     } finally {
       setActionLoading(false);
     }
@@ -133,8 +133,8 @@ export default function AdminDashboard() {
 
       setMessage({ type: 'success', text: `User role changed to ${newRole}` });
       fetchUsers();
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'An error occurred' });
     } finally {
       setActionLoading(false);
     }

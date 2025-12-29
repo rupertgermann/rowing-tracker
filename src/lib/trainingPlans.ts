@@ -88,7 +88,7 @@ export class TrainingPlansService {
   async getPlans(): Promise<TrainingPlan[]> {
     try {
       const plans = await fetchTrainingPlansFromDB();
-      return plans.map((plan: any) => this.deserializePlan(plan));
+      return plans.map((plan: Record<string, unknown>) => this.deserializePlan(plan));
     } catch (error) {
       console.error('Failed to load training plans:', error);
       return [];
@@ -113,7 +113,7 @@ export class TrainingPlansService {
               localStorage.setItem(this.ACTIVE_PLAN_KEY, activePlanId);
             }
           }
-        } catch (e) {
+        } catch {
           console.warn('[TRAINING PLANS] Failed to fetch active plan from DB');
         }
       }
@@ -357,7 +357,7 @@ export class TrainingPlansService {
     };
   }
 
-  private serializePlan(plan: TrainingPlan): any {
+  private serializePlan(plan: TrainingPlan): Record<string, unknown> {
     return {
       ...plan,
       createdAt: plan.createdAt.toISOString(),
@@ -366,7 +366,7 @@ export class TrainingPlansService {
     };
   }
 
-  private deserializePlan(plan: any): TrainingPlan {
+  private deserializePlan(plan: Record<string, unknown>): TrainingPlan {
     return {
       ...plan,
       createdAt: new Date(plan.createdAt),

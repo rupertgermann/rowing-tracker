@@ -1,12 +1,11 @@
 import { Session } from '@/types/session';
-import { TrainingPlan, TrainingSession, TrainingWeek, PlanTemplate } from '@/lib/trainingPlans';
+import { TrainingPlan, TrainingWeek } from '@/lib/trainingPlans';
 import { SettingsService } from '@/lib/settings';
 import {
-  DEFAULT_CHAT_SYSTEM_PROMPT,
   DEFAULT_PLAN_GENERATION_PROMPT,
-  DEFAULT_SYSTEM_PROMPT,
-  DEFAULT_INSIGHTS_PROMPT
+  DEFAULT_SYSTEM_PROMPT
 } from '@/lib/aiPromptDefaults';
+import type { AISettings } from '@/lib/settings';
 
 // OpenAI API configuration
 interface OpenAIConfig {
@@ -104,7 +103,7 @@ export interface CloudInsight {
 export class CloudAIService {
   private static instance: CloudAIService;
   private config: OpenAIConfig | null = null;
-  private aiSettings: any = null; // Store AI settings for API calls
+  private aiSettings: AISettings | null = null; // Store AI settings for API calls
 
   private constructor() { }
 
@@ -267,7 +266,7 @@ export class CloudAIService {
       ];
 
       // Prepare initial input messages
-      const messages: any[] = [
+      const messages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: string; file?: { file_data: string; filename: string } }> }> = [
         { role: 'system', content: this.getChatSystemPrompt() },
         ...conversationHistory.slice(-10).map(msg => ({
           role: msg.role,
@@ -278,7 +277,7 @@ export class CloudAIService {
       // Build user message with optional file attachments
       if (attachments && attachments.length > 0) {
         // Multi-part content with files and text
-        const userContent: any[] = [];
+        const userContent: Array<{ type: string; text?: string; image_url?: string; file?: { file_data: string; filename: string } }> = [];
         
         // Supported MIME types for OpenAI file inputs
         const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -335,7 +334,7 @@ export class CloudAIService {
         messages.push({ role: 'user', content: message });
       }
 
-      let currentInput: any = messages;
+      let currentInput: typeof messages | unknown = messages;
       let currentPreviousResponseId = previousResponseId;
       let finalContent = '';
       let finalResponseId = '';
@@ -359,7 +358,7 @@ export class CloudAIService {
         finalResponseId = response.id;
 
         // Check for tool calls
-        const toolCalls = response.output?.filter((item: any) => item.type === 'function_call');
+        const toolCalls = response.output?.filter((item: { type: string }) => item.type === 'function_call');
 
         if (toolCalls && toolCalls.length > 0) {
           // Execute tools and prepare next input
@@ -398,7 +397,7 @@ export class CloudAIService {
 
   // Build GPT-5.1 Responses API request
   private buildRequest(config: ApiRequestConfig): object {
-    const request: any = {
+    const request: Record<string, unknown> = {
       model: config.model, // Use model from config instead of hardcoded
       max_output_tokens: config.maxTokens
     };
@@ -471,7 +470,7 @@ export class CloudAIService {
   }
 
   // Parse GPT-5.1 Responses API response
-  private parseResponse(data: any): string {
+  private parseResponse(data: Record<string, unknown> & { status?: string; incomplete_details?: { reason?: string }; output_text?: string; output?: Array<{ type: string; content?: Array<{ type: string; text?: string }> }> }): string {
     // Check for incomplete response
     if (data.status === 'incomplete') {
       const reason = data.incomplete_details?.reason || 'unknown';
@@ -485,12 +484,12 @@ export class CloudAIService {
 
     // Manual parsing (for HTTP responses)
     const messageOutput = data.output?.find(
-      (item: any) => item.type === 'message'
+      (item: { type: string }) => item.type === 'message'
     );
 
-    if (messageOutput?.content?.length > 0) {
+    if (messageOutput?.content?.length && messageOutput.content.length > 0) {
       const textContent = messageOutput.content.find(
-        (c: any) => c.type === 'output_text'
+        (c: { type: string }) => c.type === 'output_text'
       );
 
       if (textContent?.text) {
@@ -502,7 +501,7 @@ export class CloudAIService {
   }
 
   // Make API call to GPT-5.1 Responses API
-  private async makeApiCall(config: ApiRequestConfig): Promise<any> {
+  private async makeApiCall(config: ApiRequestConfig): Promise<{ id: string; output: Array<{ type: string; content?: Array<{ type: string; text?: string }> }> }> {
     const requestBody = this.buildRequest(config);
 
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -524,10 +523,10 @@ export class CloudAIService {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let finalResponse: any = { id: '', output: [] };
+      let finalResponse: { id: string; output: Array<{ type: string; content?: Array<{ type: string; text?: string }> }> } = { id: '', output: [] };
 
       // Track items being built by index
-      const activeItems: Record<number, any> = {};
+      const activeItems: Record<number, Record<string, unknown>> = {};
 
       try {
         while (true) {
@@ -627,7 +626,7 @@ export class CloudAIService {
   }
 
   // Execute tool calls
-  private async executeTool(name: string, args: any): Promise<any> {
+  private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (name === 'get_sessions') {
       // Dynamic import to avoid circular dependencies if possible, or just use the store
       // Since we're in a class, we can access the store directly via import
@@ -721,7 +720,7 @@ export class CloudAIService {
       const { AWARDS } = await import('@/lib/awards');
       const store = useRowingStore.getState();
 
-      const result: any = {};
+      const result: Record<string, unknown> = {};
 
       // Personal Records
       if (args.includePersonalRecords !== false) {
@@ -792,7 +791,7 @@ export class CloudAIService {
 
 
   // Get system prompt for chat AI trainer
-  private getChatSystemPrompt(sessions?: Session[]): string {
+  private getChatSystemPrompt(_sessions?: Session[]): string {
     return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
 
 CRITICAL FORMATTING RULES - READ CAREFULLY:
@@ -914,7 +913,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
   // Get user's session context for personalized coaching
   // Deprecated: Context is now retrieved via tools
-  private getSessionContext(sessions: Session[]): string {
+  private getSessionContext(_sessions: Session[]): string {
     return '';
   }
 
@@ -930,7 +929,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   }
 
   // Anonymize session data for privacy
-  private anonymizeSessions(sessions: Session[], includeDetails: boolean = false): any[] {
+  private anonymizeSessions(sessions: Session[], includeDetails: boolean = false): Record<string, unknown>[] {
     return sessions.map(session => {
       const baseData = {
         id: session.id, // Include ID for reference
@@ -1045,7 +1044,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   }
 
   // Build user prompt with session data using configurable prompt
-  private buildInsightPrompt(sessions: any[]): string {
+  private buildInsightPrompt(sessions: Record<string, unknown>[]): string {
     // Include more sessions for better progress analysis
     const recentSessions = sessions.slice(-20); // Last 20 sessions for better context
     const sessionSummary = this.createSessionSummary(recentSessions);
@@ -1058,7 +1057,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
     const insightsPrompt = settings.aiSettings.insightsPrompt || this.getDefaultInsightsPrompt();
 
     // Restructure prompt to make analysis task clear
-    let finalPrompt = `You are an expert rowing coach analyzing training data. The user has a specific request below.
+    const finalPrompt = `You are an expert rowing coach analyzing training data. The user has a specific request below.
 
 USER REQUEST:
 ${insightsPrompt}
@@ -1130,7 +1129,7 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
   }
 
   // Create readable session summary for the AI
-  private createSessionSummary(sessions: any[]): string {
+  private createSessionSummary(sessions: Record<string, unknown>[]): string {
     return sessions.map((session, index) => {
       const pace = session.pace ? `${this.formatPace(session.pace)}/500m` : 'N/A';
       const power = session.power ? `${Math.round(session.power)}W` : 'N/A';
@@ -1146,7 +1145,7 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
   }
 
   // Create aggregated training summary for progress analysis
-  private createTrainingSummary(sessions: any[]): string {
+  private createTrainingSummary(sessions: Record<string, unknown>[]): string {
     if (sessions.length === 0) {
       return 'No training data available.';
     }
@@ -1234,7 +1233,7 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       // Ensure we have an array
       const insightsArray = Array.isArray(insightsData) ? insightsData : [insightsData];
 
-      return insightsArray.map((insight: any, index: number) => ({
+      return insightsArray.map((insight: Record<string, unknown>, index: number) => ({
         id: `cloud-insight-${Date.now()}-${index}`,
         type: insight.type || 'recommendation',
         title: insight.title || 'Performance Insight',
@@ -1575,7 +1574,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
   }
 
   // Helper methods for plan generation
-  private parsePlanResponse(response: string): any {
+  private parsePlanResponse(response: string): Record<string, unknown> {
     try {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -1626,7 +1625,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
     return repaired;
   }
 
-  private parsePlanModificationResponse(response: string): any {
+  private parsePlanModificationResponse(response: string): Record<string, unknown> {
     try {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -1640,18 +1639,20 @@ Maintain a supportive, motivational tone while being honest about adherence patt
   }
 
   private createTrainingPlanFromAI(
-    planData: any,
+    planData: Record<string, unknown>,
     goals: string[],
     level: 'beginner' | 'intermediate' | 'advanced',
     focus: 'general_fitness' | 'endurance' | 'speed' | 'strength' | 'competition',
     duration: number
   ): TrainingPlan {
-    const weeks: TrainingWeek[] = planData.weeks.map((weekData: any, index: number) => ({
+    interface WeekDataType { weekNumber: number; focus: string; sessions: Array<{ day: number; type: string; title: string; description: string; duration: number; intensity: string; notes: string }> }
+    interface SessionDataType { day: number; type: string; title: string; description: string; duration: number; intensity: string; notes: string }
+    const weeks: TrainingWeek[] = (planData.weeks as WeekDataType[]).map((weekData: WeekDataType, index: number) => ({
       id: `week_${Date.now()}_${index}`,
       weekNumber: weekData.weekNumber,
       focus: weekData.focus,
-      totalVolume: weekData.sessions.reduce((total: number, session: any) => total + session.duration, 0),
-      sessions: weekData.sessions.map((sessionData: any, sessionIndex: number) => ({
+      totalVolume: weekData.sessions.reduce((total: number, session: SessionDataType) => total + session.duration, 0),
+      sessions: weekData.sessions.map((sessionData: SessionDataType, sessionIndex: number) => ({
         id: `session_${Date.now()}_${index}_${sessionIndex}`,
         day: sessionData.day,
         week: weekData.weekNumber,
@@ -1688,20 +1689,22 @@ Maintain a supportive, motivational tone while being honest about adherence patt
     };
   }
 
-  private applyPlanModifications(plan: TrainingPlan, modifications: any): TrainingPlan {
+  private applyPlanModifications(plan: TrainingPlan, modifications: Record<string, unknown>): TrainingPlan {
     // Apply modifications to the plan
     const updatedPlan = { ...plan };
 
     if (modifications.title) {
-      updatedPlan.title = modifications.title;
+      updatedPlan.title = modifications.title as string;
     }
 
     if (modifications.description) {
-      updatedPlan.description = modifications.description;
+      updatedPlan.description = modifications.description as string;
     }
 
+    interface WeekModType { weekNumber: number; focus?: string; sessionChanges?: Array<{ action: string; session?: unknown; sessionDay?: number }> }
+    interface ChangeType { action: string; session?: unknown; sessionDay?: number }
     if (modifications.weekModifications) {
-      modifications.weekModifications.forEach((weekMod: any) => {
+      (modifications.weekModifications as WeekModType[]).forEach((weekMod: WeekModType) => {
         const weekIndex = updatedPlan.weeks.findIndex(w => w.weekNumber === weekMod.weekNumber);
         if (weekIndex !== -1) {
           if (weekMod.focus) {
@@ -1709,7 +1712,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
           }
 
           if (weekMod.sessionChanges) {
-            weekMod.sessionChanges.forEach((change: any) => {
+            weekMod.sessionChanges.forEach((change: ChangeType) => {
               if (change.action === 'add') {
                 updatedPlan.weeks[weekIndex].sessions.push({
                   id: `session_${Date.now()}`,
@@ -1767,7 +1770,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
 Use this data to create an appropriate plan that matches their current fitness and experience level.`;
   }
 
-  private calculateAdherenceMetrics(plan: TrainingPlan, sessions: Session[]): string {
+  private calculateAdherenceMetrics(plan: TrainingPlan, _sessions: Session[]): string {
     const totalPlannedSessions = plan.progress.totalSessions;
     const completedSessions = plan.progress.completedSessions;
     const adherenceRate = totalPlannedSessions > 0 ? (completedSessions / totalPlannedSessions) * 100 : 0;

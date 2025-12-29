@@ -2,6 +2,10 @@
 
 - fix lint errors "npm run lint"
 
+- deleting training plan does not work. after reload  i see the deleted plan again.
+
+- 
+
 - existing "explain"-chats-links for charts showing data of many sessions should not be re-set when session data changes. f.i. the charts in /analytics should always to to an existing chat, even if the data changed since this chat was created. for single-session charts, a new chat should be created.
 
 - selected segments in Segment Analysis are not stored. they should be stored persistent in the database in the same way as "Select Charts to Display" (ond other chart related settings)

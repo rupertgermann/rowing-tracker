@@ -1,34 +1,28 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef, useCallback, useTransition } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRowingStore, ChartMetric, type SmoothingOption, type AnalyticsChartSettings } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, BarChart3, Waypoints, HelpCircle, ExternalLink, MessageCircle, ZoomIn, ZoomOut } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, RefreshCw, BarChart3, Waypoints, HelpCircle, ZoomIn, ZoomOut } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter } from 'recharts';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { ConsistencyScoreChart } from '@/components/ConsistencyScoreChart';
-import { Insight } from '@/lib/aiAnalysis';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { formatChartDate } from '@/lib/dateTimeUtils';
-import { CloudInsight } from '@/lib/cloudAI';
 import { chartTheme } from '@/lib/chartUtils';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
-import ReactMarkdown from 'react-markdown';
 import { chatStorage } from '@/lib/chatStorage';
 import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
-import { Skeleton } from '@/components/ui/skeleton';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area' | 'scatter';
@@ -168,7 +162,7 @@ function formatPower(watts: number): string {
 
 
 // Prepare chart data for distance over time
-function prepareChartData(sessions: any[]) {
+function prepareChartData(sessions: { timestamp: Date | string; distance: number }[]) {
   return sessions
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -217,7 +211,14 @@ const calculateMovingAverage = (data: number[], windowSize: number): (number | n
 };
 
 // Custom tooltip component with full styling control
-const CustomTooltip = ({ active, payload, label, config, smoothing }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number; payload: { smoothedValue?: number | null } }>;
+  label?: string;
+  config: ChartConfig;
+  smoothing: number;
+}
+const CustomTooltip = ({ active, payload, label, config, smoothing }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const smoothedValue = data.smoothedValue;
@@ -398,7 +399,7 @@ const Analytics = () => {
   }, [analyticsSettings, chartZoom, updateChartSettings]);
 
   // Cache expensive per-session calculations (e.g., consistency score) - computed lazily on demand
-  const consistencyCache = useRef(new Map<string, { dataRef: any; score: number }>());
+  const consistencyCache = useRef(new Map<string, { dataRef: unknown; score: number }>());
 
   // Precompute lightweight derived session values (defer heavy calculations like consistency score)
   const computedSessions = useMemo(() => {
@@ -449,11 +450,11 @@ const Analytics = () => {
 
   // Helper function to capture chart screenshot and navigate to chat
   const handleExplainChart = useCallback(async (
-    chartId: string, 
-    chartTitle: string, 
-    chartDescription: string, 
+    chartId: string,
+    chartTitle: string,
+    chartDescription: string,
     dataContext: string,
-    fullData: any[]
+    fullData: Record<string, unknown>[]
   ) => {
     // Get the custom explain chart prompt from settings
     const aiSettings = SettingsService.getInstance().getAISettings();
@@ -543,7 +544,7 @@ ${explainChartPrompt}`;
   }, [setPendingChartExplanation, router]);
 
   // Helper to generate data context for metric charts
-  const getMetricDataContext = (metric: ChartMetric, chartData: any[]) => {
+  const getMetricDataContext = (metric: ChartMetric, chartData: Record<string, unknown>[]) => {
     if (chartData.length === 0) return 'No data available for this time period.';
     
     const values = chartData.map(d => d[metric]).filter(v => v !== undefined && v !== -1);
@@ -566,7 +567,7 @@ ${explainChartPrompt}`;
   };
 
   // Helper to generate data context for scatter plots
-  const getScatterDataContext = (xLabel: string, yLabel: string, data: any[], xKey: string, yKey: string) => {
+  const getScatterDataContext = (xLabel: string, yLabel: string, data: Record<string, unknown>[], xKey: string, yKey: string) => {
     if (data.length === 0) return 'No data available for this time period.';
     
     const xValues = data.map(d => d[xKey]).filter(v => v !== undefined);
@@ -633,7 +634,7 @@ ${explainChartPrompt}`;
             minSplit: 0,
             avgWork: 0,
             wattPerKg: 0,
-          } as any; // Type assertion to avoid complex Session type issues
+          } as SessionForChart; // Type assertion to avoid complex Session type issues
         })
         .filter(session => {
           const sessionDate = session._timestamp;
@@ -714,9 +715,21 @@ ${explainChartPrompt}`;
   const hasData = (analyticsData?.sessionCount ?? 0) > 0 || sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0 || (analyticsData?.sessionCount ?? 0) > 0;
 
+  // Session type for metric extraction
+  interface SessionForMetric {
+    distance: number;
+    avgSplit: number;
+    avgPower: number;
+    avgStrokeRate: number;
+    energy: number;
+    duration: number;
+    consistencyScore?: number | null;
+    strokeData?: unknown[];
+    id: string;
+  }
   // Get metric value from session based on metric type
   // Consistency score now uses pre-computed value from DB for fast rendering
-  const getMetricValue = useCallback((session: any, metric: ChartMetric): number => {
+  const getMetricValue = useCallback((session: SessionForMetric, metric: ChartMetric): number => {
     switch (metric) {
       case 'distance': return session.distance;
       case 'pace': return session.avgSplit;
@@ -748,8 +761,13 @@ ${explainChartPrompt}`;
     }
   }, []);
 
+  // Session with computed properties for chart preparation
+  interface SessionForChart extends SessionForMetric {
+    timestamp: Date | string;
+    _formattedDate?: string;
+  }
   // Prepare chart data for different metrics (with smoothing)
-  const prepareChartDataWithSmoothing = useCallback((sessions: any[], metric: ChartMetric, smoothing: SmoothingOption) => {
+  const prepareChartDataWithSmoothing = useCallback((sessions: SessionForChart[], metric: ChartMetric, smoothing: SmoothingOption) => {
     const baseData = sessions
       .slice()
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -815,14 +833,14 @@ ${explainChartPrompt}`;
           smoothedValue: d.smoothedValue
         }));
         return acc;
-      }, {} as Record<ChartMetric, any[]>);
+      }, {} as Record<ChartMetric, Record<string, unknown>[]>);
     }
 
     // Fallback: compute from sessions if analytics not loaded
     return orderedEnabledCharts.reduce((acc, metric) => {
-      acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, metric, smoothingValue) : [];
+      acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions as SessionForChart[], metric, smoothingValue) : [];
       return acc;
-    }, {} as Record<ChartMetric, any[]>);
+    }, {} as Record<ChartMetric, Record<string, unknown>[]>);
   }, [analyticsData, orderedEnabledCharts, smoothingValue, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing]);
 
   // Compute dynamic Y-axis domains for each metric (with 10% padding)
@@ -875,7 +893,7 @@ ${explainChartPrompt}`;
   }, [analyticsData, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue]);
 
   // Handle chart data point click
-  const handleChartClick = (data: any, chartData: any[]) => {
+  const handleChartClick = (data: { activeIndex?: number } | null, chartData: Record<string, unknown>[]) => {
     if (data && data.activeIndex !== undefined && chartData[data.activeIndex]) {
       const dataPoint = chartData[data.activeIndex];
       if (dataPoint.sessionId) {
@@ -909,13 +927,21 @@ ${explainChartPrompt}`;
   }, [filteredSessions, analyticsData]);
 
   // Custom scatter tooltip component
-  const ScatterTooltip = ({ active, payload }: any) => {
+  interface ScatterTooltipEntry {
+    name: string;
+    value: number;
+    dataKey: string;
+  }
+  interface ScatterTooltipPayload {
+    payload: { date: string };
+  }
+  const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: (ScatterTooltipEntry & ScatterTooltipPayload)[] }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
         <div style={chartTheme.tooltip.contentStyle}>
           <p style={chartTheme.tooltip.labelStyle}>{data.date}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry: ScatterTooltipEntry, index: number) => (
             <p key={index} style={chartTheme.tooltip.itemStyle}>
               {entry.name}: {
                 entry.dataKey === 'pace' 
@@ -943,7 +969,7 @@ ${explainChartPrompt}`;
   };
 
   // Render chart based on selected type
-  const renderChart = (metric: ChartMetric, chartData: any[], config: ChartConfig) => {
+  const renderChart = (metric: ChartMetric, chartData: Record<string, unknown>[], config: ChartConfig) => {
     // Special handling for Pace Analysis (splitTime) - use SplitTimeChart component
     if (config.isSpecial && metric === 'splitTime') {
       return <SplitTimeChart sessions={filteredSessions} />;
@@ -966,7 +992,7 @@ ${explainChartPrompt}`;
     // Props for Bar/Area charts (need container onClick)
     const barAreaProps = {
       ...commonProps,
-      onClick: (data: any) => handleChartClick(data, chartData)
+      onClick: (data: { activeIndex?: number } | null) => handleChartClick(data, chartData)
     };
 
     const commonChartElements = (
@@ -1050,7 +1076,7 @@ ${explainChartPrompt}`;
               activeDot={{
                 r: 6,
                 cursor: 'pointer',
-                onClick: (e: any, payload: any) => {
+                onClick: (_e: React.MouseEvent, payload: { date: string }) => {
                   const dataIndex = chartData.findIndex(item => item.date === payload.date);
                   if (dataIndex !== -1) {
                     handleChartClick({ activeIndex: dataIndex }, chartData);

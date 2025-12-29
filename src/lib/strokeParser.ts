@@ -37,7 +37,7 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
           }
 
           const parsedData: StrokeData[] = results.data
-            .map((row: any) => {
+            .map((row: Record<string, string | undefined>) => {
               if (!row['Stroke (#)']) return null;
 
               const distance = parseEuropeanNumber(row['Distance (m)']);
@@ -78,7 +78,7 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
           });
 
           resolve({ data: enrichedData });
-        } catch (e) {
+        } catch {
           resolve({ data: [], error: 'Failed to parse stroke data.' });
         }
       },

@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AWARDS } from '@/lib/awards';
 import { SettingsService } from '@/lib/settings';
 
-type ReasoningSetting = 'none' | 'low' | 'medium' | 'high';
-
-type VerbositySetting = 'low' | 'medium' | 'high';
 
 interface SuggestionCriteria {
   type: string;
@@ -23,7 +20,7 @@ interface SuggestionResponse {
   }>;
 }
 
-function extractResponseTextOrJson(data: any): { kind: 'text' | 'json'; value: string } | null {
+function extractResponseTextOrJson(data: Record<string, unknown>): { kind: 'text' | 'json'; value: string } | null {
   if (data?.status === 'incomplete') {
     const reason = data?.incomplete_details?.reason || 'unknown';
     throw new Error(`Response incomplete: ${reason}`);
@@ -41,18 +38,18 @@ function extractResponseTextOrJson(data: any): { kind: 'text' | 'json'; value: s
     if (item?.type !== 'message') continue;
     const content = Array.isArray(item?.content) ? item.content : [];
 
-    const refusal = content.find((c: any) => c?.type === 'refusal');
+    const refusal = content.find((c: { type?: string }) => c?.type === 'refusal');
     if (refusal) {
-      const refusalText = typeof refusal?.refusal === 'string' ? refusal.refusal : 'Model refusal';
+      const refusalText = typeof (refusal as { refusal?: string })?.refusal === 'string' ? (refusal as { refusal: string }).refusal : 'Model refusal';
       throw new Error(refusalText);
     }
 
-    const jsonPart = content.find((c: any) => c?.type === 'output_json' && c?.json);
+    const jsonPart = content.find((c: { type?: string; json?: unknown }) => c?.type === 'output_json' && c?.json);
     if (jsonPart?.json) {
       return { kind: 'json', value: JSON.stringify(jsonPart.json) };
     }
 
-    const textPart = content.find((c: any) => c?.type === 'output_text' && typeof c?.text === 'string');
+    const textPart = content.find((c: { type?: string; text?: string }) => c?.type === 'output_text' && typeof c?.text === 'string');
     if (textPart?.text && textPart.text.trim()) {
       return { kind: 'text', value: textPart.text };
     }

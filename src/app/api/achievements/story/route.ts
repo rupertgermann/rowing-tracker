@@ -100,12 +100,12 @@ Write the achievement story:`;
     } else {
       // Manual parsing
       const messageOutput = data.output?.find(
-        (item: any) => item.type === 'message'
+        (item: { type: string }) => item.type === 'message'
       );
-      
+
       if (messageOutput?.content?.length > 0) {
         const textContent = messageOutput.content.find(
-          (c: any) => c.type === 'output_text'
+          (c: { type: string }) => c.type === 'output_text'
         );
         if (textContent?.text) {
           story = textContent.text;

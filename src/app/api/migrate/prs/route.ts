@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         if (existing) {
           // Update if the local PR is better
           let shouldUpdate = false;
-          const updateData: any = {
+          const updateData: { achievedAt: Date; sessionId: null; bestTime?: number; bestPace?: number; avgPower?: number } = {
             achievedAt: new Date(localPR.achievedAt),
             sessionId: null, // Can't link to old localStorage session
           };
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
           }
         } else {
           // Create new PR
-          const createData: any = {
+          const createData: { userId: string; distance: number; achievedAt: Date; sessionId: null; bestTime?: number; bestPace?: number; avgPower?: number } = {
             userId: session.user.id,
             distance: localPR.distance,
             achievedAt: new Date(localPR.achievedAt),

@@ -93,7 +93,7 @@ export function PeriodComparisonStats() {
     // Determine color based on change
     // Usually positive change is green, negative is red.
     // For inverse metrics (like pace/split time), negative change (faster) is green.
-    let isPositiveGood = !inverse;
+    const isPositiveGood = !inverse;
     let isGood = isPositiveGood ? diff >= 0 : diff <= 0;
     
     // If values are equal

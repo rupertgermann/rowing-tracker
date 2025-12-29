@@ -173,7 +173,7 @@ export function useChat() {
       }
 
       const data = await res.json();
-      const messages = (data.messages || []).map((m: any) => dbMessageToChatMessage(m, sessionId));
+      const messages = (data.messages || []).map((m: Record<string, unknown>) => dbMessageToChatMessage(m, sessionId));
 
       setState(prev => ({
         ...prev,

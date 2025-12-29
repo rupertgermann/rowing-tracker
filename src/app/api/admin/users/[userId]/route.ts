@@ -104,7 +104,7 @@ export async function PATCH(
     }
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: Record<string, string> = {};
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (role !== undefined) updateData.role = role;

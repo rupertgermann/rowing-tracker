@@ -68,7 +68,7 @@ class MemoryStorageService {
       throw new Error(data?.error || 'Failed to fetch memory documents');
     }
     const data = await res.json();
-    const docs = (data.documents || []) as any[];
+    const docs = (data.documents || []) as Record<string, unknown>[];
     return docs.map((d) => this.deserializeDocument(d));
   }
 

@@ -230,7 +230,7 @@ export async function POST(req: Request) {
 
     if (action === 'appendMessage') {
       const sessionId = body?.sessionId as string | undefined;
-      const message = body?.message as any;
+      const message = body?.message as { role?: string; content?: string } | undefined;
       if (!sessionId || !message?.role || !message?.content) {
         return NextResponse.json({ error: 'Invalid appendMessage payload' }, { status: 400 });
       }

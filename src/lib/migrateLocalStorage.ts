@@ -1,8 +1,8 @@
 interface LocalStorageData {
-  sessions?: any[];
-  personalRecords?: any[];
-  trainingPlans?: any[];
-  awards?: any[];
+  sessions?: Record<string, unknown>[];
+  personalRecords?: Record<string, unknown>[];
+  trainingPlans?: Record<string, unknown>[];
+  awards?: Record<string, unknown>[];
 }
 
 export interface MigrationResult {
@@ -112,7 +112,7 @@ function getLocalStorageData(): LocalStorageData {
   return data;
 }
 
-async function migrateSessions(sessions: any[]): Promise<{ count: number; error?: string }> {
+async function migrateSessions(sessions: Record<string, unknown>[]): Promise<{ count: number; error?: string }> {
   try {
     const response = await fetch('/api/migrate/sessions', {
       method: 'POST',
@@ -132,7 +132,7 @@ async function migrateSessions(sessions: any[]): Promise<{ count: number; error?
   }
 }
 
-async function migratePersonalRecords(prs: any[]): Promise<{ count: number; error?: string }> {
+async function migratePersonalRecords(prs: Record<string, unknown>[]): Promise<{ count: number; error?: string }> {
   try {
     const response = await fetch('/api/migrate/prs', {
       method: 'POST',
