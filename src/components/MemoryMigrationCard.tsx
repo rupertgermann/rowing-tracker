@@ -230,7 +230,7 @@ export function MemoryMigrationCard() {
               <Alert className="border-gray-200 bg-gray-50">
                 <AlertTriangle className="h-4 w-4 text-gray-600" />
                 <AlertDescription className="text-gray-800">
-                  You don't have any memory documents yet. Start by uploading PDFs, images, or creating notes.
+                  You don&apos;t have any memory documents yet. Start by uploading PDFs, images, or creating notes.
                 </AlertDescription>
               </Alert>
             )}

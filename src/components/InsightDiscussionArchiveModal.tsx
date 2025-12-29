@@ -88,7 +88,7 @@ export function InsightDiscussionArchiveModal({
               <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-medium mb-2">No Discussions Yet</h3>
               <p className="text-sm text-muted-foreground">
-                Click "Discuss" on an AI insight to start your first discussion.
+                Click &quot;Discuss&quot; on an AI insight to start your first discussion.
               </p>
             </div>
           ) : (

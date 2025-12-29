@@ -469,7 +469,7 @@ export default function UploadPage() {
                   <div>
                     <p className="font-medium">Open SmartRow App</p>
                     <p className="text-sm text-muted-foreground">
-                      Open https://smartrow.fit/ in your browser and ensure you're logged in to your account.
+                      Open https://smartrow.fit/ in your browser and ensure you&apos;re logged in to your account.
                     </p>
                   </div>
                 </div>
@@ -480,9 +480,9 @@ export default function UploadPage() {
                   <div>
                     <p className="font-medium">Export Your Data</p>
                     <p className="text-sm text-muted-foreground">
-                      Go to "My Workouts" → Click "Export All" then click "Spreadsheet .csv file" under "List of your workouts" to download the session list.
-                      After the file was downloaded, click "Export All" again to get the detailed workout data from "Workout files" 
-                      (click ".csv file" again and wait a bit for the download to start).
+                      Go to &quot;My Workouts&quot; → Click &quot;Export All&quot; then click &quot;Spreadsheet .csv file&quot; under &quot;List of your workouts&quot; to download the session list.
+                      After the file was downloaded, click &quot;Export All&quot; again to get the detailed workout data from &quot;Workout files&quot;
+                      (click &quot;.csv file&quot; again and wait a bit for the download to start).
                     </p>
                   </div>
                 </div>

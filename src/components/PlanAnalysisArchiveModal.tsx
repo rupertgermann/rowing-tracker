@@ -88,7 +88,7 @@ export function PlanAnalysisArchiveModal({
               <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-medium mb-2">No Analyses Yet</h3>
               <p className="text-sm text-muted-foreground">
-                Click "Analyze Progress" on your active training plan to generate your first analysis.
+                Click &quot;Analyze Progress&quot; on your active training plan to generate your first analysis.
               </p>
             </div>
           ) : (

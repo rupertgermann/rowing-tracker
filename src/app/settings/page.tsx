@@ -1099,7 +1099,7 @@ export default function SettingsPage() {
               <Alert className="border-green-200 bg-green-50">
                 <Brain className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
-                  <strong>AI Coach is ready!</strong> You'll now receive advanced AI-powered insights
+                  <strong>AI Coach is ready!</strong> You&apos;ll now receive advanced AI-powered insights
                   based on your training data. These insights will appear alongside local analysis
                   in your dashboard and chat.
                 </AlertDescription>
@@ -1723,7 +1723,7 @@ export default function SettingsPage() {
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Local Analysis Only:</strong> You'll receive insights based on statistical
+                  <strong>Local Analysis Only:</strong> You&apos;ll receive insights based on statistical
                   analysis of your training data. Enable Cloud AI for more advanced, personalized recommendations.
                 </AlertDescription>
               </Alert>

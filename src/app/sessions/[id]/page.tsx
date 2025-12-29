@@ -177,7 +177,7 @@ export default function SessionDetailPage() {
               Session Not Found
             </h1>
             <p className="text-muted-foreground mb-8">
-              The session you're looking for doesn't exist or has been deleted.
+              The session you&apos;re looking for doesn&apos;t exist or has been deleted.
             </p>
             <Button asChild>
               <Link href="/sessions">
