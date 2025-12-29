@@ -4,7 +4,7 @@ import { StrokeData } from '@/types/session';
 /**
  * Parse European decimal format (comma to dot)
  */
-function parseEuropeanNumber(value: string): number {
+function parseEuropeanNumber(value: string | undefined): number {
   if (!value || value.trim() === '') return 0;
   const cleaned = value.trim().replace(',', '.');
   const parsed = parseFloat(cleaned);
@@ -36,8 +36,8 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
             return;
           }
 
-          const parsedData: StrokeData[] = results.data
-            .map((row: Record<string, string | undefined>) => {
+          const parsedData: StrokeData[] = (results.data as Record<string, string | undefined>[])
+            .map((row) => {
               if (!row['Stroke (#)']) return null;
 
               const distance = parseEuropeanNumber(row['Distance (m)']);
@@ -48,8 +48,8 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
               // Better: calculate it after mapping or use a closure variable.
               
               return {
-                strokeIndex: parseInt(row['Stroke (#)']),
-                time: parseInt(row['Second (#)']),
+                strokeIndex: parseInt(row['Stroke (#)'] || '0'),
+                time: parseInt(row['Second (#)'] || '0'),
                 timestamp: row['Timestamp (UTC)'],
                 distance: distance,
                 work: parseEuropeanNumber(row['Work (J)']),

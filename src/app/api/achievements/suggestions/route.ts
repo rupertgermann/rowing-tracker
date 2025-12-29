@@ -22,7 +22,8 @@ interface SuggestionResponse {
 
 function extractResponseTextOrJson(data: Record<string, unknown>): { kind: 'text' | 'json'; value: string } | null {
   if (data?.status === 'incomplete') {
-    const reason = data?.incomplete_details?.reason || 'unknown';
+    const incompleteDetails = data?.incomplete_details as { reason?: string } | undefined;
+    const reason = incompleteDetails?.reason || 'unknown';
     throw new Error(`Response incomplete: ${reason}`);
   }
 

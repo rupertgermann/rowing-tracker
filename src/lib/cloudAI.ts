@@ -1,5 +1,5 @@
 import { Session } from '@/types/session';
-import { TrainingPlan, TrainingWeek } from '@/lib/trainingPlans';
+import { TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
 import { SettingsService } from '@/lib/settings';
 import {
   DEFAULT_PLAN_GENERATION_PROMPT,
@@ -165,6 +165,10 @@ export class CloudAIService {
       throw new Error('Cloud AI service not configured');
     }
 
+    if (!this.aiSettings) {
+      throw new Error('AI settings not available');
+    }
+
     try {
       const useCaseConfig = this.aiSettings.chat;
 
@@ -297,15 +301,19 @@ export class CloudAIService {
             // PDF attachment - use input_file
             userContent.push({
               type: 'input_file',
-              filename: attachment.name,
-              file_data: attachment.data
+              file: {
+                filename: attachment.name,
+                file_data: attachment.data
+              }
             });
           } else if (supportedFileTypes.includes(attachment.mimeType)) {
             // Other supported file types
             userContent.push({
               type: 'input_file',
-              filename: attachment.name,
-              file_data: attachment.data
+              file: {
+                filename: attachment.name,
+                file_data: attachment.data
+              }
             });
           } else {
             // Unsupported file type - log warning and skip
@@ -334,7 +342,7 @@ export class CloudAIService {
         messages.push({ role: 'user', content: message });
       }
 
-      let currentInput: typeof messages | unknown = messages;
+      let currentInput: typeof messages = messages;
       let currentPreviousResponseId = previousResponseId;
       let finalContent = '';
       let finalResponseId = '';
@@ -342,7 +350,7 @@ export class CloudAIService {
       // Tool loop - handle up to 5 turns of tool calls
       for (let turn = 0; turn < 5; turn++) {
         const config: ApiRequestConfig = {
-          input: currentInput,
+          input: currentInput as string | Array<{ role: string; content: string }>,
           model: this.mapModel(useCaseConfig.model),
           reasoning: useCaseConfig.reasoning,
           verbosity: useCaseConfig.verbosity,
@@ -358,7 +366,7 @@ export class CloudAIService {
         finalResponseId = response.id;
 
         // Check for tool calls
-        const toolCalls = response.output?.filter((item: { type: string }) => item.type === 'function_call');
+        const toolCalls = response.output?.filter((item: { type: string }) => item.type === 'function_call') as Array<{ type: string; name: string; arguments: string; call_id: string }> | undefined;
 
         if (toolCalls && toolCalls.length > 0) {
           // Execute tools and prepare next input
@@ -376,7 +384,7 @@ export class CloudAIService {
           }
 
           // Feed tool outputs back to model
-          currentInput = toolOutputs;
+          currentInput = toolOutputs as unknown as typeof messages;
           currentPreviousResponseId = response.id;
         } else {
           // No tool calls, just get the text response
@@ -439,7 +447,7 @@ export class CloudAIService {
     request.text = { verbosity: config.verbosity };
 
     if (config.jsonSchema) {
-      request.text.format = {
+      (request.text as { verbosity: string; format?: unknown }).format = {
         type: "json_schema",
         name: config.jsonSchema.name,
         strict: true,
@@ -573,16 +581,22 @@ export class CloudAIService {
                   const index = event.output_index;
                   const partIndex = event.content_index || 0;
                   if (activeItems[index] && activeItems[index].type === 'message') {
-                    if (!activeItems[index].content[partIndex]) {
-                      activeItems[index].content[partIndex] = event.part;
+                    const content = (activeItems[index].content as unknown[]) || [];
+                    if (!content[partIndex]) {
+                      content[partIndex] = event.part;
+                      activeItems[index].content = content;
                     }
                   }
                 } else if (event.type === 'response.content_part.delta') {
                   const index = event.output_index;
                   const partIndex = event.content_index || 0;
                   if (event.delta) {
-                    if (activeItems[index] && activeItems[index].content && activeItems[index].content[partIndex]) {
-                      activeItems[index].content[partIndex].text += event.delta;
+                    const content = activeItems[index]?.content as unknown[] | undefined;
+                    if (activeItems[index] && content && content[partIndex]) {
+                      const part = content[partIndex] as { text?: string };
+                      if (part.text !== undefined) {
+                        part.text += event.delta;
+                      }
                     }
                     config.onToken(event.delta);
                   }
@@ -609,7 +623,7 @@ export class CloudAIService {
       }
 
       // Construct final response object
-      finalResponse.output = Object.values(activeItems);
+      finalResponse.output = Object.values(activeItems) as Array<{ type: string; content?: Array<{ type: string; text?: string }> }>;
 
       // Safeguard: if output is empty, this is an error
       if (!finalResponse.output || finalResponse.output.length === 0) {
@@ -644,19 +658,19 @@ export class CloudAIService {
       let filtered = [...sessions];
 
       if (args.startDate) {
-        const start = new Date(args.startDate);
+        const start = new Date(args.startDate as string);
         filtered = filtered.filter(s => new Date(s.timestamp) >= start);
       }
 
       if (args.endDate) {
-        const end = new Date(args.endDate);
+        const end = new Date(args.endDate as string);
         filtered = filtered.filter(s => new Date(s.timestamp) <= end);
       }
 
       // Sort by date desc
       filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-      const limit = args.limit || 5;
+      const limit = (args.limit as number) || 5;
       return this.anonymizeSessions(filtered.slice(0, limit), includeDetails);
     }
 
@@ -682,7 +696,7 @@ export class CloudAIService {
 
       // Search by query
       if (args.query) {
-        const query = args.query.toLowerCase();
+        const query = (args.query as string).toLowerCase();
         docs = docs.filter(d =>
           d.name.toLowerCase().includes(query) ||
           d.description?.toLowerCase().includes(query) ||
@@ -967,6 +981,10 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
       throw new Error('Cloud AI service not configured');
     }
 
+    if (!this.aiSettings) {
+      throw new Error('AI settings not available');
+    }
+
     if (sessions.length < 3) {
       return [];
     }
@@ -1131,13 +1149,13 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
   // Create readable session summary for the AI
   private createSessionSummary(sessions: Record<string, unknown>[]): string {
     return sessions.map((session, index) => {
-      const pace = session.pace ? `${this.formatPace(session.pace)}/500m` : 'N/A';
-      const power = session.power ? `${Math.round(session.power)}W` : 'N/A';
-      const strokeRate = session.strokeRate ? `${Math.round(session.strokeRate)} spm` : 'N/A';
+      const pace = session.pace ? `${this.formatPace(session.pace as number)}/500m` : 'N/A';
+      const power = session.power ? `${Math.round(session.power as number)}W` : 'N/A';
+      const strokeRate = session.strokeRate ? `${Math.round(session.strokeRate as number)} spm` : 'N/A';
 
-      return `Session ${index + 1} (${session.date}):
-  - Distance: ${session.distance}m
-  - Duration: ${this.formatDuration(session.duration)}
+      return `Session ${index + 1} (${session.date as string}):
+  - Distance: ${session.distance as number}m
+  - Duration: ${this.formatDuration(session.duration as number)}
   - Pace: ${pace}
   - Power: ${power}
   - Stroke Rate: ${strokeRate}`;
@@ -1151,23 +1169,23 @@ CRITICAL: Your response must be ONLY the JSON array. No markdown code blocks, no
     }
 
     const totalSessions = sessions.length;
-    const totalDuration = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
-    const totalDistance = sessions.reduce((sum, s) => sum + (s.distance || 0), 0);
-    const avgPace = sessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / sessions.filter(s => s.pace).length || 0;
-    const avgPower = sessions.filter(s => s.power).reduce((sum, s) => sum + s.power, 0) / sessions.filter(s => s.power).length || 0;
-    const avgStrokeRate = sessions.filter(s => s.strokeRate).reduce((sum, s) => sum + s.strokeRate, 0) / sessions.filter(s => s.strokeRate).length || 0;
+    const totalDuration = sessions.reduce((sum, s) => sum + ((s.duration as number) || 0), 0);
+    const totalDistance = sessions.reduce((sum, s) => sum + ((s.distance as number) || 0), 0);
+    const avgPace = sessions.filter(s => s.pace).reduce((sum, s) => sum + (s.pace as number), 0) / sessions.filter(s => s.pace).length || 0;
+    const avgPower = sessions.filter(s => s.power).reduce((sum, s) => sum + (s.power as number), 0) / sessions.filter(s => s.power).length || 0;
+    const avgStrokeRate = sessions.filter(s => s.strokeRate).reduce((sum, s) => sum + (s.strokeRate as number), 0) / sessions.filter(s => s.strokeRate).length || 0;
 
     // Calculate recent vs older comparisons for progress
     const recentSessions = sessions.slice(-5);
     const olderSessions = sessions.slice(-10, -5);
 
-    const recentAvgPace = recentSessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / recentSessions.filter(s => s.pace).length || 0;
-    const olderAvgPace = olderSessions.filter(s => s.pace).reduce((sum, s) => sum + s.pace, 0) / olderSessions.filter(s => s.pace).length || 0;
+    const recentAvgPace = recentSessions.filter(s => s.pace).reduce((sum, s) => sum + (s.pace as number), 0) / recentSessions.filter(s => s.pace).length || 0;
+    const olderAvgPace = olderSessions.filter(s => s.pace).reduce((sum, s) => sum + (s.pace as number), 0) / olderSessions.filter(s => s.pace).length || 0;
 
     const paceTrend = recentAvgPace < olderAvgPace ? 'improving (faster)' : recentAvgPace > olderAvgPace ? 'declining (slower)' : 'stable';
 
     // Date range
-    const dates = sessions.map(s => new Date(s.date)).sort((a, b) => a.getTime() - b.getTime());
+    const dates = sessions.map(s => new Date(s.date as string)).sort((a, b) => a.getTime() - b.getTime());
     const startDate = dates[0]?.toLocaleDateString();
     const endDate = dates[dates.length - 1]?.toLocaleDateString();
 
@@ -1235,15 +1253,15 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
 
       return insightsArray.map((insight: Record<string, unknown>, index: number) => ({
         id: `cloud-insight-${Date.now()}-${index}`,
-        type: insight.type || 'recommendation',
-        title: insight.title || 'Performance Insight',
-        description: insight.description || 'No description provided',
+        type: (insight.type as string) || 'recommendation',
+        title: (insight.title as string) || 'Performance Insight',
+        description: (insight.description as string) || 'No description provided',
         actionable: Boolean(insight.actionable),
-        priority: insight.priority || 'medium',
+        priority: (insight.priority as string) || 'medium',
         confidence: Math.max(0, Math.min(1, Number(insight.confidence) || 0.5)),
-        evidence: Array.isArray(insight.evidence) ? insight.evidence : [],
+        evidence: Array.isArray(insight.evidence) ? insight.evidence as string[] : [],
         dateGenerated: new Date()
-      }));
+      })) as CloudInsight[];
     } catch (error) {
       console.error('Failed to parse AI response:', error);
       console.error('Response content:', response);
@@ -1273,6 +1291,10 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
   ): Promise<TrainingPlan> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
+    }
+
+    if (!this.aiSettings) {
+      throw new Error('AI settings not available');
     }
 
     try {
@@ -1350,6 +1372,10 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       throw new Error('Cloud AI service not configured');
     }
 
+    if (!this.aiSettings) {
+      throw new Error('AI settings not available');
+    }
+
     try {
       const prompt = this.buildPlanModificationPrompt(plan, modificationRequest, userSessions);
 
@@ -1421,6 +1447,10 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
   ): Promise<string> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
+    }
+
+    if (!this.aiSettings) {
+      throw new Error('AI settings not available');
     }
 
     try {
@@ -1656,22 +1686,22 @@ Maintain a supportive, motivational tone while being honest about adherence patt
         id: `session_${Date.now()}_${index}_${sessionIndex}`,
         day: sessionData.day,
         week: weekData.weekNumber,
-        type: sessionData.type,
+        type: sessionData.type as 'rest' | 'endurance' | 'interval' | 'tempo' | 'recovery' | 'strength' | 'technique',
         title: sessionData.title,
         description: sessionData.description,
         duration: sessionData.duration,
-        intensity: sessionData.intensity,
+        intensity: sessionData.intensity as 'low' | 'moderate' | 'high',
         notes: sessionData.notes,
         completed: false
       })),
       completed: false,
       actualVolume: 0
-    }));
+    })) as TrainingWeek[];
 
     return {
       id: `plan_${Date.now()}`,
-      title: planData.title,
-      description: planData.description,
+      title: planData.title as string,
+      description: planData.description as string,
       goals,
       duration,
       level,
@@ -1679,7 +1709,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
       createdAt: new Date(),
       updatedAt: new Date(),
       weeks,
-      status: 'draft',
+      status: 'draft' as 'draft' | 'active' | 'completed' | 'paused',
       progress: {
         completedWeeks: 0,
         completedSessions: 0,
@@ -1716,23 +1746,23 @@ Maintain a supportive, motivational tone while being honest about adherence patt
               if (change.action === 'add') {
                 updatedPlan.weeks[weekIndex].sessions.push({
                   id: `session_${Date.now()}`,
-                  ...change.session,
+                  ...(change.session as Record<string, unknown>),
                   week: weekMod.weekNumber,
                   completed: false
-                });
+                } as TrainingSession);
               } else if (change.action === 'modify') {
                 const sessionIndex = updatedPlan.weeks[weekIndex].sessions.findIndex(
-                  s => s.day === change.session.day
+                  s => s.day === ((change.session as Record<string, unknown>).day as number)
                 );
                 if (sessionIndex !== -1) {
                   updatedPlan.weeks[weekIndex].sessions[sessionIndex] = {
                     ...updatedPlan.weeks[weekIndex].sessions[sessionIndex],
-                    ...change.session
+                    ...(change.session as Record<string, unknown>)
                   };
                 }
               } else if (change.action === 'remove') {
                 updatedPlan.weeks[weekIndex].sessions = updatedPlan.weeks[weekIndex].sessions.filter(
-                  s => s.day !== change.session.day
+                  s => s.day !== ((change.session as Record<string, unknown>).day as number)
                 );
               }
             });

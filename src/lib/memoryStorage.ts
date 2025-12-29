@@ -68,7 +68,7 @@ class MemoryStorageService {
       throw new Error(data?.error || 'Failed to fetch memory documents');
     }
     const data = await res.json();
-    const docs = (data.documents || []) as Record<string, unknown>[];
+    const docs = (data.documents || []) as MemoryDocument[];
     return docs.map((d) => this.deserializeDocument(d));
   }
 
@@ -103,7 +103,7 @@ class MemoryStorageService {
     }
 
     const data = await res.json();
-    return this.deserializeDocument(data.document);
+    return this.deserializeDocument(data.document as MemoryDocument);
   }
 
   async addSystemDocument(
@@ -148,7 +148,7 @@ class MemoryStorageService {
     }
 
     const data = await res.json();
-    const docs = data.documents || [];
+    const docs = (data.documents || []) as MemoryDocument[];
     if (docs.length === 0) {
       throw new Error('Failed to save system document');
     }
@@ -190,7 +190,7 @@ class MemoryStorageService {
     }
 
     const data = await res.json();
-    const docs = data.documents || [];
+    const docs = (data.documents || []) as MemoryDocument[];
     return docs.length > 0 ? this.deserializeDocument(docs[0]) : null;
   }
 

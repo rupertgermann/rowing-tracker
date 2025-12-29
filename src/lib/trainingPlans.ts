@@ -327,7 +327,7 @@ export class TrainingPlansService {
   private async savePlans(plans: TrainingPlan[]): Promise<void> {
     try {
       console.log('[TRAINING PLANS] Saving plans to database:', plans.length);
-      await saveTrainingPlansToDB(plans);
+      await saveTrainingPlansToDB(plans as unknown as Record<string, unknown>[]);
     } catch (error) {
       console.error('Failed to save training plans:', error);
     }
@@ -369,17 +369,17 @@ export class TrainingPlansService {
   private deserializePlan(plan: Record<string, unknown>): TrainingPlan {
     return {
       ...plan,
-      createdAt: new Date(plan.createdAt),
-      updatedAt: new Date(plan.updatedAt),
-      startDate: plan.startDate ? new Date(plan.startDate) : undefined,
+      createdAt: new Date(plan.createdAt as string | Date),
+      updatedAt: new Date(plan.updatedAt as string | Date),
+      startDate: plan.startDate ? new Date(plan.startDate as string | Date) : undefined,
       // Transform flat progress fields into nested progress object
       progress: {
-        completedWeeks: plan.completedWeeks || 0,
-        completedSessions: plan.completedSessions || 0,
-        totalSessions: plan.totalSessions || 0,
-        adherenceRate: plan.adherenceRate || 0,
+        completedWeeks: (plan.completedWeeks as number) || 0,
+        completedSessions: (plan.completedSessions as number) || 0,
+        totalSessions: (plan.totalSessions as number) || 0,
+        adherenceRate: (plan.adherenceRate as number) || 0,
       }
-    };
+    } as TrainingPlan;
   }
 
   // Template generators

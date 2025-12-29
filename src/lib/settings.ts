@@ -434,57 +434,63 @@ Be specific and actionable. Only include information relevant to rowing training
   private transformDBToAppSettings(dbSettings: Record<string, unknown>): Settings {
     return {
       userPreferences: {
-        theme: dbSettings.theme || 'system',
-        lightModeBrightness: dbSettings.lightModeBrightness ?? 100,
-        units: dbSettings.units || 'metric',
-        dateFormat: dbSettings.dateFormat || 'MM/DD/YYYY',
-        timeFormat: dbSettings.timeFormat || '24h',
-        language: dbSettings.language || 'en',
-        timeZone: dbSettings.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-        defaultChartType: dbSettings.defaultChartType || 'line',
-        animationsEnabled: dbSettings.animationsEnabled !== false,
-        showPromptSuggestions: dbSettings.showPromptSuggestions !== false,
-        customPrompts: dbSettings.customPrompts || []
+        theme: (dbSettings.theme as 'light' | 'dark' | 'system') || 'system',
+        lightModeBrightness: (dbSettings.lightModeBrightness as number) ?? 100,
+        units: (dbSettings.units as 'metric' | 'imperial') || 'metric',
+        dateFormat: (dbSettings.dateFormat as 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD') || 'MM/DD/YYYY',
+        timeFormat: (dbSettings.timeFormat as '12h' | '24h') || '24h',
+        language: (dbSettings.language as 'en' | 'es' | 'fr' | 'de') || 'en',
+        timeZone: (dbSettings.timeZone as string) || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        defaultChartType: (dbSettings.defaultChartType as 'line' | 'bar' | 'area') || 'line',
+        animationsEnabled: (dbSettings.animationsEnabled as boolean) !== false,
+        showPromptSuggestions: (dbSettings.showPromptSuggestions as boolean) !== false,
+        customPrompts: (dbSettings.customPrompts as string[]) || []
       },
       dataManagement: {
         ...this.defaultSettings.dataManagement,
-        exportFormat: dbSettings.exportFormat || 'json',
-        backupEnabled: dbSettings.backupEnabled || false,
-        lastBackup: dbSettings.lastBackup ? new Date(dbSettings.lastBackup) : null,
+        exportFormat: (dbSettings.exportFormat as 'json' | 'csv') || 'json',
+        backupEnabled: (dbSettings.backupEnabled as boolean) || false,
+        lastBackup: dbSettings.lastBackup ? new Date(dbSettings.lastBackup as string) : null,
       },
       trainingSettings: {
         ...this.defaultSettings.trainingSettings,
-        defaultTrainingZones: dbSettings.trainingZones || this.defaultSettings.trainingSettings.defaultTrainingZones,
-        preferredMetrics: dbSettings.preferredMetrics || this.defaultSettings.trainingSettings.preferredMetrics,
+        defaultTrainingZones: (dbSettings.trainingZones as {
+          zone1: { min: number; max: number };
+          zone2: { min: number; max: number };
+          zone3: { min: number; max: number };
+          zone4: { min: number; max: number };
+          zone5: { min: number; max: number };
+        }) || this.defaultSettings.trainingSettings.defaultTrainingZones,
+        preferredMetrics: (dbSettings.preferredMetrics as ('pace' | 'power' | 'strokeRate' | 'heartRate')[]) || this.defaultSettings.trainingSettings.preferredMetrics,
         weeklyGoal: {
-          type: dbSettings.weeklyGoalType || 'sessions',
-          target: dbSettings.weeklyGoalTarget || 3
+          type: (dbSettings.weeklyGoalType as 'sessions' | 'distance' | 'duration') || 'sessions',
+          target: (dbSettings.weeklyGoalTarget as number) || 3
         },
-        restDayAlerts: dbSettings.restDayAlerts !== false,
-        adaptationEnabled: dbSettings.adaptationEnabled !== false
+        restDayAlerts: (dbSettings.restDayAlerts as boolean) !== false,
+        adaptationEnabled: (dbSettings.adaptationEnabled as boolean) !== false
       },
       notificationSettings: {
-        sessionReminders: dbSettings.sessionReminders || false,
-        weeklyProgress: dbSettings.weeklyProgress !== false,
-        achievementAlerts: dbSettings.achievementAlerts !== false,
-        planReminders: dbSettings.planReminders !== false,
-        adherenceAlerts: dbSettings.adherenceAlerts !== false,
+        sessionReminders: (dbSettings.sessionReminders as boolean) || false,
+        weeklyProgress: (dbSettings.weeklyProgress as boolean) !== false,
+        achievementAlerts: (dbSettings.achievementAlerts as boolean) !== false,
+        planReminders: (dbSettings.planReminders as boolean) || false,
+        adherenceAlerts: (dbSettings.adherenceAlerts as boolean) || false,
         emailNotifications: this.defaultSettings.notificationSettings.emailNotifications
       },
       privacySettings: this.defaultSettings.privacySettings,
       aiSettings: {
         ...this.defaultSettings.aiSettings,
-        cloudAIEnabled: dbSettings.cloudAIEnabled || false,
+        cloudAIEnabled: (dbSettings.cloudAIEnabled as boolean) || false,
         // Note: openaiApiKey is NOT loaded from DB - it's kept local only
         // Will be preserved from localStorage if present
-        maxTokens: dbSettings.maxTokens || 4000,
-        userProfileContext: dbSettings.userProfileContext || '',
-        userProfileRawInput: dbSettings.userProfileRawInput || '',
-        ...(dbSettings.aiConfig || {}),
-        ...(dbSettings.customPromptsAi || {})
+        maxTokens: (dbSettings.maxTokens as number) || 4000,
+        userProfileContext: (dbSettings.userProfileContext as string) || '',
+        userProfileRawInput: (dbSettings.userProfileRawInput as string) || '',
+        ...(dbSettings.aiConfig as Record<string, unknown> || {}),
+        ...(dbSettings.customPromptsAi as Record<string, unknown> || {})
       },
       version: this.CURRENT_VERSION,
-      updatedAt: new Date(dbSettings.updatedAt || Date.now())
+      updatedAt: new Date((dbSettings.updatedAt as string) || Date.now())
     };
   }
 
@@ -877,7 +883,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
     // Handle AI settings migration from old flat structure to new nested structure
     if (settings.aiSettings) {
-      const oldAiSettings = settings.aiSettings;
+      const oldAiSettings = settings.aiSettings as AISettings & { model?: string; temperature?: number };
 
       // Check if this is the old format (has flat model/temperature properties)
       if (oldAiSettings.model || oldAiSettings.temperature !== undefined) {

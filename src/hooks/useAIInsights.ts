@@ -604,7 +604,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
           // Persist insights to DB (source of truth) - AWAIT to ensure save completes
           try {
-            await saveInsightsToDB(updatedResult.insights || [], { markAsCurrent: true });
+            await saveInsightsToDB((updatedResult.insights || []) as Record<string, unknown>[], { markAsCurrent: true });
             // Update the DB active insights count so we don't regenerate on next check
             setDbActiveInsightsCount(updatedResult.insights?.length || 0);
           } catch (err) {
@@ -644,7 +644,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
           // IMPORTANT: Also save fallback results to DB with markAsCurrent to prevent re-regeneration
           try {
-            await saveInsightsToDB(localResult.insights || [], { markAsCurrent: true });
+            await saveInsightsToDB((localResult.insights || []) as Record<string, unknown>[], { markAsCurrent: true });
             setDbActiveInsightsCount(localResult.insights?.length || 0);
           } catch (err) {
             console.warn('[useAIInsights] Failed to save fallback insights to database:', err);

@@ -23,6 +23,7 @@ import { DateRange } from 'react-day-picker';
 import { chatStorage } from '@/lib/chatStorage';
 import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
+import { StrokeData, Session } from '@/types/session';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area' | 'scatter';
@@ -546,10 +547,10 @@ ${explainChartPrompt}`;
   // Helper to generate data context for metric charts
   const getMetricDataContext = (metric: ChartMetric, chartData: Record<string, unknown>[]) => {
     if (chartData.length === 0) return 'No data available for this time period.';
-    
-    const values = chartData.map(d => d[metric]).filter(v => v !== undefined && v !== -1);
+
+    const values = chartData.map(d => d[metric]).filter((v): v is number => typeof v === 'number' && v !== -1);
     if (values.length === 0) return 'No valid data points available.';
-    
+
     const config = chartConfigs[metric];
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -569,10 +570,10 @@ ${explainChartPrompt}`;
   // Helper to generate data context for scatter plots
   const getScatterDataContext = (xLabel: string, yLabel: string, data: Record<string, unknown>[], xKey: string, yKey: string) => {
     if (data.length === 0) return 'No data available for this time period.';
-    
-    const xValues = data.map(d => d[xKey]).filter(v => v !== undefined);
-    const yValues = data.map(d => d[yKey]).filter(v => v !== undefined);
-    
+
+    const xValues = data.map(d => d[xKey]).filter((v): v is number => typeof v === 'number');
+    const yValues = data.map(d => d[yKey]).filter((v): v is number => typeof v === 'number');
+
     if (xValues.length === 0) return 'No valid data points available.';
     
     return `- Time period: ${timeRange === 'all' ? 'All time' : defaultTimeRangeOptions.find(o => o.value === timeRange)?.label}
@@ -637,8 +638,9 @@ ${explainChartPrompt}`;
           } as SessionForChart; // Type assertion to avoid complex Session type issues
         })
         .filter(session => {
-          const sessionDate = session._timestamp;
-          
+          const sessionDate = session._timestamp || new Date(session.timestamp);
+          const sessionMs = session._timestampMs || sessionDate.getTime();
+
           // If custom date range is set, use it
           if (dateRange?.from) {
             if (sessionDate < dateRange.from) return false;
@@ -649,7 +651,7 @@ ${explainChartPrompt}`;
             }
             return true;
           }
-          
+
           // Otherwise use the fixed time range
           if (timeRange === 'all') return true;
 
@@ -658,7 +660,7 @@ ${explainChartPrompt}`;
           if (!daysAgo) return true;
 
           const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
-          return session._timestampMs >= cutoffDate.getTime();
+          return sessionMs >= cutoffDate.getTime();
         });
     }
     
@@ -721,6 +723,7 @@ ${explainChartPrompt}`;
     avgSplit: number;
     avgPower: number;
     avgStrokeRate: number;
+    avgStrokeLength: number;
     energy: number;
     duration: number;
     consistencyScore?: number | null;
@@ -751,7 +754,7 @@ ${explainChartPrompt}`;
           if (cached && cached.dataRef === session.strokeData) {
             return cached.score;
           }
-          const score = calculateAdvancedStats(session.strokeData).consistencyScore;
+          const score = calculateAdvancedStats(session.strokeData as StrokeData[]).consistencyScore;
           consistencyCache.current.set(cacheKey, { dataRef: session.strokeData, score });
           return score;
         }
@@ -764,6 +767,8 @@ ${explainChartPrompt}`;
   // Session with computed properties for chart preparation
   interface SessionForChart extends SessionForMetric {
     timestamp: Date | string;
+    _timestamp?: Date;
+    _timestampMs?: number;
     _formattedDate?: string;
   }
   // Prepare chart data for different metrics (with smoothing)
@@ -972,7 +977,7 @@ ${explainChartPrompt}`;
   const renderChart = (metric: ChartMetric, chartData: Record<string, unknown>[], config: ChartConfig) => {
     // Special handling for Pace Analysis (splitTime) - use SplitTimeChart component
     if (config.isSpecial && metric === 'splitTime') {
-      return <SplitTimeChart sessions={filteredSessions} />;
+      return <SplitTimeChart sessions={filteredSessions as Session[]} />;
     }
 
     const smoothing = smoothingValue;
@@ -992,7 +997,7 @@ ${explainChartPrompt}`;
     // Props for Bar/Area charts (need container onClick)
     const barAreaProps = {
       ...commonProps,
-      onClick: (data: { activeIndex?: number } | null) => handleChartClick(data, chartData)
+      onClick: (data: Record<string, unknown> | null) => handleChartClick(data as { activeIndex?: number } | null, chartData)
     };
 
     const commonChartElements = (
@@ -1073,16 +1078,7 @@ ${explainChartPrompt}`;
               stroke={config.color}
               strokeWidth={2}
               dot={{ fill: config.color, strokeWidth: 2, r: 4, cursor: 'pointer' }}
-              activeDot={{
-                r: 6,
-                cursor: 'pointer',
-                onClick: (_e: React.MouseEvent, payload: { date: string }) => {
-                  const dataIndex = chartData.findIndex(item => item.date === payload.date);
-                  if (dataIndex !== -1) {
-                    handleChartClick({ activeIndex: dataIndex }, chartData);
-                  }
-                }
-              }}
+              activeDot={{ r: 6, cursor: 'pointer' }}
             />
             {hasSmoothing && (
               <Line
@@ -1587,7 +1583,7 @@ ${explainChartPrompt}`;
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <SplitTimeChart sessions={filteredSessions} embedded />
+                      <SplitTimeChart sessions={filteredSessions as Session[]} embedded />
                     </CardContent>
                   </Card>
 

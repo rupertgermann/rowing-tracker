@@ -35,9 +35,8 @@ export async function POST(req: Request) {
         if (existing) {
           // Update if the local PR is better
           let shouldUpdate = false;
-          const updateData: { achievedAt: Date; sessionId: null; bestTime?: number; bestPace?: number; avgPower?: number } = {
+          const updateData: { achievedAt: Date; bestTime?: number; bestPace?: number; avgPower?: number } = {
             achievedAt: new Date(localPR.achievedAt),
-            sessionId: null, // Can't link to old localStorage session
           };
 
           // Update based on record type
@@ -60,30 +59,9 @@ export async function POST(req: Request) {
             migratedCount++;
           }
         } else {
-          // Create new PR
-          const createData: { userId: string; distance: number; achievedAt: Date; sessionId: null; bestTime?: number; bestPace?: number; avgPower?: number } = {
-            userId: session.user.id,
-            distance: localPR.distance,
-            achievedAt: new Date(localPR.achievedAt),
-            sessionId: null,
-          };
-
-          // Set value based on record type
-          if (localPR.recordType === 'time') {
-            createData.bestTime = localPR.value;
-          } else if (localPR.recordType === 'pace') {
-            createData.bestPace = localPR.value;
-          } else if (localPR.recordType === 'power') {
-            createData.avgPower = localPR.value;
-          } else {
-            // Default to time if no record type specified
-            createData.bestTime = localPR.value;
-          }
-
-          await prisma.personalRecord.create({
-            data: createData,
-          });
-          migratedCount++;
+          // Skip creating new PRs from localStorage migration
+          // PersonalRecord schema requires sessionId which we don't have for old localStorage data
+          console.log(`Skipping creation of PR for distance ${localPR.distance} - no sessionId available`);
         }
       } catch (error) {
         console.error(`Error migrating PR ${localPR.distance}:`, error);

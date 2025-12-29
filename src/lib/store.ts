@@ -1092,18 +1092,18 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           
           
           // Convert timestamps to Date objects
-          const sessions = data.sessions.map((s: Record<string, unknown>) => ({
+          const sessions = data.sessions.map((s) => ({
             ...s,
-            timestamp: new Date(s.timestamp as string)
+            timestamp: new Date(s.timestamp as string | Date)
           }));
 
           // Calculate PRs from sessions
           const personalRecords = calculatePersonalRecords(sessions as Session[]);
 
           // Convert database awards to app format
-          const earnedAwards = data.earnedAwards.map((a: { awardId: string; earnedAt: string }) => ({
+          const earnedAwards = data.earnedAwards.map((a) => ({
             awardId: a.awardId,
-            earnedAt: new Date(a.earnedAt)
+            earnedAt: new Date(a.earnedAt as string | Date)
           }));
           
           // Load generated achievements into the achievement store
@@ -1128,7 +1128,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           }
           
           // Load chart settings from database, or use defaults
-          const chartSettings = data.chartSettings || defaultChartSettings;
+          const chartSettings = (data.chartSettings as unknown as ChartSettings | undefined) || defaultChartSettings;
           
           
           set({
