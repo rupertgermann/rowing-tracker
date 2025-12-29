@@ -1,8 +1,21 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
-
 // =============================================================================
-// FILESYSTEM-BASED IMAGE STORAGE (New approach)
-// Images are stored as real files in public/assets/awards/
+// ACHIEVEMENT IMAGE STORAGE (Filesystem + Database)
+// =============================================================================
+//
+// Architecture:
+// - Image files are stored on filesystem at /public/assets/awards/
+// - Image metadata is stored in database (GeneratedAchievement model)
+// - Images are saved/deleted via API endpoints
+//
+// Main Functions:
+// - storeAchievementImage() - saves image file via API
+// - getAchievementImage() - checks if image exists on filesystem
+// - deleteAchievementImage() - deletes image file via API
+// - getAwardImagePath() - returns public URL path for an image
+//
+// Legacy Migration (IndexedDB):
+// - Migration functions are kept at the bottom for users with old IndexedDB data
+// - These should only be used during one-time migration
 // =============================================================================
 
 /**
@@ -15,6 +28,7 @@ export function getAwardImagePath(awardId: string): string {
 
 /**
  * Store an achievement image to the filesystem via API
+ * Image metadata is stored separately in the database via /api/generated-achievements
  */
 export async function storeAchievementImage(awardId: string, imageData: string): Promise<string> {
   const response = await fetch('/api/achievements/image/save', {
@@ -38,7 +52,7 @@ export async function storeAchievementImage(awardId: string, imageData: string):
  */
 export async function getAchievementImage(awardId: string): Promise<string | null> {
   const imagePath = getAwardImagePath(awardId);
-  
+
   try {
     // Check if the image exists by making a HEAD request
     const response = await fetch(imagePath, { method: 'HEAD' });
@@ -53,6 +67,7 @@ export async function getAchievementImage(awardId: string): Promise<string | nul
 
 /**
  * Delete an achievement image from the filesystem via API
+ * Note: This only deletes the image file, not the database record
  */
 export async function deleteAchievementImage(awardId: string): Promise<void> {
   try {
@@ -67,9 +82,14 @@ export async function deleteAchievementImage(awardId: string): Promise<void> {
 }
 
 // =============================================================================
-// INDEXEDDB LEGACY STORAGE (For migration purposes only)
-// These functions are kept to read existing images from IndexedDB during migration
+// LEGACY INDEXEDDB MIGRATION FUNCTIONS
 // =============================================================================
+// These functions are kept for migrating old IndexedDB data to filesystem.
+// They should only be used during one-time migration from the Settings page.
+// After migration is complete, the IndexedDB data can be cleared.
+// =============================================================================
+
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
 interface AchievementImageDB extends DBSchema {
   images: {
@@ -102,7 +122,8 @@ function getDB(): Promise<IDBPDatabase<AchievementImageDB>> {
 }
 
 /**
- * Get an image from IndexedDB (legacy - for migration)
+ * @deprecated Legacy function for migration only
+ * Get an image from IndexedDB
  */
 export async function getAchievementImageFromIndexedDB(awardId: string): Promise<string | null> {
   try {
@@ -116,7 +137,8 @@ export async function getAchievementImageFromIndexedDB(awardId: string): Promise
 }
 
 /**
- * Get all stored achievement image IDs from IndexedDB (legacy - for migration)
+ * @deprecated Legacy function for migration only
+ * Get all stored achievement image IDs from IndexedDB
  */
 export async function getAllAchievementImageIdsFromIndexedDB(): Promise<string[]> {
   try {
@@ -129,7 +151,8 @@ export async function getAllAchievementImageIdsFromIndexedDB(): Promise<string[]
 }
 
 /**
- * Delete an image from IndexedDB (legacy - for migration cleanup)
+ * @deprecated Legacy function for migration only
+ * Delete an image from IndexedDB
  */
 export async function deleteAchievementImageFromIndexedDB(awardId: string): Promise<void> {
   try {
@@ -141,7 +164,8 @@ export async function deleteAchievementImageFromIndexedDB(awardId: string): Prom
 }
 
 /**
- * Clear all achievement images from IndexedDB (legacy - for migration cleanup)
+ * @deprecated Legacy function for migration only
+ * Clear all achievement images from IndexedDB
  */
 export async function clearAllAchievementImagesFromIndexedDB(): Promise<void> {
   try {
@@ -153,6 +177,7 @@ export async function clearAllAchievementImagesFromIndexedDB(): Promise<void> {
 }
 
 /**
+ * @deprecated Legacy function for migration only
  * Migrate all images from IndexedDB to filesystem
  * Returns the number of images migrated
  */

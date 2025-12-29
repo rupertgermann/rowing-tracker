@@ -73,28 +73,32 @@ export default function PlansPage() {
 
   // Auto-select current week when active plan changes
   useEffect(() => {
-    if (activePlan && activePlan.weeks.length > 0) {
-      // Try to restore selected week from localStorage
-      const savedWeekId = localStorage.getItem(`selectedWeek_${activePlan.id}`);
-      if (savedWeekId) {
-        const savedWeek = activePlan.weeks.find(w => w.id === savedWeekId);
-        if (savedWeek) {
-          setSelectedWeek(savedWeek);
-          return;
+    const selectWeek = async () => {
+      if (activePlan && activePlan.weeks.length > 0) {
+        // Try to restore selected week from localStorage
+        const savedWeekId = localStorage.getItem(`selectedWeek_${activePlan.id}`);
+        if (savedWeekId) {
+          const savedWeek = activePlan.weeks.find(w => w.id === savedWeekId);
+          if (savedWeek) {
+            setSelectedWeek(savedWeek);
+            return;
+          }
         }
-      }
-      
-      // Try to get current week based on start date
-      const currentWeek = trainingPlans.getCurrentWeek();
-      if (currentWeek) {
-        setSelectedWeek(currentWeek);
+        
+        // Try to get current week based on start date
+        const currentWeek = await trainingPlans.getCurrentWeek();
+        if (currentWeek) {
+          setSelectedWeek(currentWeek);
+        } else {
+          // Fallback to first week if no current week found
+          setSelectedWeek(activePlan.weeks[0]);
+        }
       } else {
-        // Fallback to first week if no current week found
-        setSelectedWeek(activePlan.weeks[0]);
+        setSelectedWeek(null);
       }
-    } else {
-      setSelectedWeek(null);
-    }
+    };
+    
+    selectWeek();
   }, [activePlan]);
 
   // Save selected week to localStorage when it changes
@@ -104,10 +108,10 @@ export default function PlansPage() {
     }
   }, [selectedWeek, activePlan]);
 
-  const loadPlans = () => {
+  const loadPlans = async () => {
     try {
-      const allPlans = trainingPlans.getPlans();
-      const active = trainingPlans.getActivePlan();
+      const allPlans = await trainingPlans.getPlans();
+      const active = await trainingPlans.getActivePlan();
       setPlans(allPlans);
       setActivePlan(active);
       setError(null);
@@ -141,8 +145,8 @@ export default function PlansPage() {
           userSessions
         );
 
-        // Save AI-generated plan to localStorage
-        trainingPlans.createPlan({
+        // Save AI-generated plan to database
+        newPlan = await trainingPlans.createPlan({
           title: newPlan.title,
           description: newPlan.description,
           goals: newPlan.goals,
@@ -162,7 +166,7 @@ export default function PlansPage() {
         }
 
         const goals = planForm.goals.split(',').map(g => g.trim()).filter(g => g);
-        newPlan = trainingPlans.createPlan({
+        newPlan = await trainingPlans.createPlan({
           title: planForm.title,
           description: planForm.description,
           goals,
@@ -192,19 +196,19 @@ export default function PlansPage() {
   const handleActivatePlan = async (planId: string) => {
     try {
       // First, update the currently active plan's status to 'paused'
-      const currentActivePlan = trainingPlans.getActivePlan();
+      const currentActivePlan = await trainingPlans.getActivePlan();
       if (currentActivePlan && currentActivePlan.id !== planId) {
-        trainingPlans.updatePlan(currentActivePlan.id, {
+        await trainingPlans.updatePlan(currentActivePlan.id, {
           status: 'paused'
         });
       }
 
       // Set the new plan as active
       trainingPlans.setActivePlan(planId);
-      const plan = trainingPlans.getPlan(planId);
+      const plan = await trainingPlans.getPlan(planId);
       if (plan) {
         // Update plan status to active and set start date
-        const updatedPlan = trainingPlans.updatePlan(planId, {
+        const updatedPlan = await trainingPlans.updatePlan(planId, {
           status: 'active',
           startDate: new Date()
         });
@@ -249,17 +253,17 @@ export default function PlansPage() {
     }
   };
 
-  const handleCompleteSession = (planId: string, weekId: string, sessionId: string) => {
+  const handleCompleteSession = async (planId: string, weekId: string, sessionId: string) => {
     try {
       const userSessions = getSessions();
       // Find the most recent session that might match this planned session
       const recentSession = userSessions[0]; // Assuming sessions are sorted by date
 
-      trainingPlans.completeSession(planId, weekId, sessionId, recentSession);
+      await trainingPlans.completeSession(planId, weekId, sessionId, recentSession);
       
       // Update local state immediately for better UX
       if (activePlan && activePlan.id === planId) {
-        const updatedActivePlan = trainingPlans.getPlan(planId);
+        const updatedActivePlan = await trainingPlans.getPlan(planId);
         if (updatedActivePlan) {
           setActivePlan(updatedActivePlan);
           // Update selected week if it's the one being modified
@@ -273,7 +277,7 @@ export default function PlansPage() {
       }
       
       // Update plans list
-      const updatedPlans = trainingPlans.getPlans();
+      const updatedPlans = await trainingPlans.getPlans();
       setPlans(updatedPlans);
     } catch (err) {
       setError('Failed to complete session');
@@ -284,10 +288,10 @@ export default function PlansPage() {
     setDeletePlanId(planId);
   };
 
-  const confirmDeletePlan = () => {
+  const confirmDeletePlan = async () => {
     if (!deletePlanId) return;
     try {
-      trainingPlans.deletePlan(deletePlanId);
+      await trainingPlans.deletePlan(deletePlanId);
       setPlans(plans.filter(p => p.id !== deletePlanId));
       if (activePlan?.id === deletePlanId) {
         setActivePlan(null);
@@ -302,16 +306,17 @@ export default function PlansPage() {
     setResetPlanId(planId);
   };
 
-  const confirmResetPlan = () => {
+  const confirmResetPlan = async () => {
     if (!resetPlanId) return;
     try {
-      trainingPlans.updatePlan(resetPlanId, {
+      const plan = await trainingPlans.getPlan(resetPlanId);
+      await trainingPlans.updatePlan(resetPlanId, {
         status: 'draft',
         startDate: undefined,
         progress: {
           completedWeeks: 0,
           completedSessions: 0,
-          totalSessions: trainingPlans.getPlan(resetPlanId)?.progress.totalSessions || 0,
+          totalSessions: plan?.progress.totalSessions || 0,
           adherenceRate: 0
         }
       });
@@ -334,10 +339,10 @@ export default function PlansPage() {
     });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingPlan) return;
     try {
-      trainingPlans.updatePlan(editingPlan.id, {
+      await trainingPlans.updatePlan(editingPlan.id, {
         title: planForm.title,
         description: planForm.description,
         goals: planForm.goals.split(',').map(g => g.trim()).filter(g => g),

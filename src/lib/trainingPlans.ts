@@ -1,4 +1,5 @@
 import { Session } from '@/types/session';
+import { saveTrainingPlansToDB, fetchTrainingPlansFromDB } from '@/lib/dataSync';
 
 // Training plan data structures
 export interface TrainingSession {
@@ -84,12 +85,9 @@ export class TrainingPlansService {
   }
 
   // Get all training plans
-  getPlans(): TrainingPlan[] {
+  async getPlans(): Promise<TrainingPlan[]> {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (!stored) return [];
-      
-      const plans = JSON.parse(stored);
+      const plans = await fetchTrainingPlansFromDB();
       return plans.map((plan: any) => this.deserializePlan(plan));
     } catch (error) {
       console.error('Failed to load training plans:', error);
@@ -98,12 +96,31 @@ export class TrainingPlansService {
   }
 
   // Get active training plan
-  getActivePlan(): TrainingPlan | null {
+  async getActivePlan(): Promise<TrainingPlan | null> {
     try {
-      const activePlanId = localStorage.getItem(this.ACTIVE_PLAN_KEY);
+      // Try localStorage cache first
+      let activePlanId = localStorage.getItem(this.ACTIVE_PLAN_KEY);
+      
+      // If not in localStorage, check DB (via settings)
+      if (!activePlanId) {
+        try {
+          const response = await fetch('/api/settings');
+          if (response.ok) {
+            const data = await response.json();
+            activePlanId = data.settings?.dashboardSettings?.activePlanId || null;
+            if (activePlanId) {
+              // Cache in localStorage
+              localStorage.setItem(this.ACTIVE_PLAN_KEY, activePlanId);
+            }
+          }
+        } catch (e) {
+          console.warn('[TRAINING PLANS] Failed to fetch active plan from DB');
+        }
+      }
+      
       if (!activePlanId) return null;
       
-      const plan = this.getPlan(activePlanId);
+      const plan = await this.getPlan(activePlanId);
       return plan;
     } catch (error) {
       console.error('Failed to load active plan:', error);
@@ -112,21 +129,50 @@ export class TrainingPlansService {
   }
 
   // Set active training plan
-  setActivePlan(planId: string): void {
-    const plan = this.getPlan(planId);
-    if (plan) {
-      localStorage.setItem(this.ACTIVE_PLAN_KEY, planId);
+  async setActivePlan(planId: string): Promise<void> {
+    // Cache in localStorage for synchronous access
+    localStorage.setItem(this.ACTIVE_PLAN_KEY, planId);
+    
+    // Sync to database (non-blocking)
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dashboardSettings: { activePlanId: planId }
+        })
+      });
+      console.log('[TRAINING PLANS] Active plan synced to DB:', planId);
+    } catch (error) {
+      console.error('[TRAINING PLANS] Failed to sync active plan to DB:', error);
+    }
+  }
+  
+  // Clear active training plan
+  async clearActivePlan(): Promise<void> {
+    localStorage.removeItem(this.ACTIVE_PLAN_KEY);
+    
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dashboardSettings: { activePlanId: null }
+        })
+      });
+    } catch (error) {
+      console.error('[TRAINING PLANS] Failed to clear active plan in DB:', error);
     }
   }
 
   // Get plan by ID
-  getPlan(planId: string): TrainingPlan | null {
-    const plans = this.getPlans();
+  async getPlan(planId: string): Promise<TrainingPlan | null> {
+    const plans = await this.getPlans();
     return plans.find(p => p.id === planId) || null;
   }
 
   // Create new training plan
-  createPlan(planData: Omit<TrainingPlan, 'id' | 'createdAt' | 'updatedAt' | 'progress'>): TrainingPlan {
+  async createPlan(planData: Omit<TrainingPlan, 'id' | 'createdAt' | 'updatedAt' | 'progress'>): Promise<TrainingPlan> {
     const newPlan: TrainingPlan = {
       id: this.generateId(),
       ...planData,
@@ -140,16 +186,16 @@ export class TrainingPlansService {
       }
     };
 
-    const plans = this.getPlans();
+    const plans = await this.getPlans();
     plans.unshift(newPlan);
-    this.savePlans(plans);
+    await this.savePlans(plans);
 
     return newPlan;
   }
 
   // Update training plan
-  updatePlan(planId: string, updates: Partial<TrainingPlan>): TrainingPlan {
-    const plans = this.getPlans();
+  async updatePlan(planId: string, updates: Partial<TrainingPlan>): Promise<TrainingPlan> {
+    const plans = await this.getPlans();
     const planIndex = plans.findIndex(p => p.id === planId);
     
     if (planIndex === -1) {
@@ -163,33 +209,33 @@ export class TrainingPlansService {
     };
 
     plans[planIndex] = updatedPlan;
-    this.savePlans(plans);
+    await this.savePlans(plans);
 
     return updatedPlan;
   }
 
   // Delete training plan
-  deletePlan(planId: string): void {
-    const plans = this.getPlans();
+  async deletePlan(planId: string): Promise<void> {
+    const plans = await this.getPlans();
     const filteredPlans = plans.filter(p => p.id !== planId);
-    
-    this.savePlans(filteredPlans);
+    await this.savePlans(filteredPlans);
 
     // If deleted plan was active, clear active plan
-    if (this.getActivePlan()?.id === planId) {
-      localStorage.removeItem(this.ACTIVE_PLAN_KEY);
+    const activePlan = await this.getActivePlan();
+    if (activePlan?.id === planId) {
+      await this.clearActivePlan();
     }
   }
 
   // Mark session as completed
-  completeSession(planId: string, weekId: string, sessionId: string, actualSession?: Session): void {
-    const plan = this.getPlan(planId);
+  async completeSession(planId: string, weekId: string, sessionId: string, actualSession?: Session): Promise<void> {
+    const plan = await this.getPlan(planId);
     if (!plan) throw new Error('Plan not found');
 
-    const week = plan.weeks.find(w => w.id === weekId);
+    const week = plan.weeks.find((w: TrainingWeek) => w.id === weekId);
     if (!week) throw new Error('Week not found');
 
-    const session = week.sessions.find(s => s.id === sessionId);
+    const session = week.sessions.find((s: TrainingSession) => s.id === sessionId);
     if (!session) throw new Error('Session not found');
 
     // Mark session as completed
@@ -197,7 +243,7 @@ export class TrainingPlansService {
     session.actualSession = actualSession;
 
     // Update week progress
-    const completedSessionsInWeek = week.sessions.filter(s => s.completed).length;
+    const completedSessionsInWeek = week.sessions.filter((s: TrainingSession) => s.completed).length;
     week.completed = completedSessionsInWeek === week.sessions.length;
     
     if (actualSession) {
@@ -208,32 +254,32 @@ export class TrainingPlansService {
     this.updatePlanProgress(plan);
 
     // Save updated plan
-    const plans = this.getPlans();
-    const planIndex = plans.findIndex(p => p.id === planId);
+    const plans = await this.getPlans();
+    const planIndex = plans.findIndex((p: TrainingPlan) => p.id === planId);
     if (planIndex !== -1) {
       plans[planIndex] = { ...plan, updatedAt: new Date() };
-      this.savePlans(plans);
+      await this.savePlans(plans);
     }
   }
 
   // Get current week for active plan
-  getCurrentWeek(): TrainingWeek | null {
-    const activePlan = this.getActivePlan();
+  async getCurrentWeek(): Promise<TrainingWeek | null> {
+    const activePlan = await this.getActivePlan();
     if (!activePlan || !activePlan.startDate) return null;
 
     const daysSinceStart = Math.floor((Date.now() - activePlan.startDate.getTime()) / (1000 * 60 * 60 * 24));
     const currentWeekNumber = Math.floor(daysSinceStart / 7) + 1;
 
-    return activePlan.weeks.find(w => w.weekNumber === currentWeekNumber) || null;
+    return activePlan.weeks.find((w: TrainingWeek) => w.weekNumber === currentWeekNumber) || null;
   }
 
   // Get today's session
-  getTodaysSession(): TrainingSession | null {
-    const currentWeek = this.getCurrentWeek();
+  async getTodaysSession(): Promise<TrainingSession | null> {
+    const currentWeek = await this.getCurrentWeek();
     if (!currentWeek) return null;
 
     const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-    return currentWeek.sessions.find(s => s.day === today) || null;
+    return currentWeek.sessions.find((s: TrainingSession) => s.day === today) || null;
   }
 
   // Calculate plan adherence
@@ -278,10 +324,10 @@ export class TrainingPlansService {
   }
 
   // Private helper methods
-  private savePlans(plans: TrainingPlan[]): void {
+  private async savePlans(plans: TrainingPlan[]): Promise<void> {
     try {
-      const serializedPlans = plans.map(plan => this.serializePlan(plan));
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(serializedPlans));
+      console.log('[TRAINING PLANS] Saving plans to database:', plans.length);
+      await saveTrainingPlansToDB(plans);
     } catch (error) {
       console.error('Failed to save training plans:', error);
     }
@@ -325,7 +371,14 @@ export class TrainingPlansService {
       ...plan,
       createdAt: new Date(plan.createdAt),
       updatedAt: new Date(plan.updatedAt),
-      startDate: plan.startDate ? new Date(plan.startDate) : undefined
+      startDate: plan.startDate ? new Date(plan.startDate) : undefined,
+      // Transform flat progress fields into nested progress object
+      progress: {
+        completedWeeks: plan.completedWeeks || 0,
+        completedSessions: plan.completedSessions || 0,
+        totalSessions: plan.totalSessions || 0,
+        adherenceRate: plan.adherenceRate || 0,
+      }
     };
   }
 

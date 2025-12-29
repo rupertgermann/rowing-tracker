@@ -1,8 +1,10 @@
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
 
 // Settings types and interfaces
+// VERSION: 2024-12-27-v2 - Added auth check before DB sync
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'system';
+  lightModeBrightness: number; // 0-100, controls light mode brightness (100 = default bright, 0 = dimmed)
   units: 'metric' | 'imperial';
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
   timeFormat: '12h' | '24h';
@@ -68,7 +70,7 @@ export interface PrivacySettings {
 }
 
 export interface UseCaseConfig {
-  reasoning: 'minimal' | 'low' | 'medium' | 'high';
+  reasoning: 'none' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
   model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' | 'gpt-5.2';
 }
@@ -98,6 +100,7 @@ export interface AISettings {
   achievementImageModel: 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
   achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
+  achievementImageColors: 'classic' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean'; // color palette
 
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description
@@ -121,10 +124,15 @@ export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
   private readonly CURRENT_VERSION = '1.4.0'; // Condensed explainChartPrompt - max 6 lines per section
+  private dbInitialized = false;
+  private initPromise: Promise<void> | null = null;
+  private syncTimeout: NodeJS.Timeout | null = null;
+  private lastSyncedData: string = '';
 
   private defaultSettings: Settings = {
     userPreferences: {
       theme: 'system',
+      lightModeBrightness: 100, // Default to full brightness
       units: 'metric',
       dateFormat: 'MM/DD/YYYY',
       timeFormat: '24h',
@@ -187,11 +195,11 @@ export class SettingsService {
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
-      maxTokens: 1500,
+      maxTokens: 4000,
 
       // Per-use-case configurations with smart defaults
       chat: {
-        reasoning: 'minimal',      // Ultra-fast responses (compatible with all models)
+        reasoning: 'none',          // Ultra-fast responses (compatible with all models)
         verbosity: 'medium',       // Natural conversation
         model: 'gpt-5-mini'        // Good balance of speed and quality
       },
@@ -261,6 +269,7 @@ Be brief and direct. No fluff.`,
       achievementImageModel: 'gpt-image-1',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',
+      achievementImageColors: 'classic',
 
       // Achievement generator prompts
       achievementStoryPrompt: `You are a creative writer crafting inspiring achievement stories for rowers. 
@@ -288,11 +297,10 @@ Description: {description}
 Style guidelines:
 - Modern, clean design with elegant typography
 - Incorporate rowing imagery (stylized oars, water ripples, rowing silhouette)
-- Use a color palette of deep blues, golds, and whites
+- (colors)
 - Include decorative elements suggesting achievement (laurels, ribbons, stars)
 - The image should feel prestigious and celebratory
 - Do NOT include any text - the text will be overlaid separately
-- Aspect ratio: square (1:1)
 - High quality, suitable for display`,
 
       // Personal context defaults
@@ -334,6 +342,236 @@ Be specific and actionable. Only include information relevant to rowing training
 
   private constructor() { }
 
+  /**
+   * Initialize settings from database (DB-first pattern)
+   * This should be called on app load to ensure DB is source of truth
+   * localStorage is used only as a synchronous cache after initialization
+   */
+  async initializeFromDB(): Promise<void> {
+    // Prevent multiple simultaneous initializations
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    if (this.dbInitialized) {
+      return;
+    }
+
+    this.initPromise = this._doInitializeFromDB();
+    await this.initPromise;
+    this.initPromise = null;
+  }
+
+  private async _doInitializeFromDB(): Promise<void> {
+    // Guard against SSR/non-browser environments
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/settings');
+      
+      if (!response.ok) {
+        console.warn('[SETTINGS] Failed to fetch from DB, using localStorage');
+        this.dbInitialized = true;
+        return;
+      }
+
+      const data = await response.json();
+      const dbSettings = data.settings;
+
+      if (dbSettings) {
+        // Get current localStorage settings to preserve sensitive data like API key
+        const currentLocalSettings = localStorage.getItem(this.STORAGE_KEY);
+        let currentApiKey = '';
+        
+        if (currentLocalSettings) {
+          try {
+            const parsed = JSON.parse(currentLocalSettings);
+            currentApiKey = parsed.aiSettings?.openaiApiKey || '';
+          } catch (e) {
+            console.warn('[SETTINGS] Failed to parse current localStorage settings');
+          }
+        }
+        
+        // Check if aiConfig is missing achievementImageColors BEFORE transformation
+        const dbAiConfig = dbSettings.aiConfig as any;
+        const needsColorFieldMigration = !dbAiConfig?.achievementImageColors;
+        
+        // Transform DB settings to app format and cache in localStorage
+        const appSettings = this.transformDBToAppSettings(dbSettings);
+        const migrated = this.migrateSettings(appSettings);
+        
+        // Preserve API key from localStorage (never stored in DB)
+        if (currentApiKey) {
+          migrated.aiSettings.openaiApiKey = currentApiKey;
+        }
+        
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
+        
+        // If achievementImageColors was missing from DB, trigger a save to populate it
+        if (needsColorFieldMigration) {
+          // Trigger an immediate sync to add the missing field to the database
+          setTimeout(() => this.syncToDatabase(migrated), 100);
+        }
+      } else {
+        // No DB settings, check if we have localStorage settings to sync up
+        const localSettings = localStorage.getItem(this.STORAGE_KEY);
+        if (localSettings) {
+          const parsed = JSON.parse(localSettings);
+          await this.syncToDatabase(parsed);
+        }
+      }
+
+      this.dbInitialized = true;
+    } catch (error) {
+      console.error('[SETTINGS] Error initializing from database:', error);
+      this.dbInitialized = true; // Mark as initialized to prevent retry loops
+    }
+  }
+
+  /**
+   * Transform database settings format to app Settings format
+   */
+  private transformDBToAppSettings(dbSettings: any): Settings {
+    return {
+      userPreferences: {
+        theme: dbSettings.theme || 'system',
+        lightModeBrightness: dbSettings.lightModeBrightness ?? 100,
+        units: dbSettings.units || 'metric',
+        dateFormat: dbSettings.dateFormat || 'MM/DD/YYYY',
+        timeFormat: dbSettings.timeFormat || '24h',
+        language: dbSettings.language || 'en',
+        timeZone: dbSettings.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        defaultChartType: dbSettings.defaultChartType || 'line',
+        animationsEnabled: dbSettings.animationsEnabled !== false,
+        showPromptSuggestions: dbSettings.showPromptSuggestions !== false,
+        customPrompts: dbSettings.customPrompts || []
+      },
+      dataManagement: this.defaultSettings.dataManagement,
+      trainingSettings: {
+        ...this.defaultSettings.trainingSettings,
+        defaultTrainingZones: dbSettings.trainingZones || this.defaultSettings.trainingSettings.defaultTrainingZones,
+        preferredMetrics: dbSettings.preferredMetrics || this.defaultSettings.trainingSettings.preferredMetrics,
+        weeklyGoal: {
+          type: dbSettings.weeklyGoalType || 'sessions',
+          target: dbSettings.weeklyGoalTarget || 3
+        },
+        restDayAlerts: dbSettings.restDayAlerts !== false,
+        adaptationEnabled: dbSettings.adaptationEnabled !== false
+      },
+      notificationSettings: {
+        sessionReminders: dbSettings.sessionReminders || false,
+        weeklyProgress: dbSettings.weeklyProgress !== false,
+        achievementAlerts: dbSettings.achievementAlerts !== false,
+        planReminders: dbSettings.planReminders !== false,
+        adherenceAlerts: dbSettings.adherenceAlerts !== false,
+        emailNotifications: this.defaultSettings.notificationSettings.emailNotifications
+      },
+      privacySettings: this.defaultSettings.privacySettings,
+      aiSettings: {
+        ...this.defaultSettings.aiSettings,
+        cloudAIEnabled: dbSettings.cloudAIEnabled || false,
+        // Note: openaiApiKey is NOT loaded from DB - it's kept local only
+        // Will be preserved from localStorage if present
+        maxTokens: dbSettings.maxTokens || 4000,
+        userProfileContext: dbSettings.userProfileContext || '',
+        userProfileRawInput: dbSettings.userProfileRawInput || '',
+        ...(dbSettings.aiConfig || {}),
+        ...(dbSettings.customPromptsAi || {})
+      },
+      version: this.CURRENT_VERSION,
+      updatedAt: new Date(dbSettings.updatedAt || Date.now())
+    };
+  }
+
+  /**
+   * Sync settings to database (async, non-blocking)
+   */
+  private async syncToDatabase(settings: Settings): Promise<void> {
+    try {
+      const dbPayload = this.transformAppToDBSettings(settings);
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dbPayload)
+      });
+
+      if (!response.ok) {
+        // If unauthorized, the API will return 401 and we can skip silently
+        if (response.status === 401) {
+          return;
+        }
+        console.error('[SETTINGS] Failed to sync to database');
+      }
+    } catch (error) {
+      console.error('[SETTINGS] Error syncing to database:', error);
+    }
+  }
+
+  /**
+   * Transform app Settings format to database format
+   */
+  private transformAppToDBSettings(settings: Settings): any {
+    return {
+      theme: settings.userPreferences.theme,
+      units: settings.userPreferences.units,
+      dateFormat: settings.userPreferences.dateFormat,
+      timeFormat: settings.userPreferences.timeFormat,
+      language: settings.userPreferences.language,
+      timeZone: settings.userPreferences.timeZone,
+      defaultChartType: settings.userPreferences.defaultChartType,
+      animationsEnabled: settings.userPreferences.animationsEnabled,
+      showPromptSuggestions: settings.userPreferences.showPromptSuggestions,
+      customPrompts: settings.userPreferences.customPrompts,
+      trainingZones: settings.trainingSettings.defaultTrainingZones,
+      preferredMetrics: settings.trainingSettings.preferredMetrics,
+      weeklyGoalType: settings.trainingSettings.weeklyGoal.type,
+      weeklyGoalTarget: settings.trainingSettings.weeklyGoal.target,
+      restDayAlerts: settings.trainingSettings.restDayAlerts,
+      adaptationEnabled: settings.trainingSettings.adaptationEnabled,
+      sessionReminders: settings.notificationSettings.sessionReminders,
+      weeklyProgress: settings.notificationSettings.weeklyProgress,
+      achievementAlerts: settings.notificationSettings.achievementAlerts,
+      planReminders: settings.notificationSettings.planReminders,
+      adherenceAlerts: settings.notificationSettings.adherenceAlerts,
+      cloudAIEnabled: settings.aiSettings.cloudAIEnabled,
+      maxTokens: settings.aiSettings.maxTokens,
+      userProfileContext: settings.aiSettings.userProfileContext,
+      userProfileRawInput: settings.aiSettings.userProfileRawInput,
+      aiConfig: {
+        chat: settings.aiSettings.chat,
+        insights: settings.aiSettings.insights,
+        trainingPlans: settings.aiSettings.trainingPlans,
+        awardSuggestions: settings.aiSettings.awardSuggestions,
+        achievementText: settings.aiSettings.achievementText,
+        achievementImageModel: settings.aiSettings.achievementImageModel,
+        achievementImageQuality: settings.aiSettings.achievementImageQuality,
+        achievementImageSize: settings.aiSettings.achievementImageSize,
+        achievementImageColors: settings.aiSettings.achievementImageColors,
+        userProfileGeneration: settings.aiSettings.userProfileGeneration
+      },
+      customPromptsAi: {
+        systemPrompt: settings.aiSettings.systemPrompt,
+        chatSystemPrompt: settings.aiSettings.chatSystemPrompt,
+        planGenerationPrompt: settings.aiSettings.planGenerationPrompt,
+        insightsPrompt: settings.aiSettings.insightsPrompt,
+        explainChartPrompt: settings.aiSettings.explainChartPrompt,
+        awardSuggestionsPrompt: settings.aiSettings.awardSuggestionsPrompt,
+        achievementStoryPrompt: settings.aiSettings.achievementStoryPrompt,
+        achievementImagePrompt: settings.aiSettings.achievementImagePrompt,
+        userProfilePrompt: settings.aiSettings.userProfilePrompt
+      }
+    };
+  }
+
+  /**
+   * Check if settings have been initialized from DB
+   */
+  isInitialized(): boolean {
+    return this.dbInitialized;
+  }
+
   static getInstance(): SettingsService {
     if (!SettingsService.instance) {
       SettingsService.instance = new SettingsService();
@@ -356,7 +594,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
       const settings = JSON.parse(stored);
       const migrated = this.migrateSettings(settings);
-      this.saveSettings(migrated, { dispatchEvent: false });
+      this.saveSettings(migrated);
       return migrated;
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -569,33 +807,49 @@ Be specific and actionable. Only include information relevant to rowing training
     keysToRemove.forEach(key => localStorage.removeItem(key));
   }
 
-  // Private helper methods
-  private saveSettings(settings: Settings, options?: { dispatchEvent?: boolean }): void {
-    try {
-      // Guard against SSR/non-browser environments
-      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-        return;
-      }
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
-      if (options?.dispatchEvent !== false) {
-        window.dispatchEvent(new Event('rowing_app_settings_updated'));
-      }
-    } catch (error) {
-      console.error('Failed to save settings:', error);
+  /**
+   * Save settings to localStorage and sync to database (debounced)
+   */
+  private saveSettings(settings: Settings): void {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
+    this.debouncedSyncToDatabase(settings);
+  }
+
+  /**
+   * Debounced sync to database to prevent excessive API calls
+   */
+  private debouncedSyncToDatabase(settings: Settings): void {
+    // Clear existing timeout
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
     }
+
+    // Create string representation to compare with last synced data
+    const currentData = JSON.stringify(settings);
+    
+    // Skip if data hasn't changed
+    if (currentData === this.lastSyncedData) {
+      return;
+    }
+
+    // Set new timeout
+    this.syncTimeout = setTimeout(async () => {
+      await this.syncToDatabase(settings);
+      this.lastSyncedData = currentData;
+    }, 1000); // 1 second debounce
   }
 
   private migrateSettings(settings: any): Settings {
     let migratedSettings = { ...settings };
 
-    // Ensure UserPreferences has customPrompts field
-    if (!migratedSettings.userPreferences?.customPrompts) {
-      migratedSettings.userPreferences = {
-        ...this.defaultSettings.userPreferences,
-        ...migratedSettings.userPreferences,
-        customPrompts: migratedSettings.userPreferences?.customPrompts || []
-      };
-    }
+    // Ensure UserPreferences has all required fields
+    migratedSettings.userPreferences = {
+      ...this.defaultSettings.userPreferences,
+      ...migratedSettings.userPreferences,
+      // Explicitly preserve lightModeBrightness if it exists, otherwise use default
+      lightModeBrightness: migratedSettings.userPreferences?.lightModeBrightness ?? this.defaultSettings.userPreferences.lightModeBrightness,
+      customPrompts: migratedSettings.userPreferences?.customPrompts || []
+    };
 
     // Handle AI settings migration from old flat structure to new nested structure
     if (settings.aiSettings) {
@@ -623,7 +877,12 @@ Be specific and actionable. Only include information relevant to rowing training
           insights: this.defaultSettings.aiSettings.insights,
           trainingPlans: this.defaultSettings.aiSettings.trainingPlans,
           awardSuggestions: this.defaultSettings.aiSettings.awardSuggestions,
-          awardSuggestionsPrompt: oldAiSettings.awardSuggestionsPrompt ?? this.defaultSettings.aiSettings.awardSuggestionsPrompt
+          awardSuggestionsPrompt: oldAiSettings.awardSuggestionsPrompt ?? this.defaultSettings.aiSettings.awardSuggestionsPrompt,
+          // Preserve achievement image settings
+          achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+          achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+          achievementImageColors: oldAiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
         };
       } else if (oldAiSettings.chat?.model || oldAiSettings.insights?.model || oldAiSettings.trainingPlans?.model || oldAiSettings.awardSuggestions?.model) {
         migratedSettings.aiSettings = {
@@ -633,7 +892,12 @@ Be specific and actionable. Only include information relevant to rowing training
           chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
           trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
-          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions }
+          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions },
+          // Preserve achievement image settings that user may have configured
+          achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+          achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+          achievementImageColors: oldAiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
         };
       } else {
         // New format - just ensure all nested properties exist
@@ -643,7 +907,12 @@ Be specific and actionable. Only include information relevant to rowing training
           chat: { ...this.defaultSettings.aiSettings.chat, ...oldAiSettings.chat },
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
           trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
-          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions }
+          awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions },
+          // Preserve achievement image settings that user may have configured
+          achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+          achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+          achievementImageSize: oldAiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+          achievementImageColors: oldAiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
         };
       }
     } else {
@@ -679,7 +948,12 @@ Be specific and actionable. Only include information relevant to rowing training
             awardSuggestions: {
               ...this.defaultSettings.aiSettings.awardSuggestions,
               ...migratedSettings.aiSettings.awardSuggestions
-            }
+            },
+            // Preserve achievement image settings that user may have configured
+            achievementImageModel: migratedSettings.aiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
+            achievementImageQuality: migratedSettings.aiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
+            achievementImageSize: migratedSettings.aiSettings.achievementImageSize ?? this.defaultSettings.aiSettings.achievementImageSize,
+            achievementImageColors: migratedSettings.aiSettings.achievementImageColors ?? this.defaultSettings.aiSettings.achievementImageColors
           };
         }
 

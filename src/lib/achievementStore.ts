@@ -1,23 +1,24 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { GeneratedAchievement, AchievementGeneratorSettings, DEFAULT_ACHIEVEMENT_STORY_PROMPT, DEFAULT_ACHIEVEMENT_IMAGE_PROMPT } from '@/types/achievement';
+import { GeneratedAchievement } from '@/types/achievement';
 
 // Note: Images are stored as files in public/assets/awards/ via imageStorage.ts
 // The store keeps the file path (imageUrl) and a hasImage flag
 // This avoids localStorage quota issues with large base64 images
+//
+// Note: Achievement generation settings (prompts, image style, etc.) are stored
+// in the database via UserSettings.aiConfig and accessed via settings.getAISettings().
+// This store only manages UI state and in-memory achievement data loaded from DB.
 
 interface AchievementStore {
-  // Generated achievements keyed by awardId
+  // Generated achievements keyed by awardId (loaded from database on app init)
   // Note: imageUrl contains the file path (e.g., /assets/awards/award_id.png)
   generatedAchievements: Record<string, GeneratedAchievement>;
   
-  // Settings for generation
-  settings: AchievementGeneratorSettings;
-  
-  // Currently selected achievement for gallery view
+  // Currently selected achievement for gallery view (UI state)
   selectedAchievementId: string | null;
   
-  // Gallery open state
+  // Gallery open state (UI state)
   isGalleryOpen: boolean;
   
   // Actions
@@ -25,10 +26,6 @@ interface AchievementStore {
   updateGeneratedAchievement: (awardId: string, updates: Partial<GeneratedAchievement>) => void;
   removeGeneratedAchievement: (awardId: string) => void;
   clearAllGeneratedAchievements: () => void;
-  
-  // Settings actions
-  updateSettings: (settings: Partial<AchievementGeneratorSettings>) => void;
-  resetSettings: () => void;
   
   // Gallery actions
   openGallery: (awardId?: string) => void;
@@ -40,18 +37,10 @@ interface AchievementStore {
   hasGeneratedContent: (awardId: string) => boolean;
 }
 
-const defaultSettings: AchievementGeneratorSettings = {
-  storySystemPrompt: DEFAULT_ACHIEVEMENT_STORY_PROMPT,
-  imagePrompt: DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
-  imageStyle: 'artistic',
-  imageSize: '1024x1024'
-};
-
 export const useAchievementStore = create<AchievementStore>()(
   persist(
     (set, get) => ({
       generatedAchievements: {},
-      settings: defaultSettings,
       selectedAchievementId: null,
       isGalleryOpen: false,
       
@@ -96,16 +85,6 @@ export const useAchievementStore = create<AchievementStore>()(
         set({ generatedAchievements: {} });
       },
       
-      updateSettings: (newSettings) => {
-        set((state) => ({
-          settings: { ...state.settings, ...newSettings }
-        }));
-      },
-      
-      resetSettings: () => {
-        set({ settings: defaultSettings });
-      },
-      
       openGallery: (awardId) => {
         set({ 
           isGalleryOpen: true,
@@ -134,36 +113,11 @@ export const useAchievementStore = create<AchievementStore>()(
       name: 'rowing-achievement-generator',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Images are stored as files in public/assets/awards/
-        // We persist the file path (imageUrl) and hasImage flag
-        generatedAchievements: Object.fromEntries(
-          Object.entries(state.generatedAchievements).map(([key, achievement]) => [
-            key,
-            {
-              ...achievement,
-              // Keep imageUrl if it's a file path (starts with /), otherwise clear it
-              imageUrl: achievement.imageUrl?.startsWith('/') ? achievement.imageUrl : undefined,
-              // Keep hasImage flag to know if we need to check filesystem
-              hasImage: Boolean(achievement.imageUrl || achievement.hasImage)
-            }
-          ])
-        ),
-        settings: state.settings
+        // Only persist UI state to localStorage
+        // Generated achievements are loaded from database on app init
+        selectedAchievementId: state.selectedAchievementId,
+        isGalleryOpen: state.isGalleryOpen,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Convert date strings back to Date objects
-          Object.keys(state.generatedAchievements).forEach(key => {
-            const achievement = state.generatedAchievements[key];
-            if (achievement.earnedAt) {
-              achievement.earnedAt = new Date(achievement.earnedAt);
-            }
-            if (achievement.generatedAt) {
-              achievement.generatedAt = new Date(achievement.generatedAt);
-            }
-          });
-        }
-      }
     }
   )
 );

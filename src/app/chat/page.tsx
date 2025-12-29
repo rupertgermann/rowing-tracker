@@ -95,10 +95,12 @@ function ChatPageContent() {
       
       if (pendingData) {
         initialPromptProcessedRef.current = true;
+
+        const run = async () => {
         
         // Create a new session with the chart title, explanation category, and chartId
         const sessionTitle = `Explain: ${pendingData.chartTitle}`;
-        const newSession = createSession(sessionTitle, 'explanation', pendingData.chartId);
+        const newSession = await createSession(sessionTitle, 'explanation', pendingData.chartId);
         
         if (newSession) {
           // Store pending chart explanation context for tracking AI response
@@ -132,6 +134,9 @@ function ChatPageContent() {
           // Clear URL params without triggering navigation
           router.replace('/chat', { scroll: false });
         }
+        };
+
+        run();
       }
       return;
     }
@@ -142,21 +147,26 @@ function ChatPageContent() {
       
       if (pendingData) {
         initialPromptProcessedRef.current = true;
-        
-        // Create a new session with the plan title and plan_analysis category
-        const sessionTitle = `Plan Analysis: ${pendingData.planTitle}`;
-        const newSession = createSession(sessionTitle, 'plan_analysis', pendingData.planId);
-        
-        if (newSession) {
-          // Pre-fill the input field with the prompt
-          setMessageInput(pendingData.prompt);
-          
-          // Clear pending data from store
-          clearPendingPlanAnalysis(null);
-          
-          // Clear URL params without triggering navigation
-          router.replace('/chat', { scroll: false });
-        }
+
+        const run = async () => {
+          // Create a new session with the plan title and plan_analysis category
+          const sessionTitle = `Plan Analysis: ${pendingData.planTitle}`;
+          const newSession = await createSession(sessionTitle, 'plan_analysis', pendingData.planId);
+
+          if (newSession) {
+            // Pre-fill the input field with the prompt
+            setMessageInput(pendingData.prompt);
+
+            // Clear pending data from store
+            clearPendingPlanAnalysis(null);
+
+            // Clear URL params without triggering navigation
+            router.replace('/chat', { scroll: false });
+          }
+        };
+
+        run();
+        return;
       }
       return;
     }
@@ -167,22 +177,28 @@ function ChatPageContent() {
       
       if (pendingData) {
         initialPromptProcessedRef.current = true;
-        
-        // Create a new session with the insight title and insight_discussion category
-        const sessionTitle = `Discuss: ${pendingData.insightTitle}`;
-        const newSession = createSession(sessionTitle, 'insight_discussion', pendingData.insightId);
-        
-        if (newSession) {
-          // Pre-fill the input field with the prompt
-          setMessageInput(pendingData.prompt);
-          
-          // Clear pending data from store
-          setPendingInsight(null);
-          
-          // Clear URL params without triggering navigation
-          router.replace('/chat', { scroll: false });
-        }
+
+        const run = async () => {
+          // Create a new session with the insight title and insight_discussion category
+          const sessionTitle = `Discuss: ${pendingData.insightTitle}`;
+          const newSession = await createSession(sessionTitle, 'insight_discussion', pendingData.insightId);
+
+          if (newSession) {
+            // Pre-fill the input field with the prompt
+            setMessageInput(pendingData.prompt);
+
+            // Clear pending data from store
+            setPendingInsight(null);
+
+            // Clear URL params without triggering navigation
+            router.replace('/chat', { scroll: false });
+          }
+        };
+
+        run();
+        return;
       }
+      return;
     }
   }, [searchParams, isAIConfigured, createSession, router, getPendingChartExplanation, clearPendingChartExplanation, getPendingPlanAnalysis, clearPendingPlanAnalysis, getPendingInsight, setPendingInsight]);
 
@@ -654,7 +670,7 @@ function ChatPageContent() {
               <CardTitle className="text-lg">Conversations</CardTitle>
               <Button
                 size="sm"
-                onClick={() => createSession()}
+                onClick={() => { void createSession(); }}
                 disabled={!isAIConfigured}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -1000,7 +1016,7 @@ function ChatPageContent() {
                   }
                 </p>
                 {isAIConfigured && (
-                  <Button onClick={() => createSession()}>
+                  <Button onClick={() => { void createSession(); }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Start New Chat
                   </Button>

@@ -235,17 +235,10 @@ export function useMemory() {
   const isOrphanedDocument = useCallback((doc: MemoryDocument): boolean => {
     if (doc.source !== 'system') return false;
 
+    // For training plans, we can't check synchronously anymore since getPlans is async
+    // Mark them as not orphaned by default - they'll be cleaned up manually if needed
     if (doc.type === 'training_plan') {
-      // Check if the training plan still exists
-      const planId = memoryStorage.getTrainingPlanId(doc);
-      if (planId) {
-        const existingPlans = trainingPlans.getPlans();
-        return !existingPlans.some(p => p.id === planId);
-      }
-      // If no planId stored, check by name matching
-      const existingPlans = trainingPlans.getPlans();
-      const planTitle = doc.name.replace('Training Plan: ', '');
-      return !existingPlans.some(p => p.title === planTitle);
+      return false;
     }
 
     // For insights, we can't easily check if they're orphaned without

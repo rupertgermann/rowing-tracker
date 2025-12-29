@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SettingsService } from '@/lib/settings';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, earnedAt, customPrompt, apiKey, model, reasoning, verbosity, imageUrl } = body;
+    const { title, description, earnedAt, customPrompt, apiKey, imageUrl } = body;
 
     if (!title || !description) {
       return NextResponse.json(
@@ -21,6 +22,19 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Load AI settings from database
+    const settings = SettingsService.getInstance();
+    const aiSettings = settings.getAISettings();
+    const useCaseConfig = aiSettings.achievementText;
+
+    // Map model for API compatibility
+    const mapModel = (model: string): 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' => {
+      if (model === 'gpt-5-nano') return 'gpt-5-nano';
+      if (model === 'gpt-5-mini') return 'gpt-5-mini';
+      if (model === 'gpt-5.1' || model === 'gpt-5.2') return 'gpt-5.1';
+      return 'gpt-5-mini'; // default fallback
+    };
 
     // Build the prompt
     const defaultPrompt = `You are a creative writer crafting inspiring achievement stories for rowers. 
@@ -58,11 +72,11 @@ Write the achievement story:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: model || 'gpt-5-mini',
+        model: mapModel(useCaseConfig.model),
         input: prompt,
         max_output_tokens: 500,
-        reasoning: { effort: reasoning || 'low' },
-        text: { verbosity: verbosity || 'medium' }
+        reasoning: { effort: useCaseConfig.reasoning },
+        text: { verbosity: useCaseConfig.verbosity }
       })
     });
 

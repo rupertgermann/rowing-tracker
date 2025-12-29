@@ -39,13 +39,16 @@ export function InsightDiscussionArchiveModal({
 
   useEffect(() => {
     if (open) {
-      // Load insight discussion sessions
-      const insightDiscussionSessions = chatStorage.getInsightDiscussionSessions(insightId);
-      // Sort by date, newest first
-      const sorted = insightDiscussionSessions.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setDiscussions(sorted);
+      // Load insight discussion sessions (async)
+      const loadDiscussions = async () => {
+        const insightDiscussionSessions = await chatStorage.getInsightDiscussionSessions(insightId);
+        // Sort by date, newest first
+        const sorted = insightDiscussionSessions.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setDiscussions(sorted);
+      };
+      loadDiscussions();
     }
   }, [open, insightId]);
 

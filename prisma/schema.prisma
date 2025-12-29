@@ -1,0 +1,489 @@
+// Prisma Schema for Rowing Tracker
+// Supports both local Docker PostgreSQL and Supabase
+// 
+// Local development: docker-compose up -d
+// Supabase: Configure DATABASE_URL and DIRECT_URL in .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// USER & AUTHENTICATION (NextAuth.js compatible)
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String?
+  role          String    @default("user")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts              Account[]
+  sessions              AuthSession[]
+  rowingSessions        RowingSession[]
+  personalRecords       PersonalRecord[]
+  earnedAwards          EarnedAward[]
+  aiAwards              AIAwardSuggestion[]
+  generatedAchievements GeneratedAchievement[]
+  trainingPlans         TrainingPlan[]
+  chatSessions          ChatSession[]
+  aiInsights            AIInsight[]
+  memoryDocuments       MemoryDocument[]
+  settings              UserSettings?
+  apiKeys               UserApiKey[]
+  chartExplanations     ChartExplanation[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model AuthSession {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
+// ============================================================================
+// ROWING SESSIONS
+// ============================================================================
+
+model RowingSession {
+  id        String   @id @default(cuid())
+  userId    String
+  timestamp DateTime
+  distance  Int
+  duration  Int
+  energy    Int
+  strokeCount    Int
+  avgPower       Float
+  maxPower       Float
+  wattPerKg      Float
+  avgSplit       Float
+  minSplit       Float
+  avgWork        Float
+  avgStrokeLength Float
+  avgStrokeRate  Float
+  maxStrokeRate  Float
+  consistencyScore Float?  // Pre-computed consistency score (0-100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  importedAt     DateTime @default(now())
+  sourceFile     String?
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strokeData           StrokeData[]
+  personalRecords      PersonalRecord[]
+  trainingSessionLinks TrainingSessionLink[]
+
+  @@unique([userId, timestamp, distance])
+  @@index([userId])
+  @@index([userId, timestamp])
+  @@index([userId, distance])
+}
+
+model StrokeData {
+  id           String  @id @default(cuid())
+  sessionId    String
+  strokeIndex  Int
+  time         Float
+  timestamp    String
+  distance     Float
+  work         Float
+  power        Float
+  avgPower     Float
+  split        Float
+  avgSplit     Float
+  strokeRate   Float
+  heartRate    Float?
+  strokeLength Float?
+
+  session RowingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, strokeIndex])
+}
+
+model PersonalRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  sessionId  String
+  distance   Int
+  bestTime   Float
+  bestPace   Float
+  avgPower   Float
+  achievedAt DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session RowingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, distance])
+  @@index([userId])
+}
+
+// ============================================================================
+// AWARDS & ACHIEVEMENTS
+// ============================================================================
+
+model EarnedAward {
+  id        String   @id @default(cuid())
+  userId    String
+  awardId   String
+  earnedAt  DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, awardId])
+  @@index([userId])
+}
+
+model AIAwardSuggestion {
+  id                 String    @id @default(cuid())
+  userId             String
+  title              String
+  description        String
+  rationale          String    @db.Text
+  status             String
+  criteriaType       String?
+  criteriaValue      Float?
+  criteriaComparison String?
+  targetDate         DateTime?
+  suggestedAt        DateTime  @default(now())
+  approvedAt         DateTime?
+  earnedAt           DateTime?
+  model              String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model GeneratedAchievement {
+  id          String    @id @default(cuid())
+  userId      String
+  awardId     String
+  story       String?   @db.Text
+  imageUrl    String?
+  hasImage    Boolean   @default(false)
+  earnedAt    DateTime?
+  generatedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, awardId])
+  @@index([userId])
+}
+
+// ============================================================================
+// TRAINING PLANS
+// ============================================================================
+
+model TrainingPlan {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  description       String    @db.Text
+  goals             String[]
+  duration          Int
+  level             String
+  focus             String
+  status            String
+  startDate         DateTime?
+  completedWeeks    Int       @default(0)
+  completedSessions Int       @default(0)
+  totalSessions     Int       @default(0)
+  adherenceRate     Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeks TrainingWeek[]
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model TrainingWeek {
+  id           String  @id @default(cuid())
+  planId       String
+  weekNumber   Int
+  focus        String
+  totalVolume  Int
+  completed    Boolean @default(false)
+  actualVolume Float   @default(0)
+
+  plan     TrainingPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  sessions TrainingSession[]
+
+  @@index([planId])
+  @@index([planId, weekNumber])
+}
+
+model TrainingSession {
+  id                  String  @id @default(cuid())
+  weekId              String
+  day                 Int
+  type                String
+  title               String
+  description         String  @db.Text
+  duration            Int
+  distance            Int?
+  intensity           String
+  notes               String? @db.Text
+  completed           Boolean @default(false)
+  targetPace          Float?
+  targetPaceMin       Float?
+  targetPaceMax       Float?
+  targetPower         Float?
+  targetPowerMin      Float?
+  targetPowerMax      Float?
+  targetStrokeRate    Float?
+  targetStrokeRateMin Float?
+  targetStrokeRateMax Float?
+
+  week               TrainingWeek          @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  actualSessionLinks TrainingSessionLink[]
+
+  @@index([weekId])
+}
+
+model TrainingSessionLink {
+  id                String @id @default(cuid())
+  trainingSessionId String
+  rowingSessionId   String
+
+  trainingSession TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  rowingSession   RowingSession   @relation(fields: [rowingSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingSessionId, rowingSessionId])
+  @@index([trainingSessionId])
+  @@index([rowingSessionId])
+}
+
+// ============================================================================
+// CHAT & AI INTERACTIONS
+// ============================================================================
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  category  String
+  chartId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([userId, category])
+}
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  sessionId      String
+  role           String
+  content        String   @db.Text
+  model          String?
+  attachmentType String?
+  attachmentData String?  @db.Text
+  timestamp      DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, timestamp])
+}
+
+// ============================================================================
+// AI INSIGHTS
+// ============================================================================
+
+model AIInsight {
+  id            String    @id @default(cuid())
+  userId        String
+  type          String
+  title         String
+  description   String    @db.Text
+  priority      String
+  actionable    Boolean   @default(false)
+  confidence    Float?
+  evidence      String[]
+  category      String?
+  source        String
+  archived      Boolean   @default(false)
+  dateGenerated DateTime  @default(now())
+  archivedAt    DateTime?
+  feedback      String?   // 'helpful' | 'not_helpful' | 'action_taken'
+  feedbackAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, archived])
+  @@index([userId, dateGenerated])
+}
+
+// ============================================================================
+// MEMORY DOCUMENTS
+// ============================================================================
+
+model MemoryDocument {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  type          String
+  source        String
+  mimeType      String
+  size          Int
+  filePath      String?
+  description   String?  @db.Text
+  extractedText String?  @db.Text
+  tags          String[]
+  content       Json?
+  status        String?
+  uploadedAt    DateTime @default(now())
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, type])
+}
+
+// ============================================================================
+// USER SETTINGS
+// ============================================================================
+
+model UserSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  theme                 String   @default("system")
+  units                 String   @default("metric")
+  dateFormat            String   @default("MM/DD/YYYY")
+  timeFormat            String   @default("24h")
+  language              String   @default("en")
+  timeZone              String?  @default("UTC")
+  defaultChartType      String   @default("line")
+  animationsEnabled     Boolean  @default(true)
+  showPromptSuggestions Boolean  @default(true)
+  customPrompts         String[]
+  trainingZones         Json?
+  preferredMetrics      String[]
+  weeklyGoalType        String   @default("sessions")
+  weeklyGoalTarget      Int      @default(3)
+  restDayAlerts         Boolean  @default(true)
+  adaptationEnabled     Boolean  @default(true)
+  sessionReminders      Boolean  @default(false)
+  weeklyProgress        Boolean  @default(true)
+  achievementAlerts     Boolean  @default(true)
+  planReminders         Boolean  @default(true)
+  adherenceAlerts       Boolean  @default(true)
+  cloudAIEnabled        Boolean  @default(false)
+  maxTokens             Int      @default(1500)
+  aiConfig              Json?
+  customPromptsAi       Json?
+  userProfileContext    String?  @db.Text
+  userProfileRawInput   String?  @db.Text
+  dashboardSettings     Json?
+  sessionsViewSettings  Json?
+  sessionAnalysisSettings Json?
+  chartSettings         Json?
+  analyticsSettings     Json?
+  sessionsRevision      Int      @default(0)
+  insightsRevision      Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserApiKey {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String
+  keyHash      String
+  encryptedKey String   @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+// ============================================================================
+// CHART EXPLANATIONS CACHE
+// ============================================================================
+
+model ChartExplanation {
+  id           String   @id @default(cuid())
+  userId       String
+  chartId      String
+  summary      String   @db.Text
+  fullResponse String   @db.Text
+  chartTitle   String
+  generatedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chartId])
+  @@index([userId])
+}

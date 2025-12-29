@@ -8,7 +8,7 @@ export const AI_TEXT_MODEL_OPTIONS: Array<{ value: UseCaseConfig['model']; label
 ];
 
 export const AI_REASONING_EFFORT_OPTIONS: Array<{ value: UseCaseConfig['reasoning']; label: string }> = [
-  { value: 'minimal', label: 'Minimal (Ultra-fast)' },
+  { value: 'none', label: 'None (Ultra-fast)' },
   { value: 'low', label: 'Low (Fast)' },
   { value: 'medium', label: 'Medium (Balanced)' },
   { value: 'high', label: 'High (Quality)' },

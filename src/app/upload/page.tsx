@@ -3,22 +3,26 @@
 import { useState, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { parseSmartRowCsv, validateSmartRowCsv } from '@/lib/csvParser';
-import { processZipFile, ZipImportResult } from '@/lib/zipParser';
+import { processZipFile, ZipImportResult, ZipProcessProgress } from '@/lib/zipParser';
 import { formatValidationErrors, hasCriticalErrors } from '@/lib/validation';
-import { ImportResult } from '@/types/session';
+import { ImportResult, Session } from '@/types/session';
+import { saveSessionsToDBChunked, UploadProgress } from '@/lib/dataSync';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive, Database } from 'lucide-react';
 
-type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'success' | 'error';
+type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' | 'success' | 'error';
 
 export default function UploadPage() {
-  const { addSessions, getSessions, updateSession } = useRowingStore();
+  const { addSessions, getSessions, updateSessionsInStore } = useRowingStore();
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [zipResult, setZipResult] = useState<ZipImportResult | null>(null);
   const [error, setError] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [zipProgress, setZipProgress] = useState<ZipProcessProgress | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -66,13 +70,49 @@ export default function UploadPage() {
     setUploadState('validating');
     setImportResult(null);
     setZipResult(null);
+    setUploadProgress(null);
+    setZipProgress(null);
 
     try {
       // Check if it's a ZIP file
       if (file.name.toLowerCase().endsWith('.zip')) {
         setUploadState('processing');
         const existingSessions = getSessions();
-        const result = await processZipFile(file, existingSessions, updateSession);
+
+        // Process ZIP file - this parses all CSVs and returns sessions to save
+        const result = await processZipFile(
+          file,
+          existingSessions,
+          (progress) => setZipProgress(progress)
+        );
+
+        // If we have sessions to save, do a chunked bulk save
+        if (result.sessionsToSave.length > 0) {
+          setUploadState('saving');
+          setZipProgress(null);  // Clear ZIP progress
+          setUploadProgress({
+            current: 0,
+            total: 1,
+            sessionsProcessed: 0,
+            totalSessions: result.sessionsToSave.length,
+            message: 'Saving stroke data to database...'
+          });
+
+          // Save to database with progress tracking
+          const saveResult = await saveSessionsToDBChunked(
+            result.sessionsToSave,
+            (progress) => setUploadProgress(progress)
+          );
+
+          if (!saveResult.success) {
+            setError(saveResult.error || 'Failed to save sessions to database');
+            setUploadState('error');
+            return;
+          }
+
+          // Update local store state (already saved to DB)
+          updateSessionsInStore(result.sessionsToSave);
+        }
 
         setZipResult(result);
         setUploadState('success');
@@ -99,9 +139,31 @@ export default function UploadPage() {
         return;
       }
 
-      // Add sessions to store
+      // Save sessions to database with progress tracking
       if (result.importedSessions > 0) {
-        addSessions(sessions);
+        setUploadState('saving');
+        setUploadProgress({
+          current: 0,
+          total: 1,
+          sessionsProcessed: 0,
+          totalSessions: sessions.length,
+          message: 'Preparing to save sessions...'
+        });
+
+        // Save to database with progress tracking
+        const saveResult = await saveSessionsToDBChunked(
+          sessions,
+          (progress) => setUploadProgress(progress)
+        );
+
+        if (!saveResult.success) {
+          setError(saveResult.error || 'Failed to save sessions to database');
+          setUploadState('error');
+          return;
+        }
+
+        // Update local store state (skip DB save since we already saved with chunked upload)
+        addSessions(sessions, { skipDbSave: true });
       }
 
       setImportResult(result);
@@ -120,6 +182,8 @@ export default function UploadPage() {
     setImportResult(null);
     setZipResult(null);
     setError('');
+    setUploadProgress(null);
+    setZipProgress(null);
   }, []);
 
   const formatDuration = (seconds: number): string => {
@@ -187,22 +251,60 @@ export default function UploadPage() {
               </div>
             </CardContent>
           </Card>
-        ) : uploadState === 'validating' || uploadState === 'processing' ? (
+        ) : uploadState === 'validating' || uploadState === 'processing' || uploadState === 'saving' ? (
           <Card>
             <CardContent className="p-12 text-center">
               <div className="flex flex-col items-center space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                {uploadState === 'saving' ? (
+                  <Database className="h-12 w-12 text-primary animate-pulse" />
+                ) : (
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                )}
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-foreground">
-                    {uploadState === 'validating' ? 'Validating file...' : 'Processing your data...'}
+                    {uploadState === 'validating'
+                      ? 'Validating file...'
+                      : uploadState === 'processing'
+                        ? 'Processing your data...'
+                        : 'Saving to database...'}
                   </h3>
                   <p className="text-muted-foreground">
                     {uploadState === 'validating'
                       ? 'Checking file format'
-                      : 'Parsing your rowing data and calculating statistics'
+                      : uploadState === 'processing'
+                        ? 'Parsing your rowing data and calculating statistics'
+                        : uploadProgress?.message || 'Uploading your sessions to the server'
                     }
                   </p>
                 </div>
+
+                {/* Progress bar for saving state */}
+                {uploadState === 'saving' && uploadProgress && (
+                  <div className="w-full max-w-md space-y-2">
+                    <Progress
+                      value={(uploadProgress.sessionsProcessed / uploadProgress.totalSessions) * 100}
+                      className="h-2"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Sessions: {uploadProgress.sessionsProcessed} / {uploadProgress.totalSessions}</span>
+                      <span>Chunk {uploadProgress.current} / {uploadProgress.total}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress bar for ZIP processing */}
+                {uploadState === 'processing' && zipProgress && (
+                  <div className="w-full max-w-md space-y-2">
+                    <Progress
+                      value={(zipProgress.current / zipProgress.total) * 100}
+                      className="h-2"
+                    />
+                    <div className="text-xs text-muted-foreground text-center">
+                      {zipProgress.message}
+                    </div>
+                  </div>
+                )}
+
                 {selectedFile && (
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                     {selectedFile.name.endsWith('.zip') ? (
@@ -367,7 +469,7 @@ export default function UploadPage() {
                   <div>
                     <p className="font-medium">Open SmartRow App</p>
                     <p className="text-sm text-muted-foreground">
-                      Launch the SmartRow mobile app and ensure you're logged in
+                      Open https://smartrow.fit/ in your browser and ensure you're logged in to your account.
                     </p>
                   </div>
                 </div>
@@ -378,7 +480,9 @@ export default function UploadPage() {
                   <div>
                     <p className="font-medium">Export Your Data</p>
                     <p className="text-sm text-muted-foreground">
-                      Go to Settings → Export Data and select CSV format
+                      Go to "My Workouts" → Click "Export All" then click "Spreadsheet .csv file" under "List of your workouts" to download the session list.
+                      After the file was downloaded, click "Export All" again to get the detailed workout data from "Workout files" 
+                      (click ".csv file" again and wait a bit for the download to start).
                     </p>
                   </div>
                 </div>
@@ -389,7 +493,7 @@ export default function UploadPage() {
                   <div>
                     <p className="font-medium">Upload Here</p>
                     <p className="text-sm text-muted-foreground">
-                      Drag and drop the exported CSV file or ZIP archive above
+                      Drag and drop the exported CSV file or ZIP archive above (csv first then zip)
                     </p>
                   </div>
                 </div>

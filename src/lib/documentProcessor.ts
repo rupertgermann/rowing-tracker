@@ -118,7 +118,7 @@ async function extractTextFromImage(file: File): Promise<string> {
           }
         ],
         max_output_tokens: 2000,
-        reasoning: { effort: 'minimal' },
+        reasoning: { effort: 'none' },
         text: { verbosity: 'low' }
       })
     });

@@ -42,3 +42,15 @@ next-env.d.ts
 docs/test.md
 public/assets/awards/*
 !public/assets/awards/.gitkeep
+
+# Prisma
+/src/generated/prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Docker volumes (local data)
+postgres_data/
+pgadmin_data/
+
+# App runtime storage (local data)
+storage/

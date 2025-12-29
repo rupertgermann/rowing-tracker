@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -19,6 +20,9 @@ import {
 } from '@/components/ui/dialog';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
+import { deleteAllInsightsFromDB } from '@/lib/dataSync';
+import { useAIInsights } from '@/hooks/useAIInsights';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_CHAT_SYSTEM_PROMPT,
@@ -32,6 +36,7 @@ import {
   DEFAULT_ACHIEVEMENT_IMAGE_PROMPT,
   DEFAULT_ACHIEVEMENT_STORY_PROMPT
 } from '@/types/achievement';
+import { ACHIEVEMENT_COLOR_PALETTES } from '@/lib/achievementColors';
 import {
   migrateImagesFromIndexedDB,
   getAllAchievementImageIdsFromIndexedDB
@@ -80,10 +85,14 @@ type SettingsCategory =
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('userPreferences');
+  // Initialize as null to avoid hydration mismatch - load from localStorage after mount
   const [settingsData, setSettingsData] = useState<Settings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Get refreshArchivedInsights from useAIInsights hook
+  const { refreshArchivedInsights } = useAIInsights();
 
   // Toast component for overlay notifications
   const Toast = ({ message, type, onExit }: { message: string; type: 'success' | 'error'; onExit: () => void }) => {
@@ -161,6 +170,10 @@ export default function SettingsPage() {
   } | null>(null);
   const [promptEditorValue, setPromptEditorValue] = useState('');
 
+  // Clear data confirmation dialog state
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
+  const [dataCategoryToClear, setDataCategoryToClear] = useState<'sessions' | 'chatHistory' | 'trainingPlans' | 'insightsArchive' | null>(null);
+
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
     if (connectionStatus === 'success' || connectionStatus === 'error') {
@@ -220,6 +233,27 @@ export default function SettingsPage() {
     }
   };
 
+  const clearInsightsArchive = async () => {
+    setIsLoading(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const result = await deleteAllInsightsFromDB();
+      if (!result.success) {
+        setErrorMessage(result.error || 'Failed to clear insights archive');
+        return;
+      }
+
+      await refreshArchivedInsights?.();
+      setSuccessMessage('Insights archive cleared');
+    } catch (error) {
+      setErrorMessage('Failed to clear insights archive');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleResetPrompt = async (
     promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt' | 'explainChartPrompt' | 'awardSuggestionsPrompt',
     defaultValue: string
@@ -252,9 +286,12 @@ export default function SettingsPage() {
     }
   };
 
-  const resetPromptInEditor = () => {
+  const resetPromptInEditor = async () => {
     if (editingPrompt) {
       setPromptEditorValue(editingPrompt.defaultValue);
+      // Save the default value to settings
+      await saveSettings('aiSettings', { [editingPrompt.key]: editingPrompt.defaultValue });
+      setSuccessMessage('Prompt reset to default');
     }
   };
 
@@ -336,17 +373,38 @@ export default function SettingsPage() {
     setSuccessMessage('Settings reset to defaults');
   };
 
-  const clearDataCategory = (category: 'sessions' | 'chatHistory' | 'trainingPlans') => {
-    if (confirm(`Are you sure you want to clear all ${category}? This cannot be undone.`)) {
-      settings.clearDataCategory(category);
+  const clearDataCategory = async (category: 'sessions' | 'chatHistory' | 'trainingPlans' | 'insightsArchive') => {
+    // Set the category and show dialog instead of using confirm()
+    setDataCategoryToClear(category);
+    setShowClearDataConfirm(true);
+  };
+
+  const executeClearDataCategory = async () => {
+    if (!dataCategoryToClear) return;
+
+    try {
+      // Handle insightsArchive separately since it's not in settings
+      if (dataCategoryToClear === 'insightsArchive') {
+        await clearInsightsArchive();
+        setShowClearDataConfirm(false);
+        setDataCategoryToClear(null);
+        return;
+      }
+
+      settings.clearDataCategory(dataCategoryToClear);
 
       // Also clear from Zustand store if clearing sessions
-      if (category === 'sessions') {
+      if (dataCategoryToClear === 'sessions') {
         const { useRowingStore } = require('@/lib/store');
         useRowingStore.getState().clearSessions();
       }
 
-      setSuccessMessage(`${category} cleared successfully`);
+      setSuccessMessage(`${dataCategoryToClear} cleared successfully`);
+    } catch (error) {
+      setErrorMessage(`Failed to clear ${dataCategoryToClear}`);
+    } finally {
+      setShowClearDataConfirm(false);
+      setDataCategoryToClear(null);
     }
   };
 
@@ -385,6 +443,26 @@ export default function SettingsPage() {
             <option value="dark">Dark</option>
             <option value="system">System</option>
           </select>
+        </div>
+
+        <div>
+          <Label htmlFor="lightModeBrightness">
+            Light Mode Brightness: {settingsData.userPreferences.lightModeBrightness}%
+          </Label>
+          <div className="mt-2">
+            <Slider
+              id="lightModeBrightness"
+              value={[settingsData.userPreferences.lightModeBrightness]}
+              onValueChange={(value) => saveSettings('userPreferences', { lightModeBrightness: value[0] })}
+              min={30}
+              max={100}
+              step={5}
+              disabled={settingsData.userPreferences.theme === 'dark'}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Reduce brightness for a softer light mode appearance (only applies in light mode)
+          </p>
         </div>
 
         <div>
@@ -594,7 +672,7 @@ export default function SettingsPage() {
             <CardDescription>Permanently remove stored data</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button
                 variant="outline"
                 onClick={() => clearDataCategory('sessions')}
@@ -620,6 +698,15 @@ export default function SettingsPage() {
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear Training Plans
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => clearDataCategory('insightsArchive')}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear Insights Archive
               </Button>
             </div>
           </CardContent>
@@ -1142,7 +1229,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
-                          value={settingsData.aiSettings.chat?.reasoning || 'minimal'}
+                          value={settingsData.aiSettings.chat?.reasoning || 'none'}
                           onChange={(e) => saveSettings('aiSettings', {
                             chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
                           })}
@@ -1501,6 +1588,57 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Achievement Image Colors */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        Color Palette
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Choose the color scheme for achievement certificate images
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {ACHIEVEMENT_COLOR_PALETTES.map((palette) => (
+                          <button
+                            key={palette.value}
+                            onClick={() => saveSettings('aiSettings', { achievementImageColors: palette.value })}
+                            className={`relative p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+                              settingsData.aiSettings.achievementImageColors === palette.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex gap-1 mt-1">
+                                {palette.colors.map((color, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="w-4 h-4 rounded-full border border-gray-300"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm mb-1">{palette.label}</div>
+                                <div className="text-xs text-muted-foreground line-clamp-2">
+                                  {palette.description}
+                                </div>
+                              </div>
+                            </div>
+                            {settingsData.aiSettings.achievementImageColors === palette.value && (
+                              <div className="absolute top-2 right-2">
+                                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   {/* Personal Context Generation Configuration */}
                   <Card>
                     <CardHeader className="pb-3">
@@ -1577,7 +1715,7 @@ export default function SettingsPage() {
                         min="100"
                         max="16000"
                         value={settingsData.aiSettings.maxTokens}
-                        onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 1500 })}
+                        onChange={(e) => saveSettings('aiSettings', { maxTokens: parseInt(e.target.value) || 4000 })}
                         className="mt-1"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
@@ -2182,6 +2320,18 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Clear Data Confirmation Dialog */}
+      <ConfirmDialog
+        open={showClearDataConfirm}
+        onOpenChange={setShowClearDataConfirm}
+        title={`Clear ${dataCategoryToClear}?`}
+        description={`Are you sure you want to clear all ${dataCategoryToClear}? This action cannot be undone and will permanently remove all stored data.`}
+        confirmLabel="Clear"
+        cancelLabel="Cancel"
+        onConfirm={executeClearDataCategory}
+        variant="destructive"
+      />
     </div>
   );
 }

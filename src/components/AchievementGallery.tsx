@@ -8,6 +8,7 @@ import { useAchievementStore } from '@/lib/achievementStore';
 import { useRowingStore, AIAwardSuggestion } from '@/lib/store';
 import { settings } from '@/lib/settings';
 import { storeAchievementImage, getAchievementImage, deleteAchievementImage } from '@/lib/imageStorage';
+import { fetchGeneratedAchievementsFromDB, saveGeneratedAchievementsToDB } from '@/lib/dataSync';
 import { 
   Dialog, 
   DialogContent, 
@@ -118,6 +119,34 @@ export function AchievementGallery({
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageLoadingMessage, setImageLoadingMessage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Load generated achievements from DB when gallery opens (DB wins)
+  useEffect(() => {
+    if (!open) return;
+
+    const load = async () => {
+      try {
+        const dbAchievements = await fetchGeneratedAchievementsFromDB();
+        for (const a of dbAchievements) {
+          if (!a?.awardId) continue;
+          updateGeneratedAchievement(a.awardId, {
+            story: a.story || undefined,
+            imageUrl: a.imageUrl || undefined,
+            hasImage: Boolean(a.hasImage) || Boolean(a.imageUrl),
+            earnedAt: a.earnedAt ? new Date(a.earnedAt) : undefined,
+            generatedAt: a.generatedAt ? new Date(a.generatedAt) : undefined,
+          });
+        }
+      } catch (e) {
+        // Non-fatal; gallery can still work without DB data
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[AchievementGallery] Failed to load generated achievements from DB', e);
+        }
+      }
+    };
+
+    load();
+  }, [open, updateGeneratedAchievement]);
 
   // Fun rowing-themed loading messages
   const loadingMessages = [
@@ -285,6 +314,20 @@ export function AchievementGallery({
         story: data.story,
         generatedAt: new Date()
       });
+
+      const saveResult = await saveGeneratedAchievementsToDB([
+        {
+          awardId: currentAward.id,
+          story: data.story,
+          earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : undefined,
+          generatedAt: new Date(),
+        },
+      ]);
+      
+      if (!saveResult.success) {
+        console.error('[AchievementGallery] Failed to save story to DB:', saveResult.error);
+        setError(`Failed to save: ${saveResult.error}`);
+      }
       
       return data.story;
     } catch (err) {
@@ -316,16 +359,10 @@ export function AchievementGallery({
         model: aiSettings.achievementImageModel,
         quality: aiSettings.achievementImageQuality,
         size: aiSettings.achievementImageSize,
+        colorPalette: aiSettings.achievementImageColors,
         // If a story already exists, pass it for better coherence
         story: storyToUse
       };
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[AchievementGallery] image request body', {
-          ...requestBody,
-          storyPreview: requestBody.story?.slice?.(0, 120) || null,
-          hasStory: Boolean(requestBody.story)
-        });
-      }
 
       const response = await fetch('/api/achievements/image', {
         method: 'POST',
@@ -369,6 +406,21 @@ export function AchievementGallery({
           generatedAt: new Date()
         });
       }
+
+      const saveResult = await saveGeneratedAchievementsToDB([
+        {
+          awardId: currentAward.id,
+          imageUrl: filePath,
+          hasImage: true,
+          earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : undefined,
+          generatedAt: new Date(),
+        },
+      ]);
+      
+      if (!saveResult.success) {
+        console.error('[AchievementGallery] Failed to save image to DB:', saveResult.error);
+        setError(`Failed to save: ${saveResult.error}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate image');
     } finally {
@@ -389,6 +441,14 @@ export function AchievementGallery({
       error: undefined,
       generatedAt: new Date()
     });
+
+    await saveGeneratedAchievementsToDB([
+      {
+        awardId: currentAward.id,
+        story: null,
+        generatedAt: new Date(),
+      },
+    ]);
   };
 
   const handleResetImage = async () => {
@@ -402,6 +462,15 @@ export function AchievementGallery({
       error: undefined,
       generatedAt: new Date()
     });
+
+    await saveGeneratedAchievementsToDB([
+      {
+        awardId: currentAward.id,
+        imageUrl: null,
+        hasImage: false,
+        generatedAt: new Date(),
+      },
+    ]);
   };
 
   const handleDownloadImage = () => {

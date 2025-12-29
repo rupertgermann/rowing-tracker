@@ -39,13 +39,16 @@ export function PlanAnalysisArchiveModal({
 
   useEffect(() => {
     if (open) {
-      // Load plan analysis sessions
-      const planAnalysisSessions = chatStorage.getPlanAnalysisSessions(planId);
-      // Sort by date, newest first
-      const sorted = planAnalysisSessions.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setAnalyses(sorted);
+      // Load plan analysis sessions (async)
+      const loadAnalyses = async () => {
+        const planAnalysisSessions = await chatStorage.getPlanAnalysisSessions(planId);
+        // Sort by date, newest first
+        const sorted = planAnalysisSessions.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setAnalyses(sorted);
+      };
+      loadAnalyses();
     }
   }, [open, planId]);
 

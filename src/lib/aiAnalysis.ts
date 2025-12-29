@@ -1,4 +1,5 @@
 import { Session } from '@/types/session';
+import { cloudAI } from '@/lib/cloudAI';
 
 // Types for AI analysis results
 export interface TrendData {
@@ -201,7 +202,7 @@ export class AIAnalysisService {
   }
 
   // Generate actionable insights
-  generateInsights(sessions: Session[]): Insight[] {
+  async generateInsights(sessions: Session[]): Promise<Insight[]> {
     const insights: Insight[] = [];
     
     if (sessions.length < 5) return insights;
@@ -233,29 +234,41 @@ export class AIAnalysisService {
       });
     }
     
-    // Training load insights
+    // Training load insights - use AI when available, otherwise simplified logic
     const trainingLoad = this.calculateTrainingLoad(sessions);
     if (trainingLoad) {
-      if (trainingLoad.strain > 1.3) {
-        insights.push({
-          id: `load-high-${Date.now()}`,
-          type: 'recommendation',
-          title: 'High Training Load Detected',
-          description: 'Your training load is significantly higher than usual. Consider adding extra recovery time.',
-          actionable: true,
-          priority: 'high',
-          dateGenerated: new Date()
-        });
-      } else if (trainingLoad.strain < 0.8) {
-        insights.push({
-          id: `load-low-${Date.now()}`,
-          type: 'recommendation',
-          title: 'Low Training Volume',
-          description: 'Your training load is lower than your baseline. Consider increasing frequency or intensity.',
-          actionable: true,
-          priority: 'medium',
-          dateGenerated: new Date()
-        });
+      // Try to get AI-generated training load insights
+      if (cloudAI.isConfigured()) {
+        try {
+          const aiInsights = await cloudAI.generateInsights(sessions);
+          // Filter for training load related insights
+          const trainingLoadInsights = aiInsights.filter(insight => 
+            insight.title.toLowerCase().includes('load') ||
+            insight.title.toLowerCase().includes('training') ||
+            insight.title.toLowerCase().includes('recovery') ||
+            insight.description.toLowerCase().includes('strain')
+          );
+          
+          // Convert AI insights to local Insight format
+          trainingLoadInsights.forEach(aiInsight => {
+            insights.push({
+              id: `ai-load-${aiInsight.id}`,
+              type: aiInsight.type as Insight['type'],
+              title: aiInsight.title,
+              description: aiInsight.description,
+              actionable: aiInsight.actionable,
+              priority: aiInsight.priority,
+              dateGenerated: aiInsight.dateGenerated
+            });
+          });
+        } catch (error) {
+          console.warn('Failed to generate AI training load insights, falling back to basic logic:', error);
+          // Fallback to basic logic
+          this.addBasicTrainingLoadInsights(trainingLoad, insights);
+        }
+      } else {
+        // Use basic logic when AI is not configured
+        this.addBasicTrainingLoadInsights(trainingLoad, insights);
       }
     }
     
@@ -358,6 +371,31 @@ export class AIAnalysisService {
     const minutes = Math.floor(secondsPer500m / 60);
     const seconds = Math.floor(secondsPer500m % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  // Add basic training load insights when AI is not available
+  private addBasicTrainingLoadInsights(trainingLoad: TrainingLoadData, insights: Insight[]): void {
+    if (trainingLoad.strain > 1.3) {
+      insights.push({
+        id: `load-high-${Date.now()}`,
+        type: 'recommendation',
+        title: 'High Training Load Detected',
+        description: 'Your training load is significantly higher than usual. Consider adding extra recovery time.',
+        actionable: true,
+        priority: 'high',
+        dateGenerated: new Date()
+      });
+    } else if (trainingLoad.strain < 0.8) {
+      insights.push({
+        id: `load-low-${Date.now()}`,
+        type: 'recommendation',
+        title: 'Low Training Volume',
+        description: 'Your training load is lower than your baseline. Consider increasing frequency or intensity.',
+        actionable: true,
+        priority: 'medium',
+        dateGenerated: new Date()
+      });
+    }
   }
 }
 

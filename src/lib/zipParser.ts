@@ -8,6 +8,13 @@ export interface ZipImportResult {
     skippedFiles: number;
     errors: string[];
     updatedSessions: number;
+    sessionsToSave: Session[];  // Sessions that need to be saved to DB
+}
+
+export interface ZipProcessProgress {
+    current: number;
+    total: number;
+    message: string;
 }
 
 interface FilenameInfo {
@@ -83,18 +90,20 @@ function findMatchingSession(timestamp: Date, sessions: Session[], distance: num
 
 /**
  * Process a ZIP file containing detailed workout CSVs
+ * Returns the updated sessions for bulk saving (doesn't save to DB directly)
  */
 export async function processZipFile(
     file: File,
     existingSessions: Session[],
-    updateSession: (session: Session) => void
+    onProgress?: (progress: ZipProcessProgress) => void
 ): Promise<ZipImportResult> {
     const result: ZipImportResult = {
         totalFiles: 0,
         processedFiles: 0,
         skippedFiles: 0,
         errors: [],
-        updatedSessions: 0
+        updatedSessions: 0,
+        sessionsToSave: []
     };
 
     try {
@@ -104,7 +113,18 @@ export async function processZipFile(
         const files = Object.values(loadedZip.files).filter(f => !f.dir && f.name.endsWith('.csv'));
         result.totalFiles = files.length;
 
-        for (const zipEntry of files) {
+        // Track which sessions we've already updated (by id) to avoid duplicates
+        const updatedSessionsMap = new Map<string, Session>();
+
+        for (let i = 0; i < files.length; i++) {
+            const zipEntry = files[i];
+
+            // Report progress
+            onProgress?.({
+                current: i + 1,
+                total: files.length,
+                message: `Parsing file ${i + 1} of ${files.length}...`
+            });
             try {
                 const fileInfo = extractInfoFromFilename(zipEntry.name);
 
@@ -116,22 +136,17 @@ export async function processZipFile(
 
                 if (!session) {
                     result.skippedFiles++;
-                    // result.errors.push(`No matching session found for file: ${zipEntry.name}`);
                     continue;
                 }
 
-                // Check if session already has stroke data? 
-                // Maybe we want to overwrite it or skip. For now, let's overwrite/update.
-
                 const content = await zipEntry.async('blob');
-                // Create a File object from Blob to reuse parseStrokeCsv
                 const csvFile = new File([content], zipEntry.name, { type: 'text/csv' });
 
                 const parseResult = await parseStrokeCsv(csvFile);
 
                 if (parseResult.data.length > 0) {
                     const updatedSession = { ...session, strokeData: parseResult.data };
-                    updateSession(updatedSession);
+                    updatedSessionsMap.set(session.id, updatedSession);
                     result.updatedSessions++;
                     result.processedFiles++;
                 } else {
@@ -146,6 +161,9 @@ export async function processZipFile(
                 result.errors.push(`Error processing ${zipEntry.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }
         }
+
+        // Collect all updated sessions for bulk saving
+        result.sessionsToSave = Array.from(updatedSessionsMap.values());
 
     } catch (err) {
         result.errors.push(`Failed to process ZIP file: ${err instanceof Error ? err.message : 'Unknown error'}`);
