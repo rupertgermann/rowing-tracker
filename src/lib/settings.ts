@@ -17,8 +17,6 @@ export interface UserPreferences {
 }
 
 export interface DataManagement {
-  autoSave: boolean;
-  autoSaveInterval: number; // minutes
   exportFormat: 'json' | 'csv';
   backupEnabled: boolean;
   lastBackup: Date | null;
@@ -26,6 +24,7 @@ export interface DataManagement {
     sessions: number;
     chatHistory: number;
     trainingPlans: number;
+    insightsArchive: number;
     total: number;
   };
 }
@@ -144,8 +143,6 @@ export class SettingsService {
       customPrompts: []
     },
     dataManagement: {
-      autoSave: true,
-      autoSaveInterval: 5,
       exportFormat: 'json',
       backupEnabled: false,
       lastBackup: null,
@@ -153,6 +150,7 @@ export class SettingsService {
         sessions: 0,
         chatHistory: 0,
         trainingPlans: 0,
+        insightsArchive: 0,
         total: 0
       }
     },
@@ -448,7 +446,12 @@ Be specific and actionable. Only include information relevant to rowing training
         showPromptSuggestions: dbSettings.showPromptSuggestions !== false,
         customPrompts: dbSettings.customPrompts || []
       },
-      dataManagement: this.defaultSettings.dataManagement,
+      dataManagement: {
+        ...this.defaultSettings.dataManagement,
+        exportFormat: dbSettings.exportFormat || 'json',
+        backupEnabled: dbSettings.backupEnabled || false,
+        lastBackup: dbSettings.lastBackup ? new Date(dbSettings.lastBackup) : null,
+      },
       trainingSettings: {
         ...this.defaultSettings.trainingSettings,
         defaultTrainingZones: dbSettings.trainingZones || this.defaultSettings.trainingSettings.defaultTrainingZones,
@@ -524,6 +527,9 @@ Be specific and actionable. Only include information relevant to rowing training
       animationsEnabled: settings.userPreferences.animationsEnabled,
       showPromptSuggestions: settings.userPreferences.showPromptSuggestions,
       customPrompts: settings.userPreferences.customPrompts,
+      exportFormat: settings.dataManagement.exportFormat,
+      backupEnabled: settings.dataManagement.backupEnabled,
+      lastBackup: settings.dataManagement.lastBackup,
       trainingZones: settings.trainingSettings.defaultTrainingZones,
       preferredMetrics: settings.trainingSettings.preferredMetrics,
       weeklyGoalType: settings.trainingSettings.weeklyGoal.type,
@@ -711,7 +717,7 @@ Be specific and actionable. Only include information relevant to rowing training
   }
 
   // Storage management
-  calculateStorageUsage(): DataManagement['storageUsage'] {
+  async calculateStorageUsage(): Promise<DataManagement['storageUsage']> {
     try {
       // Guard against SSR/non-browser environments
       if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
@@ -719,17 +725,34 @@ Be specific and actionable. Only include information relevant to rowing training
           sessions: 0,
           chatHistory: 0,
           trainingPlans: 0,
+          insightsArchive: 0,
           total: 0
         };
       }
 
-      // Read from actual Zustand store
-      const rowingStore = localStorage.getItem('rowing-tracker-storage');
-      const chatHistory = localStorage.getItem('rowing_ai_chat_sessions');
-      const trainingPlans = localStorage.getItem('rowing_training_plans');
-      const settings = localStorage.getItem(this.STORAGE_KEY);
+      // Try to fetch from DB API first
+      try {
+        const response = await fetch('/api/data-usage');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.usage) {
+            return {
+              sessions: data.usage.sessions || 0,
+              chatHistory: data.usage.chatHistory || 0,
+              trainingPlans: data.usage.trainingPlans || 0,
+              insightsArchive: data.usage.insightsArchive || 0,
+              total: data.usage.total || 0
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[SETTINGS] Failed to fetch storage usage from API, falling back to local calculation');
+      }
 
-      // Calculate sessions size from Zustand store
+      // Fallback to local calculation for remaining localStorage items
+      const rowingStore = localStorage.getItem('rowing-tracker-storage');
+      const settings = localStorage.getItem(this.STORAGE_KEY);
+      
       let sessionsSize = 0;
       if (rowingStore) {
         try {
@@ -744,13 +767,13 @@ Be specific and actionable. Only include information relevant to rowing training
 
       const usage = {
         sessions: sessionsSize,
-        chatHistory: chatHistory ? new Blob([chatHistory]).size : 0,
-        trainingPlans: trainingPlans ? new Blob([trainingPlans]).size : 0,
+        chatHistory: 0,
+        trainingPlans: 0,
+        insightsArchive: 0,
         total: 0
       };
 
-      usage.total = usage.sessions + usage.chatHistory + usage.trainingPlans +
-        (settings ? new Blob([settings]).size : 0);
+      usage.total = usage.sessions + (settings ? new Blob([settings]).size : 0);
 
       return usage;
     } catch (error) {
@@ -759,6 +782,7 @@ Be specific and actionable. Only include information relevant to rowing training
         sessions: 0,
         chatHistory: 0,
         trainingPlans: 0,
+        insightsArchive: 0,
         total: 0
       };
     }

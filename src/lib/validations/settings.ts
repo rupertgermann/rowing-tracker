@@ -106,6 +106,9 @@ export const settingsUpdateSchema = z.object({
   achievementAlerts: z.boolean(),
   planReminders: z.boolean(),
   adherenceAlerts: z.boolean(),
+  exportFormat: z.enum(['json', 'csv']).optional(),
+  backupEnabled: z.boolean().optional(),
+  lastBackup: z.string().optional().nullable(),
 
   // AI settings
   cloudAIEnabled: z.boolean(),

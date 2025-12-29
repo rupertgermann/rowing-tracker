@@ -90,9 +90,19 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [storageUsage, setStorageUsage] = useState<DataManagement['storageUsage'] | null>(null);
   
   // Get refreshArchivedInsights from useAIInsights hook
   const { refreshArchivedInsights } = useAIInsights();
+
+  // Load storage usage
+  useEffect(() => {
+    const loadStorageUsage = async () => {
+      const usage = await settings.calculateStorageUsage();
+      setStorageUsage(usage);
+    };
+    loadStorageUsage();
+  }, [settingsData]);
 
   // Toast component for overlay notifications
   const Toast = ({ message, type, onExit }: { message: string; type: 'success' | 'error'; onExit: () => void }) => {
@@ -576,11 +586,17 @@ export default function SettingsPage() {
   );
 
   const renderDataManagement = () => {
-    const storageUsage = settings.calculateStorageUsage();
+    if (!storageUsage) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Storage Usage</CardTitle>
@@ -599,41 +615,15 @@ export default function SettingsPage() {
                   <span>Training Plans:</span>
                   <span>{settings.formatBytes(storageUsage.trainingPlans)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Insights Archive:</span>
+                  <span>{settings.formatBytes(storageUsage.insightsArchive)}</span>
+                </div>
                 <div className="flex justify-between font-semibold">
                   <span>Total:</span>
                   <span>{settings.formatBytes(storageUsage.total)}</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Auto Save</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={settingsData.dataManagement.autoSave}
-                  onCheckedChange={(checked) => saveSettings('dataManagement', { autoSave: checked })}
-                />
-                <Label>Enable Auto Save</Label>
-              </div>
-
-              {settingsData.dataManagement.autoSave && (
-                <div>
-                  <Label htmlFor="autoSaveInterval">Save Interval (minutes)</Label>
-                  <Input
-                    id="autoSaveInterval"
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={settingsData.dataManagement.autoSaveInterval}
-                    onChange={(e) => saveSettings('dataManagement', { autoSaveInterval: parseInt(e.target.value) })}
-                    className="mt-1"
-                  />
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
