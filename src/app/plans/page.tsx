@@ -11,11 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { trainingPlans, TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
 import { cloudAI } from '@/lib/cloudAI';
+import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 import { useRowingStore } from '@/lib/store';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { memoryStorage } from '@/lib/memoryStorage';
 import { chatStorage } from '@/lib/chatStorage';
-import { SettingsService } from '@/lib/settings';
 import {
   Calendar,
   Play,
@@ -69,6 +69,8 @@ export default function PlansPage() {
 
   useEffect(() => {
     loadPlans();
+    // Keep AI availability consistent across reloads/navigation.
+    initializeCloudAIFromSettings();
   }, []);
 
   // Auto-select current week when active plan changes
@@ -132,7 +134,16 @@ export default function PlansPage() {
     try {
       let newPlan: TrainingPlan;
 
-      if (isAI && cloudAI.isConfigured()) {
+      if (isAI) {
+        // Ensure AI is configured from persisted settings (API key is stored in localStorage).
+        initializeCloudAIFromSettings();
+
+        if (!isAIAvailable()) {
+          const errorMessage = getAIConfigurationErrorMessage();
+          setError(errorMessage || 'Configure OpenAI API key to use AI generation');
+          return;
+        }
+
         // AI-generated plan
         const goals = planForm.goals.split(',').map(g => g.trim()).filter(g => g);
         const userSessions = getSessions();
