@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
-import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB } from '@/lib/dataSync';
+import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
 import { clearSessionsCache } from '@/lib/services/sessionsCache';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 
@@ -1000,12 +1000,33 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       },
 
       updateSessionAnalysisSettings: (settings) => {
-        set((state) => ({
-          sessionAnalysisSettings: {
+        set((state) => {
+          const updatedSettings = {
             ...state.sessionAnalysisSettings,
             ...settings
-          }
-        }));
+          };
+
+          console.log('[STORE DEBUG] updateSessionAnalysisSettings called with:', settings);
+          console.log('[STORE DEBUG] Current state:', state.sessionAnalysisSettings);
+          console.log('[STORE DEBUG] Updated settings:', updatedSettings);
+
+          // Persist to database (async, non-blocking)
+          saveSessionAnalysisSettingsToDB(updatedSettings)
+            .then(result => {
+              if (!result.success) {
+                console.error('[STORE] Failed to save session analysis settings:', result.error);
+              } else {
+                console.log('[STORE] ✅ Session analysis settings saved to database:', updatedSettings);
+              }
+            })
+            .catch(err => {
+              console.error('[STORE] Error saving session analysis settings to database:', err);
+            });
+
+          return {
+            sessionAnalysisSettings: updatedSettings
+          };
+        });
       },
 
       setChartExplanation: (chartId, explanation) => {
@@ -1089,8 +1110,9 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       initializeFromDB: async () => {
         try {
           const data = await initializeStoreFromDB();
-          
-          
+
+          console.log('[STORE DEBUG] initializeFromDB - raw data from DB:', data);
+
           // Convert timestamps to Date objects
           const sessions = data.sessions.map((s) => ({
             ...s,
@@ -1105,12 +1127,12 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
             awardId: a.awardId,
             earnedAt: new Date(a.earnedAt as string | Date)
           }));
-          
+
           // Load generated achievements into the achievement store
           if (data.generatedAchievements && data.generatedAchievements.length > 0) {
             const useAchievementStore = await import('@/lib/achievementStore').then(m => m.useAchievementStore);
             const { setGeneratedAchievement } = useAchievementStore.getState();
-            
+
             for (const achievement of data.generatedAchievements) {
               if (achievement?.awardId) {
                 setGeneratedAchievement(achievement.awardId, {
@@ -1126,18 +1148,28 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
               }
             }
           }
-          
+
           // Load chart settings from database, or use defaults
           const chartSettings = (data.chartSettings as unknown as ChartSettings | undefined) || defaultChartSettings;
-          
-          
+
+          // Load session analysis settings from database, or use defaults
+          const sessionAnalysisSettings = (data.sessionAnalysisSettings as unknown as SessionAnalysisSettings | undefined) || defaultSessionAnalysisSettings;
+
+          console.log('[STORE DEBUG] initializeFromDB - chartSettings loaded:', chartSettings);
+          console.log('[STORE DEBUG] initializeFromDB - sessionAnalysisSettings in data:', (data as any).sessionAnalysisSettings);
+          console.log('[STORE DEBUG] initializeFromDB - sessionAnalysisSettings loaded:', sessionAnalysisSettings);
+          console.log('[STORE DEBUG] initializeFromDB - current store state before set:', get().sessionAnalysisSettings);
+
           set({
             sessions,
             personalRecords,
             earnedAwards,
-            chartSettings
+            chartSettings,
+            sessionAnalysisSettings
           });
-          
+
+          console.log('[STORE DEBUG] ✅ initializeFromDB - store state AFTER set:', get().sessionAnalysisSettings);
+
         } catch (error) {
           console.error('[STORE] Failed to initialize from database:', error);
         }

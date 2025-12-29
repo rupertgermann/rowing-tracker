@@ -429,6 +429,25 @@ export async function fetchChartSettingsFromDB(): Promise<Record<string, unknown
 }
 
 /**
+ * Fetch session analysis settings from database
+ */
+export async function fetchSessionAnalysisSettingsFromDB(): Promise<Record<string, unknown> | null> {
+  try {
+    const response = await fetch('/api/settings');
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
+    const data = await response.json();
+    console.log('[DATASYNC DEBUG] fetchSessionAnalysisSettingsFromDB - full settings:', data.settings);
+    console.log('[DATASYNC DEBUG] fetchSessionAnalysisSettingsFromDB - sessionAnalysisSettings:', data.settings?.sessionAnalysisSettings);
+    return data.settings?.sessionAnalysisSettings || null;
+  } catch (error) {
+    console.error('Error fetching session analysis settings:', error);
+    return null;
+  }
+}
+
+/**
  * Save chart settings to database
  */
 export async function saveChartSettingsToDB(chartSettings: Record<string, unknown>): Promise<SyncResult> {
@@ -447,6 +466,37 @@ export async function saveChartSettingsToDB(chartSettings: Record<string, unknow
     return { success: true };
   } catch (error) {
     console.error('Error saving chart settings:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Save session analysis settings to database
+ */
+export async function saveSessionAnalysisSettingsToDB(sessionAnalysisSettings: Record<string, unknown>): Promise<SyncResult> {
+  try {
+    console.log('[DATASYNC DEBUG] saveSessionAnalysisSettingsToDB called with:', sessionAnalysisSettings);
+
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionAnalysisSettings }),
+    });
+
+    console.log('[DATASYNC DEBUG] API response status:', response.status);
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[DATASYNC DEBUG] API error response:', error);
+      return { success: false, error: error.error || 'Failed to save session analysis settings' };
+    }
+
+    const responseData = await response.json();
+    console.log('[DATASYNC DEBUG] ✅ API success response:', responseData);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[DATASYNC DEBUG] Exception in saveSessionAnalysisSettingsToDB:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
@@ -673,6 +723,8 @@ export async function saveMemoryDocumentsToDB(documents: any[]): Promise<SyncRes
  * Call this when user logs in or app loads.
  */
 export async function initializeStoreFromDB() {
+  console.log('[DATASYNC DEBUG] initializeStoreFromDB - starting fetch...');
+
   const [
     sessions,
     prs,
@@ -683,7 +735,8 @@ export async function initializeStoreFromDB() {
     settings,
     generatedAchievements,
     memoryDocuments,
-    chartSettings
+    chartSettings,
+    sessionAnalysisSettings
   ] = await Promise.all([
     fetchSessionsFromDB(), // Full sessions with strokeData for session details
     fetchPRsFromDB(),
@@ -695,7 +748,12 @@ export async function initializeStoreFromDB() {
     fetchGeneratedAchievementsFromDB(),
     fetchMemoryDocumentsFromDB(),
     fetchChartSettingsFromDB(),
+    fetchSessionAnalysisSettingsFromDB(),
   ]);
+
+  console.log('[DATASYNC DEBUG] initializeStoreFromDB - settings fetched:', settings);
+  console.log('[DATASYNC DEBUG] initializeStoreFromDB - chartSettings fetched:', chartSettings);
+  console.log('[DATASYNC DEBUG] ✅ initializeStoreFromDB - sessionAnalysisSettings fetched:', sessionAnalysisSettings);
 
   return {
     sessions,
@@ -708,5 +766,6 @@ export async function initializeStoreFromDB() {
     generatedAchievements,
     memoryDocuments,
     chartSettings,
+    sessionAnalysisSettings,
   };
 }
