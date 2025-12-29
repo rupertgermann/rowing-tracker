@@ -1251,72 +1251,6 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Award Suggestions Configuration */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                        Award Suggestions
-                      </CardTitle>
-                      <CardDescription className="text-sm">
-                        Suggest upcoming achievements based on your recent sessions
-                      </CardDescription>
-                    </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-3">
-                      <div>
-                        <Label>AI Model</Label>
-                        <select
-                          value={settingsData.aiSettings.awardSuggestions?.model || 'gpt-5-mini'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, model: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Balanced models work well for quick, realistic milestone suggestions
-                        </p>
-                      </div>
-                      <div>
-                        <Label>Reasoning Effort</Label>
-                        <select
-                          value={settingsData.aiSettings.awardSuggestions?.reasoning || 'medium'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, reasoning: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Response Verbosity</Label>
-                        <select
-                          value={settingsData.aiSettings.awardSuggestions?.verbosity || 'low'}
-                          onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, verbosity: e.target.value as any }
-                          })}
-                          className="w-full mt-1 p-2 border rounded-md"
-                        >
-                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   {/* Insights Configuration */}
                   <Card>
                     <CardHeader className="pb-3">
@@ -1436,6 +1370,72 @@ export default function SettingsPage() {
                           value={settingsData.aiSettings.trainingPlans?.verbosity || 'high'}
                           onChange={(e) => saveSettings('aiSettings', {
                             trainingPlans: { ...settingsData.aiSettings.trainingPlans, verbosity: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_RESPONSE_VERBOSITY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Personal Context Generation Configuration */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                        Personal Context Generation
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        AI-generated context from your personal information for coaching personalization
+                      </CardDescription>
+                    </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <Label>AI Model</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5-mini'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, model: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_TEXT_MODEL_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Condensing personal info works well with balanced models
+                        </p>
+                      </div>
+                      <div>
+                        <Label>Reasoning Effort</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.reasoning || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, reasoning: e.target.value as any }
+                          })}
+                          className="w-full mt-1 p-2 border rounded-md"
+                        >
+                          {AI_REASONING_EFFORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Response Verbosity</Label>
+                        <select
+                          value={settingsData.aiSettings.userProfileGeneration?.verbosity || 'low'}
+                          onChange={(e) => saveSettings('aiSettings', {
+                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, verbosity: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1629,24 +1629,24 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Personal Context Generation Configuration */}
+                  {/* Award Suggestions Configuration */}
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                        Personal Context Generation
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        Award Suggestions
                       </CardTitle>
                       <CardDescription className="text-sm">
-                        AI-generated context from your personal information for coaching personalization
+                        Suggest upcoming achievements based on your recent sessions
                       </CardDescription>
                     </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5-mini'}
+                          value={settingsData.aiSettings.awardSuggestions?.model || 'gpt-5-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, model: e.target.value as any }
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, model: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1657,15 +1657,15 @@ export default function SettingsPage() {
                           ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Condensing personal info works well with balanced models
+                          Balanced models work well for quick, realistic milestone suggestions
                         </p>
                       </div>
                       <div>
                         <Label>Reasoning Effort</Label>
                         <select
-                          value={settingsData.aiSettings.userProfileGeneration?.reasoning || 'low'}
+                          value={settingsData.aiSettings.awardSuggestions?.reasoning || 'medium'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, reasoning: e.target.value as any }
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, reasoning: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1679,9 +1679,9 @@ export default function SettingsPage() {
                       <div>
                         <Label>Response Verbosity</Label>
                         <select
-                          value={settingsData.aiSettings.userProfileGeneration?.verbosity || 'low'}
+                          value={settingsData.aiSettings.awardSuggestions?.verbosity || 'low'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, verbosity: e.target.value as any }
+                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, verbosity: e.target.value as any }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
