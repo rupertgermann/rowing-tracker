@@ -216,11 +216,32 @@ export class TrainingPlansService {
 
   // Delete training plan
   async deletePlan(planId: string): Promise<void> {
-    const plans = await this.getPlans();
-    const filteredPlans = plans.filter(p => p.id !== planId);
-    await this.savePlans(filteredPlans);
+    // If deleted plan was active, clear active plan pointer first
+    // to avoid a stale activePlanId pointing to a removed record.
+    const activePlanId = localStorage.getItem(this.ACTIVE_PLAN_KEY);
+    if (activePlanId === planId) {
+      await this.clearActivePlan();
+    }
 
-    // If deleted plan was active, clear active plan
+    const response = await fetch('/api/training-plans', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId }),
+    });
+
+    if (!response.ok) {
+      let message = 'Failed to delete training plan';
+      try {
+        const data = await response.json();
+        if (data?.error) message = data.error;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
+
+    // Defensive: if the active plan was derived from settings and not localStorage,
+    // make sure it's cleared too.
     const activePlan = await this.getActivePlan();
     if (activePlan?.id === planId) {
       await this.clearActivePlan();
