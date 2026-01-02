@@ -1,7 +1,7 @@
 // Color palette options for achievement certificate images
 
 export interface ColorPalette {
-  value: 'classic' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean';
+  value: 'classic' | 'classic-red' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean';
   label: string;
   description: string;
   colors: string[]; // Hex colors for preview
@@ -15,6 +15,13 @@ export const ACHIEVEMENT_COLOR_PALETTES: ColorPalette[] = [
     description: 'Traditional achievement colors with deep blues and golds',
     colors: ['#1e3a8a', '#fbbf24', '#ffffff'],
     prompt: 'deep blues, golds, and whites'
+  },
+  {
+    value: 'classic-red',
+    label: 'Classic Red & Gold',
+    description: 'Traditional achievement colors with deep reds and golds',
+    colors: ['#7f1d1d', '#d97706', '#fef3c7'],
+    prompt: 'deep red, gold, and cream'
   },
   {
     value: 'gold-blue',
@@ -55,8 +62,8 @@ export const ACHIEVEMENT_COLOR_PALETTES: ColorPalette[] = [
     value: 'ocean',
     label: 'Ocean Blue',
     description: 'Cool ocean blues with aqua and white highlights',
-    colors: ['#0369a1', '#06b6d4', '#e0f2fe'],
-    prompt: 'deep ocean blue, aqua, and sky blue'
+    colors: ['#0369a1', '#ffea00ff', '#e0f2fe'],
+    prompt: 'deep ocean blue, gold, and sky blue'
   }
 ];
 

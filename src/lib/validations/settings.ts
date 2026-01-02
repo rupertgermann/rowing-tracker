@@ -23,7 +23,7 @@ const modelSchema = z.enum(["gpt-5-nano", "gpt-5-mini", "gpt-5.1", "gpt-5.2"]);
 const imageModelSchema = z.enum(["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]);
 const imageQualitySchema = z.enum(["auto", "high", "medium", "low"]);
 const imageSizeSchema = z.enum(["1024x1024", "1024x1536", "1536x1024", "auto"]);
-const colorPaletteSchema = z.enum(["classic", "gold-blue", "emerald", "royal", "sunset", "monochrome", "ocean"]);
+const colorPaletteSchema = z.enum(["classic", "classic-red", "gold-blue", "emerald", "royal", "sunset", "monochrome", "ocean"]);
 
 // Use case configuration object
 const useCaseConfigSchema = z.object({

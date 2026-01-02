@@ -99,7 +99,7 @@ export interface AISettings {
   achievementImageModel: 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
   achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
-  achievementImageColors: 'classic' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean'; // color palette
+  achievementImageColors: 'classic' | 'classic-red' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean'; // color palette
 
   // Personal context for AI personalization
   userProfileContext: string; // Condensed system prompt addition from user docs/self-description
