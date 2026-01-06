@@ -99,7 +99,7 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach, isOrph
             </Badge>
           )}
         </div>
-        
+
         {document.description && (
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {document.description}
@@ -114,8 +114,14 @@ function DocumentCard({ document, onDelete, onView, onViewText, onAttach, isOrph
           <span>•</span>
           <span>{formatBytes(document.size)}</span>
           <span>•</span>
-          <Badge variant="secondary" className="text-xs px-1.5 py-0">
-            {document.source === 'user' ? 'Uploaded' : 'System'}
+          <Badge
+            variant="outline"
+            className={`text-xs px-1.5 py-0 ${document.source === 'user'
+                ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20'
+                : 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20 hover:bg-zinc-500/20'
+              }`}
+          >
+            {document.source === 'user' ? 'User' : 'System'}
           </Badge>
         </div>
 
@@ -206,9 +212,8 @@ function StorageQuota({ used, total }: StorageQuotaProps) {
       </div>
       <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all ${
-            isCritical ? 'bg-destructive' : isWarning ? 'bg-yellow-500' : 'bg-primary'
-          }`}
+          className={`h-full transition-all ${isCritical ? 'bg-destructive' : isWarning ? 'bg-yellow-500' : 'bg-primary'
+            }`}
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -243,7 +248,7 @@ function UploadDropzone({ onUpload, isUploading, progress }: UploadDropzoneProps
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       onUpload(files);
@@ -268,11 +273,10 @@ function UploadDropzone({ onUpload, isUploading, progress }: UploadDropzoneProps
 
   return (
     <div
-      className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-        isDragging
+      className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragging
           ? 'border-primary bg-primary/5'
           : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-      }`}
+        }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -350,12 +354,12 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
 
   // Filter documents
   const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesType = typeFilter === 'all' || doc.type === typeFilter;
-    
+
     return matchesSearch && matchesType;
   });
 
@@ -604,7 +608,7 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            
+
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {viewingTextDoc.description && (
