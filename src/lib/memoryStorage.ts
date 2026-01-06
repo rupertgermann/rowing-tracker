@@ -112,9 +112,10 @@ class MemoryStorageService {
     content: Record<string, unknown>,
     options?: { description?: string; status?: 'active' | 'archived' }
   ): Promise<MemoryDocument> {
-    // NOTE: We no longer auto-archive plans when activating a new one
-    // This was causing issues where the newly activated plan would be immediately archived
-    // Plan lifecycle is now managed entirely by the plans page
+    // For training plans, archive existing active plans
+    if (type === 'training_plan' && options?.status === 'active') {
+      await this.archiveActivePlans();
+    }
 
     const contentString = JSON.stringify(content);
     const uploadedAt = new Date();
@@ -460,7 +461,14 @@ class MemoryStorageService {
     };
   }
 
-
+  private async archiveActivePlans(): Promise<void> {
+    const plans = await this.filterByType('training_plan');
+    for (const plan of plans) {
+      if (plan.status === 'active') {
+        await this.updateDocument(plan.id, { status: 'archived' });
+      }
+    }
+  }
 
   private formatBytes(bytes: number): string {
     if (bytes === 0) return '0 Bytes';

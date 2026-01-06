@@ -231,14 +231,28 @@ export function useMemory() {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Get orphaned documents - UNUSED (kept for historical purposes)
-  // User documents (source: 'user') are never considered orphaned
-  // System documents (training plans, insights) are always valid references
+  // Check if a document is orphaned (source data no longer exists)
   const isOrphanedDocument = useCallback((doc: MemoryDocument): boolean => {
-    // All valid documents
+    if (doc.source !== 'system') return false;
+
+    // For training plans, we can't check synchronously anymore since getPlans is async
+    // Mark them as not orphaned by default - they'll be cleaned up manually if needed
+    if (doc.type === 'training_plan') {
+      return false;
+    }
+
+    // For insights, we can't easily check if they're orphaned without
+    // accessing the insights storage, so we'll mark old ones (>30 days)
+    if (doc.type === 'insight') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return new Date(doc.uploadedAt) < thirtyDaysAgo;
+    }
+
     return false;
   }, []);
 
+  // Get orphaned documents
   const getOrphanedDocuments = useCallback((): MemoryDocument[] => {
     return state.documents.filter(isOrphanedDocument);
   }, [state.documents, isOrphanedDocument]);
