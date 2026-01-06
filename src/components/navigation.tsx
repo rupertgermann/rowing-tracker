@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { settings } from '@/lib/settings';
-import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle, Sun, Moon, Monitor } from 'lucide-react';
+import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle, Sun, Moon, Monitor, RefreshCw } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
@@ -26,7 +26,7 @@ const navigation = [
   { name: 'Personal Records', href: '/prs', icon: Trophy },
   { name: 'Training Plans', href: '/plans', icon: Target },
   { name: 'AI Coach', href: '/chat', icon: MessageCircle },
-  { name: 'Upload', href: '/upload', icon: Upload },
+  { name: 'Sync', href: '/sync', icon: RefreshCw },
 ];
 
 function ThemeToggle() {
@@ -40,7 +40,7 @@ function ThemeToggle() {
   const cycleTheme = () => {
     const currentTheme = theme || 'system';
     let newTheme: 'light' | 'dark' | 'system';
-    
+
     if (currentTheme === 'light') {
       newTheme = 'dark';
     } else if (currentTheme === 'dark') {
@@ -48,7 +48,7 @@ function ThemeToggle() {
     } else {
       newTheme = 'light';
     }
-    
+
     setTheme(newTheme);
     settings.updateUserPreferences({ theme: newTheme });
   };
@@ -239,9 +239,9 @@ export function Navigation() {
               </DropdownMenu>
             )}
             <Button asChild variant="outline" size="sm">
-              <Link href="/upload" className="flex items-center space-x-2">
-                <Upload className="h-4 w-4" />
-                <span>Upload</span>
+              <Link href="/sync" className="flex items-center space-x-2">
+                <RefreshCw className="h-4 w-4" />
+                <span>Sync</span>
               </Link>
             </Button>
           </div>

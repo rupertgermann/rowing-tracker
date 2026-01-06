@@ -412,7 +412,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <MigrationPrompt />
-        
+
         {!mounted ? (
           // Enhanced loading placeholder
           <div className="animate-pulse">
@@ -447,7 +447,7 @@ const Dashboard = () => {
               Upload your first SmartRow CSV file to see your rowing analytics and track your progress over time.
             </p>
             <Button asChild size="lg">
-              <Link href="/upload" className="flex items-center gap-2">
+              <Link href="/sync" className="flex items-center gap-2">
                 <Upload className="h-5 w-5" />
                 Upload Your Data
               </Link>
@@ -679,11 +679,11 @@ const Dashboard = () => {
                     const insightsList = insights ?? [];
                     // Sort by priority to find the highest priority insight
                     const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-                    const sorted = [...insightsList].sort((a, b) => 
+                    const sorted = [...insightsList].sort((a, b) =>
                       (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
                     );
                     const [featured, ...rest] = sorted;
-                    
+
                     return (
                       <div className="space-y-4">
                         {/* Featured (highest priority) insight - full width */}
@@ -691,7 +691,7 @@ const Dashboard = () => {
                           <InsightCard
                             key={featured.id || 'featured'}
                             insight={featured}
-                            onFeedback={() => {}}
+                            onFeedback={() => { }}
                             isArchived={false}
                             onArchive={archiveInsight}
                           />
@@ -703,7 +703,7 @@ const Dashboard = () => {
                               <InsightCard
                                 key={insight.id || `local-${insight.type}-${index}`}
                                 insight={insight}
-                                onFeedback={() => {}}
+                                onFeedback={() => { }}
                                 isArchived={false}
                                 onArchive={archiveInsight}
                               />
@@ -736,8 +736,8 @@ const Dashboard = () => {
                               {cloudAIError && !isCloudAIConfigured ? 'AI Not Configured' : 'No Current Insights'}
                             </h3>
                             <p className="text-muted-foreground mb-4">
-                              {cloudAIError && !isCloudAIConfigured 
-                                ? cloudAIError 
+                              {cloudAIError && !isCloudAIConfigured
+                                ? cloudAIError
                                 : 'Click Refresh to generate new personalized insights.'
                               }
                             </p>
@@ -776,8 +776,8 @@ const Dashboard = () => {
                       {cloudAIError && !isCloudAIConfigured ? 'AI Not Configured' : 'AI Insights Coming Soon'}
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      {cloudAIError && !isCloudAIConfigured 
-                        ? cloudAIError 
+                      {cloudAIError && !isCloudAIConfigured
+                        ? cloudAIError
                         : 'Complete at least 5 sessions to unlock personalized AI recommendations and insights.'
                       }
                     </p>

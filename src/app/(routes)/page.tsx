@@ -22,7 +22,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   }
@@ -60,7 +60,7 @@ export default function DashboardPage() {
 
   // Check if user has data
   const hasData = sessions.length > 0;
-  
+
   // Prepare chart data
   const chartData = hasData ? prepareChartData(sessions) : [];
 
@@ -77,7 +77,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Button asChild variant="outline">
-              <Link href="/upload" className="flex items-center gap-2">
+              <Link href="/sync" className="flex items-center gap-2">
                 <Upload className="h-4 w-4" />
                 Add More Data
               </Link>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
               Upload your first SmartRow CSV file to see your rowing analytics and track your progress over time.
             </p>
             <Button asChild size="lg">
-              <Link href="/upload" className="flex items-center gap-2">
+              <Link href="/sync" className="flex items-center gap-2">
                 <Upload className="h-5 w-5" />
                 Upload Your Data
               </Link>
@@ -248,12 +248,12 @@ export default function DashboardPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={chartTheme.margin.default}>
                         <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
-                        <XAxis 
-                          dataKey="date" 
+                        <XAxis
+                          dataKey="date"
                           stroke={chartTheme.axis.strokeColor}
                           tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                         />
-                        <YAxis 
+                        <YAxis
                           stroke={chartTheme.axis.strokeColor}
                           tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                           tickFormatter={(value) => {
@@ -263,16 +263,16 @@ export default function DashboardPage() {
                             return value.toString();
                           }}
                         />
-                        <Tooltip 
+                        <Tooltip
                           contentStyle={chartTheme.tooltip.contentStyle}
                           labelStyle={chartTheme.tooltip.labelStyle}
                           itemStyle={chartTheme.tooltip.itemStyle}
                           formatter={(value: number) => [formatDistance(value), 'Distance']}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="distance" 
-                          stroke="hsl(var(--primary))" 
+                        <Line
+                          type="monotone"
+                          dataKey="distance"
+                          stroke="hsl(var(--primary))"
                           strokeWidth={chartTheme.line.strokeWidth}
                           dot={{ fill: 'hsl(var(--primary))', strokeWidth: chartTheme.line.dot.strokeWidth, r: chartTheme.line.dot.r }}
                           activeDot={{ r: chartTheme.line.activeDot.r }}
