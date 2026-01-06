@@ -219,12 +219,17 @@ function ChatPageContent() {
   // Monitor for AI response completion to save chart explanation
   useEffect(() => {
     if (!pendingChartExplanation || !currentSession) return;
-    
+
+    // Check if current session is an explanation session matching our pending chart
+    if (currentSession.category !== 'explanation' || currentSession.chartId !== pendingChartExplanation.chartId) {
+      return;
+    }
+
     // Check if we have an AI response (at least 2 messages: user + assistant)
     const messages = currentSession.messages;
     if (messages.length >= 2) {
       const lastMessage = messages[messages.length - 1];
-      
+
       // If the last message is from the assistant and we're not loading, save the explanation
       if (lastMessage.role === 'assistant' && !isLoading && lastMessage.content) {
         // Extract summary from first paragraph (the key insight)
@@ -234,7 +239,7 @@ function ChatPageContent() {
           .replace(/^#+\s*/gm, '')    // Remove heading markers
           .trim()
           .slice(0, 200) + (firstPara.length > 200 ? '...' : '');
-        
+
         setChartExplanation(pendingChartExplanation.chartId, {
           summary,
           fullResponse: lastMessage.content,
@@ -242,7 +247,7 @@ function ChatPageContent() {
           chartTitle: pendingChartExplanation.chartTitle,
           generatedAt: new Date()
         });
-        
+
         // Clear pending state
         setPendingChartExplanation(null);
       }
