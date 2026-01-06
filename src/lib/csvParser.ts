@@ -18,19 +18,19 @@ function parseEuropeanNumber(value: string): number {
 function parseTimestamp(timestamp: string): Date {
   // Handle both with and without milliseconds
   const cleanTimestamp = timestamp.trim();
-  
+
   // Try parsing with milliseconds first
   const withMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})$/.exec(cleanTimestamp);
   if (withMs) {
     return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
   }
-  
+
   // Try parsing without milliseconds
   const withoutMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$/.exec(cleanTimestamp);
   if (withoutMs) {
     return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
   }
-  
+
   // Fallback - try direct parsing
   const date = new Date(cleanTimestamp);
   return isNaN(date.getTime()) ? new Date() : date;
@@ -50,7 +50,7 @@ function transformRowToSession(row: RawCsvRow): Session {
   const timestamp = parseTimestamp(row['Time stamp (UTC)']);
   const distance = parseEuropeanNumber(row['Distance (m)']);
   const duration = parseEuropeanNumber(row['Time']);
-  
+
   return {
     id: generateSessionId(timestamp, distance),
     timestamp,
@@ -74,7 +74,7 @@ function transformRowToSession(row: RawCsvRow): Session {
  * Check if a session is a duplicate based on timestamp and distance
  */
 function isDuplicateSession(newSession: Session, existingSessions: Session[]): boolean {
-  return existingSessions.some(existing => 
+  return existingSessions.some(existing =>
     existing.id === newSession.id ||
     (Math.abs(existing.timestamp.getTime() - newSession.timestamp.getTime()) < 1000 && // within 1 second
      existing.distance === newSession.distance)
@@ -82,10 +82,21 @@ function isDuplicateSession(newSession: Session, existingSessions: Session[]): b
 }
 
 /**
+ * Detect delimiter from first line of CSV
+ * Returns ';' or ',' depending on which one appears more
+ */
+function detectDelimiter(firstLine: string): string {
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  console.log(`Delimiter detection: semicolons=${semicolonCount}, commas=${commaCount}`);
+  return semicolonCount > commaCount ? ';' : ',';
+}
+
+/**
  * Parse SmartRow CSV file and return sessions with import statistics
  */
 export async function parseSmartRowCsv(
-  file: File, 
+  file: File,
   existingSessions: Session[] = []
 ): Promise<{ sessions: Session[], result: ImportResult }> {
   return new Promise((resolve) => {
@@ -95,34 +106,95 @@ export async function parseSmartRowCsv(
     let totalDistance = 0;
     let totalTime = 0;
 
-    Papa.parse<RawCsvRow>(file, {
-      delimiter: ';',
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => header.replace(/\r/g, '').trim(),
-      transform: (value) => value.replace(/\r/g, '').trim(),
-      complete: (results) => {
-        try {
-          // Validate required columns
-          const requiredColumns = [
-            'Time stamp (UTC)',
-            'Distance (m)',
-            'Time',
-            'Energy (kCal)',
-            'Stroke count (#)',
-            'Average power (W)',
-            'Maximum power (W)',
-            'Average split (s)',
-            'Minimum split (s)',
-            'Average stroke rate (SPM)',
-            'Maximum stroke rate (SPM)'
-          ];
+    // Auto-detect delimiter by reading first line
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const firstLine = text.split('\n')[0];
+      const delimiter = detectDelimiter(firstLine);
 
-          const actualColumns = results.meta.fields || [];
-          const missingColumns = requiredColumns.filter(col => !actualColumns.includes(col));
-          
-          if (missingColumns.length > 0) {
-            errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
+      Papa.parse<RawCsvRow>(file, {
+        delimiter: delimiter,
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.replace(/\r/g, '').trim(),
+        transform: (value) => value.replace(/\r/g, '').trim(),
+        complete: (results) => {
+          try {
+            // Validate required columns
+            const requiredColumns = [
+              'Time stamp (UTC)',
+              'Distance (m)',
+              'Time',
+              'Energy (kCal)',
+              'Stroke count (#)',
+              'Average power (W)',
+              'Maximum power (W)',
+              'Average split (s)',
+              'Minimum split (s)',
+              'Average stroke rate (SPM)',
+              'Maximum stroke rate (SPM)'
+            ];
+
+            const actualColumns = results.meta.fields || [];
+            const missingColumns = requiredColumns.filter(col => !actualColumns.includes(col));
+
+            if (missingColumns.length > 0) {
+              errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
+              resolve({
+                sessions: [],
+                result: {
+                  totalRows: results.data.length,
+                  importedSessions: 0,
+                  duplicatesSkipped: 0,
+                  errors,
+                  totalDistance: 0,
+                  totalTime: 0
+                }
+              });
+              return;
+            }
+
+            // Process each row
+            results.data.forEach((row, index) => {
+              try {
+                const session = transformRowToSession(row);
+
+                // Validate session data
+                if (session.distance <= 0 || session.duration <= 0) {
+                  errors.push(`Row ${index + 1}: Invalid distance or duration`);
+                  return;
+                }
+
+                // Check for duplicates
+                if (isDuplicateSession(session, existingSessions)) {
+                  duplicatesSkipped++;
+                  return;
+                }
+
+                importedSessions.push(session);
+                totalDistance += session.distance;
+                totalTime += session.duration;
+
+              } catch (error) {
+                errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+            });
+
+            resolve({
+              sessions: importedSessions,
+              result: {
+                totalRows: results.data.length,
+                importedSessions: importedSessions.length,
+                duplicatesSkipped,
+                errors,
+                totalDistance,
+                totalTime
+              }
+            });
+
+          } catch (error) {
+            errors.push(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
             resolve({
               sessions: [],
               result: {
@@ -134,53 +206,14 @@ export async function parseSmartRowCsv(
                 totalTime: 0
               }
             });
-            return;
           }
-
-          // Process each row
-          results.data.forEach((row, index) => {
-            try {
-              const session = transformRowToSession(row);
-              
-              // Validate session data
-              if (session.distance <= 0 || session.duration <= 0) {
-                errors.push(`Row ${index + 1}: Invalid distance or duration`);
-                return;
-              }
-
-              // Check for duplicates
-              if (isDuplicateSession(session, existingSessions)) {
-                duplicatesSkipped++;
-                return;
-              }
-
-              importedSessions.push(session);
-              totalDistance += session.distance;
-              totalTime += session.duration;
-
-            } catch (error) {
-              errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-          });
-
-          resolve({
-            sessions: importedSessions,
-            result: {
-              totalRows: results.data.length,
-              importedSessions: importedSessions.length,
-              duplicatesSkipped,
-              errors,
-              totalDistance,
-              totalTime
-            }
-          });
-
-        } catch (error) {
-          errors.push(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        },
+        error: (error) => {
+          errors.push(`CSV parsing error: ${error.message}`);
           resolve({
             sessions: [],
             result: {
-              totalRows: results.data.length,
+              totalRows: 0,
               importedSessions: 0,
               duplicatesSkipped: 0,
               errors,
@@ -189,27 +222,31 @@ export async function parseSmartRowCsv(
             }
           });
         }
-      },
-      error: (error) => {
-        errors.push(`CSV parsing error: ${error.message}`);
-        resolve({
-          sessions: [],
-          result: {
-            totalRows: 0,
-            importedSessions: 0,
-            duplicatesSkipped: 0,
-            errors,
-            totalDistance: 0,
-            totalTime: 0
-          }
-        });
-      }
-    });
+      });
+    };
+
+    reader.onerror = () => {
+      errors.push('Failed to read file');
+      resolve({
+        sessions: [],
+        result: {
+          totalRows: 0,
+          importedSessions: 0,
+          duplicatesSkipped: 0,
+          errors,
+          totalDistance: 0,
+          totalTime: 0
+        }
+      });
+    };
+
+    reader.readAsText(file);
   });
 }
 
 /**
  * Validate CSV file format before parsing
+ * Tries both semicolon and comma delimiters
  */
 export function validateSmartRowCsv(file: File): Promise<{ isValid: boolean; error?: string }> {
   return new Promise((resolve) => {
@@ -219,35 +256,73 @@ export function validateSmartRowCsv(file: File): Promise<{ isValid: boolean; err
       return;
     }
 
-    // Read first few lines to validate format
+    // Try semicolon delimiter first (EU format)
     Papa.parse(file, {
       delimiter: ';',
-      preview: 2, // Only read first 2 lines
+      preview: 2,
       complete: (results) => {
         const headers = results.data[0] as string[];
-        
+
         if (!headers || headers.length === 0) {
-          resolve({ isValid: false, error: 'CSV file appears to be empty' });
+          // If no headers with semicolon, try comma
+          validateWithCommaDelimiter(file, resolve);
           return;
         }
 
         // Check for key SmartRow columns
         const keyColumns = ['Time stamp (UTC)', 'Distance (m)', 'Time'];
         const missingKeyColumns = keyColumns.filter(col => !headers.includes(col));
-        
+
         if (missingKeyColumns.length > 0) {
-          resolve({ 
-            isValid: false, 
-            error: `This doesn't appear to be a SmartRow CSV file. Missing: ${missingKeyColumns.join(', ')}` 
-          });
+          console.log('Semicolon delimiter validation failed, trying comma delimiter...');
+          validateWithCommaDelimiter(file, resolve);
           return;
         }
 
+        console.log('✓ CSV validation passed with semicolon delimiter');
         resolve({ isValid: true });
       },
-      error: (error) => {
-        resolve({ isValid: false, error: `Failed to read CSV: ${error.message}` });
+      error: () => {
+        // If semicolon fails, try comma
+        validateWithCommaDelimiter(file, resolve);
       }
     });
+  });
+}
+
+/**
+ * Helper to validate with comma delimiter (US format)
+ */
+function validateWithCommaDelimiter(file: File, resolve: (result: { isValid: boolean; error?: string }) => void): void {
+  Papa.parse(file, {
+    delimiter: ',',
+    preview: 2,
+    complete: (results) => {
+      const headers = results.data[0] as string[];
+
+      if (!headers || headers.length === 0) {
+        resolve({ isValid: false, error: 'CSV file appears to be empty' });
+        return;
+      }
+
+      const keyColumns = ['Time stamp (UTC)', 'Distance (m)', 'Time'];
+      const missingKeyColumns = keyColumns.filter(col => !headers.includes(col));
+
+      if (missingKeyColumns.length > 0) {
+        console.error('CSV validation failed. Missing columns:', missingKeyColumns);
+        console.error('Available headers:', headers);
+        resolve({
+          isValid: false,
+          error: `This doesn't appear to be a SmartRow CSV file. Missing: ${missingKeyColumns.join(', ')}`
+        });
+        return;
+      }
+
+      console.log('✓ CSV validation passed with comma delimiter');
+      resolve({ isValid: true });
+    },
+    error: (error) => {
+      resolve({ isValid: false, error: `Failed to read CSV: ${error.message}` });
+    }
   });
 }
