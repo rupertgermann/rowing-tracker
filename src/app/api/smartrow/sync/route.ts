@@ -23,7 +23,7 @@ interface SyncResponse {
     success: boolean;
     error?: string;
     csvData?: string;
-    zipData?: string; // Base64 encoded
+    zipData?: string; // Base64 encoded ZIP file
     message?: string;
 }
 
@@ -134,14 +134,27 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
 
             // Try to find link that's NOT stroke data
             // Stroke data links typically mention "stroke" or individual workout files
+            // CRITICAL: We need EU format (csv-eu-list) which uses semicolon delimiter
+            // US format (csv-us-list) uses commas and will fail parsing
             for (const { link, text, textLower, hrefLower } of linkInfos) {
                 const isCsv = hrefLower.includes('.csv') || textLower.includes('.csv');
                 const isNotStroke = !textLower.includes('stroke') && !textLower.includes('individual') && !textLower.includes('workout file');
 
+                // Prioritize EU format (csv-eu-list) for semicolon delimiter
+                const isEuFormat = hrefLower.includes('csv-eu-list');
+
                 if (isCsv && isNotStroke) {
-                    targetLink = link;
-                    console.log(`✓ Selected workout summary CSV: "${text}" (href: ${hrefLower})`);
-                    break;
+                    // If we found EU format, use it immediately
+                    if (isEuFormat) {
+                        targetLink = link;
+                        console.log(`✓ Selected EU format CSV: "${text}" (href: ${hrefLower})`);
+                        break;
+                    }
+                    // Otherwise store as fallback, but keep looking for EU format
+                    if (!targetLink) {
+                        targetLink = link;
+                        console.log(`  Storing as fallback: "${text}" (href: ${hrefLower})`);
+                    }
                 }
             }
 
@@ -216,25 +229,55 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
 
                 console.log(`  Detailed link ${i}: text="${text?.trim()}", href="${href}"`);
 
-                // Look for ZIP files or links mentioning "all workouts" or "workout files"
+            // Look for ZIP files or links mentioning "all workouts" or "workout files"
+            for (let i = 0; i < exportLinks.length; i++) {
+                const link = exportLinks[i];
+                const text = await link.textContent().catch(() => 'N/A');
+                const href = await link.getAttribute('href').catch(() => 'N/A');
+                const textLower = (text || '').toLowerCase();
+                const hrefLower = (href || '').toLowerCase();
+
+                console.log(`  Detailed link ${i}: text="${text?.trim()}", href="${href}"`);
+
+                // Look for CSV-EU-ALL which might have detailed data
+                const isEuDetailedCsv = hrefLower.includes('csv-eu-all');
+                // Look for ZIP files
                 const isZip = textLower.includes('.zip') || hrefLower.includes('.zip');
+                // Look for links mentioning "all workouts" or "workout files"
                 const mentionsAllWorkouts = textLower.includes('all workouts') || textLower.includes('workout files');
 
-                if (isZip || mentionsAllWorkouts) {
+                if (isEuDetailedCsv || isZip || mentionsAllWorkouts) {
                     detailedExport = link;
-                    console.log(`✓ Found detailed export: "${text}"`);
+                    console.log(`✓ Found detailed export: "${text}" (href: ${href})`);
                     break;
                 }
             }
+            }
 
-            // Fallback: look for any ZIP link
+            // Fallback: look for "csv-eu-all" or "csv-us-all" which might have detailed data
             if (!detailedExport) {
-                console.log('No specific detailed export found, looking for any .zip link...');
+                console.log('No ZIP found, looking for detailed CSV export (csv-eu-all or csv-us-all)...');
+                const euAllLink = frame.locator('a[href*="/api/export/csv-eu-all"]').first();
+                if (await euAllLink.isVisible().catch(() => false)) {
+                    detailedExport = euAllLink;
+                    console.log('✓ Found csv-eu-all link (detailed data)');
+                } else {
+                    const usAllLink = frame.locator('a[href*="/api/export/csv-us-all"]').first();
+                    if (await usAllLink.isVisible().catch(() => false)) {
+                        detailedExport = usAllLink;
+                        console.log('✓ Found csv-us-all link (detailed data)');
+                    }
+                }
+            }
+
+            // Fallback: look for any ZIP link as last resort
+            if (!detailedExport) {
+                console.log('No detailed export found, looking for any .zip link...');
                 detailedExport = frame.locator('a').filter({ hasText: '.zip' }).first();
             }
 
             if (await detailedExport.isVisible()) {
-                console.log('Starting detailed export (ZIP) download...');
+                console.log('Starting detailed export download...');
                 const [detailedDownload] = await Promise.all([
                     page.waitForEvent('download', { timeout: 60000 }),
                     detailedExport.click(),
@@ -348,6 +391,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
         const downloadedTypes = [];
         if (csvData) downloadedTypes.push('CSV');
         if (zipDataBase64) downloadedTypes.push('ZIP');
+
+        console.log(`Download summary: ${downloadedTypes.join(' and ')}`);
+        if (downloadedTypes.length === 1 && downloadedTypes[0] === 'CSV') {
+            console.log('⚠ Only summary CSV downloaded - detailed workout data not available');
+        }
 
         return NextResponse.json({
             success: true,
