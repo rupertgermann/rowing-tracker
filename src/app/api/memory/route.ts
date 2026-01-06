@@ -12,7 +12,7 @@ import path from "path";
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -46,7 +46,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -66,13 +66,13 @@ export async function POST(req: Request) {
     const savedDocuments = [];
 
     for (const docData of documents) {
-      // Check if document exists
-      const existing = await prisma.memoryDocument.findFirst({
+      // Check if document exists (only if ID is provided)
+      const existing = docData.id ? await prisma.memoryDocument.findFirst({
         where: {
           id: docData.id,
           userId: session.user.id,
         },
-      });
+      }) : null;
 
       if (existing) {
         // Update existing document
@@ -81,6 +81,7 @@ export async function POST(req: Request) {
           data: {
             ...(docData.name !== undefined ? { name: docData.name } : {}),
             ...(docData.type !== undefined ? { type: docData.type } : {}),
+            ...(docData.source !== undefined ? { source: docData.source } : {}), // Update source if provided
             ...(docData.mimeType !== undefined ? { mimeType: docData.mimeType } : {}),
             ...(docData.size !== undefined ? { size: docData.size } : {}),
             ...(docData.description !== undefined ? { description: docData.description } : {}),
@@ -115,9 +116,9 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       documents: savedDocuments,
-      count: savedDocuments.length 
+      count: savedDocuments.length
     });
   } catch (error) {
     console.error("Error saving memory documents:", error);
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
