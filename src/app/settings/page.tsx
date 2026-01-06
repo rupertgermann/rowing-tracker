@@ -651,10 +651,12 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="smartrow-email">Email</Label>
+                <Label htmlFor="sr-connect-identity">Email</Label>
                 <Input
-                  id="smartrow-email"
+                  id="sr-connect-identity"
+                  name="sr-connect-identity"
                   type="email"
+                  autoComplete="off"
                   placeholder="your@email.com"
                   value={settingsData.smartRowSettings?.email || ''}
                   onChange={(e) => saveSettings('smartRowSettings', { email: e.target.value })}
@@ -662,11 +664,13 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="smartrow-password">Password</Label>
+                <Label htmlFor="sr-connect-secret">Password</Label>
                 <div className="relative mt-1">
                   <Input
-                    id="smartrow-password"
+                    id="sr-connect-secret"
+                    name="sr-connect-secret"
                     type={showSmartRowPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={settingsData.smartRowSettings?.password || ''}
                     onChange={(e) => saveSettings('smartRowSettings', { password: e.target.value })}
