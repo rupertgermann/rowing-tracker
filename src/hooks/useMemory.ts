@@ -231,14 +231,22 @@ export function useMemory() {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Check if a document is orphaned (source data no longer exists)
-  const isOrphanedDocument = useCallback((doc: MemoryDocument): boolean => {
+  // Check if a document is orphaned (source data no longer exists) - async version
+  const isOrphanedDocumentAsync = useCallback(async (doc: MemoryDocument): Promise<boolean> => {
     if (doc.source !== 'system') return false;
 
-    // For training plans, we can't check synchronously anymore since getPlans is async
-    // Mark them as not orphaned by default - they'll be cleaned up manually if needed
+    // For training plans, check if plan still exists in database
     if (doc.type === 'training_plan') {
-      return false;
+      const planId = (doc.content as { id?: string })?.id;
+      if (!planId) return false;
+
+      try {
+        const plan = await trainingPlans.getPlan(planId);
+        return plan === null;
+      } catch (error) {
+        console.error('[MEMORY] Failed to check training plan existence:', error);
+        return false;
+      }
     }
 
     // For insights, we can't easily check if they're orphaned without
@@ -252,10 +260,52 @@ export function useMemory() {
     return false;
   }, []);
 
-  // Get orphaned documents
+  // Get orphaned documents (async version)
+  const getOrphanedDocumentsAsync = useCallback(async (): Promise<MemoryDocument[]> => {
+    const orphaned: MemoryDocument[] = [];
+
+    for (const doc of state.documents) {
+      const isOrphaned = await isOrphanedDocumentAsync(doc);
+      if (isOrphaned) {
+        orphaned.push(doc);
+      }
+    }
+
+    return orphaned;
+  }, [state.documents, isOrphanedDocumentAsync]);
+
+  // Sync version of orphaned check for UI rendering
+  const isOrphanedDocument = useCallback((doc: MemoryDocument): boolean => {
+    if (doc.source !== 'system') return false;
+
+    // For training plans, return false (can't check synchronously)
+    // For insights, mark old ones (>30 days)
+    if (doc.type === 'training_plan') {
+      return false;
+    }
+
+    if (doc.type === 'insight') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return new Date(doc.uploadedAt) < thirtyDaysAgo;
+    }
+
+    return false;
+  }, []);
+
+  // Get orphaned documents (sync fallback for UI)
   const getOrphanedDocuments = useCallback((): MemoryDocument[] => {
     return state.documents.filter(isOrphanedDocument);
   }, [state.documents, isOrphanedDocument]);
+
+  // Cleanup orphaned system documents
+  const cleanupOrphanedDocuments = useCallback(async (): Promise<number> => {
+    const deletedCount = await memoryStorage.cleanupOrphanedSystemDocuments();
+    if (deletedCount > 0) {
+      await loadDocuments();
+    }
+    return deletedCount;
+  }, [loadDocuments]);
 
   // Computed values
   const userDocuments = state.documents.filter(d => d.source === 'user');
@@ -292,6 +342,9 @@ export function useMemory() {
     activeTrainingPlan,
     orphanedDocuments,
     isOrphanedDocument,
+    isOrphanedDocumentAsync,
+    getOrphanedDocumentsAsync,
+    cleanupOrphanedDocuments,
     hasDocuments: state.documents.length > 0,
     isQuotaExceeded: storageStats 
       ? storageStats.remainingQuota < MEMORY_CONFIG.maxFileSize 

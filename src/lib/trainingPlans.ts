@@ -1,5 +1,6 @@
 import { Session } from '@/types/session';
 import { saveTrainingPlansToDB, fetchTrainingPlansFromDB } from '@/lib/dataSync';
+import { memoryStorage } from '@/lib/memoryStorage';
 
 // Training plan data structures
 export interface TrainingSession {
@@ -238,6 +239,20 @@ export class TrainingPlansService {
         // ignore
       }
       throw new Error(message);
+    }
+
+    // Delete corresponding memory document if it exists
+    try {
+      const trainingPlanDocs = await memoryStorage.filterByType('training_plan');
+      for (const doc of trainingPlanDocs) {
+        const docPlanId = (doc.content as { id?: string })?.id;
+        if (docPlanId === planId) {
+          await memoryStorage.deleteDocument(doc.id);
+          console.log('[TRAINING PLANS] Deleted memory document for plan:', planId);
+        }
+      }
+    } catch (error) {
+      console.error('[TRAINING PLANS] Failed to delete memory document:', error);
     }
 
     // Defensive: if the active plan was derived from settings and not localStorage,

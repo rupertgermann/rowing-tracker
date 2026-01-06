@@ -301,6 +301,45 @@ class MemoryStorageService {
   }
 
   /**
+   * Remove orphaned system documents (training plans that no longer exist).
+   * Returns the number of documents deleted.
+   */
+  async cleanupOrphanedSystemDocuments(): Promise<number> {
+    const allDocs = await this.getAllDocuments();
+    const systemDocs = allDocs.filter(d => d.source === 'system');
+    let deletedCount = 0;
+
+    for (const doc of systemDocs) {
+      if (doc.type === 'training_plan') {
+        const planId = (doc.content as { id?: string })?.id;
+        if (!planId) continue;
+
+        // Check if plan still exists by fetching from API
+        try {
+          const res = await fetch('/api/training-plans');
+          if (res.ok) {
+            const data = await res.json();
+            const plans = (data.plans || []) as Array<{ id: string }>;
+            const planExists = plans.some(p => p.id === planId);
+
+            if (!planExists) {
+              const deleted = await this.deleteDocument(doc.id);
+              if (deleted) {
+                deletedCount++;
+                console.log('[MEMORY STORAGE] Deleted orphaned training plan memory document:', planId);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[MEMORY STORAGE] Failed to check training plan existence:', error);
+        }
+      }
+    }
+
+    return deletedCount;
+  }
+
+  /**
    * Keep only the latest N insights in memory, deleting older ones.
    * Called automatically after adding a new insight.
    */

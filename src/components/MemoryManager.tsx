@@ -343,6 +343,7 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
     clearError,
     isOrphanedDocument,
     orphanedDocuments,
+    cleanupOrphanedDocuments,
   } = useMemory();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -511,11 +512,27 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
               {/* Orphaned documents warning */}
               {orphanedDocuments.length > 0 && typeFilter === 'all' && !searchQuery && (
                 <div className="mb-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
-                  <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      {orphanedDocuments.length} orphaned document{orphanedDocuments.length !== 1 ? 's' : ''} found
-                    </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {orphanedDocuments.length} orphaned document{orphanedDocuments.length !== 1 ? 's' : ''} found
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs bg-background"
+                      onClick={async () => {
+                        const deletedCount = await cleanupOrphanedDocuments();
+                        if (deletedCount > 0) {
+                          console.log(`Cleaned up ${deletedCount} orphaned documents`);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Cleanup All
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     These documents reference deleted training plans or old insights. You can safely remove them.
