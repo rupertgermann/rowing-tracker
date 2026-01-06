@@ -631,9 +631,13 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         clearSessionsCache();
         clearAnalyticsCache();
 
-        // Save to database first (async, non-blocking) - unless skipDbSave is true
-        const existingIds = new Set(get().sessions.map(s => s.id));
-        const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
+        // Use timestamp+distance as key for deduplication (not ID, to handle CSV→DB ID replacement)
+        const existingKeys = new Set(
+          get().sessions.map(s => `${s.timestamp.getTime()}-${s.distance}`)
+        );
+        const uniqueNewSessions = newSessions.filter(
+          s => !existingKeys.has(`${s.timestamp.getTime()}-${s.distance}`)
+        );
 
         console.log('[STORE] Unique new sessions:', uniqueNewSessions.length);
 
