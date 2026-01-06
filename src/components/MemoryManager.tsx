@@ -294,202 +294,10 @@ function UploadDropzone({ onUpload, isUploading, progress }: UploadDropzoneProps
             Uploading... {progress !== null && `${progress}%`}
           </p>
         </div>
-      ) : (
-        <>
-          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm font-medium mb-1">
-            Drop files here or{' '}
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => inputRef.current?.click()}
-            >
-              browse
-            </button>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Supports JPEG, PNG, GIF, WebP, PDF (max {MEMORY_CONFIG.maxFileSize / 1024 / 1024}MB)
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Main Memory Manager Component
-// ============================================================================
-
-interface MemoryManagerProps {
-  onClose?: () => void;
-  onAttachToChat?: (doc: MemoryDocument) => void;
-}
-
-export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
-  const {
-    documents,
-    isLoading,
-    error,
-    uploadProgress,
-    storageStats,
-    uploadDocuments,
-    deleteDocument,
-    getDocumentUrl,
-    exportMemory,
-    clearError,
-    isOrphanedDocument,
-    orphanedDocuments,
-  } = useMemory();
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<MemoryDocumentType | 'all'>('all');
-  const [viewingDocId, setViewingDocId] = useState<string | null>(null);
-  const [viewingUrl, setViewingUrl] = useState<string | null>(null);
-  const [viewingTextDoc, setViewingTextDoc] = useState<MemoryDocument | null>(null);
-  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
-
-  // Filter documents
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = !searchQuery || 
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesType = typeFilter === 'all' || doc.type === typeFilter;
-    
-    return matchesSearch && matchesType;
-  });
-
-  // Handle file upload
-  const handleUpload = async (files: File[]) => {
-    await uploadDocuments(files);
-  };
-
-  // Handle delete
-  const handleDelete = (id: string) => {
-    setDeleteDocId(id);
-  };
-
-  const confirmDelete = async () => {
-    if (deleteDocId) {
-      await deleteDocument(deleteDocId);
-      setDeleteDocId(null);
-    }
-  };
-
-  // Handle view
-  const handleView = async (id: string) => {
-    const url = await getDocumentUrl(id);
-    if (url) {
-      setViewingDocId(id);
-      setViewingUrl(url);
-    }
-  };
-
-  // Close preview
-  const closePreview = () => {
-    if (viewingUrl) {
-      URL.revokeObjectURL(viewingUrl);
-    }
-    setViewingDocId(null);
-    setViewingUrl(null);
-  };
-
-  // Handle view extracted text
-  const handleViewText = (doc: MemoryDocument) => {
-    setViewingTextDoc(doc);
-  };
-
-  // Close text preview
-  const closeTextPreview = () => {
-    setViewingTextDoc(null);
-  };
-
-  // Handle export
-  const handleExport = async () => {
-    const blob = await exportMemory();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rowing-memory-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              Coach Memory
-            </CardTitle>
-            <CardDescription>
-              Documents and knowledge accessible to your AI coach
-            </CardDescription>
-          </div>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-
-      <CardContent className="flex-1 overflow-hidden flex flex-col gap-4 pt-4">
-        {/* Error Alert */}
-        {error && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span className="flex-1">{error}</span>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={clearError}>
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-
-        {/* Storage Quota */}
-        {storageStats && (
-          <StorageQuota
-            used={storageStats.totalSize}
-            total={MEMORY_CONFIG.maxTotalStorage}
-          />
-        )}
-
-        {/* Upload Zone */}
-        <UploadDropzone
-          onUpload={handleUpload}
-          isUploading={uploadProgress !== null}
-          progress={uploadProgress}
-        />
-
-        {/* Search & Filter */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as MemoryDocumentType | 'all')}
-            className="h-9 px-3 rounded-md border bg-background text-sm"
-          >
-            <option value="all">All Types</option>
-            <option value="image">Images</option>
-            <option value="pdf">PDFs</option>
-            <option value="training_plan">Training Plans</option>
-            <option value="insight">Insights</option>
-            <option value="note">Notes</option>
-          </select>
-        </div>
-
-        {/* Document List */}
-        <div className="flex-1 overflow-y-auto space-y-2 scrollbar-none">
+          ) : (
+            <>
+              {/* Document List */}
+              <div className="flex-1 overflow-y-auto space-y-2 scrollbar-none">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -518,17 +326,16 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
                   </p>
                 </div>
               )}
-              {filteredDocuments.map(doc => (
-                <DocumentCard
-                  key={doc.id}
-                  document={doc}
-                  onDelete={handleDelete}
-                  onView={handleView}
-                  onViewText={handleViewText}
-                  onAttach={onAttachToChat}
-                  isOrphaned={isOrphanedDocument(doc)}
-                />
-              ))}
+               {filteredDocuments.map(doc => (
+                 <DocumentCard
+                   key={doc.id}
+                   document={doc}
+                   onDelete={handleDelete}
+                   onView={handleView}
+                   onViewText={handleViewText}
+                   onAttach={onAttachToChat}
+                 />
+               ))}
             </>
           )}
         </div>
