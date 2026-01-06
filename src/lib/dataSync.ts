@@ -13,6 +13,7 @@ import {
 export interface SyncResult {
   success: boolean;
   error?: string;
+  sessions?: Session[];
 }
 
 export interface SessionsListResponse {
@@ -127,11 +128,12 @@ export async function saveSessionsToDBChunked(
   chunkSize: number = 25
 ): Promise<SyncResult> {
   if (sessions.length === 0) {
-    return { success: true };
+    return { success: true, sessions: [] };
   }
 
   const totalChunks = Math.ceil(sessions.length / chunkSize);
   let sessionsProcessed = 0;
+  const allCreatedSessions: Session[] = [];
 
   console.log(`[SYNC] Starting chunked upload: ${sessions.length} sessions in ${totalChunks} chunks`);
 
@@ -165,6 +167,9 @@ export async function saveSessionsToDBChunked(
         };
       }
 
+      const data = await response.json();
+      allCreatedSessions.push(...data.sessions);
+
       sessionsProcessed += chunk.length;
       console.log(`[SYNC] Chunk ${i + 1}/${totalChunks} complete (${sessionsProcessed}/${sessions.length} sessions)`);
     } catch (error) {
@@ -185,7 +190,7 @@ export async function saveSessionsToDBChunked(
     message: 'Upload complete!'
   });
 
-  return { success: true };
+  return { success: true, sessions: allCreatedSessions };
 }
 
 /**
@@ -210,8 +215,8 @@ export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult>
       return { success: false, error: error.error || 'Failed to save sessions' };
     }
 
-    await response.json();
-    return { success: true };
+    const data = await response.json();
+    return { success: true, sessions: data.sessions || [] };
   } catch (error) {
     console.error('[SYNC] Error saving sessions:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

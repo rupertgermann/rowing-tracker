@@ -40,7 +40,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
@@ -68,20 +68,20 @@ export default function SessionsPage() {
   const sessions = getSessions();
   const personalRecords = getPersonalRecords();
   const router = useRouter();
-  
+
   // Helper function to check if session is a personal record
   const isPersonalRecord = (session: any): { isPR: boolean; distances: string[] } => {
     const prDistances = personalRecords
       .filter(pr => pr.sessionId === session.id)
       .map(pr => formatDistance(pr.distance));
-    
+
     return {
       isPR: prDistances.length > 0,
       distances: prDistances
     };
   };
   const [mounted, setMounted] = useState(false);
-  
+
   const sortConfig = sessionsViewSettings.sortConfig;
   const filters = sessionsViewSettings.filters;
 
@@ -100,13 +100,13 @@ export default function SessionsPage() {
         '30days': 30,
         '90days': 90
       }[filters.dateRange];
-      
+
       if (daysToFilter) {
         const cutoffDate = new Date(now.getTime() - (daysToFilter * 24 * 60 * 60 * 1000));
         if (sessionDate < cutoffDate) return false;
       }
     }
-    
+
     // Distance range filter
     if (filters.distanceRange !== 'all') {
       if (filters.distanceRange === '5000+') {
@@ -116,16 +116,16 @@ export default function SessionsPage() {
         if (session.distance !== targetDistance) return false;
       }
     }
-    
+
     return true;
   });
 
   // Sort sessions based on current sort configuration
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     const { field, direction } = sortConfig;
-    
+
     let comparison = 0;
-    
+
     switch (field) {
       case 'date':
         comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
@@ -140,7 +140,7 @@ export default function SessionsPage() {
         comparison = a.avgPower - b.avgPower;
         break;
     }
-    
+
     return direction === 'asc' ? comparison : -comparison;
   });
 
@@ -161,8 +161,8 @@ export default function SessionsPage() {
     if (sortConfig.field !== field) {
       return <ArrowUpDown className="h-4 w-4" />;
     }
-    return sortConfig.direction === 'asc' ? 
-      <ArrowUp className="h-4 w-4" /> : 
+    return sortConfig.direction === 'asc' ?
+      <ArrowUp className="h-4 w-4" /> :
       <ArrowDown className="h-4 w-4" />;
   };
 
@@ -203,7 +203,7 @@ export default function SessionsPage() {
               Upload your SmartRow CSV data to see your workout history and detailed session information.
             </p>
             <Button asChild size="lg">
-              <Link href="/upload" className="flex items-center gap-2">
+              <Link href="/sync" className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
                 Upload Your Data
               </Link>
@@ -278,8 +278,8 @@ export default function SessionsPage() {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      {hasFilteredData ? 
-                        `${sortedSessions.length} of ${sessions.length} sessions` : 
+                      {hasFilteredData ?
+                        `${sortedSessions.length} of ${sessions.length} sessions` :
                         `${sortedSessions.length} sessions`
                       }
                     </span>
@@ -369,8 +369,8 @@ export default function SessionsPage() {
                           const prInfo = isPersonalRecord(session);
                           const hasStrokeData = !!(session.strokeData && session.strokeData.length > 0);
                           return (
-                            <TableRow 
-                              key={session.id} 
+                            <TableRow
+                              key={session.id}
                               tabIndex={0}
                               onClick={() => handleRowNavigate(session.id)}
                               onKeyDown={(event) => {
@@ -383,15 +383,15 @@ export default function SessionsPage() {
                             >
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <Link 
+                                  <Link
                                     href={`/sessions/${session.id}`}
                                     className="text-sm font-medium hover:underline"
                                   >
                                     {formatSessionDate(session.timestamp)}
                                   </Link>
                                   {prInfo.isPR && (
-                                    <Badge 
-                                      variant="secondary" 
+                                    <Badge
+                                      variant="secondary"
                                       className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
                                       title={`Personal Record: ${prInfo.distances.join(', ')}`}
                                     >
@@ -401,34 +401,34 @@ export default function SessionsPage() {
                                   )}
                                 </div>
                               </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">
-                                {formatDistance(session.distance)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              {formatDuration(session.duration)}
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-mono">
-                              {formatPace(session.avgSplit)}
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              {hasStrokeData ? (
-                                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-                                  <Sparkles className="h-3 w-3 mr-1" />
-                                  Enhanced
+                              <TableCell className="text-right">
+                                <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">
+                                  {formatDistance(session.distance)}
                                 </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">No stroke file</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {formatDuration(session.duration)}
+                              </TableCell>
+                              <TableCell className="text-right text-sm font-mono">
+                                {formatPace(session.avgSplit)}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {session.avgPower > 0 ? `${Math.round(session.avgPower)}W` : '--'}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {session.avgStrokeRate > 0 ? `${Math.round(session.avgStrokeRate)} SPM` : '--'}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {hasStrokeData ? (
+                                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Enhanced
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No stroke file</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
                       </TableBody>
@@ -451,10 +451,10 @@ export default function SessionsPage() {
                     </Button>
                   </div>
                 )}
-                
+
                 {/* Summary */}
                 <div className="mt-6 text-center text-sm text-muted-foreground">
-                  {hasActiveFilters ? 
+                  {hasActiveFilters ?
                     `Showing ${sortedSessions.length} filtered sessions` :
                     `Showing all ${sessions.length} sessions`
                   } • Sorted by {sortConfig.field} ({sortConfig.direction})

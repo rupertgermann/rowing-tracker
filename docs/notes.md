@@ -1,9 +1,7 @@
 # notes 
 
 
- 
-
-- existing "explain"-chats-links for charts showing data of many sessions should not be re-set when session data changes. f.i. the charts in /analytics should always link to an existing chat, even if the data changed since this chat was created. for single-session charts, a new chat should be created.
+when i click "sync now" in uploads module i see 0 distance and 0 time in the success message. see image  
 
 in chat module all chats in sidebar show "0 messages" despite having messages. also add the time to the date of the chat.
 
@@ -11,7 +9,7 @@ auto-name the chats of type "chat" in sidebar
 
 - cleanup /docs folder and update main README.md 
 
-  
+ in award-details add a possibility to select one of the existing Color Palette for the award image generation. keep the Color Palette selection in settings as global fallback if the user does not select a color palette for the award image generation in a certain award. make sure the available color palettes can be changed at one point in the code. 
 
 
 

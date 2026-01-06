@@ -114,8 +114,11 @@ export default function UploadPage() {
             return;
           }
 
-          // Update local store state (already saved to DB)
-          updateSessionsInStore(result.sessionsToSave);
+          // Update local store state with sessions returned from database (with correct CUIDs)
+          // skip DB save since we already saved with chunked upload
+          if (saveResult.sessions && saveResult.sessions.length > 0) {
+            updateSessionsInStore(saveResult.sessions);
+          }
         }
 
         setZipResult(result);
@@ -166,8 +169,11 @@ export default function UploadPage() {
           return;
         }
 
-        // Update local store state (skip DB save since we already saved with chunked upload)
-        addSessions(sessions, { skipDbSave: true });
+        // Update local store state with sessions returned from database (with correct CUIDs)
+        // skip DB save since we already saved with chunked upload
+        if (saveResult.sessions && saveResult.sessions.length > 0) {
+          addSessions(saveResult.sessions, { skipDbSave: true });
+        }
       }
 
       setImportResult(result);
@@ -367,39 +373,71 @@ export default function UploadPage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="text-center space-y-2 py-4">
-          <h1 className="text-4xl font-bold text-foreground">Upload SmartRow Data</h1>
+          <h1 className="text-4xl font-bold text-foreground">Sync SmartRow Data</h1>
           <p className="text-muted-foreground text-lg">
-            Upload your CSV export or ZIP archive to visualize your rowing performance
+            Sync your workouts directly from SmartRow or manually upload your data files
           </p>
         </div>
 
         {/* Upload Area */}
         {uploadState === 'idle' || uploadState === 'dragging' ? (
           <>
-            <Card className="border-2 border-dashed transition-colors">
+            {/* SmartRow Sync Button */}
+            <Card className="border-2 border-primary/20 bg-primary/5">
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center justify-center gap-6 text-center">
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-semibold text-foreground">Sync from SmartRow</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Automatically download your latest workouts from smartrow.fit. This is the recommended way to keep your data up to date.
+                    </p>
+                  </div>
+
+                  <Button onClick={handleSmartRowSync} size="lg" className="h-12 px-8 text-lg shrink-0">
+                    <RefreshCw className="h-5 w-5 mr-2" />
+                    Sync Now
+                  </Button>
+
+                  <p className="text-sm text-muted-foreground">
+                    Configure your SmartRow credentials in{' '}
+                    <Link href="/settings" className="text-primary hover:underline inline-flex items-center gap-1">
+                      <Settings className="h-3 w-3" />
+                      Settings
+                    </Link>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-8">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-muted-foreground text-sm uppercase tracking-wider font-medium">or manually upload</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Manual Upload Area */}
+            <Card className={`border-2 border-dashed transition-colors ${uploadState === 'dragging'
+                ? 'border-primary bg-primary/5'
+                : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
+              }`}>
               <CardContent
-                className={`p-12 text-center cursor-pointer transition-colors ${uploadState === 'dragging'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
-                  }`}
+                className="p-8 text-center cursor-pointer"
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => document.getElementById('file-input')?.click()}
               >
                 <div className="flex flex-col items-center space-y-4">
-                  <Upload className="h-12 w-12 text-muted-foreground" />
-                  <div className="space-y-2">
+                  <Upload className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-foreground">
-                      {uploadState === 'dragging' ? 'Drop your file here' : 'Drag and drop your CSV or ZIP file here'}
+                      {uploadState === 'dragging' ? 'Drop your file here' : 'Manual File Upload'}
                     </h3>
-                    <p className="text-muted-foreground">
-                      or click to browse your files
+                    <p className="text-sm text-muted-foreground">
+                      Drag and drop your CSV or ZIP file here, or click to browse
                     </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Supports SmartRow CSV exports and ZIP archives containing detailed workout files
-                  </p>
                   <input
                     id="file-input"
                     type="file"
@@ -408,38 +446,6 @@ export default function UploadPage() {
                     className="hidden"
                   />
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Divider */}
-            <div className="flex items-center gap-4 my-6">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-muted-foreground text-sm">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {/* SmartRow Sync Button */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-center sm:text-left">
-                    <h3 className="font-semibold text-foreground">Sync from SmartRow</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically download your latest workouts from smartrow.fit
-                    </p>
-                  </div>
-                  <Button onClick={handleSmartRowSync} size="lg" className="shrink-0">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Sync Now
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Configure your SmartRow credentials in{' '}
-                  <Link href="/settings" className="text-primary hover:underline inline-flex items-center gap-1">
-                    <Settings className="h-3 w-3" />
-                    Settings
-                  </Link>
-                </p>
               </CardContent>
             </Card>
           </>

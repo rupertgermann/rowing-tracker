@@ -113,7 +113,9 @@ ${explainChartPrompt}`;
               <TooltipContent side="left" className="max-w-lg xl:max-w-3xl max-h-[28rem] xl:max-h-[calc(100vh-6rem)] min-h-[12rem] xl:min-h-[20rem] overflow-y-auto p-4 bg-popover text-popover-foreground border shadow-lg z-50">
                 <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
                   <Brain className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-sm">AI Analysis</span>
+                  <span className="font-semibold text-sm">
+                    AI Analysis{explanation?.chartTitle && `: ${explanation.chartTitle}`}
+                  </span>
                 </div>
                 <div className="text-popover-foreground text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-primary [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:text-primary [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:my-1 [&_strong]:text-cyan-400 [&_strong]:font-semibold">
                   <ReactMarkdown>

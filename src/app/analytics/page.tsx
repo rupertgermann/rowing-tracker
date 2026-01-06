@@ -201,10 +201,10 @@ const defaultAnalyticsSettings: AnalyticsChartSettings = {
 // Calculate moving average for smoothing
 const calculateMovingAverage = (data: number[], windowSize: number): (number | null)[] => {
   if (windowSize === 0) return data;
-  
+
   return data.map((_, index) => {
     if (index < windowSize - 1) return null;
-    
+
     const window = data.slice(index - windowSize + 1, index + 1);
     const sum = window.reduce((acc, d) => acc + d, 0);
     return sum / windowSize;
@@ -290,11 +290,11 @@ const Analytics = () => {
   const isExplanationValid = useCallback((chartId: string) => {
     return validExplanations[chartId] ?? false;
   }, [validExplanations]);
-  
+
   // Only load sessions from store if analytics data is not available
   // This avoids loading large strokeData payloads unnecessarily
   const sessions = analyticsData ? [] : getSessions();
-  const stats = analyticsData ? { 
+  const stats = analyticsData ? {
     totalDistance: analyticsData.summary.totalDistance,
     totalTime: analyticsData.summary.totalDuration,
     totalEnergy: analyticsData.summary.totalEnergy,
@@ -316,7 +316,7 @@ const Analytics = () => {
   }, [analyticsData, sessions]);
 
   const chartSettings = getChartSettings();
-  
+
   // Refs for chart containers (for screenshot capture)
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -325,7 +325,7 @@ const Analytics = () => {
 
   // Analytics settings (with fallback for migration)
   const analyticsSettings = chartSettings.analyticsSettings ?? defaultAnalyticsSettings;
-  
+
   // Convert stored date range to DateRange object
   const dateRange: DateRange | undefined = useMemo(() => {
     if (!analyticsSettings.dateRangeFrom) return undefined;
@@ -433,9 +433,9 @@ const Analytics = () => {
       if (hash && chartRefs.current[hash]) {
         // Small delay to ensure DOM is ready
         setTimeout(() => {
-          chartRefs.current[hash]?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
+          chartRefs.current[hash]?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
           });
         }, 100);
       }
@@ -488,30 +488,30 @@ ${explainChartPrompt}`;
         if (svgElement) {
           // Clone and serialize the SVG
           const svgClone = svgElement.cloneNode(true) as SVGElement;
-          
+
           // Set explicit dimensions
           const bbox = svgElement.getBoundingClientRect();
           const width = bbox.width * 2; // 2x scale for quality
           const height = bbox.height * 2;
           svgClone.setAttribute('width', String(width));
           svgClone.setAttribute('height', String(height));
-          
+
           // Add white background for visibility
           const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           bgRect.setAttribute('width', '100%');
           bgRect.setAttribute('height', '100%');
           bgRect.setAttribute('fill', '#1f2937'); // Dark background
           svgClone.insertBefore(bgRect, svgClone.firstChild);
-          
+
           // Serialize to string
           const serializer = new XMLSerializer();
           const svgString = serializer.serializeToString(svgClone);
-          
+
           // Convert SVG to PNG via canvas
           const img = new Image();
           const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
           const url = URL.createObjectURL(svgBlob);
-          
+
           screenshot = await new Promise<string | undefined>((resolve) => {
             img.onload = () => {
               const canvas = document.createElement('canvas');
@@ -567,7 +567,7 @@ ${explainChartPrompt}`;
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
     const latest = values[values.length - 1];
     const earliest = values[0];
-    
+
     return `- Time period: ${timeRange === 'all' ? 'All time' : defaultTimeRangeOptions.find(o => o.value === timeRange)?.label}
 - Data points: ${values.length} sessions
 - Range: ${config.formatter(min)} to ${config.formatter(max)}
@@ -585,7 +585,7 @@ ${explainChartPrompt}`;
     const yValues = data.map(d => d[yKey]).filter((v): v is number => typeof v === 'number');
 
     if (xValues.length === 0) return 'No valid data points available.';
-    
+
     return `- Time period: ${timeRange === 'all' ? 'All time' : defaultTimeRangeOptions.find(o => o.value === timeRange)?.label}
 - Data points: ${data.length} sessions
 - ${xLabel} range: ${Math.min(...xValues).toFixed(1)} to ${Math.max(...xValues).toFixed(1)}
@@ -615,14 +615,14 @@ ${explainChartPrompt}`;
     // If we have analytics data, create minimal session objects from chart data for filtering
     if (analyticsData && analyticsData.chartData.distance && analyticsData.chartData.distance.length > 0) {
       const distanceData = analyticsData.chartData.distance;
-      
+
       // Create lookup maps for other metrics by sessionId
       const paceMap = new Map(analyticsData.chartData.pace?.map(p => [p.sessionId, p.value]) || []);
       const powerMap = new Map(analyticsData.chartData.power?.map(p => [p.sessionId, p.value]) || []);
       const strokeRateMap = new Map(analyticsData.chartData.strokeRate?.map(p => [p.sessionId, p.value]) || []);
       const energyMap = new Map(analyticsData.chartData.energy?.map(p => [p.sessionId, p.value]) || []);
       const durationMap = new Map(analyticsData.chartData.duration?.map(p => [p.sessionId, p.value]) || []);
-      
+
       return distanceData
         .map(point => {
           const timestamp = new Date(point.fullDate);
@@ -673,11 +673,11 @@ ${explainChartPrompt}`;
           return sessionMs >= cutoffDate.getTime();
         });
     }
-    
+
     // Fallback to computed sessions when analytics data not available
     return computedSessions.filter(session => {
       const sessionDate = session._timestamp;
-      
+
       // If custom date range is set, use it
       if (dateRange?.from) {
         if (sessionDate < dateRange.from) return false;
@@ -690,7 +690,7 @@ ${explainChartPrompt}`;
         }
         return true;
       }
-      
+
       // Otherwise use the fixed time range
       if (timeRange === 'all') return true;
 
@@ -794,7 +794,7 @@ ${explainChartPrompt}`;
       }))
       // Filter out sessions without data (e.g., consistency score requires strokeData)
       .filter(dataPoint => dataPoint[metric] !== -1);
-    
+
     // Add smoothed values if smoothing is enabled
     if (smoothingValue > 0 && baseData.length > 0) {
       const values = baseData.map(d => d[metric] as number);
@@ -804,7 +804,7 @@ ${explainChartPrompt}`;
         smoothedValue: smoothedValues[i]
       }));
     }
-    
+
     return baseData;
   }, [smoothingValue, getMetricValue]);
 
@@ -959,7 +959,7 @@ ${explainChartPrompt}`;
           {payload.map((entry: ScatterTooltipEntry, index: number) => (
             <p key={index} style={chartTheme.tooltip.itemStyle}>
               {entry.name}: {
-                entry.dataKey === 'pace' 
+                entry.dataKey === 'pace'
                   ? formatPace(entry.value)
                   : entry.dataKey === 'durationMinutes'
                     ? `${entry.value} min`
@@ -1142,7 +1142,7 @@ ${explainChartPrompt}`;
               Upload your first SmartRow CSV file to see your rowing analytics and track your progress over time.
             </p>
             <Button asChild size="lg">
-              <Link href="/upload" className="flex items-center gap-2">
+              <Link href="/sync" className="flex items-center gap-2">
                 <Upload className="h-5 w-5" />
                 Upload Your Data
               </Link>
@@ -1306,22 +1306,22 @@ ${explainChartPrompt}`;
                     {Object.entries(chartConfigs)
                       .filter(([metric]) => metric !== 'splitTime') // Split Time now lives in Correlations section
                       .map(([metric, config]) => {
-                      const Icon = config.icon;
-                      const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
+                        const Icon = config.icon;
+                        const isEnabled = chartSettings.enabledCharts.includes(metric as ChartMetric);
 
-                      return (
-                        <Button
-                          key={metric}
-                          variant={isEnabled ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleChart(metric as ChartMetric)}
-                          className="flex items-center gap-2 h-auto p-3 flex-col"
-                        >
-                          <Icon className="h-4 w-4 mb-1" />
-                          <span className="text-xs font-medium">{config.label}</span>
-                        </Button>
-                      );
-                    })}
+                        return (
+                          <Button
+                            key={metric}
+                            variant={isEnabled ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleChart(metric as ChartMetric)}
+                            className="flex items-center gap-2 h-auto p-3 flex-col"
+                          >
+                            <Icon className="h-4 w-4 mb-1" />
+                            <span className="text-xs font-medium">{config.label}</span>
+                          </Button>
+                        );
+                      })}
                   </div>
                   <div className="mt-4 text-sm text-muted-foreground">
                     {orderedEnabledCharts.length === 0
@@ -1343,7 +1343,7 @@ ${explainChartPrompt}`;
 
                   if (config.isSpecial && metric === 'consistencyScore') {
                     return (
-                      <div 
+                      <div
                         key={metric}
                         id={`metric-${metric}`}
                         ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
@@ -1357,6 +1357,7 @@ ${explainChartPrompt}`;
                               <ExplanationTooltip
                                 chatSessionId={chartExplanations[`metric-consistencyScore-${timeRange}`].chatSessionId}
                                 content={chartExplanations[`metric-consistencyScore-${timeRange}`].fullResponse || chartExplanations[`metric-consistencyScore-${timeRange}`].summary}
+                                chartTitle={chartExplanations[`metric-consistencyScore-${timeRange}`].chartTitle}
                               />
                             ) : undefined
                           }
@@ -1367,141 +1368,142 @@ ${explainChartPrompt}`;
 
                   // Standard charts use the generic Card wrapper
                   return (
-                    <Card 
+                    <Card
                       key={metric}
                       id={`metric-${metric}`}
-                      className="border-l-4" 
+                      className="border-l-4"
                       style={{ borderLeftColor: config.color }}
                       ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
                     >
                       <>
                         <CardHeader>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-md" style={{ backgroundColor: `${config.color}15` }}>
-                                  <span style={{ color: config.color }}>
-                                    <Icon className="h-5 w-5" />
-                                  </span>
-                                </div>
-                                <div>
-                                  <CardTitle className="text-lg">
-                                    {config.label} Over Time
-                                  </CardTitle>
-                                  <CardDescription>
-                                    {`Track your ${config.label.toLowerCase()} progress`}
-                                  </CardDescription>
-                                </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-md" style={{ backgroundColor: `${config.color}15` }}>
+                                <span style={{ color: config.color }}>
+                                  <Icon className="h-5 w-5" />
+                                </span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {/* Zoom toggle button */}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleChartZoom(metric)}
-                                  className="h-8 w-8 p-0"
-                                  title={chartZoom[metric] ? 'Show Full Range' : 'Zoom to Data'}
-                                >
-                                  {chartZoom[metric] ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-                                </Button>
-                                {/* Show saved explanation indicator */}
-                                {isExplanationValid(`metric-${metric}-${timeRange}`) && (
-                                  <ExplanationTooltip
-                                    chatSessionId={chartExplanations[`metric-${metric}-${timeRange}`].chatSessionId}
-                                    content={chartExplanations[`metric-${metric}-${timeRange}`].fullResponse || chartExplanations[`metric-${metric}-${timeRange}`].summary}
-                                  />
-                                )}
-                                {/* Explain button */}
-                                <TooltipProvider>
-                                  <UITooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleExplainChart(
-                                          `metric-${metric}-${timeRange}`,
-                                          `${config.label} Over Time`,
-                                          `This chart shows how my ${config.label.toLowerCase()} (${config.unit}) has changed over time.`,
-                                          getMetricDataContext(metric, chartData),
-                                          chartData
-                                        )}
-                                      >
-                                        <HelpCircle className="h-4 w-4 mr-1" />
-                                        Explain
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Ask AI to explain this chart</p>
-                                    </TooltipContent>
-                                  </UITooltip>
-                                </TooltipProvider>
+                              <div>
+                                <CardTitle className="text-lg">
+                                  {config.label} Over Time
+                                </CardTitle>
+                                <CardDescription>
+                                  {`Track your ${config.label.toLowerCase()} progress`}
+                                </CardDescription>
                               </div>
                             </div>
-                          </CardHeader>
-                          <CardContent>
-                            {/* Controls row */}
-                            <div className="flex flex-wrap items-center gap-4 mb-4 pb-4 border-b border-border">
-                              {/* Date Range Picker */}
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">Period:</span>
-                                <DateRangePicker
-                                  value={dateRange}
-                                  onChange={setDateRange}
-                                  placeholder="All time"
-                                  availableDates={availableDates}
+                            <div className="flex items-center gap-2">
+                              {/* Zoom toggle button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleChartZoom(metric)}
+                                className="h-8 w-8 p-0"
+                                title={chartZoom[metric] ? 'Show Full Range' : 'Zoom to Data'}
+                              >
+                                {chartZoom[metric] ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                              </Button>
+                              {/* Show saved explanation indicator */}
+                              {isExplanationValid(`metric-${metric}-${timeRange}`) && (
+                                <ExplanationTooltip
+                                  chatSessionId={chartExplanations[`metric-${metric}-${timeRange}`].chatSessionId}
+                                  content={chartExplanations[`metric-${metric}-${timeRange}`].fullResponse || chartExplanations[`metric-${metric}-${timeRange}`].summary}
+                                  chartTitle={chartExplanations[`metric-${metric}-${timeRange}`].chartTitle}
                                 />
-                              </div>
-
-                              {/* Smoothing Selector */}
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">Smooth:</span>
-                                <div className="flex gap-1">
-                                  {smoothingOptions.map((option) => (
+                              )}
+                              {/* Explain button */}
+                              <TooltipProvider>
+                                <UITooltip>
+                                  <TooltipTrigger asChild>
                                     <Button
-                                      key={option.value}
-                                      variant={smoothingValue === option.value ? 'default' : 'outline'}
+                                      variant="outline"
                                       size="sm"
-                                      onClick={() => setSmoothing(option.value)}
-                                      className="text-xs px-2"
+                                      onClick={() => handleExplainChart(
+                                        `metric-${metric}-${timeRange}`,
+                                        `${config.label} Over Time`,
+                                        `This chart shows how my ${config.label.toLowerCase()} (${config.unit}) has changed over time.`,
+                                        getMetricDataContext(metric, chartData),
+                                        chartData
+                                      )}
                                     >
-                                      {option.label}
+                                      <HelpCircle className="h-4 w-4 mr-1" />
+                                      Explain
                                     </Button>
-                                  ))}
-                                </div>
-                              </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Ask AI to explain this chart</p>
+                                  </TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Controls row */}
+                          <div className="flex flex-wrap items-center gap-4 mb-4 pb-4 border-b border-border">
+                            {/* Date Range Picker */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Period:</span>
+                              <DateRangePicker
+                                value={dateRange}
+                                onChange={setDateRange}
+                                placeholder="All time"
+                                availableDates={availableDates}
+                              />
                             </div>
 
-                            {/* Legend (shown when smoothing is enabled) */}
-                            {smoothingValue > 0 && (
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-teal-500" />
-                                  <span>Individual Sessions</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-0.5 bg-orange-500" />
-                                  <span>{smoothingValue}-Session Moving Average</span>
-                                </div>
+                            {/* Smoothing Selector */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Smooth:</span>
+                              <div className="flex gap-1">
+                                {smoothingOptions.map((option) => (
+                                  <Button
+                                    key={option.value}
+                                    variant={smoothingValue === option.value ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSmoothing(option.value)}
+                                    className="text-xs px-2"
+                                  >
+                                    {option.label}
+                                  </Button>
+                                ))}
                               </div>
-                            )}
+                            </div>
+                          </div>
+
+                          {/* Legend (shown when smoothing is enabled) */}
+                          {smoothingValue > 0 && (
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-teal-500" />
+                                <span>Individual Sessions</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-0.5 bg-orange-500" />
+                                <span>{smoothingValue}-Session Moving Average</span>
+                              </div>
+                            </div>
+                          )}
 
                           {chartData.length > 0 ? (
-                              <div className="w-full min-w-0">
-                                <ResponsiveContainer
-                                  width="100%"
-                                  height={300}
-                                  initialDimension={{ width: 600, height: 300 }}
-                                >
-                                  {renderChart(metric, chartData, config)}
-                                </ResponsiveContainer>
-                              </div>
-                            ) : (
-                              <div className="text-center text-muted-foreground py-8">
-                                <p>No data available for {config.label.toLowerCase()} chart.</p>
-                                <p className="text-sm">Try selecting a different time range or upload more data.</p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </>
+                            <div className="w-full min-w-0">
+                              <ResponsiveContainer
+                                width="100%"
+                                height={300}
+                                initialDimension={{ width: 600, height: 300 }}
+                              >
+                                {renderChart(metric, chartData, config)}
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <div className="text-center text-muted-foreground py-8">
+                              <p>No data available for {config.label.toLowerCase()} chart.</p>
+                              <p className="text-sm">Try selecting a different time range or upload more data.</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </>
                     </Card>
                   );
                 })}
@@ -1566,6 +1568,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`correlation-split-time-${timeRange}`].chatSessionId}
                               content={chartExplanations[`correlation-split-time-${timeRange}`].fullResponse || chartExplanations[`correlation-split-time-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`correlation-split-time-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1617,6 +1620,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-power-pace-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-power-pace-${timeRange}`].fullResponse || chartExplanations[`scatter-power-pace-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-power-pace-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1651,24 +1655,24 @@ ${explainChartPrompt}`;
                           initialDimension={{ width: 600, height: 300 }}
                         >
                           <ScatterChart margin={chartTheme.margin.scatter}>
-                            <CartesianGrid 
-                              strokeDasharray={chartTheme.grid.strokeDasharray} 
-                              stroke={chartTheme.grid.stroke} 
-                              opacity={chartTheme.grid.opacity} 
+                            <CartesianGrid
+                              strokeDasharray={chartTheme.grid.strokeDasharray}
+                              stroke={chartTheme.grid.stroke}
+                              opacity={chartTheme.grid.opacity}
                             />
-                            <XAxis 
-                              type="number" 
-                              dataKey="power" 
-                              name="Power" 
+                            <XAxis
+                              type="number"
+                              dataKey="power"
+                              name="Power"
                               unit="W"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
-                            <YAxis 
-                              type="number" 
-                              dataKey="pace" 
-                              name="Pace" 
+                            <YAxis
+                              type="number"
+                              dataKey="pace"
+                              name="Pace"
                               domain={['auto', 'auto']}
                               reversed={true}
                               tickFormatter={(val) => formatPace(val)}
@@ -1676,10 +1680,10 @@ ${explainChartPrompt}`;
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
                             <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                            <Scatter 
-                              name="Sessions" 
-                              data={scatterPlotData} 
-                              fill="#f59e0b" 
+                            <Scatter
+                              name="Sessions"
+                              data={scatterPlotData}
+                              fill="#f59e0b"
                               fillOpacity={0.7}
                             />
                           </ScatterChart>
@@ -1708,6 +1712,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-rate-pace-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-rate-pace-${timeRange}`].fullResponse || chartExplanations[`scatter-rate-pace-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-rate-pace-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1742,24 +1747,24 @@ ${explainChartPrompt}`;
                           initialDimension={{ width: 600, height: 300 }}
                         >
                           <ScatterChart margin={chartTheme.margin.scatter}>
-                            <CartesianGrid 
-                              strokeDasharray={chartTheme.grid.strokeDasharray} 
-                              stroke={chartTheme.grid.stroke} 
-                              opacity={chartTheme.grid.opacity} 
+                            <CartesianGrid
+                              strokeDasharray={chartTheme.grid.strokeDasharray}
+                              stroke={chartTheme.grid.stroke}
+                              opacity={chartTheme.grid.opacity}
                             />
-                            <XAxis 
-                              type="number" 
-                              dataKey="strokeRate" 
-                              name="Stroke Rate" 
+                            <XAxis
+                              type="number"
+                              dataKey="strokeRate"
+                              name="Stroke Rate"
                               unit=" SPM"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
-                            <YAxis 
-                              type="number" 
-                              dataKey="pace" 
-                              name="Pace" 
+                            <YAxis
+                              type="number"
+                              dataKey="pace"
+                              name="Pace"
                               domain={['auto', 'auto']}
                               reversed={true}
                               tickFormatter={(val) => formatPace(val)}
@@ -1767,10 +1772,10 @@ ${explainChartPrompt}`;
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
                             <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                            <Scatter 
-                              name="Sessions" 
-                              data={scatterPlotData} 
-                              fill="#8b5cf6" 
+                            <Scatter
+                              name="Sessions"
+                              data={scatterPlotData}
+                              fill="#8b5cf6"
                               fillOpacity={0.7}
                             />
                           </ScatterChart>
@@ -1799,6 +1804,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-duration-distance-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-duration-distance-${timeRange}`].fullResponse || chartExplanations[`scatter-duration-distance-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-duration-distance-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1833,24 +1839,24 @@ ${explainChartPrompt}`;
                           initialDimension={{ width: 600, height: 300 }}
                         >
                           <ScatterChart margin={chartTheme.margin.scatter}>
-                            <CartesianGrid 
-                              strokeDasharray={chartTheme.grid.strokeDasharray} 
-                              stroke={chartTheme.grid.stroke} 
-                              opacity={chartTheme.grid.opacity} 
+                            <CartesianGrid
+                              strokeDasharray={chartTheme.grid.strokeDasharray}
+                              stroke={chartTheme.grid.stroke}
+                              opacity={chartTheme.grid.opacity}
                             />
-                            <XAxis 
-                              type="number" 
-                              dataKey="durationMinutes" 
-                              name="Duration" 
+                            <XAxis
+                              type="number"
+                              dataKey="durationMinutes"
+                              name="Duration"
                               unit=" min"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
-                            <YAxis 
-                              type="number" 
-                              dataKey="distance" 
-                              name="Distance" 
+                            <YAxis
+                              type="number"
+                              dataKey="distance"
+                              name="Distance"
                               unit="m"
                               domain={['auto', 'auto']}
                               tickFormatter={(val) => formatDistance(val)}
@@ -1858,10 +1864,10 @@ ${explainChartPrompt}`;
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
                             <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                            <Scatter 
-                              name="Sessions" 
-                              data={scatterPlotData} 
-                              fill="#3b82f6" 
+                            <Scatter
+                              name="Sessions"
+                              data={scatterPlotData}
+                              fill="#3b82f6"
                               fillOpacity={0.7}
                             />
                           </ScatterChart>
@@ -1890,6 +1896,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-energy-duration-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-energy-duration-${timeRange}`].fullResponse || chartExplanations[`scatter-energy-duration-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-energy-duration-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1924,34 +1931,34 @@ ${explainChartPrompt}`;
                           initialDimension={{ width: 600, height: 300 }}
                         >
                           <ScatterChart margin={chartTheme.margin.scatter}>
-                            <CartesianGrid 
-                              strokeDasharray={chartTheme.grid.strokeDasharray} 
-                              stroke={chartTheme.grid.stroke} 
-                              opacity={chartTheme.grid.opacity} 
+                            <CartesianGrid
+                              strokeDasharray={chartTheme.grid.strokeDasharray}
+                              stroke={chartTheme.grid.stroke}
+                              opacity={chartTheme.grid.opacity}
                             />
-                            <XAxis 
-                              type="number" 
-                              dataKey="durationMinutes" 
-                              name="Duration" 
+                            <XAxis
+                              type="number"
+                              dataKey="durationMinutes"
+                              name="Duration"
                               unit=" min"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
-                            <YAxis 
-                              type="number" 
-                              dataKey="energy" 
-                              name="Energy" 
+                            <YAxis
+                              type="number"
+                              dataKey="energy"
+                              name="Energy"
                               unit=" kCal"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
                             <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                            <Scatter 
-                              name="Sessions" 
-                              data={scatterPlotData} 
-                              fill="#ef4444" 
+                            <Scatter
+                              name="Sessions"
+                              data={scatterPlotData}
+                              fill="#ef4444"
                               fillOpacity={0.7}
                             />
                           </ScatterChart>
@@ -1980,6 +1987,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-power-rate-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-power-rate-${timeRange}`].fullResponse || chartExplanations[`scatter-power-rate-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-power-rate-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -2014,34 +2022,34 @@ ${explainChartPrompt}`;
                           initialDimension={{ width: 600, height: 300 }}
                         >
                           <ScatterChart margin={chartTheme.margin.scatter}>
-                            <CartesianGrid 
-                              strokeDasharray={chartTheme.grid.strokeDasharray} 
-                              stroke={chartTheme.grid.stroke} 
-                              opacity={chartTheme.grid.opacity} 
+                            <CartesianGrid
+                              strokeDasharray={chartTheme.grid.strokeDasharray}
+                              stroke={chartTheme.grid.stroke}
+                              opacity={chartTheme.grid.opacity}
                             />
-                            <XAxis 
-                              type="number" 
-                              dataKey="strokeRate" 
-                              name="Stroke Rate" 
+                            <XAxis
+                              type="number"
+                              dataKey="strokeRate"
+                              name="Stroke Rate"
                               unit=" SPM"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
-                            <YAxis 
-                              type="number" 
-                              dataKey="power" 
-                              name="Power" 
+                            <YAxis
+                              type="number"
+                              dataKey="power"
+                              name="Power"
                               unit="W"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
                             <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                            <Scatter 
-                              name="Sessions" 
-                              data={scatterPlotData} 
-                              fill="#10b981" 
+                            <Scatter
+                              name="Sessions"
+                              data={scatterPlotData}
+                              fill="#10b981"
                               fillOpacity={0.7}
                             />
                           </ScatterChart>
@@ -2070,6 +2078,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations['scatter-distance-power'].chatSessionId}
                               content={chartExplanations['scatter-distance-power'].fullResponse || chartExplanations['scatter-distance-power'].summary}
+                              chartTitle={chartExplanations['scatter-distance-power'].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -2104,35 +2113,35 @@ ${explainChartPrompt}`;
                           initialDimension={{ width: 600, height: 300 }}
                         >
                           <ScatterChart margin={chartTheme.margin.scatter}>
-                            <CartesianGrid 
-                              strokeDasharray={chartTheme.grid.strokeDasharray} 
-                              stroke={chartTheme.grid.stroke} 
-                              opacity={chartTheme.grid.opacity} 
+                            <CartesianGrid
+                              strokeDasharray={chartTheme.grid.strokeDasharray}
+                              stroke={chartTheme.grid.stroke}
+                              opacity={chartTheme.grid.opacity}
                             />
-                            <XAxis 
-                              type="number" 
-                              dataKey="distance" 
-                              name="Distance" 
+                            <XAxis
+                              type="number"
+                              dataKey="distance"
+                              name="Distance"
                               unit="m"
                               domain={['auto', 'auto']}
                               tickFormatter={(val) => formatDistance(val)}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
-                            <YAxis 
-                              type="number" 
-                              dataKey="power" 
-                              name="Power" 
+                            <YAxis
+                              type="number"
+                              dataKey="power"
+                              name="Power"
                               unit="W"
                               domain={['auto', 'auto']}
                               stroke={chartTheme.axis.strokeColor}
                               tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
                             />
                             <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                            <Scatter 
-                              name="Sessions" 
-                              data={scatterPlotData} 
-                              fill="#06b6d4" 
+                            <Scatter
+                              name="Sessions"
+                              data={scatterPlotData}
+                              fill="#06b6d4"
                               fillOpacity={0.7}
                             />
                           </ScatterChart>

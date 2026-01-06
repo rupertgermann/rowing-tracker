@@ -31,7 +31,7 @@ export const config = {
     "/prs/:path*",
     "/plans/:path*",
     "/chat/:path*",
-    "/upload/:path*",
+    "/sync/:path*",
     "/settings/:path*",
     "/insights/:path*",
     "/admin/:path*",

@@ -25,7 +25,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   }
@@ -43,7 +43,7 @@ export default function PRsPage() {
   const { getPersonalRecords, getSessions, getStats } = useRowingStore();
   const [mounted, setMounted] = useState(false);
   const [awardSuggestionsOpen, setAwardSuggestionsOpen] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -56,13 +56,13 @@ export default function PRsPage() {
   const hasPRs = personalRecords.length > 0;
 
   // Find best overall stats for additional metrics
-  const bestPower = sessions.reduce((best, session) => 
-    session.avgPower > best.avgPower ? session : best, 
+  const bestPower = sessions.reduce((best, session) =>
+    session.avgPower > best.avgPower ? session : best,
     sessions[0] || { avgPower: 0, timestamp: new Date() }
   );
 
-  const bestStrokeRate = sessions.reduce((best, session) => 
-    session.avgStrokeRate > best.avgStrokeRate ? session : best, 
+  const bestStrokeRate = sessions.reduce((best, session) =>
+    session.avgStrokeRate > best.avgStrokeRate ? session : best,
     sessions[0] || { avgStrokeRate: 0, timestamp: new Date() }
   );
 
@@ -72,7 +72,7 @@ export default function PRsPage() {
   // Calculate consistency records from sessions with stroke data
   const consistencyRecords = (() => {
     const sessionsWithStrokeData = sessions.filter(s => s.strokeData && s.strokeData.length > 0);
-    
+
     if (sessionsWithStrokeData.length === 0) {
       return {
         bestScore: 0,
@@ -106,16 +106,16 @@ export default function PRsPage() {
     const now = Date.now();
     const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
     const threeMonthsMs = 90 * 24 * 60 * 60 * 1000;
-    
+
     // Last 2 weeks
     const recentStart = now - twoWeeksMs;
     const recentSessions = sessionScores.filter(s => s.timestamp >= recentStart);
-    
+
     // 2 weeks from 3 months ago (between 3 months ago and 3 months - 2 weeks ago)
     const oldEnd = now - threeMonthsMs;
     const oldStart = oldEnd - twoWeeksMs;
     const oldSessions = sessionScores.filter(s => s.timestamp >= oldStart && s.timestamp < oldEnd);
-    
+
     if (recentSessions.length > 0 && oldSessions.length > 0) {
       const recentAvg = recentSessions.reduce((sum, s) => sum + s.score, 0) / recentSessions.length;
       const oldAvg = oldSessions.reduce((sum, s) => sum + s.score, 0) / oldSessions.length;
@@ -158,7 +158,7 @@ export default function PRsPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center space-y-4 mb-10">
-          <div 
+          <div
             className={`inline-flex flex-col items-center justify-center px-6 py-4 rounded-2xl ${cardStyles.gold.border} ${cardStyles.gold.bg}`}
             style={getShadowStyle('gold')}
           >
@@ -186,7 +186,7 @@ export default function PRsPage() {
               Upload your SmartRow CSV data to start tracking your personal records and achievements.
             </p>
             <Button asChild size="lg">
-              <Link href="/upload" className="flex items-center gap-2">
+              <Link href="/sync" className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
                 Upload Your Data
               </Link>
@@ -201,7 +201,7 @@ export default function PRsPage() {
                 <Medal className="h-6 w-6 text-primary" />
                 Distance Records
               </h2>
-              
+
               {hasPRs ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {personalRecords.map((record) => (
@@ -227,7 +227,7 @@ export default function PRsPage() {
                           <div className="text-3xl font-bold text-foreground font-mono">
                             {formatDuration(record.bestTime)}
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Avg Pace:</span>
@@ -242,7 +242,7 @@ export default function PRsPage() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className={`h-4 w-4 ${cardStyles.gold.accentColor}`} />
                             <span>Achieved: {formatDateOnly(record.date)}</span>
@@ -270,7 +270,7 @@ export default function PRsPage() {
                 <Zap className="h-6 w-6 text-primary" />
                 Performance Records
               </h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Best Average Power */}
                 <Link
@@ -353,7 +353,7 @@ export default function PRsPage() {
                 <BarChart3 className="h-6 w-6 text-teal-500" />
                 Consistency Records
               </h2>
-              
+
               {consistencyRecords.totalWithData > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Best Consistency Score */}
