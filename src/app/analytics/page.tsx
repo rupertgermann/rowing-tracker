@@ -1357,6 +1357,7 @@ ${explainChartPrompt}`;
                               <ExplanationTooltip
                                 chatSessionId={chartExplanations[`metric-consistencyScore-${timeRange}`].chatSessionId}
                                 content={chartExplanations[`metric-consistencyScore-${timeRange}`].fullResponse || chartExplanations[`metric-consistencyScore-${timeRange}`].summary}
+                                chartTitle={chartExplanations[`metric-consistencyScore-${timeRange}`].chartTitle}
                               />
                             ) : undefined
                           }
@@ -1408,6 +1409,7 @@ ${explainChartPrompt}`;
                                   <ExplanationTooltip
                                     chatSessionId={chartExplanations[`metric-${metric}-${timeRange}`].chatSessionId}
                                     content={chartExplanations[`metric-${metric}-${timeRange}`].fullResponse || chartExplanations[`metric-${metric}-${timeRange}`].summary}
+                                    chartTitle={chartExplanations[`metric-${metric}-${timeRange}`].chartTitle}
                                   />
                                 )}
                                 {/* Explain button */}
@@ -1566,6 +1568,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`correlation-split-time-${timeRange}`].chatSessionId}
                               content={chartExplanations[`correlation-split-time-${timeRange}`].fullResponse || chartExplanations[`correlation-split-time-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`correlation-split-time-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1617,6 +1620,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-power-pace-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-power-pace-${timeRange}`].fullResponse || chartExplanations[`scatter-power-pace-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-power-pace-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1708,6 +1712,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-rate-pace-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-rate-pace-${timeRange}`].fullResponse || chartExplanations[`scatter-rate-pace-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-rate-pace-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1799,6 +1804,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-duration-distance-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-duration-distance-${timeRange}`].fullResponse || chartExplanations[`scatter-duration-distance-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-duration-distance-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1890,6 +1896,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-energy-duration-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-energy-duration-${timeRange}`].fullResponse || chartExplanations[`scatter-energy-duration-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-energy-duration-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -1980,6 +1987,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations[`scatter-power-rate-${timeRange}`].chatSessionId}
                               content={chartExplanations[`scatter-power-rate-${timeRange}`].fullResponse || chartExplanations[`scatter-power-rate-${timeRange}`].summary}
+                              chartTitle={chartExplanations[`scatter-power-rate-${timeRange}`].chartTitle}
                             />
                           )}
                           <TooltipProvider>
@@ -2070,6 +2078,7 @@ ${explainChartPrompt}`;
                             <ExplanationTooltip
                               chatSessionId={chartExplanations['scatter-distance-power'].chatSessionId}
                               content={chartExplanations['scatter-distance-power'].fullResponse || chartExplanations['scatter-distance-power'].summary}
+                              chartTitle={chartExplanations['scatter-distance-power'].chartTitle}
                             />
                           )}
                           <TooltipProvider>
