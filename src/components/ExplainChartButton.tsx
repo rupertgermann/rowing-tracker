@@ -50,7 +50,18 @@ export function ExplainChartButton({
     checkValidity();
   }, [chartExplanations, chartId, removeChartExplanationsBySessionId]);
 
+  const explanation = chartExplanations[chartId];
+  const hasValidExplanation = isExplanationValid;
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+
   const handleExplainChart = useCallback(async () => {
+    // For multi-session charts (not single-session), reuse existing explanation if it exists
+    const isMultiSession = !chartId.startsWith('session-');
+    if (isMultiSession && hasValidExplanation && explanation) {
+      router.push(`/chat?session=${explanation.chatSessionId}`);
+      return;
+    }
+
     const aiSettings = SettingsService.getInstance().getAISettings();
     const explainChartPrompt = aiSettings.explainChartPrompt || '';
 
@@ -72,11 +83,7 @@ ${explainChartPrompt}`;
 
     // Navigate to chat
     router.push('/chat?fromChart=true');
-  }, [chartId, chartTitle, chartDescription, dataContext, fullData, setPendingChartExplanation, router]);
-
-  const explanation = chartExplanations[chartId];
-  const hasValidExplanation = isExplanationValid;
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+  }, [chartId, chartTitle, chartDescription, dataContext, fullData, setPendingChartExplanation, router, hasValidExplanation, explanation]);
 
   return (
     <>

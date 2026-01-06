@@ -457,10 +457,20 @@ const Analytics = () => {
     dataContext: string,
     fullData: Record<string, unknown>[]
   ) => {
+    // Check if an explanation already exists and is valid for this chart
+    const existingExplanation = chartExplanations[chartId];
+    if (existingExplanation) {
+      const session = await chatStorage.getSession(existingExplanation.chatSessionId);
+      if (session) {
+        router.push(`/chat?session=${existingExplanation.chatSessionId}`);
+        return;
+      }
+    }
+
     // Get the custom explain chart prompt from settings
     const aiSettings = SettingsService.getInstance().getAISettings();
     const explainChartPrompt = aiSettings.explainChartPrompt || '';
-    
+
     const prompt = `I'm looking at my "${chartTitle}" chart in my rowing analytics. ${chartDescription}
 
 Here's what the data shows:
@@ -542,7 +552,7 @@ ${explainChartPrompt}`;
 
     // Navigate to chat
     router.push('/chat?fromChart=true');
-  }, [setPendingChartExplanation, router]);
+  }, [setPendingChartExplanation, router, chartExplanations]);
 
   // Helper to generate data context for metric charts
   const getMetricDataContext = (metric: ChartMetric, chartData: Record<string, unknown>[]) => {

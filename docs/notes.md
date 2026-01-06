@@ -3,15 +3,15 @@
 
  
 
-- existing "explain"-chats-links for charts showing data of many sessions should not be re-set when session data changes. f.i. the charts in /analytics should always to to an existing chat, even if the data changed since this chat was created. for single-session charts, a new chat should be created.
+- existing "explain"-chats-links for charts showing data of many sessions should not be re-set when session data changes. f.i. the charts in /analytics should always link to an existing chat, even if the data changed since this chat was created. for single-session charts, a new chat should be created.
 
-- selected segments in Segment Analysis are not stored. they should be stored persistent in the database in the same way as "Select Charts to Display" (ond other chart related settings)
+in chat module all chats in sidebar show "0 messages" despite having messages. also add the time to the date of the chat.
 
+auto-name the chats of type "chat" in sidebar
 
 - cleanup /docs folder and update main README.md 
 
-## Task: Fix orphaned training plan detection
-- I see already deleted training plans in the memory manager (Coach memory) in chat. check if we have garbage collection / orphaned memories detection and make sure it works reliably?
+  
 
 
 
