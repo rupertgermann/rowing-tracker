@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings } from '@/lib/settings';
+import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings, SmartRowSettings } from '@/lib/settings';
 import { cloudAI } from '@/lib/cloudAI';
 import { deleteAllInsightsFromDB } from '@/lib/dataSync';
 import { useAIInsights } from '@/hooks/useAIInsights';
@@ -64,7 +64,10 @@ import {
   Sparkles,
   Heart,
   Loader2,
-  Trophy
+  Trophy,
+  Eye,
+  EyeOff,
+  RefreshCw
 } from 'lucide-react';
 import {
   AI_TEXT_MODEL_OPTIONS,
@@ -81,6 +84,7 @@ type SettingsCategory =
   | 'trainingSettings'
   | 'notificationSettings'
   | 'privacySettings'
+  | 'smartRowSettings'
   | 'aiSettings';
 
 export default function SettingsPage() {
@@ -91,7 +95,7 @@ export default function SettingsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [storageUsage, setStorageUsage] = useState<DataManagement['storageUsage'] | null>(null);
-  
+
   // Get refreshArchivedInsights from useAIInsights hook
   const { refreshArchivedInsights } = useAIInsights();
 
@@ -157,13 +161,13 @@ export default function SettingsPage() {
   // AI Settings state moved to component level (React Rules of Hooks)
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  
+
   // Personal Context state
   const [isCondensingProfile, setIsCondensingProfile] = useState(false);
   const [profileRawInput, setProfileRawInput] = useState('');
   const [memoryDocuments, setMemoryDocuments] = useState<MemoryDocument[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
-  
+
   // Image migration state
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<{ migrated: number; failed: string[]; total: number } | null>(null);
@@ -183,6 +187,9 @@ export default function SettingsPage() {
   // Clear data confirmation dialog state
   const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
   const [dataCategoryToClear, setDataCategoryToClear] = useState<'sessions' | 'chatHistory' | 'trainingPlans' | 'insightsArchive' | null>(null);
+
+  // SmartRow credentials state
+  const [showSmartRowPassword, setShowSmartRowPassword] = useState(false);
 
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
@@ -209,7 +216,7 @@ export default function SettingsPage() {
       try {
         const docs = await memoryStorage.getAllDocuments();
         // Filter to only user-uploaded documents (PDFs and text notes)
-        const userDocs = docs.filter(doc => 
+        const userDocs = docs.filter(doc =>
           doc.source === 'user' || doc.type === 'note'
         );
         setMemoryDocuments(userDocs);
@@ -326,6 +333,9 @@ export default function SettingsPage() {
           break;
         case 'privacySettings':
           settings.updatePrivacySettings(updates);
+          break;
+        case 'smartRowSettings':
+          settings.updateSmartRowSettings(updates);
           break;
         case 'aiSettings':
           settings.updateAISettings(updates);
@@ -627,6 +637,68 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              SmartRow Account
+            </CardTitle>
+            <CardDescription>
+              Configure your SmartRow credentials for automatic workout sync
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="smartrow-email">Email</Label>
+                <Input
+                  id="smartrow-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={settingsData.smartRowSettings?.email || ''}
+                  onChange={(e) => saveSettings('smartRowSettings', { email: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="smartrow-password">Password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="smartrow-password"
+                    type={showSmartRowPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={settingsData.smartRowSettings?.password || ''}
+                    onChange={(e) => saveSettings('smartRowSettings', { password: e.target.value })}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowSmartRowPassword(!showSmartRowPassword)}
+                  >
+                    {showSmartRowPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {settingsData.smartRowSettings?.lastSync && (
+              <p className="text-sm text-muted-foreground">
+                Last synced: {new Date(settingsData.smartRowSettings.lastSync).toLocaleString()}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Your credentials are stored locally and never sent to our servers.
+              Use the &quot;Sync from SmartRow&quot; button on the Upload page to download new workouts.
+            </p>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -1196,7 +1268,7 @@ export default function SettingsPage() {
                         Real-time conversation with your AI coach
                       </CardDescription>
                     </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-3">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1394,7 +1466,7 @@ export default function SettingsPage() {
                         AI-generated context from your personal information for coaching personalization
                       </CardDescription>
                     </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-3">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1460,7 +1532,7 @@ export default function SettingsPage() {
                         AI-generated celebratory stories for achievement certificates
                       </CardDescription>
                     </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-3">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1595,11 +1667,10 @@ export default function SettingsPage() {
                           <button
                             key={palette.value}
                             onClick={() => saveSettings('aiSettings', { achievementImageColors: palette.value })}
-                            className={`relative p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
-                              settingsData.aiSettings.achievementImageColors === palette.value
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:border-primary/50'
-                            }`}
+                            className={`relative p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${settingsData.aiSettings.achievementImageColors === palette.value
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                              }`}
                           >
                             <div className="flex items-start gap-3">
                               <div className="flex gap-1 mt-1">
@@ -1640,7 +1711,7 @@ export default function SettingsPage() {
                         Suggest upcoming achievements based on your recent sessions
                       </CardDescription>
                     </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-3">
+                    <CardContent className="grid gap-4 md:grid-cols-3">
                       <div>
                         <Label>AI Model</Label>
                         <select
@@ -1807,9 +1878,9 @@ export default function SettingsPage() {
                               // Add document content to input
                               const content = doc.extractedText || doc.description || '';
                               if (content) {
-                                setProfileRawInput(prev => 
-                                  prev 
-                                    ? `${prev}\n\n--- From ${doc.name} ---\n${content}` 
+                                setProfileRawInput(prev =>
+                                  prev
+                                    ? `${prev}\n\n--- From ${doc.name} ---\n${content}`
                                     : `--- From ${doc.name} ---\n${content}`
                                 );
                               }
@@ -1820,11 +1891,11 @@ export default function SettingsPage() {
                                 const marker = `--- From ${doc.name} ---`;
                                 const startIdx = prev.indexOf(marker);
                                 if (startIdx === -1) return prev;
-                                
+
                                 // Find the next document marker or end of string
                                 const nextMarkerIdx = prev.indexOf('--- From ', startIdx + marker.length);
                                 const endIdx = nextMarkerIdx === -1 ? prev.length : nextMarkerIdx;
-                                
+
                                 return (prev.slice(0, startIdx) + prev.slice(endIdx)).trim();
                               });
                             }
@@ -1858,7 +1929,7 @@ export default function SettingsPage() {
                       setErrorMessage('Please enter some information first');
                       return;
                     }
-                    
+
                     setIsCondensingProfile(true);
                     try {
                       // Initialize cloudAI with API key before use
@@ -1866,9 +1937,9 @@ export default function SettingsPage() {
                         cloudAI.initialize(settingsData.aiSettings.openaiApiKey);
                       }
                       const condensed = await cloudAI.condenseUserProfile(profileRawInput);
-                      saveSettings('aiSettings', { 
+                      saveSettings('aiSettings', {
                         userProfileContext: condensed,
-                        userProfileRawInput: profileRawInput 
+                        userProfileRawInput: profileRawInput
                       });
                       setSuccessMessage('Personal context generated and saved');
                     } catch (error) {
@@ -1896,9 +1967,9 @@ export default function SettingsPage() {
                     onClick={() => {
                       setProfileRawInput('');
                       setSelectedDocIds([]);
-                      saveSettings('aiSettings', { 
+                      saveSettings('aiSettings', {
                         userProfileContext: '',
-                        userProfileRawInput: '' 
+                        userProfileRawInput: ''
                       });
                       setSuccessMessage('Personal context cleared');
                     }}
@@ -2101,7 +2172,7 @@ export default function SettingsPage() {
                 Image Migration Required
               </CardTitle>
               <CardDescription>
-                {indexedDBImageCount} award image(s) found in browser storage (IndexedDB). 
+                {indexedDBImageCount} award image(s) found in browser storage (IndexedDB).
                 Migrate them to the filesystem for better persistence and performance.
               </CardDescription>
             </CardHeader>

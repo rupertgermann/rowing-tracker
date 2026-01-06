@@ -7,12 +7,14 @@ import { processZipFile, ZipImportResult, ZipProcessProgress } from '@/lib/zipPa
 import { formatValidationErrors, hasCriticalErrors } from '@/lib/validation';
 import { ImportResult, Session } from '@/types/session';
 import { saveSessionsToDBChunked, UploadProgress } from '@/lib/dataSync';
+import { settings } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive, Database } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive, Database, RefreshCw, Settings } from 'lucide-react';
+import Link from 'next/link';
 
-type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' | 'success' | 'error';
+type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' | 'syncing' | 'success' | 'error';
 
 export default function UploadPage() {
   const { addSessions, getSessions, updateSessionsInStore } = useRowingStore();
@@ -23,6 +25,7 @@ export default function UploadPage() {
   const [error, setError] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [zipProgress, setZipProgress] = useState<ZipProcessProgress | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string>('');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -182,6 +185,7 @@ export default function UploadPage() {
     setImportResult(null);
     setZipResult(null);
     setError('');
+    setSyncMessage('');
     setUploadProgress(null);
     setZipProgress(null);
   }, []);
@@ -204,6 +208,153 @@ export default function UploadPage() {
     return `${meters}m`;
   };
 
+  const handleSmartRowSync = async () => {
+    const smartRowSettings = settings.getSmartRowSettings();
+
+    if (!smartRowSettings.email || !smartRowSettings.password) {
+      setError('Please configure your SmartRow credentials in Settings first.');
+      setSyncMessage('');
+      setUploadState('error');
+      return;
+    }
+
+    setUploadState('syncing');
+    setError('');
+    setSyncMessage('Connecting to SmartRow...');
+    setImportResult(null);
+    setZipResult(null);
+    setUploadProgress(null);
+    setZipProgress(null);
+
+    try {
+      setSyncMessage('Logging in and downloading workouts...');
+
+      const response = await fetch('/api/smartrow/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: smartRowSettings.email,
+          password: smartRowSettings.password,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Sync response received:', { success: data.success, csvLength: data.csvData?.length, zipLength: data.zipData?.length });
+      if (data.csvData) {
+        console.log('First 500 chars of CSV data:', data.csvData.substring(0, 500));
+        const csvLines = data.csvData.split('\n');
+        console.log('CSV headers:', csvLines[0]);
+        console.log('CSV first 3 lines:', csvLines.slice(0, 3).join('\n'));
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to sync from SmartRow');
+      }
+
+      // Update last sync time
+      settings.updateSmartRowSettings({ lastSync: new Date() });
+
+      let totalImported = 0;
+      let totalUpdated = 0;
+      const existingSessions = getSessions();
+      console.log(`Starting processing with ${existingSessions.length} existing sessions in store.`);
+
+      // Process CSV data if available
+      if (data.csvData) {
+        console.group('Processing CSV Data');
+        setSyncMessage('Processing CSV data...');
+        const csvBlob = new Blob([data.csvData], { type: 'text/csv' });
+        const csvFile = new File([csvBlob], 'smartrow-workouts.csv', { type: 'text/csv' });
+
+        const validation = await validateSmartRowCsv(csvFile);
+        console.log('CSV Validation:', validation);
+
+        if (validation.isValid) {
+          const { sessions, result } = await parseSmartRowCsv(csvFile, existingSessions);
+          console.log(`Parsed ${sessions.length} sessions from CSV. Result stats:`, result);
+
+          if (result.importedSessions > 0) {
+            setUploadState('saving');
+            setUploadProgress({
+              current: 0,
+              total: 1,
+              sessionsProcessed: 0,
+              totalSessions: sessions.length,
+              message: 'Saving sessions to database...'
+            });
+
+            const saveResult = await saveSessionsToDBChunked(
+              sessions,
+              (progress) => setUploadProgress(progress)
+            );
+            console.log('DB Save Result (CSV):', saveResult);
+
+            if (saveResult.success) {
+              addSessions(sessions, { skipDbSave: true });
+              totalImported += result.importedSessions;
+            }
+          } else {
+            console.log('No new sessions to import from CSV (all duplicates or invalid).');
+          }
+        }
+        console.groupEnd();
+      }
+
+      // Process ZIP data if available
+      if (data.zipData) {
+        console.group('Processing ZIP Data');
+        setSyncMessage('Processing workout details...');
+        const zipBuffer = Uint8Array.from(atob(data.zipData), c => c.charCodeAt(0));
+        const zipBlob = new Blob([zipBuffer], { type: 'application/zip' });
+        const zipFile = new File([zipBlob], 'smartrow-workouts.zip', { type: 'application/zip' });
+        console.log(`Created ZIP file of size: ${zipFile.size} bytes`);
+
+        const updatedExistingSessions = getSessions();
+        const zipResult = await processZipFile(
+          zipFile,
+          updatedExistingSessions,
+          (progress) => setZipProgress(progress)
+        );
+        console.log('ZIP Processing Result:', zipResult);
+
+        if (zipResult.sessionsToSave.length > 0) {
+          setUploadState('saving');
+          const saveResult = await saveSessionsToDBChunked(
+            zipResult.sessionsToSave,
+            (progress) => setUploadProgress(progress)
+          );
+          console.log('DB Save Result (ZIP):', saveResult);
+
+          if (saveResult.success) {
+            updateSessionsInStore(zipResult.sessionsToSave);
+            totalUpdated += zipResult.updatedSessions;
+          }
+        } else {
+          console.log('No sessions to save from ZIP.');
+        }
+        console.groupEnd();
+      }
+
+      setImportResult({
+        totalRows: totalImported,
+        importedSessions: totalImported,
+        duplicatesSkipped: 0,
+        totalDistance: 0,
+        totalTime: 0,
+        errors: []
+      });
+
+      setSyncMessage(`Sync complete! ${totalImported > 0 ? `Imported ${totalImported} new sessions.` : ''} ${totalUpdated > 0 ? `Updated ${totalUpdated} sessions with detailed data.` : ''}`);
+      setUploadState('success');
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      setSyncMessage('');
+      setUploadState('error');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4">
@@ -217,41 +368,75 @@ export default function UploadPage() {
 
         {/* Upload Area */}
         {uploadState === 'idle' || uploadState === 'dragging' ? (
-          <Card className="border-2 border-dashed transition-colors">
-            <CardContent
-              className={`p-12 text-center cursor-pointer transition-colors ${uploadState === 'dragging'
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
-                }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => document.getElementById('file-input')?.click()}
-            >
-              <div className="flex flex-col items-center space-y-4">
-                <Upload className="h-12 w-12 text-muted-foreground" />
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {uploadState === 'dragging' ? 'Drop your file here' : 'Drag and drop your CSV or ZIP file here'}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    or click to browse your files
+          <>
+            <Card className="border-2 border-dashed transition-colors">
+              <CardContent
+                className={`p-12 text-center cursor-pointer transition-colors ${uploadState === 'dragging'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
+                  }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('file-input')?.click()}
+              >
+                <div className="flex flex-col items-center space-y-4">
+                  <Upload className="h-12 w-12 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {uploadState === 'dragging' ? 'Drop your file here' : 'Drag and drop your CSV or ZIP file here'}
+                    </h3>
+                    <p className="text-muted-foreground">
+                      or click to browse your files
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Supports SmartRow CSV exports and ZIP archives containing detailed workout files
                   </p>
+                  <input
+                    id="file-input"
+                    type="file"
+                    accept=".csv,.zip"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Supports SmartRow CSV exports and ZIP archives containing detailed workout files
+              </CardContent>
+            </Card>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-muted-foreground text-sm">or</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* SmartRow Sync Button */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-center sm:text-left">
+                    <h3 className="font-semibold text-foreground">Sync from SmartRow</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically download your latest workouts from smartrow.fit
+                    </p>
+                  </div>
+                  <Button onClick={handleSmartRowSync} size="lg" className="shrink-0">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sync Now
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Configure your SmartRow credentials in{' '}
+                  <Link href="/settings" className="text-primary hover:underline inline-flex items-center gap-1">
+                    <Settings className="h-3 w-3" />
+                    Settings
+                  </Link>
                 </p>
-                <input
-                  id="file-input"
-                  type="file"
-                  accept=".csv,.zip"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        ) : uploadState === 'validating' || uploadState === 'processing' || uploadState === 'saving' ? (
+              </CardContent>
+            </Card>
+          </>
+        ) : uploadState === 'syncing' || uploadState === 'validating' || uploadState === 'processing' || uploadState === 'saving' ? (
           <Card>
             <CardContent className="p-12 text-center">
               <div className="flex flex-col items-center space-y-4">
@@ -262,18 +447,22 @@ export default function UploadPage() {
                 )}
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-foreground">
-                    {uploadState === 'validating'
-                      ? 'Validating file...'
-                      : uploadState === 'processing'
-                        ? 'Processing your data...'
-                        : 'Saving to database...'}
+                    {uploadState === 'syncing'
+                      ? 'Syncing from SmartRow...'
+                      : uploadState === 'validating'
+                        ? 'Validating file...'
+                        : uploadState === 'processing'
+                          ? 'Processing your data...'
+                          : 'Saving to database...'}
                   </h3>
                   <p className="text-muted-foreground">
-                    {uploadState === 'validating'
-                      ? 'Checking file format'
-                      : uploadState === 'processing'
-                        ? 'Parsing your rowing data and calculating statistics'
-                        : uploadProgress?.message || 'Uploading your sessions to the server'
+                    {uploadState === 'syncing'
+                      ? (syncMessage || 'Connecting to SmartRow...')
+                      : uploadState === 'validating'
+                        ? 'Checking file format'
+                        : uploadState === 'processing'
+                          ? 'Parsing your rowing data and calculating statistics'
+                          : uploadProgress?.message || 'Uploading your sessions to the server'
                     }
                   </p>
                 </div>

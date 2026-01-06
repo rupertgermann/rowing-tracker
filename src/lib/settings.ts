@@ -68,6 +68,12 @@ export interface PrivacySettings {
   chatRetention: number; // days
 }
 
+export interface SmartRowSettings {
+  email: string;
+  password: string;
+  lastSync: Date | null;
+}
+
 export interface UseCaseConfig {
   reasoning: 'none' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
@@ -114,6 +120,7 @@ export interface Settings {
   trainingSettings: TrainingSettings;
   notificationSettings: NotificationSettings;
   privacySettings: PrivacySettings;
+  smartRowSettings: SmartRowSettings;
   aiSettings: AISettings;
   version: string; // For migration purposes
   updatedAt: Date;
@@ -189,6 +196,11 @@ export class SettingsService {
       localStorageOnly: true,
       sessionRetention: 365,
       chatRetention: 90
+    },
+    smartRowSettings: {
+      email: '',
+      password: '',
+      lastSync: null
     },
     aiSettings: {
       openaiApiKey: '',
@@ -368,7 +380,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
     try {
       const response = await fetch('/api/settings');
-      
+
       if (!response.ok) {
         console.warn('[SETTINGS] Failed to fetch from DB, using localStorage');
         this.dbInitialized = true;
@@ -382,7 +394,7 @@ Be specific and actionable. Only include information relevant to rowing training
         // Get current localStorage settings to preserve sensitive data like API key
         const currentLocalSettings = localStorage.getItem(this.STORAGE_KEY);
         let currentApiKey = '';
-        
+
         if (currentLocalSettings) {
           try {
             const parsed = JSON.parse(currentLocalSettings);
@@ -391,22 +403,22 @@ Be specific and actionable. Only include information relevant to rowing training
             console.warn('[SETTINGS] Failed to parse current localStorage settings');
           }
         }
-        
+
         // Check if aiConfig is missing achievementImageColors BEFORE transformation
         const dbAiConfig = dbSettings.aiConfig as Record<string, unknown> | null;
         const needsColorFieldMigration = !dbAiConfig?.achievementImageColors;
-        
+
         // Transform DB settings to app format and cache in localStorage
         const appSettings = this.transformDBToAppSettings(dbSettings);
         const migrated = this.migrateSettings(appSettings);
-        
+
         // Preserve API key from localStorage (never stored in DB)
         if (currentApiKey) {
           migrated.aiSettings.openaiApiKey = currentApiKey;
         }
-        
+
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
-        
+
         // If achievementImageColors was missing from DB, trigger a save to populate it
         if (needsColorFieldMigration) {
           // Trigger an immediate sync to add the missing field to the database
@@ -478,6 +490,8 @@ Be specific and actionable. Only include information relevant to rowing training
         emailNotifications: this.defaultSettings.notificationSettings.emailNotifications
       },
       privacySettings: this.defaultSettings.privacySettings,
+      // SmartRow credentials are NOT synced to DB - kept local only like API key
+      smartRowSettings: this.defaultSettings.smartRowSettings,
       aiSettings: {
         ...this.defaultSettings.aiSettings,
         cloudAIEnabled: (dbSettings.cloudAIEnabled as boolean) || false,
@@ -635,6 +649,10 @@ Be specific and actionable. Only include information relevant to rowing training
     return this.getSettings().privacySettings;
   }
 
+  getSmartRowSettings(): SmartRowSettings {
+    return this.getSettings().smartRowSettings;
+  }
+
   getAISettings(): AISettings {
     return this.getSettings().aiSettings;
   }
@@ -671,6 +689,13 @@ Be specific and actionable. Only include information relevant to rowing training
   updatePrivacySettings(updates: Partial<PrivacySettings>): void {
     const settings = this.getSettings();
     settings.privacySettings = { ...settings.privacySettings, ...updates };
+    settings.updatedAt = new Date();
+    this.saveSettings(settings);
+  }
+
+  updateSmartRowSettings(updates: Partial<SmartRowSettings>): void {
+    const settings = this.getSettings();
+    settings.smartRowSettings = { ...settings.smartRowSettings, ...updates };
     settings.updatedAt = new Date();
     this.saveSettings(settings);
   }
@@ -758,7 +783,7 @@ Be specific and actionable. Only include information relevant to rowing training
       // Fallback to local calculation for remaining localStorage items
       const rowingStore = localStorage.getItem('rowing-tracker-storage');
       const settings = localStorage.getItem(this.STORAGE_KEY);
-      
+
       let sessionsSize = 0;
       if (rowingStore) {
         try {
@@ -856,7 +881,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
     // Create string representation to compare with last synced data
     const currentData = JSON.stringify(settings);
-    
+
     // Skip if data hasn't changed
     if (currentData === this.lastSyncedData) {
       return;
@@ -879,6 +904,12 @@ Be specific and actionable. Only include information relevant to rowing training
       // Explicitly preserve lightModeBrightness if it exists, otherwise use default
       lightModeBrightness: migratedSettings.userPreferences?.lightModeBrightness ?? this.defaultSettings.userPreferences.lightModeBrightness,
       customPrompts: migratedSettings.userPreferences?.customPrompts || []
+    };
+
+    // Ensure SmartRowSettings exists (v1.5.0 - SmartRow auto-sync feature)
+    migratedSettings.smartRowSettings = {
+      ...this.defaultSettings.smartRowSettings,
+      ...migratedSettings.smartRowSettings
     };
 
     // Handle AI settings migration from old flat structure to new nested structure
