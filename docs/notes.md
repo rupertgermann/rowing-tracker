@@ -2,9 +2,8 @@
 
 
 
-in chat module all chats in sidebar show "0 messages" despite having messages. also add the time to the date of the chat.
 
-auto-name the chats of type "chat" in sidebar
+auto-name the chats of type "chat" in sidebar by analyzing the initial prompt
 
 - cleanup /docs folder and update main README.md 
 

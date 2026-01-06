@@ -193,3 +193,15 @@ PERSONAL CONTEXT:
 - [Any other relevant coaching considerations]
 
 Be specific and actionable. Only include information relevant to rowing training and coaching.`;
+
+export const CHAT_TITLE_GENERATION_PROMPT = `Generate a concise, catchy 3-5 word title for a rowing coach chat based on the following initial user message.
+
+USER MESSAGE:
+{message}
+
+RULES:
+1. 3-5 words maximum.
+2. No punctuation, no quotes.
+3. Focus on the core intent of the user.
+4. Do NOT use the words "Chat", "Coach", or "Rowing" if it's obvious from context.
+5. Return ONLY the title text.`;

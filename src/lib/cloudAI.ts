@@ -3,7 +3,8 @@ import { TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans
 import { SettingsService } from '@/lib/settings';
 import {
   DEFAULT_PLAN_GENERATION_PROMPT,
-  DEFAULT_SYSTEM_PROMPT
+  DEFAULT_SYSTEM_PROMPT,
+  CHAT_TITLE_GENERATION_PROMPT
 } from '@/lib/aiPromptDefaults';
 import type { AISettings } from '@/lib/settings';
 
@@ -283,7 +284,7 @@ export class CloudAIService {
       if (attachments && attachments.length > 0) {
         // Multi-part content with files and text
         const userContent: Array<{ type: string; text?: string; image_url?: string; file?: { file_data: string; filename: string } }> = [];
-        
+
         // Supported MIME types for OpenAI file inputs
         const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         const supportedFileTypes = ['application/pdf'];
@@ -291,8 +292,8 @@ export class CloudAIService {
         // Add file attachments first
         for (const attachment of attachments) {
           // Check if it's a supported image type
-          if (supportedImageTypes.some(type => attachment.mimeType.startsWith(type.split('/')[0]) && attachment.mimeType.includes(type.split('/')[1])) || 
-              attachment.mimeType.startsWith('image/')) {
+          if (supportedImageTypes.some(type => attachment.mimeType.startsWith(type.split('/')[0]) && attachment.mimeType.includes(type.split('/')[1])) ||
+            attachment.mimeType.startsWith('image/')) {
             // Image attachment - use input_image
             userContent.push({
               type: 'input_image',
@@ -401,6 +402,34 @@ export class CloudAIService {
     } catch (error) {
       console.error('Chat AI failed:', error);
       throw error;
+    }
+  }
+
+  // Generate a concise title for a chat session from the first message
+  async generateChatTitle(message: string): Promise<string> {
+    if (!this.config) {
+      throw new Error('Cloud AI service not configured');
+    }
+
+    try {
+      const prompt = CHAT_TITLE_GENERATION_PROMPT.replace('{message}', message);
+
+      const config: ApiRequestConfig = {
+        input: prompt,
+        model: 'gpt-5-nano',
+        reasoning: 'none',
+        verbosity: 'low',
+        maxTokens: 50, // Titles are short
+        store: false
+      };
+
+      const response = await this.makeApiCall(config);
+      const title = this.parseResponse(response).trim().replace(/^["']|["']$/g, '');
+
+      return title || 'Chat';
+    } catch (error) {
+      console.error('Failed to generate chat title:', error);
+      return 'Chat'; // Fallback
     }
   }
 
@@ -1574,7 +1603,7 @@ Keep the response encouraging and actionable.`;
 
   private getPlanModificationSystemPrompt(): string {
     const userContext = this.getUserProfileContext();
-    
+
     return `You are an expert rowing coach helping athletes modify their training plans. 
 You understand how to adjust programs while maintaining training integrity and progression.
 
@@ -1590,7 +1619,7 @@ Always consider the athlete's current progress and capabilities when suggesting 
 
   private getAdherenceAnalysisSystemPrompt(): string {
     const userContext = this.getUserProfileContext();
-    
+
     return `You are an expert rowing coach analyzing training plan adherence. 
 You provide constructive, encouraging feedback and practical recommendations.
 
@@ -1881,7 +1910,7 @@ Use this data to create an appropriate plan that matches their current fitness a
 
     try {
       const aiSettings = SettingsService.getInstance().getSettings().aiSettings;
-      
+
       // Use customizable prompt with {userInput} placeholder
       const promptTemplate = aiSettings.userProfilePrompt || `You are helping a rowing coach AI understand a user's personal context. The user has provided information about themselves that should influence how the AI coach gives advice.
 
@@ -1909,7 +1938,7 @@ PERSONAL CONTEXT:
 Be specific and actionable. Only include information relevant to rowing training and coaching.`;
 
       const prompt = promptTemplate.replace('{userInput}', rawInput);
-      
+
       const generationConfig = aiSettings.userProfileGeneration || {
         reasoning: 'low' as const,
         verbosity: 'low' as const,
@@ -1923,7 +1952,7 @@ Be specific and actionable. Only include information relevant to rowing training
         'gpt-5.1': 'gpt-5.1',
         'gpt-5.2': 'gpt-5.1' // Fallback
       };
-      
+
       // Map UseCaseConfig reasoning to ApiRequestConfig reasoning
       const reasoningMap: Record<string, 'none' | 'low' | 'medium' | 'high'> = {
         'none': 'none',
@@ -1942,7 +1971,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
       const response = await this.makeApiCall(config);
       const content = this.parseResponse(response);
-      
+
       return content.trim();
     } catch (error) {
       console.error('Failed to condense user profile:', error);

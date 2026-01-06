@@ -234,9 +234,9 @@ export function useChat() {
         ...prev,
         currentSession: prev.currentSession
           ? {
-              ...prev.currentSession,
-              messages: [...prev.currentSession.messages, userMessage],
-            }
+            ...prev.currentSession,
+            messages: [...prev.currentSession.messages, userMessage],
+          }
           : null
       }));
 
@@ -333,6 +333,23 @@ export function useChat() {
           } : null,
           isLoading: false
         }));
+
+        // AUTO-NAMING: If this was the first message exchange and title is default, generate a new title
+        if (state.currentSession &&
+          state.currentSession.messages.length === 0 && // First message starts with 0 messages in state
+          (state.currentSession.category === 'chat' || !state.currentSession.category) &&
+          state.currentSession.title === 'Chat') {
+
+          console.log(`[useChat] Triggering auto-naming for session ${state.currentSession.id}`);
+          cloudAI.generateChatTitle(content.trim())
+            .then(newTitle => {
+              console.log(`[useChat] Title generated: "${newTitle}"`);
+              if (newTitle && newTitle !== 'Chat' && newTitle.toLowerCase() !== 'chat') {
+                updateSessionTitle(state.currentSession!.id, newTitle);
+              }
+            })
+            .catch(err => console.error('[useChat] Auto-naming failed:', err));
+        }
       } else {
         // Remove placeholder if response is empty
         setState(prev => ({
