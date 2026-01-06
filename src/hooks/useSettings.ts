@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Settings, SettingsService, AISettings, UserPreferences, TrainingSettings, NotificationSettings } from '@/lib/settings';
+import { Settings, SettingsService, AISettings, UserPreferences, TrainingSettings, NotificationSettings, SmartRowSettings } from '@/lib/settings';
 
 /**
  * Hook for managing user settings with database sync
@@ -142,6 +142,18 @@ export function useSettings() {
     }
   }, [settingsService]);
 
+  // Update SmartRow settings
+  const updateSmartRowSettings = useCallback((updates: Partial<SmartRowSettings>) => {
+    try {
+      setError(null);
+      settingsService.updateSmartRowSettings(updates);
+      setSettings(settingsService.getSettings());
+    } catch (err) {
+      console.error('[useSettings] Error updating SmartRow settings:', err);
+      setError('Failed to update SmartRow settings');
+    }
+  }, [settingsService]);
+
   return {
     settings,
     isLoading,
@@ -153,5 +165,6 @@ export function useSettings() {
     updateUserPreferences,
     updateTrainingSettings,
     updateNotificationSettings,
+    updateSmartRowSettings,
   };
 }

@@ -7,7 +7,7 @@ import { processZipFile, ZipImportResult, ZipProcessProgress } from '@/lib/zipPa
 import { formatValidationErrors, hasCriticalErrors } from '@/lib/validation';
 import { ImportResult, Session } from '@/types/session';
 import { saveSessionsToDBChunked, UploadProgress } from '@/lib/dataSync';
-import { settings } from '@/lib/settings';
+import { useSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -18,6 +18,7 @@ type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' 
 
 export default function UploadPage() {
   const { addSessions, getSessions, updateSessionsInStore } = useRowingStore();
+  const { settings, isLoading: isSettingsLoading, updateSmartRowSettings } = useSettings();
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -209,7 +210,13 @@ export default function UploadPage() {
   };
 
   const handleSmartRowSync = async () => {
-    const smartRowSettings = settings.getSmartRowSettings();
+    // Wait for settings to be initialized
+    if (isSettingsLoading || !settings) {
+      setError('Settings are still loading. Please wait...');
+      return;
+    }
+
+    const smartRowSettings = settings.smartRowSettings;
 
     if (!smartRowSettings.email || !smartRowSettings.password) {
       setError('Please configure your SmartRow credentials in Settings first.');
@@ -252,7 +259,7 @@ export default function UploadPage() {
       }
 
       // Update last sync time
-      settings.updateSmartRowSettings({ lastSync: new Date() });
+      updateSmartRowSettings({ lastSync: new Date() });
 
       let totalImported = 0;
       let totalUpdated = 0;
