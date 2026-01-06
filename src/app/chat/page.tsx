@@ -43,7 +43,7 @@ function ChatPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setChartExplanation, getPendingChartExplanation, setPendingChartExplanation: clearPendingChartExplanation, getPendingPlanAnalysis, setPendingPlanAnalysis: clearPendingPlanAnalysis, getPendingInsight, setPendingInsight } = useRowingStore();
-  
+
   const {
     currentSession,
     sessions,
@@ -88,63 +88,63 @@ function ChatPageContent() {
     const fromChart = searchParams.get('fromChart');
     const fromPlanAnalysis = searchParams.get('fromPlanAnalysis');
     const fromInsight = searchParams.get('fromInsight');
-    
+
     // Handle chart explanation
     if (fromChart && isAIConfigured && !initialPromptProcessedRef.current) {
       const pendingData = getPendingChartExplanation();
-      
+
       if (pendingData) {
         initialPromptProcessedRef.current = true;
 
         const run = async () => {
-        
-        // Create a new session with the chart title, explanation category, and chartId
-        const sessionTitle = `Explain: ${pendingData.chartTitle}`;
-        const newSession = await createSession(sessionTitle, 'explanation', pendingData.chartId);
-        
-        if (newSession) {
-          // Store pending chart explanation context for tracking AI response
-          setPendingChartExplanation({ chartId: pendingData.chartId, prompt: pendingData.prompt, chartTitle: pendingData.chartTitle });
-          
-          // Prepare attachments (screenshot only - data goes in prompt)
-          const attachments: FileAttachment[] = [];
-          
-          if (pendingData.screenshot) {
-            attachments.push({
-              name: `${pendingData.chartTitle.replace(/\s+/g, '_')}_chart.png`,
-              mimeType: 'image/png',
-              data: pendingData.screenshot
-            });
+
+          // Create a new session with the chart title, explanation category, and chartId
+          const sessionTitle = `Explain: ${pendingData.chartTitle}`;
+          const newSession = await createSession(sessionTitle, 'explanation', pendingData.chartId);
+
+          if (newSession) {
+            // Store pending chart explanation context for tracking AI response
+            setPendingChartExplanation({ chartId: pendingData.chartId, prompt: pendingData.prompt, chartTitle: pendingData.chartTitle });
+
+            // Prepare attachments (screenshot only - data goes in prompt)
+            const attachments: FileAttachment[] = [];
+
+            if (pendingData.screenshot) {
+              attachments.push({
+                name: `${pendingData.chartTitle.replace(/\s+/g, '_')}_chart.png`,
+                mimeType: 'image/png',
+                data: pendingData.screenshot
+              });
+            }
+
+            setChartAttachments(attachments);
+
+            // Append full data to the prompt (JSON files aren't supported by OpenAI)
+            let fullPrompt = pendingData.prompt;
+            if (pendingData.fullData) {
+              fullPrompt += `\n\n**Full Chart Data (JSON):**\n\`\`\`json\n${pendingData.fullData}\n\`\`\``;
+            }
+
+            // Pre-fill the input field with the complete prompt
+            setMessageInput(fullPrompt);
+
+            // Clear pending data from store
+            clearPendingChartExplanation(null);
+
+            // Clear URL params without triggering navigation
+            router.replace('/chat', { scroll: false });
           }
-          
-          setChartAttachments(attachments);
-          
-          // Append full data to the prompt (JSON files aren't supported by OpenAI)
-          let fullPrompt = pendingData.prompt;
-          if (pendingData.fullData) {
-            fullPrompt += `\n\n**Full Chart Data (JSON):**\n\`\`\`json\n${pendingData.fullData}\n\`\`\``;
-          }
-          
-          // Pre-fill the input field with the complete prompt
-          setMessageInput(fullPrompt);
-          
-          // Clear pending data from store
-          clearPendingChartExplanation(null);
-          
-          // Clear URL params without triggering navigation
-          router.replace('/chat', { scroll: false });
-        }
         };
 
         run();
       }
       return;
     }
-    
+
     // Handle plan analysis
     if (fromPlanAnalysis && isAIConfigured && !initialPromptProcessedRef.current) {
       const pendingData = getPendingPlanAnalysis();
-      
+
       if (pendingData) {
         initialPromptProcessedRef.current = true;
 
@@ -174,7 +174,7 @@ function ChatPageContent() {
     // Handle insight discussion
     if (fromInsight && isAIConfigured && !initialPromptProcessedRef.current) {
       const pendingData = getPendingInsight();
-      
+
       if (pendingData) {
         initialPromptProcessedRef.current = true;
 
@@ -319,7 +319,7 @@ function ChatPageContent() {
               mimeType = 'application/pdf';
             }
           }
-          
+
           // Convert ArrayBuffer to Blob with correct MIME type
           const blob = new Blob([arrayBuffer], { type: mimeType });
           const dataUrl = await blobToDataUrl(blob);
@@ -342,11 +342,11 @@ function ChatPageContent() {
     options?: { experimental_attachments?: FileList }
   ) => {
     e?.preventDefault?.();
-    
+
     const hasDirectAttachments = options?.experimental_attachments && options.experimental_attachments.length > 0;
     const hasMemoryDocs = attachedDocs.length > 0;
     const hasChartAttachments = chartAttachments.length > 0;
-    
+
     if (!messageInput.trim() && !hasDirectAttachments && !hasMemoryDocs && !hasChartAttachments) return;
     if (!currentSession || isLoading) return;
 
@@ -361,10 +361,10 @@ function ChatPageContent() {
         try {
           const attachment = await fileToAttachment(file);
           fileAttachments.push(attachment);
-          
+
           // Save to memory in the background (don't block sending)
-          uploadDocument(file, { 
-            description: `Attached in chat on ${new Date().toLocaleDateString()}` 
+          uploadDocument(file, {
+            description: `Attached in chat on ${new Date().toLocaleDateString()}`
           }).catch(err => {
             console.warn('Failed to save attachment to memory:', err);
           });
@@ -507,15 +507,15 @@ function ChatPageContent() {
       "list the documents in memory",
       "what training plans do I have?"
     ];
-    
+
     const userPreferences = settings.getUserPreferences();
     const customPrompts = userPreferences.customPrompts;
-    
+
     // Always show custom prompts, default prompts only if toggle is enabled
-    const suggestions = userPreferences.showPromptSuggestions 
+    const suggestions = userPreferences.showPromptSuggestions
       ? [...defaultPrompts, ...customPrompts]
       : customPrompts;
-    
+
     return suggestions;
   }, [settings]);
 
@@ -693,58 +693,53 @@ function ChatPageContent() {
             <div className="flex gap-1 p-1 bg-muted rounded-lg">
               <button
                 onClick={() => setCategoryFilter('all')}
-                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
-                  categoryFilter === 'all'
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${categoryFilter === 'all'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
-                }`}
+                  }`}
                 title={`All (${sessions.length})`}
               >
                 <MessageCircle className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setCategoryFilter('chat')}
-                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
-                  categoryFilter === 'chat'
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${categoryFilter === 'chat'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
-                }`}
+                  }`}
                 title={`Chats (${sessions.filter(s => (s.category || 'chat') === 'chat').length})`}
               >
-                <Bot className="h-4 w-4" />
+                <Bot className={`h-4 w-4 ${categoryFilter === 'chat' ? 'text-blue-500' : 'text-muted-foreground'}`} />
               </button>
               <button
                 onClick={() => setCategoryFilter('explanation')}
-                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
-                  categoryFilter === 'explanation'
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${categoryFilter === 'explanation'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
-                }`}
+                  }`}
                 title={`Explains (${sessions.filter(s => s.category === 'explanation').length})`}
               >
-                <HelpCircle className="h-4 w-4" />
+                <HelpCircle className={`h-4 w-4 ${categoryFilter === 'explanation' ? 'text-amber-500' : 'text-muted-foreground'}`} />
               </button>
               <button
                 onClick={() => setCategoryFilter('plan_analysis')}
-                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
-                  categoryFilter === 'plan_analysis'
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${categoryFilter === 'plan_analysis'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
-                }`}
+                  }`}
                 title={`Plans (${sessions.filter(s => s.category === 'plan_analysis').length})`}
               >
-                <Calendar className="h-4 w-4" />
+                <Calendar className={`h-4 w-4 ${categoryFilter === 'plan_analysis' ? 'text-emerald-500' : 'text-muted-foreground'}`} />
               </button>
               <button
                 onClick={() => setCategoryFilter('insight_discussion')}
-                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${
-                  categoryFilter === 'insight_discussion'
+                className={`flex-1 px-2 py-1.5 rounded transition-colors flex items-center justify-center ${categoryFilter === 'insight_discussion'
                     ? 'bg-background shadow-sm'
                     : 'hover:bg-background/50'
-                }`}
+                  }`}
                 title={`Insights (${sessions.filter(s => s.category === 'insight_discussion').length})`}
               >
-                <Lightbulb className="h-4 w-4" />
+                <Lightbulb className={`h-4 w-4 ${categoryFilter === 'insight_discussion' ? 'text-purple-500' : 'text-muted-foreground'}`} />
               </button>
             </div>
           </CardHeader>
@@ -775,13 +770,13 @@ function ChatPageContent() {
                   No {categoryFilter === 'explanation' ? 'Explanations' : categoryFilter === 'plan_analysis' ? 'Plan Analyses' : categoryFilter === 'insight_discussion' ? 'Insight Discussions' : 'Chats'} Yet
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {categoryFilter === 'explanation' 
+                  {categoryFilter === 'explanation'
                     ? 'Click "Explain" on any chart to create an explanation.'
                     : categoryFilter === 'plan_analysis'
-                    ? 'Click "Analyze Progress" on your active training plan.'
-                    : categoryFilter === 'insight_discussion'
-                    ? 'Click "Discuss" on any AI insight to start a discussion.'
-                    : 'Start a new chat with your AI rowing coach.'}
+                      ? 'Click "Analyze Progress" on your active training plan.'
+                      : categoryFilter === 'insight_discussion'
+                        ? 'Click "Discuss" on any AI insight to start a discussion.'
+                        : 'Start a new chat with your AI rowing coach.'}
                 </p>
               </div>
             ) : (
@@ -834,16 +829,16 @@ function ChatPageContent() {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm truncate flex items-center gap-1.5">
                               {session.category === 'explanation' && (
-                                <HelpCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                <HelpCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
                               )}
                               {session.category === 'plan_analysis' && (
-                                <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                <Calendar className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
                               )}
                               {session.category === 'insight_discussion' && (
-                                <Lightbulb className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                <Lightbulb className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
                               )}
                               {(!session.category || session.category === 'chat') && (
-                                <Bot className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                <Bot className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                               )}
                               {session.title}
                             </div>

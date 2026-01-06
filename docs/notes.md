@@ -3,7 +3,6 @@
 
 
 
-auto-name the chats of type "chat" in sidebar by analyzing the initial prompt
 
 - cleanup /docs folder and update main README.md 
 
