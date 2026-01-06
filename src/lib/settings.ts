@@ -417,6 +417,21 @@ Be specific and actionable. Only include information relevant to rowing training
           migrated.aiSettings.openaiApiKey = currentApiKey;
         }
 
+        // Preserve SmartRow credentials from localStorage (never stored in DB for security)
+        let currentSmartRowSettings = null;
+        if (currentLocalSettings) {
+          try {
+            const parsed = JSON.parse(currentLocalSettings);
+            currentSmartRowSettings = parsed.smartRowSettings || null;
+          } catch {
+            console.warn('[SETTINGS] Failed to parse current localStorage settings for SmartRow');
+          }
+        }
+
+        if (currentSmartRowSettings) {
+          migrated.smartRowSettings = currentSmartRowSettings;
+        }
+
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
 
         // If achievementImageColors was missing from DB, trigger a save to populate it
