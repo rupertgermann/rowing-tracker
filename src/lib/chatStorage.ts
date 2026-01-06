@@ -11,6 +11,7 @@ function dbSessionToChatSession(s: any): ChatSession {
     updatedAt: new Date(s.updatedAt),
     category: s.category,
     chartId: s.chartId || undefined,
+    messageCount: s.messageCount ?? 0,
   };
 }
 

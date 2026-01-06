@@ -1,8 +1,6 @@
 # notes 
 
-manual file upload is broken 
 
-when i click "sync now" in uploads module i see 0 distance and 0 time in the success message. see image  
 
 in chat module all chats in sidebar show "0 messages" despite having messages. also add the time to the date of the chat.
 

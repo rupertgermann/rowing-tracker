@@ -524,12 +524,19 @@ function ChatPageContent() {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
+    const userPreferences = settings.getUserPreferences();
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: userPreferences.timeFormat === '12h'
+    });
+
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return `Today, ${timeStr}`;
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return `Yesterday, ${timeStr}`;
     } else {
-      return formatChartDate(date);
+      return `${formatChartDate(date)}, ${timeStr}`;
     }
   };
 
@@ -841,7 +848,7 @@ function ChatPageContent() {
                               {session.title}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {session.messages.length} messages • {formatDate(session.updatedAt)}
+                              {session.messageCount ?? session.messages.length} messages • {formatDate(session.updatedAt)}
                             </div>
                           </div>
                           <div className="flex items-center gap-1">

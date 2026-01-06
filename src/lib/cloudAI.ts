@@ -83,8 +83,9 @@ export interface ChatSession {
   messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
-  category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion'; // Category for filtering
-  chartId?: string; // Chart ID for explanation sessions to link back to analytics
+  category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion';
+  chartId?: string;
+  messageCount?: number;
 }
 
 // Insight types from cloud AI
