@@ -45,11 +45,11 @@ function extractInfoFromFilename(filename: string): FilenameInfo | null {
                 '$1T$2:$3:$4'
             );
             const timestamp = new Date(formattedDateStr + 'Z'); // Assume UTC
-            
+
             // Extract distance from filename (e.g., _500m, _1000m, _100m)
             const distanceMatch = name.match(/_(\d+)m$/);
             const distance = distanceMatch ? parseInt(distanceMatch[1]) : null;
-            
+
             return { timestamp, distance };
         }
         return null;
@@ -67,24 +67,25 @@ function extractInfoFromFilename(filename: string): FilenameInfo | null {
  */
 function findMatchingSession(timestamp: Date, sessions: Session[], distance: number | null): Session | undefined {
     // Filter by distance first if provided
-    const candidateSessions = distance !== null 
+    const candidateSessions = distance !== null
         ? sessions.filter(s => s.distance === distance)
         : sessions;
-    
+
     // Find the CLOSEST match within 5 minute tolerance
     const maxTolerance = 5 * 60 * 1000; // 5 minutes
-    
+
     let bestMatch: Session | undefined;
     let bestDiff = Infinity;
-    
+
     for (const session of candidateSessions) {
-        const timeDiff = Math.abs(session.timestamp.getTime() - timestamp.getTime());
+        const sessionTime = session.timestamp instanceof Date ? session.timestamp.getTime() : new Date(session.timestamp).getTime();
+        const timeDiff = Math.abs(sessionTime - timestamp.getTime());
         if (timeDiff < maxTolerance && timeDiff < bestDiff) {
             bestDiff = timeDiff;
             bestMatch = session;
         }
     }
-    
+
     return bestMatch;
 }
 

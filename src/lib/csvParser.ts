@@ -76,11 +76,14 @@ function transformRowToSession(row: RawCsvRow): Session {
  * Check if a session is a duplicate based on timestamp and distance
  */
 function isDuplicateSession(newSession: Session, existingSessions: Session[]): boolean {
-  return existingSessions.some(existing =>
-    existing.id === newSession.id ||
-    (Math.abs(existing.timestamp.getTime() - newSession.timestamp.getTime()) < 1000 && // within 1 second
-     existing.distance === newSession.distance)
-  );
+  return existingSessions.some(existing => {
+    const existingTime = existing.timestamp instanceof Date ? existing.timestamp.getTime() : new Date(existing.timestamp).getTime();
+    const newTime = newSession.timestamp instanceof Date ? newSession.timestamp.getTime() : new Date(newSession.timestamp).getTime();
+
+    return existing.id === newSession.id ||
+      (Math.abs(existingTime - newTime) < 1000 && // within 1 second
+        existing.distance === newSession.distance);
+  });
 }
 
 /**

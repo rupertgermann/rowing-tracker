@@ -1,5 +1,6 @@
 # notes 
 
+manual file upload is broken 
 
 when i click "sync now" in uploads module i see 0 distance and 0 time in the success message. see image  
 

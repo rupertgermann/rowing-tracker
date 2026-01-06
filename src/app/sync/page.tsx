@@ -269,6 +269,9 @@ export default function UploadPage() {
 
       let totalImported = 0;
       let totalUpdated = 0;
+      let totalDistance = 0;
+      let totalTime = 0;
+      let duplicatesSkipped = 0;
       const existingSessions = getSessions();
       console.log(`Starting processing with ${existingSessions.length} existing sessions in store.`);
 
@@ -305,6 +308,9 @@ export default function UploadPage() {
             if (saveResult.success) {
               addSessions(sessions, { skipDbSave: true });
               totalImported += result.importedSessions;
+              totalDistance += result.totalDistance;
+              totalTime += result.totalTime;
+              duplicatesSkipped += result.duplicatesSkipped;
             }
           } else {
             console.log('No new sessions to import from CSV (all duplicates or invalid).');
@@ -349,11 +355,11 @@ export default function UploadPage() {
       }
 
       setImportResult({
-        totalRows: totalImported,
+        totalRows: totalImported + duplicatesSkipped,
         importedSessions: totalImported,
-        duplicatesSkipped: 0,
-        totalDistance: 0,
-        totalTime: 0,
+        duplicatesSkipped: duplicatesSkipped,
+        totalDistance: totalDistance,
+        totalTime: totalTime,
         errors: []
       });
 
@@ -418,8 +424,8 @@ export default function UploadPage() {
 
             {/* Manual Upload Area */}
             <Card className={`border-2 border-dashed transition-colors ${uploadState === 'dragging'
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
+              ? 'border-primary bg-primary/5'
+              : 'border-muted-foreground/25 hover:border-primary hover:bg-primary/5'
               }`}>
               <CardContent
                 className="p-8 text-center cursor-pointer"
