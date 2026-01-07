@@ -5,14 +5,15 @@ export interface GeneratedAchievement {
   title: string;
   description: string;
   earnedAt: Date;
-  
+
   // Generated content
   story?: string;           // AI-generated narrative/story
   imageUrl?: string;        // File path to image in public/assets/awards/ (e.g., /assets/awards/award_id.png)
   imagePrompt?: string;     // The prompt used to generate the image
   hasImage?: boolean;       // Flag indicating image exists on filesystem
   imageVersion?: number;    // Cache-busting version number, incremented on regeneration
-  
+  colorPalette?: 'classic' | 'classic-red' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean'; // Per-award color palette (falls back to global settings)
+
   // Generation metadata
   generatedAt?: Date;
   isGenerating?: boolean;

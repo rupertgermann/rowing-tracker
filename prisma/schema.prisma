@@ -221,6 +221,7 @@ model GeneratedAchievement {
   story       String?   @db.Text
   imageUrl    String?
   hasImage    Boolean   @default(false)
+  colorPalette String?   @default("classic")
   earnedAt    DateTime?
   generatedAt DateTime  @default(now())
 

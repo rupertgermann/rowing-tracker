@@ -20,17 +20,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Sparkles, 
-  RefreshCw, 
-  ImageIcon, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  RefreshCw,
+  ImageIcon,
   BookOpen,
   Loader2,
   AlertCircle,
-  Download
+  Download,
+  Palette
 } from 'lucide-react';
+import { ACHIEVEMENT_COLOR_PALETTES, type ColorPalette } from '@/lib/achievementColors';
 
 // Unified gallery item for both static awards and AI awards
 interface GalleryAward {
@@ -119,6 +121,7 @@ export function AchievementGallery({
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageLoadingMessage, setImageLoadingMessage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showColorPaletteSelector, setShowColorPaletteSelector] = useState(false);
 
   // Load generated achievements from DB when gallery opens (DB wins)
   useEffect(() => {
@@ -272,7 +275,56 @@ export function AchievementGallery({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, goToPrevious, goToNext]);
 
-  // Returns the generated story text so it can be passed to image generation
+  // Get the color palette for the current award (per-award or fallback to global settings)
+  const getCurrentColorPalette = (): string => {
+    return generated?.colorPalette || aiSettings.achievementImageColors || 'classic';
+  };
+
+  const handleColorPaletteChange = async (paletteValue: string) => {
+    if (!currentAward) return;
+
+    // Update the store with the new color palette
+    const updatedData = {
+      colorPalette: paletteValue as ColorPalette['value']
+    };
+
+    if (generated) {
+      updateGeneratedAchievement(currentAward.id, updatedData);
+    } else {
+      setGeneratedAchievement(currentAward.id, {
+        awardId: currentAward.id,
+        title: currentAward.title,
+        description: currentAward.description,
+        earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : new Date(),
+        ...updatedData
+      });
+    }
+
+    // Also save to database - include ALL existing data to avoid overwriting
+    try {
+      const saveResult = await saveGeneratedAchievementsToDB([
+        {
+          awardId: currentAward.id,
+          title: currentAward.title,
+          description: currentAward.description,
+          story: generated?.story,
+          imageUrl: generated?.imageUrl,
+          hasImage: generated?.hasImage,
+          colorPalette: paletteValue,
+          earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : undefined,
+          generatedAt: new Date(),
+        },
+      ]);
+
+      if (!saveResult.success) {
+        console.error('[AchievementGallery] Failed to save color palette to DB:', saveResult.error);
+      }
+    } catch (error) {
+      console.error('[AchievementGallery] Error saving color palette to DB:', error);
+    }
+  };
+
+  // Returns generated story text so it can be passed to image generation
   const handleGenerateStory = async (): Promise<string | null> => {
     if (!currentAward) return null;
     
@@ -318,7 +370,10 @@ export function AchievementGallery({
       const saveResult = await saveGeneratedAchievementsToDB([
         {
           awardId: currentAward.id,
+          title: currentAward.title,
+          description: currentAward.description,
           story: data.story,
+          colorPalette: getCurrentColorPalette(),
           earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : undefined,
           generatedAt: new Date(),
         },
@@ -359,7 +414,7 @@ export function AchievementGallery({
         model: aiSettings.achievementImageModel,
         quality: aiSettings.achievementImageQuality,
         size: aiSettings.achievementImageSize,
-        colorPalette: aiSettings.achievementImageColors,
+        colorPalette: getCurrentColorPalette(),
         // If a story already exists, pass it for better coherence
         story: storyToUse
       };
@@ -410,8 +465,11 @@ export function AchievementGallery({
       const saveResult = await saveGeneratedAchievementsToDB([
         {
           awardId: currentAward.id,
+          title: currentAward.title,
+          description: currentAward.description,
           imageUrl: filePath,
           hasImage: true,
+          colorPalette: getCurrentColorPalette(),
           earnedAt: currentAward.earnedAt ? new Date(currentAward.earnedAt) : undefined,
           generatedAt: new Date(),
         },
@@ -708,15 +766,85 @@ export function AchievementGallery({
                 </p>
               </div>
             )}
+           </div>
+
+          {/* Color Palette Selector */}
+          <div className={`${imageSizing.maxWidth} mx-auto`}>
+            <div className="bg-muted/20 rounded-xl p-4 border">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Palette className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-semibold text-sm">Color Palette</h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowColorPaletteSelector(!showColorPaletteSelector)}
+                  className="h-7 px-2 text-xs"
+                >
+                  {showColorPaletteSelector ? 'Hide' : 'Show'}
+                </Button>
+              </div>
+              {showColorPaletteSelector && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
+                  {ACHIEVEMENT_COLOR_PALETTES.map((palette) => {
+                    const isSelected = getCurrentColorPalette() === palette.value;
+                    return (
+                      <button
+                        key={palette.value}
+                        onClick={() => handleColorPaletteChange(palette.value)}
+                        className={`relative p-3 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+                          isSelected
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="flex gap-1 mt-0.5">
+                            {palette.colors.map((color, idx) => (
+                              <div
+                                key={idx}
+                                className="w-3 h-3 rounded-full border border-gray-300"
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-xs mb-0.5">{palette.label}</div>
+                            <div className="text-[10px] text-muted-foreground line-clamp-2">
+                              {palette.description}
+                            </div>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5">
+                            <div className="w-2 h-2 bg-primary rounded-full"></div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {!showColorPaletteSelector && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  Using: <span className="font-medium text-foreground">
+                    {ACHIEVEMENT_COLOR_PALETTES.find(p => p.value === getCurrentColorPalette())?.label || 'Default'}
+                  </span>
+                  {generated?.colorPalette && ' (custom per award)'}
+                  {!generated?.colorPalette && ' (global settings)'}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="max-w-2xl mx-auto flex items-center gap-2 text-destructive text-sm bg-destructive/10 rounded-lg p-3">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
+           {/* Error Display */}
+           {error && (
+             <div className="max-w-2xl mx-auto flex items-center gap-2 text-destructive text-sm bg-destructive/10 rounded-lg p-3">
+               <AlertCircle className="h-4 w-4 flex-shrink-0" />
+               {error}
+             </div>
+           )}
 
           {/* Action Buttons */}
           <div className="max-w-2xl mx-auto flex flex-wrap justify-center gap-3">
