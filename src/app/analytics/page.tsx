@@ -704,6 +704,18 @@ ${explainChartPrompt}`;
     });
   }, [computedSessions, timeRange, dateRange, analyticsData]);
 
+  const filteredSessionIds = useMemo(() => {
+    return new Set(filteredSessions.map((session) => session.id));
+  }, [filteredSessions]);
+
+  const filteredConsistencySessions = useMemo(() => {
+    if (filteredSessionIds.size === 0) {
+      return [];
+    }
+
+    return sessionsForConsistencyChart.filter((session) => filteredSessionIds.has(session.id));
+  }, [filteredSessionIds, sessionsForConsistencyChart]);
+
   // Calculate filtered stats
   const filteredStats = useMemo(() => {
     return filteredSessions.reduce((acc, session) => {
@@ -837,8 +849,9 @@ ${explainChartPrompt}`;
       console.log('[Analytics] Using lazy-loaded chart data');
       return orderedEnabledCharts.reduce((acc, metric) => {
         const apiData = analyticsData.chartData[metric] || [];
+        const filteredApiData = apiData.filter((point) => filteredSessionIds.has(point.sessionId));
         // Apply smoothing
-        const withSmoothing = applySmoothingToData(apiData as ChartDataPoint[], smoothingValue);
+        const withSmoothing = applySmoothingToData(filteredApiData as ChartDataPoint[], smoothingValue);
         // Convert to chart format
         acc[metric] = withSmoothing.map((d: ChartDataPoint) => ({
           date: d.date,
@@ -856,7 +869,7 @@ ${explainChartPrompt}`;
       acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions as SessionForChart[], metric, smoothingValue) : [];
       return acc;
     }, {} as Record<ChartMetric, Record<string, unknown>[]>);
-  }, [analyticsData, orderedEnabledCharts, smoothingValue, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing]);
+  }, [analyticsData, orderedEnabledCharts, smoothingValue, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, filteredSessionIds]);
 
   // Compute dynamic Y-axis domains for each metric (with 10% padding)
   const chartDomains = useMemo(() => {
@@ -894,7 +907,8 @@ ${explainChartPrompt}`;
     // Use analytics data if available
     if (analyticsData && analyticsData.chartData.splitTime && analyticsData.chartData.splitTime.length > 0) {
       const apiData = analyticsData.chartData.splitTime;
-      const withSmoothing = applySmoothingToData(apiData as ChartDataPoint[], smoothingValue);
+      const filteredApiData = apiData.filter((point) => filteredSessionIds.has(point.sessionId));
+      const withSmoothing = applySmoothingToData(filteredApiData as ChartDataPoint[], smoothingValue);
       return withSmoothing.map((d: ChartDataPoint) => ({
         date: d.date,
         splitTime: d.value,
@@ -905,7 +919,7 @@ ${explainChartPrompt}`;
     }
     // Fallback to computed data
     return hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, 'splitTime', smoothingValue) : [];
-  }, [analyticsData, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue]);
+  }, [analyticsData, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue, filteredSessionIds]);
 
   // Handle chart data point click
   const handleChartClick = (data: { activeIndex?: number } | null, chartData: Record<string, unknown>[]) => {
@@ -921,7 +935,7 @@ ${explainChartPrompt}`;
   const scatterPlotData = useMemo(() => {
     // Use analytics API data for scatter plot
     if (analyticsData && analyticsData.scatterData.length > 0) {
-      return analyticsData.scatterData;
+      return analyticsData.scatterData.filter((point) => filteredSessionIds.has(point.sessionId));
     }
     // Fallback to sessions
     return filteredSessions
@@ -939,7 +953,7 @@ ${explainChartPrompt}`;
         energy: session.energy,
         strokeLength: session.avgStrokeLength,
       }));
-  }, [filteredSessions, analyticsData]);
+  }, [filteredSessions, analyticsData, filteredSessionIds]);
 
   // Custom scatter tooltip component
   interface ScatterTooltipEntry {
@@ -1349,7 +1363,7 @@ ${explainChartPrompt}`;
                         ref={(el) => { chartRefs.current[`metric-${metric}`] = el; }}
                       >
                         <ConsistencyScoreChart
-                          sessions={sessionsForConsistencyChart}
+                          sessions={filteredConsistencySessions}
                           chartType={chartSettings.chartType}
                           onExplainChart={handleExplainChart}
                           headerActions={
