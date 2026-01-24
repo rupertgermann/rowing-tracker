@@ -2,29 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-
-/**
- * Calculate consistency score from stroke data (server-side).
- * Mirrors the client-side calculation in analysisUtils.ts
- */
-function calculateConsistencyScore(strokeData: Array<{ power: number }>): number | null {
-  if (!strokeData || strokeData.length < 5) return null;
-
-  const powers = strokeData.map(s => s.power).filter(p => p > 0);
-  if (powers.length < 5) return null;
-
-  const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
-  if (avgPower === 0) return null;
-
-  const squareDiffs = powers.map(v => Math.pow(v - avgPower, 2));
-  const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
-  const stdDevPower = Math.sqrt(avgSquareDiff);
-
-  const cvPower = stdDevPower / avgPower;
-  const score = Math.max(0, Math.min(100, 100 - (cvPower * 200)));
-
-  return Math.round(score * 100) / 100;
-}
+import { calculateConsistencyScore } from "@/lib/analysisUtils";
 
 /**
  * POST /api/sessions/backfill-consistency

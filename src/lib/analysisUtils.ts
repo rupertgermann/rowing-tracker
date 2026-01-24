@@ -49,6 +49,26 @@ export interface PerformanceSummary {
   avgStrokeLength: number; // overall average
 }
 
+// Consistency score based on coefficient of variation of power (0-100)
+export const calculateConsistencyScore = (strokeData: Array<{ power: number }>): number | null => {
+  if (!strokeData || strokeData.length < 5) return null;
+
+  const powers = strokeData.map((stroke) => stroke.power).filter((power) => power > 0);
+  if (powers.length < 5) return null;
+
+  const avgPower = powers.reduce((sum, power) => sum + power, 0) / powers.length;
+  if (avgPower === 0) return null;
+
+  const squareDiffs = powers.map((value) => Math.pow(value - avgPower, 2));
+  const avgSquareDiff = squareDiffs.reduce((sum, diff) => sum + diff, 0) / squareDiffs.length;
+  const stdDevPower = Math.sqrt(avgSquareDiff);
+
+  const cvPower = stdDevPower / avgPower;
+  const score = Math.max(0, Math.min(100, 100 - (cvPower * 200)));
+
+  return Math.round(score * 100) / 100;
+};
+
 // Calculate rolling averages using sliding window (O(n) complexity)
 export const calculateRollingAverages = (data: StrokeData[], windowSize: number): { power: number; split: number }[] => {
   const result: { power: number; split: number }[] = [];
@@ -245,9 +265,7 @@ export const calculateAdvancedStats = (data: StrokeData[]): AdvancedStats => {
 
   // Consistency Score (Simple heuristic: lower std dev relative to mean is better)
   const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
-  const cvPower = stdDevPower / avgPower; // Coefficient of variation
-  // 100 - (CV * 100) clamped. E.g. CV of 0.1 (10%) -> 90 score.
-  const consistencyScore = Math.max(0, Math.min(100, 100 - (cvPower * 200))); 
+  const consistencyScore = calculateConsistencyScore(data) ?? 0;
 
   // Efficiency
   const avgHR = hrs.length > 0 ? hrs.reduce((a, b) => a + b, 0) / hrs.length : 0;
