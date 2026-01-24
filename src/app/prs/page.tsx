@@ -97,8 +97,8 @@ export default function PRsPage() {
     // Average consistency
     const avgScore = sessionScores.reduce((sum, s) => sum + s.score, 0) / sessionScores.length;
 
-    // Sessions with excellent consistency (≥80)
-    const excellentCount = sessionScores.filter(s => s.score >= 75).length;
+    // Sessions with excellent consistency (≥90)
+    const excellentCount = sessionScores.filter(s => s.score >= 90).length;
 
     // Trend: compare last 2 weeks avg vs 2 weeks from 3 months ago
     let trend = 0;
@@ -413,7 +413,7 @@ export default function PRsPage() {
                         {consistencyRecords.excellentCount}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        Sessions with score ≥75
+                        Sessions with score ≥90
                       </div>
                     </CardContent>
                   </Card>
