@@ -2,7 +2,7 @@
 
 # Rowing Tracker
 
-A stunning web application to visualize SmartRow CSV exports with beautiful analytics, trends, and personal records. This app was completely written by AI.
+An AI-powered web application for tracking rowing workouts with analytics, training plans, and achievement tracking. Built for rowers who use SmartRow equipment. This app was completely written by AI.
 
 ## Overview
 
@@ -72,14 +72,14 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: TailwindCSS
 - **Components**: shadcn/ui
 - **Charts**: Recharts
 - **AI Integration**: OpenAI API
 - **Authentication**: NextAuth.js v4
-- **Database**: PostgreSQL with Prisma ORM v7
+- **Database**: PostgreSQL with Prisma v7
 - **State Management**: Zustand with persist middleware
 - **Storage**: 
   - PostgreSQL for user data, sessions, plans, and achievements
@@ -127,12 +127,12 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 4. **Start local services (PostgreSQL + Mailpit)**
    ```bash
-   docker-compose up -d
+   npm run db:start
    ```
    This starts:
    - PostgreSQL on port 5432
    - Mailpit SMTP on port 1025
-   - Mailpit Web UI on http://localhost:8025
+   - Mailpit Web UI on http://localhost:9025
 
 5. **Run database migrations**
    ```bash
@@ -149,7 +149,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 8. **Create an account**
    - Click "Register" to create your account
-   - Check Mailpit (http://localhost:8025) for verification email
+   - Check Mailpit (http://localhost:9025) for verification email
    - Click the verification link
    - Sign in with your credentials
 
@@ -243,19 +243,19 @@ Available npm scripts:
 
 ```bash
 # Start local Docker services
-npm run docker:up
+npm run db:start
 
 # Stop local Docker services
-npm run docker:down
+npm run db:stop
 
 # Generate Prisma client
 npm run db:generate
 
-# Run migrations
+# Run migrations (development)
 npm run db:migrate
 
-# Create a new migration
-npm run db:migrate:create
+# Run migrations (production)
+npm run db:migrate:deploy
 
 # Reset database (WARNING: deletes all data)
 npm run db:reset
@@ -271,42 +271,44 @@ npm run db:push
 
 ```
 rowing-tracker/
-├── app/                    # Next.js App Router
-│   ├── (routes)/          # Route groups
-│   │   ├── page.tsx       # Dashboard
-│   │   ├── sessions/      # Sessions pages
-│   │   ├── prs/           # Personal records
-│   │   ├── upload/        # CSV upload
-│   │   ├── analytics/     # Advanced analytics
-│   │   ├── chat/          # AI Coach chat
-│   │   ├── plans/         # Training plans
-│   │   ├── profile/       # User profile
-│   │   └── settings/      # App settings
-│   ├── api/               # API routes
-│   │   ├── auth/          # NextAuth endpoints
-│   │   └── user/          # User management
-│   ├── auth/              # Auth pages
-│   │   ├── login/         # Login page
-│   │   ├── register/      # Registration
-│   │   └── verify-email/  # Email verification
-│   ├── layout.tsx         # Root layout
-│   └── globals.css        # Global styles
-├── components/            # Reusable UI components
-├── lib/                   # Utility functions
-│   ├── auth.ts            # NextAuth configuration
-│   ├── db/                # Database
-│   │   └── prisma.ts      # Prisma client
-│   ├── csvParser.ts       # CSV parsing logic
-│   ├── store.ts           # Zustand state management
-│   ├── cloudAI.ts         # OpenAI integration
-│   └── trainingPlans.ts   # Plan generation logic
-├── prisma/                # Database schema
-│   └── schema.prisma      # Prisma schema
-├── types/                 # TypeScript type definitions
-│   └── session.ts         # Session interface
-└── docs/                  # Documentation
-    ├── DATABASE_SCHEMA.md # Database documentation
-    └── *.md               # Other docs
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── (routes)/          # Route groups
+│   │   │   ├── page.tsx       # Dashboard
+│   │   │   ├── sessions/      # Sessions pages
+│   │   │   ├── prs/           # Personal records
+│   │   │   ├── upload/        # CSV upload
+│   │   │   ├── analytics/     # Advanced analytics
+│   │   │   ├── chat/          # AI Coach chat
+│   │   │   ├── plans/         # Training plans
+│   │   │   ├── profile/       # User profile
+│   │   │   └── settings/      # App settings
+│   │   ├── api/               # API routes
+│   │   │   ├── auth/          # NextAuth endpoints
+│   │   │   └── user/          # User management
+│   │   ├── auth/              # Auth pages
+│   │   │   ├── login/         # Login page
+│   │   │   ├── register/      # Registration
+│   │   │   └── verify-email/  # Email verification
+│   │   ├── layout.tsx         # Root layout
+│   │   └── globals.css        # Global styles
+│   ├── components/            # Reusable UI components
+│   ├── hooks/                 # Custom React hooks
+│   ├── lib/                   # Utility functions & services
+│   │   ├── auth.ts            # NextAuth configuration
+│   │   ├── db/prisma.ts       # Prisma client singleton
+│   │   ├── services/          # Service singletons
+│   │   ├── ai/                # AI configuration & prompts
+│   │   └── utils/             # Utilities (CSV parser, awards, etc.)
+│   └── types/                 # TypeScript type definitions
+├── prisma/                    # Database schema & migrations
+│   └── schema.prisma
+├── docs/                      # Documentation
+│   ├── DATABASE_SCHEMA.md
+│   ├── design-system.md
+│   ├── prd.md
+│   └── csvs/                  # Sample SmartRow CSV files
+└── docker-compose.yml         # Local PostgreSQL & Mailpit
 ```
 
 ### Data Flow
@@ -333,8 +335,8 @@ rowing-tracker/
 - `npm run lint` - Run ESLint
 
 **Database:**
-- `npm run docker:up` - Start PostgreSQL & Mailpit
-- `npm run docker:down` - Stop Docker services
+- `npm run db:start` - Start PostgreSQL & Mailpit
+- `npm run db:stop` - Stop Docker services
 - `npm run db:generate` - Generate Prisma client
 - `npm run db:migrate` - Run migrations
 - `npm run db:studio` - Open Prisma Studio
@@ -343,10 +345,10 @@ rowing-tracker/
 
 ### Project Structure
 
-- **App Router**: Uses Next.js 15's App Router for file-based routing
+- **App Router**: Uses Next.js 16's App Router for file-based routing
 - **Server Components**: Default for better performance
 - **Client Components**: Mark with `'use client'` when needed
-- **State Management**: Zustand with localStorage persistence
+- **State Management**: Zustand with DB persistence
 - **Styling**: TailwindCSS with dark theme support
 
 ### Adding Components
@@ -471,8 +473,8 @@ If you encounter any issues:
 
 1. Check that your CSV file matches the required format
 2. Ensure all required columns are present
-3. Verify your browser supports localStorage
-4. Open an issue on GitHub with details about your CSV file and browser
+3. Verify Docker services are running (`npm run db:start`)
+4. Open an issue on GitHub with details about your problem
 
 ---
 

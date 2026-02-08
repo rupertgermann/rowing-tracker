@@ -4,10 +4,10 @@ This file provides guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-**Rowing Tracker** - A Next.js 15 application for tracking rowing workouts with AI-powered insights, training plans, and achievement tracking.
+**Rowing Tracker** - A Next.js 16 application for tracking rowing workouts with AI-powered insights, training plans, and achievement tracking.
 
 **Tech Stack:**
-- Next.js 15 with App Router (src/app/)
+- Next.js 16 with App Router (src/app/)
 - TypeScript with strict mode
 - Prisma v7 with PostgreSQL
 - Zustand for client state with DB persistence
@@ -29,8 +29,8 @@ npm run start            # Start production server
 npm run lint             # Run ESLint
 
 # Database (Prisma + PostgreSQL)
-npm run docker:up        # Start PostgreSQL + Mailpit containers
-npm run docker:down      # Stop Docker services
+npm run db:start         # Start PostgreSQL + Mailpit containers
+npm run db:stop           # Stop Docker services
 npm run db:generate      # Generate Prisma client
 npm run db:migrate       # Run migrations (dev)
 npm run db:migrate:deploy # Run migrations (production)

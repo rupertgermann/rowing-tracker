@@ -11,8 +11,8 @@ npm run build            # Production build
 npm run lint             # Run ESLint
 
 # Database (Prisma + PostgreSQL)
-npm run docker:up        # Start PostgreSQL + Mailpit containers
-npm run docker:down      # Stop Docker services
+npm run db:start         # Start PostgreSQL + Mailpit containers
+npm run db:stop           # Stop Docker services
 npm run db:generate      # Generate Prisma client
 npm run db:migrate       # Run migrations (dev)
 npm run db:migrate:deploy # Run migrations (production)
@@ -27,7 +27,7 @@ npm run admin:promote    # Promote user to admin role
 ## Architecture Overview
 
 ### Tech Stack
-- **Next.js 15** with App Router (src/app/)
+- **Next.js 16** with App Router (src/app/)
 - **TypeScript** with strict mode
 - **Prisma v7** with PostgreSQL adapter
 - **Zustand** for client state with DB sync
