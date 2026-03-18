@@ -1,0 +1,128 @@
+╭─── Claude Code v2.1.76 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Rupert!                │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ No recent activity      │
+│   Sonnet 4.6 · Claude Pro · pick2.rg@gmail.com's   │                         │
+│   Organization                                     │                         │
+│                 ~/AI/rowing-tracker                │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+❯ what's the single smartest and most radically innovative and accretive and    
+useful and compelling addition you could make to the project at this point?     
+show me your plan don’t implement it yet.                                       
+
+⏺ Explore(Deep explore rowing tracker project)
+  ⎿  Done (37 tool uses · 99.7k tokens · 2m 0s)
+  (ctrl+o to expand)
+
+⏺ Based on my thorough exploration of the codebase, here's my proposal:
+
+  ---
+  Adaptive Power Curve & Race Strategy Engine
+
+  The single highest-leverage addition: a physiological performance model built
+  from the stroke-by-stroke data you're already collecting but barely
+  exploiting.
+
+  Why this is the smartest move
+
+  You have stroke-level power, pace, and heart rate data for every session —
+  that's an incredibly rich dataset sitting largely untapped. Right now the
+  analytics are retrospective ("here's what happened"). This feature makes them
+  predictive ("here's what you can do, and how to do it").
+
+  No SmartRow app does this. It's the kind of feature that makes users feel the
+  app knows them.
+
+  What it consists of
+
+  1. Critical Power / Power-Duration Curve
+  - Adapts cycling's well-established Critical Power model to rowing
+  - Scans all stroke data to find best-effort power at every duration (10s, 30s,
+   1min, 2min, 5min, 10min, 30min, 60min)
+  - Fits a hyperbolic curve: P(t) = CP + W' / t where CP = aerobic threshold, W'
+   = anaerobic capacity
+  - Visualized as an interactive power-duration curve chart
+  - Updates automatically as new sessions are imported
+  - Shows how the curve shifts over weeks/months (fitness trajectory)
+
+  2. Race Strategy Simulator
+  - User picks a target distance (e.g., 2000m) and optional goal time
+  - Engine generates an optimal pacing plan based on their power curve — not
+  generic advice
+  - Shows split-by-split targets (per 100m or 500m) with power, pace, stroke
+  rate
+  - Compares negative split, even split, and positive split strategies with
+  predicted finish times for each
+  - "What-if" mode: drag sliders to adjust first-500m effort and see cascading
+  effects on remaining splits
+  - Overlay against their actual past attempts at that distance
+
+  3. PR Prediction with Confidence Intervals
+  - Uses power curve trend + training load trajectory to predict achievable PRs
+  - For each standard distance: "You can likely hit X:XX within Y weeks if you
+  maintain current training"
+  - Confidence bands (50% / 80% / 95%) so it feels scientific, not hand-wavy
+  - Identifies which factor is the bottleneck (aerobic base vs anaerobic
+  capacity vs technique/efficiency)
+
+  4. Training Zone Calculator
+  - Derives personalized power zones from the CP model (not generic percentages)
+  - Zone 1 (Recovery) through Zone 6 (Neuromuscular) with exact watt ranges
+  - Retroactively tags every past session with time-in-zone distribution
+  - Feeds directly into the existing training plan system: "Your plan says
+  'endurance' — that means 145-175W for you"
+
+  Architecture sketch
+
+  New files:
+    src/lib/powerCurve.ts          — CP/W' model fitting, best-effort extraction
+    src/lib/raceStrategy.ts        — Pacing optimizer, split calculator
+    src/lib/trainingZones.ts       — Zone derivation from CP model
+    src/app/api/performance-model/ — API routes for model computation
+    src/app/(routes)/strategy/     — New "Race Strategy" page
+    src/components/PowerCurve/     — Interactive power-duration chart
+    src/components/RaceSimulator/  — Split planner with what-if sliders
+
+  Modified files:
+    prisma/schema.prisma           — Add PerformanceModel table (cached CP/W'
+  values)
+    src/app/(routes)/analytics/    — Add power curve chart to analytics
+    src/app/(routes)/prs/          — Add PR predictions section
+    src/components/SessionDetail/  — Add zone distribution to session view
+    src/lib/trainingPlans.ts       — Zone-aware workout intensity targets
+
+  Why not the alternatives
+
+  ┌──────────────────────┬──────────────────────────────────────────────────┐
+  │     Alternative      │                  Why this wins                   │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Strava/C2            │ Useful but commodity — doesn't differentiate the │
+  │ integration          │  app                                             │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Social/leaderboards  │ Engagement feature, not intelligence — and needs │
+  │                      │  critical mass                                   │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Live workout mode    │ Requires SmartRow API that isn't available       │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ PDF reports          │ Nice-to-have, not transformative                 │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Better ML insights   │ Already doing AI insights — this adds structured │
+  │                      │  models, not more LLM calls                      │
+  └──────────────────────┴──────────────────────────────────────────────────┘
+
+  The key insight
+
+  The power curve model is deterministic math, not AI — it's reliable,
+  explainable, and instant. But it integrates beautifully with the existing AI
+  coach: the chat can reference the user's CP, W', zones, and predicted PRs to
+  give advice grounded in their actual physiology rather than generic rowing
+  wisdom.
+
+  ---
+  Want me to implement it?
+
+✻ Cooked for 2m 46s

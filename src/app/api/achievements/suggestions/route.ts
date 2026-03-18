@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AWARDS } from '@/lib/awards';
-import { SettingsService } from '@/lib/settings';
+import { normalizeAITextModel, SettingsService } from '@/lib/settings';
 
 
 interface SuggestionCriteria {
@@ -186,14 +186,6 @@ Keep output short:
       6000
     );
 
-    // Map model for API compatibility
-    const mapModel = (model: string): 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' => {
-      if (model === 'gpt-5-nano') return 'gpt-5-nano';
-      if (model === 'gpt-5-mini') return 'gpt-5-mini';
-      if (model === 'gpt-5.1' || model === 'gpt-5.2') return 'gpt-5.1';
-      return 'gpt-5-mini'; // default fallback
-    };
-
     const callOpenAI = async (requestedMaxOutputTokens: number) => {
       const resp = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
@@ -202,7 +194,7 @@ Keep output short:
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: mapModel(useCaseConfig.model),
+          model: normalizeAITextModel(useCaseConfig.model, 'gpt-5.4-mini'),
           input: prompt,
           instructions,
           max_output_tokens: requestedMaxOutputTokens,

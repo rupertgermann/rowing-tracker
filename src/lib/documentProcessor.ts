@@ -101,7 +101,7 @@ async function extractTextFromImage(file: File): Promise<string> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-nano', // Use nano for simple image text extraction
+        model: 'gpt-5.4-nano', // Use nano tier for simple image text extraction
         input: [
           {
             role: 'user',
@@ -309,7 +309,7 @@ async function extractTextWithLLM(file: File): Promise<string> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini', // Use mini model for cost efficiency
+        model: 'gpt-5.4-mini', // Use mini tier for cost efficiency
         input: [
           {
             role: 'user',

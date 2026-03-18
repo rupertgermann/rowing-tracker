@@ -1257,7 +1257,7 @@ export default function SettingsPage() {
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">
                       Configure reasoning levels and verbosity for each AI feature.
-                      All features use GPT-5.1 for optimal performance and quality.
+                      Choose the GPT-5.4 tier that fits each task best.
                     </p>
                   </div>
 
@@ -1276,7 +1276,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.chat?.model || 'gpt-5-mini'}
+                          value={settingsData.aiSettings.chat?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
                             chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
                           })}
@@ -1342,7 +1342,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.insights?.model || 'gpt-5-mini'}
+                          value={settingsData.aiSettings.insights?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
                             insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
                           })}
@@ -1408,7 +1408,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.1'}
+                          value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.4'}
                           onChange={(e) => saveSettings('aiSettings', {
                             trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
                           })}
@@ -1474,7 +1474,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5-mini'}
+                          value={settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
                             userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, model: e.target.value as any }
                           })}
@@ -1540,7 +1540,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.achievementText?.model || 'gpt-5-mini'}
+                          value={settingsData.aiSettings.achievementText?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
                             achievementText: { ...settingsData.aiSettings.achievementText, model: e.target.value as any }
                           })}
@@ -1719,7 +1719,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.awardSuggestions?.model || 'gpt-5-mini'}
+                          value={settingsData.aiSettings.awardSuggestions?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
                             awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, model: e.target.value as any }
                           })}

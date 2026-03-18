@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SettingsService } from '@/lib/settings';
+import { normalizeAITextModel, SettingsService } from '@/lib/settings';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,14 +27,6 @@ export async function POST(request: NextRequest) {
     const settings = SettingsService.getInstance();
     const aiSettings = settings.getAISettings();
     const useCaseConfig = aiSettings.achievementText;
-
-    // Map model for API compatibility
-    const mapModel = (model: string): 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' => {
-      if (model === 'gpt-5-nano') return 'gpt-5-nano';
-      if (model === 'gpt-5-mini') return 'gpt-5-mini';
-      if (model === 'gpt-5.1' || model === 'gpt-5.2') return 'gpt-5.1';
-      return 'gpt-5-mini'; // default fallback
-    };
 
     // Build the prompt
     const defaultPrompt = `You are a creative writer crafting inspiring achievement stories for rowers. 
@@ -72,7 +64,7 @@ Write the achievement story:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: mapModel(useCaseConfig.model),
+        model: normalizeAITextModel(useCaseConfig.model, 'gpt-5.4-mini'),
         input: prompt,
         max_output_tokens: 500,
         reasoning: { effort: useCaseConfig.reasoning },

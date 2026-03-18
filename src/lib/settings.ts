@@ -1,5 +1,30 @@
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
 
+export const AI_TEXT_MODELS = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'] as const;
+
+export type AITextModel = (typeof AI_TEXT_MODELS)[number];
+
+const LEGACY_AI_TEXT_MODEL_MAP: Record<string, AITextModel> = {
+  'gpt-5.4': 'gpt-5.4',
+  'gpt-5.4-mini': 'gpt-5.4-mini',
+  'gpt-5.4-nano': 'gpt-5.4-nano',
+  'gpt-5.2': 'gpt-5.4',
+  'gpt-5.1': 'gpt-5.4',
+  'gpt-5-mini': 'gpt-5.4-mini',
+  'gpt-5-nano': 'gpt-5.4-nano',
+};
+
+export function normalizeAITextModel(
+  model: string | undefined | null,
+  fallback: AITextModel = 'gpt-5.4-mini'
+): AITextModel {
+  if (!model) {
+    return fallback;
+  }
+
+  return LEGACY_AI_TEXT_MODEL_MAP[model] ?? fallback;
+}
+
 // Settings types and interfaces
 // VERSION: 2024-12-27-v2 - Added auth check before DB sync
 export interface UserPreferences {
@@ -77,7 +102,7 @@ export interface SmartRowSettings {
 export interface UseCaseConfig {
   reasoning: 'none' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
-  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1' | 'gpt-5.2';
+  model: AITextModel;
 }
 
 export interface AISettings {
@@ -129,7 +154,7 @@ export interface Settings {
 export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
-  private readonly CURRENT_VERSION = '1.4.0'; // Condensed explainChartPrompt - max 6 lines per section
+  private readonly CURRENT_VERSION = '1.5.0'; // GPT-5.4 text model refresh
   private dbInitialized = false;
   private initPromise: Promise<void> | null = null;
   private syncTimeout: NodeJS.Timeout | null = null;
@@ -211,22 +236,22 @@ export class SettingsService {
       chat: {
         reasoning: 'none',          // Ultra-fast responses (compatible with all models)
         verbosity: 'medium',       // Natural conversation
-        model: 'gpt-5-mini'        // Good balance of speed and quality
+        model: 'gpt-5.4-mini'      // Good balance of speed and quality
       },
       insights: {
         reasoning: 'medium',      // Good quality/speed ratio
         verbosity: 'low',         // Concise insights
-        model: 'gpt-5-mini'       // Efficient for analysis tasks
+        model: 'gpt-5.4-mini'     // Efficient for analysis tasks
       },
       trainingPlans: {
         reasoning: 'high',        // Maximum reasoning
         verbosity: 'high',        // Detailed explanations
-        model: 'gpt-5.1'          // Best quality for complex plans
+        model: 'gpt-5.4'          // Best quality for complex plans
       },
       awardSuggestions: {
         reasoning: 'medium',
         verbosity: 'low',
-        model: 'gpt-5-mini'
+        model: 'gpt-5.4-mini'
       },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: 'You are a personal AI rowing coach...',
@@ -275,7 +300,7 @@ Be brief and direct. No fluff.`,
       awardSuggestionsPrompt: DEFAULT_AWARD_SUGGESTIONS_PROMPT,
 
       // Achievement generator (defaults)
-      achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5-mini' },
+      achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5.4-mini' },
       achievementImageModel: 'gpt-image-1',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',
@@ -319,7 +344,7 @@ Style guidelines:
       userProfileGeneration: {
         reasoning: 'low',
         verbosity: 'low',
-        model: 'gpt-5-mini'
+        model: 'gpt-5.4-mini'
       },
       userProfilePrompt: `You are helping a rowing coach AI understand a user's personal context. The user has provided information about themselves that should influence how the AI coach gives advice.
 
@@ -909,6 +934,17 @@ Be specific and actionable. Only include information relevant to rowing training
     }, 1000); // 1 second debounce
   }
 
+  private normalizeUseCaseConfig(
+    config: Partial<UseCaseConfig> | undefined,
+    defaults: UseCaseConfig
+  ): UseCaseConfig {
+    return {
+      ...defaults,
+      ...config,
+      model: normalizeAITextModel(config?.model, defaults.model)
+    };
+  }
+
   private migrateSettings(settings: Partial<Settings>): Settings {
     const migratedSettings = { ...settings } as Settings;
 
@@ -934,7 +970,7 @@ Be specific and actionable. Only include information relevant to rowing training
       // Check if this is the old format (has flat model/temperature properties)
       if (oldAiSettings.model || oldAiSettings.temperature !== undefined) {
 
-        // Transform old flat settings to new nested structure (GPT-5.1 only)
+        // Transform old flat settings to the current nested structure
         migratedSettings.aiSettings = {
           ...this.defaultSettings.aiSettings,
           // Preserve old properties that still exist
@@ -948,11 +984,13 @@ Be specific and actionable. Only include information relevant to rowing training
           // Always use new default explainChartPrompt - improved format with "Why This Chart Matters" section
           explainChartPrompt: this.defaultSettings.aiSettings.explainChartPrompt,
 
-          // New nested structure without model fields (hardcoded to GPT-5.1)
+          // New nested structure with current GPT-5.4 defaults
           chat: this.defaultSettings.aiSettings.chat,
           insights: this.defaultSettings.aiSettings.insights,
           trainingPlans: this.defaultSettings.aiSettings.trainingPlans,
           awardSuggestions: this.defaultSettings.aiSettings.awardSuggestions,
+          achievementText: this.defaultSettings.aiSettings.achievementText,
+          userProfileGeneration: this.defaultSettings.aiSettings.userProfileGeneration,
           awardSuggestionsPrompt: oldAiSettings.awardSuggestionsPrompt ?? this.defaultSettings.aiSettings.awardSuggestionsPrompt,
           // Preserve achievement image settings
           achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
@@ -969,6 +1007,8 @@ Be specific and actionable. Only include information relevant to rowing training
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
           trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
           awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions },
+          achievementText: { ...this.defaultSettings.aiSettings.achievementText, ...oldAiSettings.achievementText },
+          userProfileGeneration: { ...this.defaultSettings.aiSettings.userProfileGeneration, ...oldAiSettings.userProfileGeneration },
           // Preserve achievement image settings that user may have configured
           achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
           achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
@@ -984,6 +1024,8 @@ Be specific and actionable. Only include information relevant to rowing training
           insights: { ...this.defaultSettings.aiSettings.insights, ...oldAiSettings.insights },
           trainingPlans: { ...this.defaultSettings.aiSettings.trainingPlans, ...oldAiSettings.trainingPlans },
           awardSuggestions: { ...this.defaultSettings.aiSettings.awardSuggestions, ...oldAiSettings.awardSuggestions },
+          achievementText: { ...this.defaultSettings.aiSettings.achievementText, ...oldAiSettings.achievementText },
+          userProfileGeneration: { ...this.defaultSettings.aiSettings.userProfileGeneration, ...oldAiSettings.userProfileGeneration },
           // Preserve achievement image settings that user may have configured
           achievementImageModel: oldAiSettings.achievementImageModel ?? this.defaultSettings.aiSettings.achievementImageModel,
           achievementImageQuality: oldAiSettings.achievementImageQuality ?? this.defaultSettings.aiSettings.achievementImageQuality,
@@ -995,6 +1037,34 @@ Be specific and actionable. Only include information relevant to rowing training
       // No AI settings exist - use defaults
       migratedSettings.aiSettings = { ...this.defaultSettings.aiSettings };
     }
+
+    migratedSettings.aiSettings = {
+      ...migratedSettings.aiSettings,
+      chat: this.normalizeUseCaseConfig(
+        migratedSettings.aiSettings.chat,
+        this.defaultSettings.aiSettings.chat
+      ),
+      insights: this.normalizeUseCaseConfig(
+        migratedSettings.aiSettings.insights,
+        this.defaultSettings.aiSettings.insights
+      ),
+      trainingPlans: this.normalizeUseCaseConfig(
+        migratedSettings.aiSettings.trainingPlans,
+        this.defaultSettings.aiSettings.trainingPlans
+      ),
+      awardSuggestions: this.normalizeUseCaseConfig(
+        migratedSettings.aiSettings.awardSuggestions,
+        this.defaultSettings.aiSettings.awardSuggestions
+      ),
+      achievementText: this.normalizeUseCaseConfig(
+        migratedSettings.aiSettings.achievementText,
+        this.defaultSettings.aiSettings.achievementText
+      ),
+      userProfileGeneration: this.normalizeUseCaseConfig(
+        migratedSettings.aiSettings.userProfileGeneration,
+        this.defaultSettings.aiSettings.userProfileGeneration
+      )
+    };
 
     // Handle version migration and ensure all properties exist
     if (!settings.version || settings.version !== this.CURRENT_VERSION) {

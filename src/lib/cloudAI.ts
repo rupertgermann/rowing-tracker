@@ -6,7 +6,8 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   CHAT_TITLE_GENERATION_PROMPT
 } from '@/lib/aiPromptDefaults';
-import type { AISettings } from '@/lib/settings';
+import { normalizeAITextModel } from '@/lib/settings';
+import type { AISettings, AITextModel } from '@/lib/settings';
 
 // OpenAI API configuration
 interface OpenAIConfig {
@@ -15,7 +16,7 @@ interface OpenAIConfig {
   baseUrl: string;
 }
 
-// GPT-5.1 Responses API request configuration
+// Responses API request configuration
 interface ApiRequestConfig {
   // Input (string for simple, array for conversations)
   input: string | Array<{ role: string; content: string }>;
@@ -24,7 +25,7 @@ interface ApiRequestConfig {
   instructions?: string;
 
   // Model selection per use case
-  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1';
+  model: AITextModel;
 
   // Reasoning effort per use case
   reasoning: "none" | "low" | "medium" | "high";
@@ -133,7 +134,7 @@ export class CloudAIService {
     // Always update config (even if already initialized) to pick up settings changes
     this.config = {
       apiKey: key,
-      model: 'gpt-5.1', // Default model (per-use-case models are used in actual calls)
+      model: 'gpt-5.4', // Default model (per-use-case models are used in actual calls)
       baseUrl: 'https://api.openai.com/v1'
     };
 
@@ -149,9 +150,7 @@ export class CloudAIService {
   }
 
   private mapModel(model: string): SupportedTextModel {
-    if (model === 'gpt-5-nano') return 'gpt-5-nano';
-    if (model === 'gpt-5-mini') return 'gpt-5-mini';
-    return 'gpt-5.1';
+    return normalizeAITextModel(model, 'gpt-5.4-mini');
   }
 
   // Send chat message to AI trainer
@@ -416,7 +415,7 @@ export class CloudAIService {
 
       const config: ApiRequestConfig = {
         input: prompt,
-        model: 'gpt-5-nano',
+        model: 'gpt-5.4-nano',
         reasoning: 'none',
         verbosity: 'low',
         maxTokens: 50, // Titles are short
@@ -433,7 +432,7 @@ export class CloudAIService {
     }
   }
 
-  // Build GPT-5.1 Responses API request
+  // Build a Responses API request
   private buildRequest(config: ApiRequestConfig): object {
     const request: Record<string, unknown> = {
       model: config.model, // Use model from config instead of hardcoded
@@ -448,30 +447,7 @@ export class CloudAIService {
       request.instructions = config.instructions;
     }
 
-    // Reasoning effort - map model-specific values
-    const reasoningMapping: Record<string, Record<string, string>> = {
-      'gpt-5-mini': {
-        'none': 'minimal', // Map 'none' to 'minimal' for gpt-5-mini
-        'low': 'low',
-        'medium': 'medium',
-        'high': 'high'
-      },
-      'gpt-5-nano': {
-        'none': 'minimal', // Assume same mapping as gpt-5-mini
-        'low': 'low',
-        'medium': 'medium',
-        'high': 'high'
-      },
-      'gpt-5.1': {
-        'none': 'none', // Keep 'none' for gpt-5.1 if supported
-        'low': 'low',
-        'medium': 'medium',
-        'high': 'high'
-      }
-    };
-
-    const mappedReasoning = reasoningMapping[config.model]?.[config.reasoning] || config.reasoning;
-    request.reasoning = { effort: mappedReasoning };
+    request.reasoning = { effort: config.reasoning };
 
     // Verbosity and structured outputs
     request.text = { verbosity: config.verbosity };
@@ -507,7 +483,7 @@ export class CloudAIService {
     return request;
   }
 
-  // Parse GPT-5.1 Responses API response
+  // Parse a Responses API response
   private parseResponse(data: Record<string, unknown> & { status?: string; incomplete_details?: { reason?: string }; output_text?: string; output?: Array<{ type: string; content?: Array<{ type: string; text?: string }> }> }): string {
     // Check for incomplete response
     if (data.status === 'incomplete') {
@@ -1942,15 +1918,7 @@ Be specific and actionable. Only include information relevant to rowing training
       const generationConfig = aiSettings.userProfileGeneration || {
         reasoning: 'low' as const,
         verbosity: 'low' as const,
-        model: 'gpt-5-mini' as const
-      };
-
-      // Map UseCaseConfig model to ApiRequestConfig model (gpt-5.2 not supported in API)
-      const modelMap: Record<string, 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5.1'> = {
-        'gpt-5-nano': 'gpt-5-nano',
-        'gpt-5-mini': 'gpt-5-mini',
-        'gpt-5.1': 'gpt-5.1',
-        'gpt-5.2': 'gpt-5.1' // Fallback
+        model: 'gpt-5.4-mini' as const
       };
 
       // Map UseCaseConfig reasoning to ApiRequestConfig reasoning
@@ -1963,7 +1931,7 @@ Be specific and actionable. Only include information relevant to rowing training
 
       const config: ApiRequestConfig = {
         input: prompt,
-        model: modelMap[generationConfig.model] || 'gpt-5-mini',
+        model: normalizeAITextModel(generationConfig.model, 'gpt-5.4-mini'),
         reasoning: reasoningMap[generationConfig.reasoning] || 'low',
         verbosity: generationConfig.verbosity,
         maxTokens: 800 // Increase to accommodate reasoning + output tokens
