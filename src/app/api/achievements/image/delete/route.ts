@@ -8,17 +8,13 @@ const NEXT_DIR = path.join(process.cwd(), '.next');
 
 /**
  * Clear Next.js image optimization cache
- * This removes all cached optimized images, forcing regeneration on next request
- * Handles both production (.next/cache/images) and dev/Turbopack (.next/dev/cache/images)
+ * This removes cached optimized images in production builds.
+ * Do not remove .next/dev/cache here: Turbopack writes to it while the dev
+ * server is running, and deleting it during a request can trigger SST warnings.
  */
 async function clearNextImageCache(): Promise<boolean> {
   const cachePaths = [
-    // Production cache
     path.join(NEXT_DIR, 'cache', 'images'),
-    path.join(NEXT_DIR, 'cache', 'fetch-cache'),
-    // Development/Turbopack cache
-    path.join(NEXT_DIR, 'dev', 'cache', 'images'),
-    path.join(NEXT_DIR, 'dev', 'cache'),
   ];
   
   let cleared = false;

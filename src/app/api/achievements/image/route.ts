@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       apiKey,
       size = '1024x1024',
       quality = 'auto',  // auto, high, medium, low
-      model = 'gpt-image-1',  // gpt-image-1, gpt-image-1-mini, gpt-image-1.5
+      model = 'gpt-image-2',  // gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
       colorPalette = 'classic',  // Color palette sent from client
       story
     } = body;
@@ -37,6 +37,14 @@ export async function POST(request: NextRequest) {
     if (!allowedSizes.includes(size)) {
       return NextResponse.json(
         { error: `Invalid size. Supported values: ${allowedSizes.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    const allowedModels = ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1', 'gpt-image-1-mini'];
+    if (!allowedModels.includes(model)) {
+      return NextResponse.json(
+        { error: `Invalid model. Supported values: ${allowedModels.join(', ')}` },
         { status: 400 }
       );
     }
