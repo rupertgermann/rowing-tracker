@@ -1,6 +1,7 @@
 import type { AISettings, UseCaseConfig } from '@/lib/settings';
 
 export const AI_TEXT_MODEL_OPTIONS: Array<{ value: UseCaseConfig['model']; label: string }> = [
+  { value: 'gpt-5.5', label: 'GPT-5.5 (Latest)' },
   { value: 'gpt-5.4', label: 'GPT-5.4 (Most Capable)' },
   { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini (Balanced)' },
   { value: 'gpt-5.4-nano', label: 'GPT-5.4 Nano (Fastest)' },
@@ -23,9 +24,10 @@ export const AI_ACHIEVEMENT_IMAGE_MODEL_OPTIONS: Array<{
   value: AISettings['achievementImageModel'];
   label: string;
 }> = [
+  { value: 'gpt-image-2', label: 'GPT Image 2 (Latest)' },
+  { value: 'gpt-image-1.5', label: 'GPT Image 1.5 (Best Quality)' },
   { value: 'gpt-image-1', label: 'GPT Image 1 (Balanced)' },
   { value: 'gpt-image-1-mini', label: 'GPT Image 1 Mini (Fast)' },
-  { value: 'gpt-image-1.5', label: 'GPT Image 1.5 (Best Quality)' },
 ];
 
 export const AI_ACHIEVEMENT_IMAGE_QUALITY_OPTIONS: Array<{

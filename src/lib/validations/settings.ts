@@ -19,8 +19,8 @@ const preferredMetricSchema = z.enum(["pace", "power", "strokeRate", "heartRate"
 // AI Settings - Use Case Config
 const reasoningLevelSchema = z.enum(["none", "low", "medium", "high"]);
 const verbosityLevelSchema = z.enum(["low", "medium", "high"]);
-const modelSchema = z.enum(["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"]);
-const imageModelSchema = z.enum(["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]);
+const modelSchema = z.enum(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"]);
+const imageModelSchema = z.enum(["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]);
 const imageQualitySchema = z.enum(["auto", "high", "medium", "low"]);
 const imageSizeSchema = z.enum(["1024x1024", "1024x1536", "1536x1024", "auto"]);
 const colorPaletteSchema = z.enum(["classic", "classic-red", "gold-blue", "emerald", "royal", "sunset", "monochrome", "ocean"]);

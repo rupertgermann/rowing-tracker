@@ -1408,7 +1408,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>AI Model</Label>
                         <select
-                          value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.4'}
+                          value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.5'}
                           onChange={(e) => saveSettings('aiSettings', {
                             trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
                           })}

@@ -1,15 +1,16 @@
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
 
-export const AI_TEXT_MODELS = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'] as const;
+export const AI_TEXT_MODELS = ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'] as const;
 
 export type AITextModel = (typeof AI_TEXT_MODELS)[number];
 
 const LEGACY_AI_TEXT_MODEL_MAP: Record<string, AITextModel> = {
+  'gpt-5.5': 'gpt-5.5',
   'gpt-5.4': 'gpt-5.4',
   'gpt-5.4-mini': 'gpt-5.4-mini',
   'gpt-5.4-nano': 'gpt-5.4-nano',
-  'gpt-5.2': 'gpt-5.4',
-  'gpt-5.1': 'gpt-5.4',
+  'gpt-5.2': 'gpt-5.5',
+  'gpt-5.1': 'gpt-5.5',
   'gpt-5-mini': 'gpt-5.4-mini',
   'gpt-5-nano': 'gpt-5.4-nano',
 };
@@ -127,7 +128,7 @@ export interface AISettings {
   achievementStoryPrompt: string; // System prompt for achievement story generation
   achievementImagePrompt: string; // Prompt template for achievement image generation
   achievementText: UseCaseConfig; // Text/story generation configuration
-  achievementImageModel: 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5'; // Image model selection
+  achievementImageModel: 'gpt-image-2' | 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini'; // Image model selection
   achievementImageQuality: 'auto' | 'high' | 'medium' | 'low'; // gpt-image-1 quality settings
   achievementImageSize: '1024x1024' | '1024x1536' | '1536x1024' | 'auto'; // image size
   achievementImageColors: 'classic' | 'classic-red' | 'gold-blue' | 'emerald' | 'royal' | 'sunset' | 'monochrome' | 'ocean'; // color palette
@@ -154,7 +155,7 @@ export interface Settings {
 export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
-  private readonly CURRENT_VERSION = '1.5.0'; // GPT-5.4 text model refresh
+  private readonly CURRENT_VERSION = '1.6.0'; // GPT-5.5 and GPT Image 2 model refresh
   private dbInitialized = false;
   private initPromise: Promise<void> | null = null;
   private syncTimeout: NodeJS.Timeout | null = null;
@@ -246,7 +247,7 @@ export class SettingsService {
       trainingPlans: {
         reasoning: 'high',        // Maximum reasoning
         verbosity: 'high',        // Detailed explanations
-        model: 'gpt-5.4'          // Best quality for complex plans
+        model: 'gpt-5.5'          // Best quality for complex plans
       },
       awardSuggestions: {
         reasoning: 'medium',
@@ -301,7 +302,7 @@ Be brief and direct. No fluff.`,
 
       // Achievement generator (defaults)
       achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5.4-mini' },
-      achievementImageModel: 'gpt-image-1',
+      achievementImageModel: 'gpt-image-2',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',
       achievementImageColors: 'classic',

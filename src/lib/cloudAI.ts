@@ -134,7 +134,7 @@ export class CloudAIService {
     // Always update config (even if already initialized) to pick up settings changes
     this.config = {
       apiKey: key,
-      model: 'gpt-5.4', // Default model (per-use-case models are used in actual calls)
+      model: 'gpt-5.5', // Default model (per-use-case models are used in actual calls)
       baseUrl: 'https://api.openai.com/v1'
     };
 
