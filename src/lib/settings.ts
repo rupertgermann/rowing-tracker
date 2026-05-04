@@ -459,18 +459,22 @@ Be specific and actionable. Only include information relevant to rowing training
         }
 
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
+        this.lastSyncedData = JSON.stringify(migrated);
 
         // If achievementImageColors was missing from DB, trigger a save to populate it
         if (needsColorFieldMigration) {
-          // Trigger an immediate sync to add the missing field to the database
-          setTimeout(() => this.syncToDatabase(migrated), 100);
+          await this.syncToDatabase(migrated);
+          this.lastSyncedData = JSON.stringify(migrated);
         }
       } else {
         // No DB settings, check if we have localStorage settings to sync up
         const localSettings = localStorage.getItem(this.STORAGE_KEY);
         if (localSettings) {
           const parsed = JSON.parse(localSettings);
-          await this.syncToDatabase(parsed);
+          const migrated = this.migrateSettings(parsed);
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(migrated));
+          await this.syncToDatabase(migrated);
+          this.lastSyncedData = JSON.stringify(migrated);
         }
       }
 
@@ -661,7 +665,9 @@ Be specific and actionable. Only include information relevant to rowing training
 
       const settings = JSON.parse(stored);
       const migrated = this.migrateSettings(settings);
-      this.saveSettings(migrated);
+      if (JSON.stringify(settings) !== JSON.stringify(migrated)) {
+        this.saveSettings(migrated);
+      }
       return migrated;
     } catch (error) {
       console.error('Failed to load settings:', error);

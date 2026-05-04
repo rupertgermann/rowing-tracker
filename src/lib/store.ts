@@ -1025,17 +1025,11 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         ...settings
       };
 
-      console.log('[STORE DEBUG] updateSessionAnalysisSettings called with:', settings);
-      console.log('[STORE DEBUG] Current state:', state.sessionAnalysisSettings);
-      console.log('[STORE DEBUG] Updated settings:', updatedSettings);
-
       // Persist to database (async, non-blocking)
       saveSessionAnalysisSettingsToDB(updatedSettings)
         .then(result => {
           if (!result.success) {
             console.error('[STORE] Failed to save session analysis settings:', result.error);
-          } else {
-            console.log('[STORE] ✅ Session analysis settings saved to database:', updatedSettings);
           }
         })
         .catch(err => {
@@ -1130,8 +1124,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     try {
       const data = await initializeStoreFromDB();
 
-      console.log('[STORE DEBUG] initializeFromDB - raw data from DB:', data);
-
       // Convert timestamps to Date objects
       const sessions = data.sessions.map((s) => ({
         ...s,
@@ -1174,11 +1166,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       // Load session analysis settings from database, or use defaults
       const sessionAnalysisSettings = (data.sessionAnalysisSettings as unknown as SessionAnalysisSettings | undefined) || defaultSessionAnalysisSettings;
 
-      console.log('[STORE DEBUG] initializeFromDB - chartSettings loaded:', chartSettings);
-      console.log('[STORE DEBUG] initializeFromDB - sessionAnalysisSettings in data:', (data as any).sessionAnalysisSettings);
-      console.log('[STORE DEBUG] initializeFromDB - sessionAnalysisSettings loaded:', sessionAnalysisSettings);
-      console.log('[STORE DEBUG] initializeFromDB - current store state before set:', get().sessionAnalysisSettings);
-
       set({
         sessions,
         personalRecords,
@@ -1186,8 +1173,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         chartSettings,
         sessionAnalysisSettings
       });
-
-      console.log('[STORE DEBUG] ✅ initializeFromDB - store state AFTER set:', get().sessionAnalysisSettings);
 
     } catch (error) {
       console.error('[STORE] Failed to initialize from database:', error);

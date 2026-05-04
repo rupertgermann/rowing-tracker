@@ -191,6 +191,15 @@ export default function SettingsPage() {
   // SmartRow credentials state
   const [showSmartRowPassword, setShowSmartRowPassword] = useState(false);
 
+  // OpenAI API key editor state — the input is only mounted after the user
+  // explicitly clicks "Edit". Password managers (LastPass, 1Password, Bitwarden,
+  // etc.) cannot auto-fill a field that does not exist in the DOM. The value
+  // is only persisted when the user clicks the explicit "Save" button.
+  const [apiKeyEditing, setApiKeyEditing] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiKeyReadOnly, setApiKeyReadOnly] = useState(true);
+
   // Auto-dismiss connection status with proper cleanup
   useEffect(() => {
     if (connectionStatus === 'success' || connectionStatus === 'error') {
@@ -209,6 +218,10 @@ export default function SettingsPage() {
       setProfileRawInput(settingsData.aiSettings.userProfileRawInput);
     }
   }, [settingsData?.aiSettings?.userProfileRawInput]);
+
+  // NOTE: We deliberately do NOT sync apiKeyDraft from settingsData here.
+  // The draft is only initialized when the user clicks "Edit API Key" so that
+  // password managers cannot autofill or clobber the stored key on mount.
 
   // Load memory documents
   useEffect(() => {
@@ -1197,20 +1210,180 @@ export default function SettingsPage() {
 
             {settingsData.aiSettings.cloudAIEnabled && (
               <>
-                {/* API Key Input */}
+                {/* API Key Input - render the input ONLY when the user clicks "Edit".
+                    Password managers cannot auto-fill a field that doesn't exist in the DOM.
+                    Saving happens only on the explicit "Save" button click. */}
                 <div className="space-y-2">
-                  <Label htmlFor="apiKey" className="flex items-center gap-2">
+                  <Label className="flex items-center gap-2">
                     <Key className="h-4 w-4" />
                     OpenAI API Key
                   </Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="sk-..."
-                    value={settingsData.aiSettings.openaiApiKey}
-                    onChange={(e) => saveSettings('aiSettings', { openaiApiKey: e.target.value })}
-                    className="mt-1"
-                  />
+
+                  {!apiKeyEditing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 mt-1 p-2 border rounded-md bg-muted/40 font-mono text-sm select-none">
+                        {settingsData.aiSettings.openaiApiKey
+                          ? `${settingsData.aiSettings.openaiApiKey.slice(0, 3)}...${settingsData.aiSettings.openaiApiKey.slice(-4)}`
+                          : 'Not set'}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Start with an empty draft so even if a password
+                          // manager somehow targets the field, it cannot
+                          // overwrite the stored key without explicit Save.
+                          setApiKeyDraft('');
+                          setApiKeyVisible(false);
+                          setApiKeyReadOnly(true);
+                          setApiKeyEditing(true);
+                        }}
+                      >
+                        {settingsData.aiSettings.openaiApiKey ? 'Replace' : 'Add'}
+                      </Button>
+                      {settingsData.aiSettings.openaiApiKey && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (!confirm('Remove the stored OpenAI API key?')) return;
+                            saveSettings('aiSettings', { openaiApiKey: '' });
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    // Wrap in an isolated form so the browser doesn't associate
+                    // the field with the surrounding page. autoComplete="off" on
+                    // the form is the most respected hint.
+                    <form
+                      autoComplete="off"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                      }}
+                      className="space-y-2"
+                    >
+                      {/* Honeypot pair: password managers fill THESE instead of
+                          the real input. They are visually hidden but remain
+                          focusable/fillable from the manager's perspective. */}
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          width: 1,
+                          height: 1,
+                          overflow: 'hidden',
+                          opacity: 0,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <input
+                          type="text"
+                          name="username"
+                          tabIndex={-1}
+                          autoComplete="username"
+                          defaultValue=""
+                          onChange={() => { /* honeypot - ignore */ }}
+                        />
+                        <input
+                          type="password"
+                          name="password"
+                          tabIndex={-1}
+                          autoComplete="current-password"
+                          defaultValue=""
+                          onChange={() => { /* honeypot - ignore */ }}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Input
+                          // Generic name/id with no "key", "api", "password",
+                          // "token", "secret" tokens so heuristics don't match.
+                          id="cfg-v1"
+                          name="config-value-1"
+                          // type="text" (NOT password) — managers aggressively
+                          // target type=password. Manual masking via CSS.
+                          type="text"
+                          placeholder="sk-..."
+                          value={apiKeyDraft}
+                          // readOnly until focus — common bypass for autofill
+                          // that runs before user interaction.
+                          readOnly={apiKeyReadOnly}
+                          onFocus={() => setApiKeyReadOnly(false)}
+                          onChange={(e) => {
+                            // Only accept changes from trusted user events.
+                            // Synthetic events from extensions have isTrusted=false.
+                            if (!e.nativeEvent.isTrusted) return;
+                            setApiKeyDraft(e.target.value);
+                          }}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-bwignore="true"
+                          data-form-type="other"
+                          aria-label="OpenAI API key"
+                          className="mt-1 font-mono"
+                          style={
+                            apiKeyVisible
+                              ? undefined
+                              : ({
+                                  // Manual masking since we use type=text.
+                                  WebkitTextSecurity: 'disc',
+                                  textSecurity: 'disc',
+                                } as React.CSSProperties)
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setApiKeyVisible((v) => !v)}
+                          aria-label={apiKeyVisible ? 'Hide' : 'Show'}
+                        >
+                          {apiKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            const next = apiKeyDraft.trim();
+                            if (!next) {
+                              setErrorMessage('API key cannot be empty');
+                              return;
+                            }
+                            saveSettings('aiSettings', { openaiApiKey: next });
+                            setApiKeyEditing(false);
+                            setApiKeyDraft('');
+                          }}
+                        >
+                          Save API Key
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setApiKeyEditing(false);
+                            setApiKeyDraft('');
+                            setApiKeyVisible(false);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+
                   <p className="text-xs text-muted-foreground">
                     Your API key is stored locally and never shared with third parties.
                     Get your key from{' '}
