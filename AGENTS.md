@@ -7,3 +7,17 @@
 3. Surgical Changes: Touch only what you must. Clean up only your own mess.
 
 4. Goal-Driven Execution: Define success criteria. Loop until verified.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `rupertgermann/rowing-tracker`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the default five-label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `CONTEXT.md` plus root `docs/adr/` when present. See `docs/agents/domain.md`.
