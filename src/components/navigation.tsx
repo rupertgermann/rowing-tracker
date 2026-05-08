@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { settings } from '@/lib/settings';
-import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle, Sun, Moon, Monitor, RefreshCw } from 'lucide-react';
+import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle, Sun, Moon, Monitor, RefreshCw, Video } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
@@ -26,6 +26,7 @@ const navigation = [
   { name: 'Personal Records', href: '/prs', icon: Trophy },
   { name: 'Training Plans', href: '/plans', icon: Target },
   { name: 'AI Coach', href: '/chat', icon: MessageCircle },
+  { name: 'Mocap', href: '/mocap', icon: Video },
   { name: 'Sync', href: '/sync', icon: RefreshCw },
 ];
 

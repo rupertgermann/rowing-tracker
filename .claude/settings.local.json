@@ -17,7 +17,22 @@
       "Bash(npx tsx:*)",
       "Bash(npx eslint:*)",
       "Bash(find:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(gh repo *)",
+      "Bash(gh label *)",
+      "Bash(gh issue *)",
+      "Bash(sed -i '' 's|BLOCKER_1|#9|' /tmp/issue-2-calibration.md)",
+      "Bash(sed -i '' 's|BLOCKER_3|#10|' /tmp/issue-6-thresholds.md)",
+      "Bash(sed -i '' 's|BLOCKER_3|#10|; s|BLOCKER_4|#13|' /tmp/issue-5-cues.md)",
+      "Bash(sed -i '' 's|BLOCKER_4|#13|' /tmp/issue-7-link.md)",
+      "Bash(sed -i '' 's|BLOCKER_4|#13|' /tmp/issue-8-lifecycle.md)",
+      "Bash(sed -i '' 's|BLOCKER_4|#13|' /tmp/issue-9-cloudai.md)",
+      "Bash(npx prisma *)",
+      "Bash(PGPASSWORD=rowing_dev_password psql -h localhost -U rowing -d rowing_tracker -f prisma/migrations/20260508120000_add_mocap_session/migration.sql)",
+      "Bash(PGPASSWORD=rowing_dev_password psql -h localhost -U rowing -d rowing_tracker -c \"INSERT INTO _prisma_migrations \\(id, checksum, finished_at, migration_name, started_at, applied_steps_count\\) VALUES \\(gen_random_uuid\\(\\)::text, md5\\('20260508120000_add_mocap_session'\\), now\\(\\), '20260508120000_add_mocap_session', now\\(\\), 1\\) ON CONFLICT DO NOTHING;\")",
+      "Bash(git commit *)",
+      "Bash(xargs -I{} echo {})",
+      "Bash(npm test *)"
     ]
   }
 }

@@ -1,0 +1,1548 @@
+{
+  "name": "slow-recovery-critical",
+  "stream": {
+    "fps": 12,
+    "capturePerspective": "side-right",
+    "frames": [
+      {
+        "timestampMs": 0,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.57358,
+            "y": -0.81915,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.92358,
+            "y": -0.79915,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.27358,
+            "y": -0.77915,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.2,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.4,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 83.33333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.52498,
+            "y": -0.85112,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.87498,
+            "y": -0.83112,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.22498,
+            "y": -0.81112,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.25,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.45,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 166.66666666666666,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.4746,
+            "y": -0.8802,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.8246,
+            "y": -0.8602,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.1746,
+            "y": -0.8402,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.4,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.6,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 250,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.42262,
+            "y": -0.90631,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.77262,
+            "y": -0.88631,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.12262,
+            "y": -0.86631,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.6,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.8,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 333.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.36921,
+            "y": -0.92935,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.71921,
+            "y": -0.90935,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.06921,
+            "y": -0.88935,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.8,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 416.66666666666663,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.31454,
+            "y": -0.94924,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.03546,
+            "y": -0.92924,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.38546,
+            "y": -0.90924,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.95,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.15,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 500,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.25882,
+            "y": -0.96593,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.09118,
+            "y": -0.94593,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.19118,
+            "y": -0.59593,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 1,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.2,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 583.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.27284,
+            "y": -0.96206,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.07716,
+            "y": -0.94206,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.17716,
+            "y": -0.59206,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.98,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.18,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 666.6666666666666,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.2868,
+            "y": -0.95799,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.0632,
+            "y": -0.93799,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.1632,
+            "y": -0.58799,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.95,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.15,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 750,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.30071,
+            "y": -0.95372,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.04929,
+            "y": -0.93372,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.14929,
+            "y": -0.58372,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.92,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.12,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 833.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.31454,
+            "y": -0.94924,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.03546,
+            "y": -0.92924,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.13546,
+            "y": -0.57924,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.89,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.09,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 916.6666666666666,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.32832,
+            "y": -0.94457,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.02168,
+            "y": -0.92457,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.12168,
+            "y": -0.57457,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.86,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.06,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1000,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.34202,
+            "y": -0.93969,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.00798,
+            "y": -0.91969,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.10798,
+            "y": -0.56969,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.82,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.02,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1083.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.35565,
+            "y": -0.93462,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.00565,
+            "y": -0.91462,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.09435,
+            "y": -0.56462,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.78,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.98,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1166.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.36921,
+            "y": -0.92935,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.01921,
+            "y": -0.90935,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.08079,
+            "y": -0.55935,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.74,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.94,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1250,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.38268,
+            "y": -0.92388,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.03268,
+            "y": -0.90388,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.06732,
+            "y": -0.55388,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.7,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.9,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1333.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.39608,
+            "y": -0.91822,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.04608,
+            "y": -0.89822,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.05392,
+            "y": -0.54822,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.66,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.86,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1416.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.40939,
+            "y": -0.91236,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.05939,
+            "y": -0.89236,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.04061,
+            "y": -0.54236,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.62,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.82,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1500,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.42262,
+            "y": -0.90631,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.07262,
+            "y": -0.88631,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.02738,
+            "y": -0.53631,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.58,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.78,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1583.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.43575,
+            "y": -0.90007,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.08575,
+            "y": -0.88007,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.01425,
+            "y": -0.53007,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.54,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.74,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1666.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.4488,
+            "y": -0.89363,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.0988,
+            "y": -0.87363,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.0012,
+            "y": -0.52363,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.5,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.7,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1750,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.46175,
+            "y": -0.88701,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.11175,
+            "y": -0.86701,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.01175,
+            "y": -0.51701,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.46,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.66,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1833.3333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.4746,
+            "y": -0.8802,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.1246,
+            "y": -0.8602,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.0246,
+            "y": -0.5102,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.42,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.62,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 1916.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.48735,
+            "y": -0.87321,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.13735,
+            "y": -0.85321,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.03735,
+            "y": -0.50321,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.38,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.58,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2000,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.5,
+            "y": -0.86603,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.15,
+            "y": -0.84603,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.05,
+            "y": -0.49603,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.34,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.54,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2083.333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.51254,
+            "y": -0.85866,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.16254,
+            "y": -0.83866,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.06254,
+            "y": -0.48866,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.3,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.5,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2166.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.52498,
+            "y": -0.85112,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.17498,
+            "y": -0.83112,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.07498,
+            "y": -0.48112,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.27,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.47,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2250,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.5373,
+            "y": -0.84339,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.1873,
+            "y": -0.82339,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.0873,
+            "y": -0.47339,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.24,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.44,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2333.333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.54951,
+            "y": -0.83549,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.19951,
+            "y": -0.81549,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.09951,
+            "y": -0.46549,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.22,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.42,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2416.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.5616,
+            "y": -0.82741,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.2116,
+            "y": -0.80741,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.1116,
+            "y": -0.45741,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.21,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.41,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2500,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.57358,
+            "y": -0.81915,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.22358,
+            "y": -0.79915,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.12358,
+            "y": -0.44915,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.2,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.4,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2583.333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.52498,
+            "y": -0.85112,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.87498,
+            "y": -0.83112,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.22498,
+            "y": -0.81112,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.25,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.45,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2666.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.4746,
+            "y": -0.8802,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.8246,
+            "y": -0.8602,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.1746,
+            "y": -0.8402,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.4,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.6,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2750,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.42262,
+            "y": -0.90631,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.77262,
+            "y": -0.88631,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.12262,
+            "y": -0.86631,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.6,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.8,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2833.333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": -0.36921,
+            "y": -0.92935,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.71921,
+            "y": -0.90935,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -1.06921,
+            "y": -0.88935,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.8,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 2916.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.31454,
+            "y": -0.94924,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.03546,
+            "y": -0.92924,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.38546,
+            "y": -0.90924,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.95,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.15,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 3000,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.25882,
+            "y": -0.96593,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.09118,
+            "y": -0.94593,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.19118,
+            "y": -0.59593,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 1,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.2,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 3083.333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.32557,
+            "y": -0.94552,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": -0.02443,
+            "y": -0.92552,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.12443,
+            "y": -0.57552,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.82,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 1.02,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 3166.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.39073,
+            "y": -0.9205,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.04073,
+            "y": -0.9005,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": -0.05927,
+            "y": -0.5505,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.6,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.8,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 3250,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.45399,
+            "y": -0.89101,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.10399,
+            "y": -0.87101,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.00399,
+            "y": -0.52101,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.42,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.62,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 3333.333333333333,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.51504,
+            "y": -0.85717,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.16504,
+            "y": -0.83717,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.06504,
+            "y": -0.48717,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.28,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.48,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      },
+      {
+        "timestampMs": 3416.6666666666665,
+        "keypoints": {
+          "rightShoulder": {
+            "x": 0.57358,
+            "y": -0.81915,
+            "confidence": 0.98
+          },
+          "rightElbow": {
+            "x": 0.22358,
+            "y": -0.79915,
+            "confidence": 0.98
+          },
+          "rightWrist": {
+            "x": 0.12358,
+            "y": -0.44915,
+            "confidence": 0.98
+          },
+          "rightHip": {
+            "x": 0,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightKnee": {
+            "x": 0.22,
+            "y": 0,
+            "confidence": 0.98
+          },
+          "rightAnkle": {
+            "x": 0.42,
+            "y": 0.42,
+            "confidence": 0.98
+          }
+        },
+        "qualityFlags": 0
+      }
+    ]
+  },
+  "expected": {
+    "strokeCount": 2,
+    "boundaries": [
+      {
+        "catchFrameIndex": 0,
+        "finishFrameIndex": 6,
+        "nextCatchFrameIndex": 30
+      },
+      {
+        "catchFrameIndex": 30,
+        "finishFrameIndex": 36,
+        "nextCatchFrameIndex": 41
+      }
+    ],
+    "metrics": {
+      "strokeIndex": 0,
+      "backAngleAtCatchDeg": 55,
+      "backAngleAtFinishDeg": 75,
+      "laybackAngleDeg": 15
+    },
+    "faults": [
+      {
+        "faultType": "slow_recovery_ratio",
+        "severity": "critical"
+      }
+    ]
+  }
+}

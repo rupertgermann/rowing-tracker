@@ -7,6 +7,7 @@ export interface MocapStorage {
   videoPath(userId: string, sessionId: string): string;
   poseStreamPath(userId: string, sessionId: string): string;
   appendBytes(storagePath: string, bytes: Uint8Array): Promise<void>;
+  writeAt(storagePath: string, bytes: Uint8Array, offset: number): Promise<void>;
   read(storagePath: string, range?: ByteRange): Promise<Uint8Array>;
   size(storagePath: string): Promise<number>;
   exists(storagePath: string): Promise<boolean>;
@@ -39,6 +40,21 @@ class LocalDiskStorage implements MocapStorage {
     const abs = this.resolve(storagePath);
     await fs.mkdir(path.dirname(abs), { recursive: true });
     await fs.appendFile(abs, bytes);
+  }
+
+  async writeAt(
+    storagePath: string,
+    bytes: Uint8Array,
+    offset: number,
+  ): Promise<void> {
+    const abs = this.resolve(storagePath);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const fh = await fs.open(abs, "r+");
+    try {
+      await fh.write(bytes, 0, bytes.byteLength, offset);
+    } finally {
+      await fh.close();
+    }
   }
 
   async read(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
