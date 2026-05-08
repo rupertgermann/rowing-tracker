@@ -42,6 +42,9 @@ type FrameOut = {
   framesEncoded: number;
   timestampMs: number;
   landmarkCount: number;
+  trackedKeypointCount: number;
+  meanConfidence: number;
+  qualityFlags: number;
 };
 type ErrorOut = { type: "error"; message: string };
 
@@ -52,10 +55,19 @@ let busy = false;
 
 function buildKeypointsFromLandmarks(
   landmarks: NormalizedLandmark[],
-): { keypoints: Float32Array; lowConfidence: boolean } {
+): {
+  keypoints: Float32Array;
+  lowConfidence: boolean;
+  meanConfidence: number;
+  trackedKeypointCount: number;
+  outOfFrame: boolean;
+} {
   const keypoints = new Float32Array(KEYPOINTS_PER_FRAME_V1 * 3);
   let lowConfidence = false;
   let lowConfidenceCount = 0;
+  let confidenceTotal = 0;
+  let trackedKeypointCount = 0;
+  let outOfFrameCount = 0;
   const limit = Math.min(landmarks.length, KEYPOINTS_PER_FRAME_V1);
   for (let i = 0; i < limit; i++) {
     const lm = landmarks[i];
@@ -63,12 +75,21 @@ function buildKeypointsFromLandmarks(
     keypoints[i * 3 + 0] = lm.x;
     keypoints[i * 3 + 1] = lm.y;
     keypoints[i * 3 + 2] = visibility;
+    confidenceTotal += visibility;
+    if (visibility >= 0.4) trackedKeypointCount++;
     if (visibility < 0.4) lowConfidenceCount++;
+    if (lm.x < 0 || lm.x > 1 || lm.y < 0 || lm.y > 1) outOfFrameCount++;
   }
   if (lowConfidenceCount > KEYPOINTS_PER_FRAME_V1 * 0.3) {
     lowConfidence = true;
   }
-  return { keypoints, lowConfidence };
+  return {
+    keypoints,
+    lowConfidence,
+    meanConfidence: confidenceTotal / KEYPOINTS_PER_FRAME_V1,
+    trackedKeypointCount,
+    outOfFrame: outOfFrameCount > KEYPOINTS_PER_FRAME_V1 * 0.2,
+  };
 }
 
 async function init(msg: InitMessage): Promise<void> {
@@ -107,13 +128,18 @@ function processFrame(msg: FrameMessage): void {
 
     let qualityFlags = 0;
     let keypoints: Float32Array;
+    let meanConfidence = 0;
+    let trackedKeypointCount = 0;
     if (landmarks.length === 0) {
       keypoints = new Float32Array(KEYPOINTS_PER_FRAME_V1 * 3);
       qualityFlags |= QUALITY_FLAG.OUT_OF_FRAME;
     } else {
       const built = buildKeypointsFromLandmarks(landmarks);
       keypoints = built.keypoints;
+      meanConfidence = built.meanConfidence;
+      trackedKeypointCount = built.trackedKeypointCount;
       if (built.lowConfidence) qualityFlags |= QUALITY_FLAG.LOW_CONFIDENCE;
+      if (built.outOfFrame) qualityFlags |= QUALITY_FLAG.OUT_OF_FRAME;
     }
 
     const frame: PoseFrame = {
@@ -132,6 +158,9 @@ function processFrame(msg: FrameMessage): void {
       framesEncoded,
       timestampMs: frame.timestampMs,
       landmarkCount: landmarks.length,
+      trackedKeypointCount,
+      meanConfidence,
+      qualityFlags,
     };
     postMessage(out, [buf]);
   } catch (err) {

@@ -33,6 +33,11 @@ export interface UserPostureThresholdSettings extends VersionedPostureThresholds
   userOverridden: boolean;
 }
 
+export interface ResolvedPostureThresholdSettings {
+  settings: UserPostureThresholdSettings;
+  warning: string | null;
+}
+
 export const POSTURE_FAULT_CATALOG_V1: readonly PostureFaultType[] = [
   "rounded_back_at_catch",
   "early_arm_bend",
@@ -90,22 +95,112 @@ export function migratePostureThresholdSettings(
   stored: unknown,
   defaults: VersionedPostureThresholds = postureThresholdsV1,
 ): UserPostureThresholdSettings {
+  return resolvePostureThresholdSettings(stored, defaults).settings;
+}
+
+export function resolvePostureThresholdSettings(
+  stored: unknown,
+  defaults: VersionedPostureThresholds = postureThresholdsV1,
+): ResolvedPostureThresholdSettings {
   if (!isUserPostureThresholdSettings(stored)) {
-    return defaultPostureThresholdSettings(defaults);
+    return {
+      settings: defaultPostureThresholdSettings(defaults),
+      warning:
+        stored === null || stored === undefined
+          ? null
+          : "Saved posture thresholds were malformed and defaults are active.",
+    };
   }
 
   if (stored.version !== defaults.version && !stored.userOverridden) {
-    return defaultPostureThresholdSettings(defaults);
+    return {
+      settings: defaultPostureThresholdSettings(defaults),
+      warning: null,
+    };
+  }
+
+  const validation = validatePostureThresholdBands(stored.thresholds);
+  if (!validation.valid) {
+    return {
+      settings: defaultPostureThresholdSettings(defaults),
+      warning:
+        "Saved posture thresholds were invalid and defaults are active.",
+    };
   }
 
   return {
-    version: stored.version,
-    thresholds: cloneThresholds(stored.thresholds),
-    userOverridden: stored.userOverridden,
+    settings: {
+      version: stored.version,
+      thresholds: cloneThresholds(stored.thresholds),
+      userOverridden: stored.userOverridden,
+    },
+    warning: null,
   };
 }
 
-function isUserPostureThresholdSettings(
+export function validatePostureThresholdBands(
+  thresholds: PostureThresholdBands,
+): { valid: true } | { valid: false; errors: string[] } {
+  const errors: string[] = [];
+
+  if (
+    thresholds.rounded_back_at_catch.criticalBelowDeg >=
+    thresholds.rounded_back_at_catch.warningBelowDeg
+  ) {
+    errors.push("Rounded-back critical angle must be below warning angle.");
+  }
+  if (
+    thresholds.early_arm_bend.infoBeforeLegsCompleteFrames >
+    thresholds.early_arm_bend.warningBeforeLegsCompleteFrames
+  ) {
+    errors.push("Early-arm-bend info frame count must be at or below warning.");
+  }
+  if (
+    thresholds.excessive_layback.infoAboveDeg >
+    thresholds.excessive_layback.warningAboveDeg
+  ) {
+    errors.push("Excessive-layback info angle must be at or below warning.");
+  }
+  if (
+    thresholds.slow_recovery_ratio.warningAboveRatio >=
+    thresholds.slow_recovery_ratio.criticalAboveRatio
+  ) {
+    errors.push("Slow-recovery warning ratio must be below critical ratio.");
+  }
+
+  for (const [key, value] of Object.entries(flattenThresholds(thresholds))) {
+    if (!Number.isFinite(value) || value < 0) {
+      errors.push(`${key} must be a non-negative number.`);
+    }
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+}
+
+export function thresholdBandsEqual(
+  a: PostureThresholdBands,
+  b: PostureThresholdBands,
+): boolean {
+  const flatA = flattenThresholds(a);
+  const flatB = flattenThresholds(b);
+  return Object.keys(flatA).every((key) => flatA[key] === flatB[key]);
+}
+
+export function cloneThresholds(
+  thresholds: PostureThresholdBands,
+): PostureThresholdBands {
+  return {
+    rounded_back_at_catch: { ...thresholds.rounded_back_at_catch },
+    early_arm_bend: { ...thresholds.early_arm_bend },
+    back_opens_before_legs_drive: {
+      ...thresholds.back_opens_before_legs_drive,
+    },
+    excessive_layback: { ...thresholds.excessive_layback },
+    slow_recovery_ratio: { ...thresholds.slow_recovery_ratio },
+  };
+}
+
+export function isUserPostureThresholdSettings(
   value: unknown,
 ): value is UserPostureThresholdSettings {
   if (!value || typeof value !== "object") return false;
@@ -113,7 +208,8 @@ function isUserPostureThresholdSettings(
   return (
     typeof candidate.version === "string" &&
     typeof candidate.userOverridden === "boolean" &&
-    isPostureThresholdBands(candidate.thresholds)
+    isPostureThresholdBands(candidate.thresholds) &&
+    validatePostureThresholdBands(candidate.thresholds).valid
   );
 }
 
@@ -141,14 +237,27 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function cloneThresholds(thresholds: PostureThresholdBands): PostureThresholdBands {
+function flattenThresholds(
+  thresholds: PostureThresholdBands,
+): Record<string, number> {
   return {
-    rounded_back_at_catch: { ...thresholds.rounded_back_at_catch },
-    early_arm_bend: { ...thresholds.early_arm_bend },
-    back_opens_before_legs_drive: {
-      ...thresholds.back_opens_before_legs_drive,
-    },
-    excessive_layback: { ...thresholds.excessive_layback },
-    slow_recovery_ratio: { ...thresholds.slow_recovery_ratio },
+    "rounded_back_at_catch.warningBelowDeg":
+      thresholds.rounded_back_at_catch.warningBelowDeg,
+    "rounded_back_at_catch.criticalBelowDeg":
+      thresholds.rounded_back_at_catch.criticalBelowDeg,
+    "early_arm_bend.infoBeforeLegsCompleteFrames":
+      thresholds.early_arm_bend.infoBeforeLegsCompleteFrames,
+    "early_arm_bend.warningBeforeLegsCompleteFrames":
+      thresholds.early_arm_bend.warningBeforeLegsCompleteFrames,
+    "back_opens_before_legs_drive.warningTorsoOpensBeforeLegsFrames":
+      thresholds.back_opens_before_legs_drive
+        .warningTorsoOpensBeforeLegsFrames,
+    "excessive_layback.infoAboveDeg": thresholds.excessive_layback.infoAboveDeg,
+    "excessive_layback.warningAboveDeg":
+      thresholds.excessive_layback.warningAboveDeg,
+    "slow_recovery_ratio.warningAboveRatio":
+      thresholds.slow_recovery_ratio.warningAboveRatio,
+    "slow_recovery_ratio.criticalAboveRatio":
+      thresholds.slow_recovery_ratio.criticalAboveRatio,
   };
 }

@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 const Body = z.object({
   durationSec: z.number().nonnegative().max(60 * 60 * 8),
   qualityScore: z.number().min(0).max(1).optional(),
+  qualityFlags: z.array(z.string().min(1).max(80)).max(20).optional(),
 });
 
 export async function POST(
@@ -74,6 +75,7 @@ export async function POST(
       status: "ready",
       durationSec: body.durationSec,
       qualityScore: body.qualityScore ?? null,
+      qualityFlags: body.qualityFlags ?? [],
     },
   });
 

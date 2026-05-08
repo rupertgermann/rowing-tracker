@@ -10,6 +10,7 @@ import {
   StrokePhaseSegmenter,
   migratePostureThresholdSettings,
   postureThresholdsV1,
+  resolvePostureThresholdSettings,
   type PoseFrameStream,
   type PostureFaultType,
 } from "../src/lib/mocap/analysis";
@@ -173,6 +174,43 @@ test("threshold migration updates defaults but preserves user overrides", () => 
     overridden.thresholds.rounded_back_at_catch.warningBelowDeg,
     10,
   );
+});
+
+test("relaxed posture thresholds emit strictly fewer fixture faults", () => {
+  const fixture = loadFixture("rounded-back-critical.json");
+  const stroke = StrokePhaseSegmenter(fixture.stream)[0];
+  const metrics = PostureMetricsCalculator(fixture.stream, stroke);
+  const defaultFaults = PostureFaultDetector(metrics);
+  const relaxedFaults = PostureFaultDetector(metrics, {
+    ...postureThresholdsV1.thresholds,
+    rounded_back_at_catch: {
+      warningBelowDeg: 0,
+      criticalBelowDeg: 0,
+    },
+  });
+
+  assert.ok(defaultFaults.length > relaxedFaults.length);
+});
+
+test("malformed posture thresholds fall back to defaults with warning", () => {
+  const resolved = resolvePostureThresholdSettings({
+    version: "V1",
+    userOverridden: true,
+    thresholds: {
+      ...postureThresholdsV1.thresholds,
+      slow_recovery_ratio: {
+        warningAboveRatio: "fast",
+        criticalAboveRatio: 3.5,
+      },
+    },
+  });
+
+  assert.equal(resolved.settings.userOverridden, false);
+  assert.equal(
+    resolved.settings.thresholds.slow_recovery_ratio.warningAboveRatio,
+    postureThresholdsV1.thresholds.slow_recovery_ratio.warningAboveRatio,
+  );
+  assert.match(resolved.warning ?? "", /malformed|invalid/);
 });
 
 test("analysis modules remain pure TypeScript with no I/O imports", () => {

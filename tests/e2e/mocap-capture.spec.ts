@@ -33,6 +33,8 @@ test("capture page loads without prompting for camera", async ({ page }) => {
   await page.goto("/mocap");
   await expect(page.getByText("Motion capture session")).toBeVisible();
   await expect(page.getByTestId("mocap-start")).toBeVisible();
+  await expect(page.getByTestId("mocap-start")).toBeDisabled();
+  await expect(page.getByTestId("mocap-start-calibration")).toBeVisible();
   await expect(page.getByTestId("mocap-recording-indicator")).toHaveCount(0);
   expect(mediaRequested).toBe(false);
 });

@@ -26,12 +26,20 @@ export type PoseSourceStatus =
   | "error";
 
 export interface PoseSourceOptions {
-  sessionId: string;
+  sessionId?: string;
   videoEl: HTMLVideoElement;
+  uploadPoseStream?: boolean;
   flushBytes?: number;
   flushIntervalMs?: number;
   onStatus?: (s: PoseSourceStatus, detail?: string) => void;
-  onFrame?: (info: { framesEncoded: number; landmarkCount: number }) => void;
+  onFrame?: (info: {
+    framesEncoded: number;
+    landmarkCount: number;
+    trackedKeypointCount: number;
+    meanConfidence: number;
+    qualityFlags: number;
+    poseFrameBase64: string;
+  }) => void;
   onError?: (err: Error) => void;
 }
 
@@ -47,10 +55,15 @@ export class BrowserPoseSource {
   private status: PoseSourceStatus = "idle";
   private readonly flushBytes: number;
   private readonly flushIntervalMs: number;
+  private readonly uploadPoseStream: boolean;
 
   constructor(private readonly opts: PoseSourceOptions) {
     this.flushBytes = opts.flushBytes ?? BYTES_PER_FRAME_V1 * 12;
     this.flushIntervalMs = opts.flushIntervalMs ?? 500;
+    this.uploadPoseStream = opts.uploadPoseStream ?? true;
+    if (this.uploadPoseStream && !opts.sessionId) {
+      throw new Error("sessionId is required when pose stream upload is enabled");
+    }
   }
 
   get framesCaptured(): number {
@@ -158,13 +171,20 @@ export class BrowserPoseSource {
     const msg = event.data;
     if (msg?.type === "frame") {
       this.framesEncoded = msg.framesEncoded;
-      this.pendingChunks.push(new Uint8Array(msg.bytes));
-      this.pendingBytes += (msg.bytes as ArrayBuffer).byteLength;
+      const bytes = new Uint8Array(msg.bytes);
+      if (this.uploadPoseStream) {
+        this.pendingChunks.push(bytes);
+        this.pendingBytes += bytes.byteLength;
+      }
       this.opts.onFrame?.({
         framesEncoded: msg.framesEncoded,
         landmarkCount: msg.landmarkCount,
+        trackedKeypointCount: msg.trackedKeypointCount,
+        meanConfidence: msg.meanConfidence,
+        qualityFlags: msg.qualityFlags,
+        poseFrameBase64: bytesToBase64(bytes),
       });
-      if (this.pendingBytes >= this.flushBytes) {
+      if (this.uploadPoseStream && this.pendingBytes >= this.flushBytes) {
         this.flush(false);
       }
     } else if (msg?.type === "error") {
@@ -200,6 +220,9 @@ export class BrowserPoseSource {
   }
 
   private async upload(buf: Uint8Array): Promise<void> {
+    if (!this.opts.sessionId) {
+      throw new Error("Cannot upload pose stream without a session id");
+    }
     const res = await fetch(
       `/api/mocap/sessions/${this.opts.sessionId}/pose-stream`,
       {
@@ -219,4 +242,12 @@ export class BrowserPoseSource {
     this.status = s;
     this.opts.onStatus?.(s, detail);
   }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }

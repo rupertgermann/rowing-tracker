@@ -191,8 +191,11 @@ model MocapSession {
   captureModelVersion String
   capturePerspective  String
   captureFps          Float
+  calibrationCatchFrame Json?
+  calibrationFinishFrame Json?
   durationSec         Float    @default(0)
   qualityScore        Float?
+  qualityFlags        String[] @default([])
   status              String   @default("capturing")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -471,6 +474,7 @@ model UserSettings {
   customPromptsAi         Json?
   userProfileContext      String?  @db.Text
   userProfileRawInput     String?  @db.Text
+  postureThresholds       Json?
   dashboardSettings       Json?
   sessionsViewSettings    Json?
   sessionAnalysisSettings Json?
