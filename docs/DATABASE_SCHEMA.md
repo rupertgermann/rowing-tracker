@@ -1,8 +1,10 @@
 # Database Schema (Condensed, current)
 
-- **Stack**: PostgreSQL + Prisma + NextAuth.
-- **Hosting**: Dev via Docker Postgres; Prod via Supabase/Vercel Postgres/Railway.
+- **Stack**: PostgreSQL + Prisma v7 + NextAuth.js v4.
+- **Hosting**: Dev via Docker Postgres; Prod via Supabase (pooler + direct URL) or any managed Postgres.
 - **Migrations**: `npx prisma generate` → `npx prisma migrate dev` (dev) / `npx prisma migrate deploy` (prod).
+- **Adapter**: `@prisma/adapter-pg` over `pg` `Pool` (configured in `prisma.config.ts`).
+- **Source of truth**: `prisma/schema.prisma`. This document is a condensed, annotated mirror.
 
 ## Core Models (Prisma)
 ```prisma
@@ -27,24 +29,28 @@ model User {
   emailVerified DateTime?
   name          String?
   image         String?
-  passwordHash  String?   // For email/password auth
+  passwordHash  String?   // For email/password auth (bcrypt)
+  role          String    @default("user") // 'user' | 'admin'
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts      Account[]
-  sessions      AuthSession[]
-  rowingSessions RowingSession[]
-  personalRecords PersonalRecord[]
-  earnedAwards  EarnedAward[]
-  aiAwards      AIAwardSuggestion[]
+  accounts              Account[]
+  sessions              AuthSession[]
+  rowingSessions        RowingSession[]
+  mocapSessions         MocapSession[]
+  personalRecords       PersonalRecord[]
+  earnedAwards          EarnedAward[]
+  aiAwards              AIAwardSuggestion[]
   generatedAchievements GeneratedAchievement[]
-  trainingPlans TrainingPlan[]
-  chatSessions  ChatSession[]
-  aiInsights    AIInsight[]
-  memoryDocuments MemoryDocument[]
-  settings      UserSettings?
-  
+  trainingPlans         TrainingPlan[]
+  chatSessions          ChatSession[]
+  aiInsights            AIInsight[]
+  memoryDocuments       MemoryDocument[]
+  settings              UserSettings?
+  apiKeys               UserApiKey[]
+  chartExplanations     ChartExplanation[]
+
   @@index([email])
 }
 
@@ -86,6 +92,17 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
 // ============================================================================
 // ROWING SESSIONS
 // ============================================================================
@@ -109,6 +126,7 @@ model RowingSession {
   avgStrokeLength Float    // meters
   avgStrokeRate   Float    // SPM
   maxStrokeRate   Float
+  consistencyScore Float?  // Pre-computed power-CV-based consistency (0–100)
   
   // Metadata
   createdAt       DateTime @default(now())
@@ -119,6 +137,7 @@ model RowingSession {
   // Relations
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   strokeData      StrokeData[]
+  mocapSession    MocapSession?
   personalRecords PersonalRecord[]
   trainingSessionLinks TrainingSessionLink[]
   
@@ -146,6 +165,7 @@ model StrokeData {
   strokeLength    Float?
   
   session         RowingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mocapMetrics    StrokePostureMetric[]
   
   @@index([sessionId])
   @@index([sessionId, strokeIndex])
@@ -173,6 +193,74 @@ model PersonalRecord {
 }
 
 // ============================================================================
+// MOCAP (motion-capture posture analysis — see docs/prd-mocap-posture.md)
+// ============================================================================
+
+model MocapSession {
+  id                     String   @id @default(cuid())
+  userId                 String
+  rowingSessionId        String?  @unique // Bidirectional, exclusive link to RowingSession
+  videoStoragePath       String   // Path to recorded video on backend (FS or Vercel Blob)
+  poseStreamPath         String   // Path to PoseFrameStream binary blob (see ADR-0001)
+  source                 String   // 'browser' | 'sidecar'
+  captureModelVersion    String   // e.g. 'mediapipe-pose-landmarker-lite@0.10.35'
+  capturePerspective     String   // 'side-left' | 'side-right' | 'sidecar-3d'
+  captureFps             Float
+  calibrationCatchFrame  Json?    // Per-session catch baseline (encoded pose frame)
+  calibrationFinishFrame Json?    // Per-session finish baseline (encoded pose frame)
+  durationSec            Float    @default(0)
+  qualityScore           Float?
+  qualityFlags           String[] @default([])
+  status                 String   @default("capturing") // capturing | analyzing | ready | linked
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rowingSession        RowingSession?        @relation(fields: [rowingSessionId], references: [id], onDelete: SetNull)
+  strokePostureMetrics StrokePostureMetric[]
+  postureFaults        PostureFault[]
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model StrokePostureMetric {
+  id                  String   @id @default(cuid())
+  mocapSessionId      String
+  strokeIndex         Int
+  phaseBoundariesJson Json     // catch / drive / finish / recovery boundaries
+  metricsJson         Json     // back angle, layback, sequencing offsets, etc.
+  segmentationSource  String   // 'pose-segmented' | 'csv-aligned'
+  strokeDataId        String?  // Joined to StrokeData when csv-aligned
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  mocapSession MocapSession @relation(fields: [mocapSessionId], references: [id], onDelete: Cascade)
+  strokeData   StrokeData?  @relation(fields: [strokeDataId], references: [id], onDelete: SetNull)
+
+  @@unique([mocapSessionId, strokeIndex, segmentationSource])
+  @@index([mocapSessionId])
+  @@index([strokeDataId])
+}
+
+model PostureFault {
+  id             String   @id @default(cuid())
+  mocapSessionId String
+  strokeIndex    Int
+  faultType      String   // see CONTEXT.md PostureFault catalog
+  severity       String   // 'info' | 'warning' | 'critical'
+  phase          String   // 'catch' | 'drive' | 'finish' | 'recovery'
+  evidenceJson   Json     // frame index + metric value + threshold
+  createdAt      DateTime @default(now())
+
+  mocapSession MocapSession @relation(fields: [mocapSessionId], references: [id], onDelete: Cascade)
+
+  @@index([mocapSessionId])
+  @@index([mocapSessionId, strokeIndex])
+  @@index([faultType, severity])
+}
+
+// ============================================================================
 // AWARDS & ACHIEVEMENTS
 // ============================================================================
 
@@ -190,45 +278,43 @@ model EarnedAward {
 }
 
 model AIAwardSuggestion {
-  id          String   @id @default(cuid())
-  userId      String
-  
-  title       String
-  description String
-  rationale   String   @db.Text
-  status      String   // 'suggested' | 'approved' | 'earned'
-  
+  id                 String    @id @default(cuid())
+  userId             String
+  title              String
+  description        String
+  rationale          String    @db.Text
+  status             String    // 'suggested' | 'approved' | 'earned'
+
   // Structured criteria for auto-evaluation
-  criteriaType       String?  // 'total_distance', 'single_session_power', etc.
+  criteriaType       String?   // 'total_distance', 'single_session_power', etc.
   criteriaValue      Float?
-  criteriaComparison String?  // 'gte', 'lte', 'eq'
-  
-  targetDate  DateTime?
-  suggestedAt DateTime @default(now())
-  approvedAt  DateTime?
-  earnedAt    DateTime?
-  model       String?  // AI model used
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  criteriaComparison String?   // 'gte' | 'lte' | 'eq'
+
+  targetDate         DateTime?
+  suggestedAt        DateTime  @default(now())
+  approvedAt         DateTime?
+  earnedAt           DateTime?
+  model              String?   // AI model used
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([userId, status])
 }
 
 model GeneratedAchievement {
-  id          String   @id @default(cuid())
-  userId      String
-  awardId     String   // Can be static or AI award ID
-  
-  story       String?  @db.Text
-  imageUrl    String?  // Path to stored image
-  hasImage    Boolean  @default(false)
-  
-  earnedAt    DateTime?
-  generatedAt DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id           String    @id @default(cuid())
+  userId       String
+  awardId      String    // Can be static or AI award ID
+  story        String?   @db.Text
+  imageUrl     String?   // Path to stored image
+  hasImage     Boolean   @default(false)
+  colorPalette String?   @default("classic") // Image color palette
+  earnedAt     DateTime?
+  generatedAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, awardId])
   @@index([userId])
 }
@@ -376,26 +462,30 @@ model ChatMessage {
 // ============================================================================
 
 model AIInsight {
-  id          String   @id @default(cuid())
-  userId      String
-  
-  type        String   // 'performance' | 'recommendation' | 'trend' | 'achievement' | 'warning'
-  title       String
-  description String   @db.Text
-  priority    String   // 'high' | 'medium' | 'low'
-  actionable  Boolean  @default(false)
-  confidence  Float?
-  evidence    String[] // Array of evidence strings
-  category    String?
-  
-  source      String   // 'cloud-ai' | 'local-analysis'
-  archived    Boolean  @default(false)
-  
-  dateGenerated DateTime @default(now())
+  id            String    @id @default(cuid())
+  userId        String
+
+  type          String    // 'performance' | 'recommendation' | 'trend' | 'achievement' | 'warning'
+  title         String
+  description   String    @db.Text
+  priority      String    // 'high' | 'medium' | 'low'
+  actionable    Boolean   @default(false)
+  confidence    Float?
+  evidence      String[]  // Evidence strings backing the insight
+  category      String?
+
+  source        String    // 'cloud-ai' | 'local-analysis'
+  archived      Boolean   @default(false)
+
+  dateGenerated DateTime  @default(now())
   archivedAt    DateTime?
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  // User feedback collected from /insights
+  feedback      String?   // 'helpful' | 'not_helpful' | 'action_taken'
+  feedbackAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([userId, archived])
   @@index([userId, dateGenerated])
@@ -406,39 +496,30 @@ model AIInsight {
 // ============================================================================
 
 model MemoryDocument {
-  id          String   @id @default(cuid())
-  userId      String
-  
-  name        String
-  type        String   // 'image' | 'pdf' | 'training_plan' | 'insight' | 'note'
-  source      String   // 'user' | 'system'
-  mimeType    String
-  size        Int      // bytes
-  
+  id            String   @id @default(cuid())
+  userId        String
+
+  name          String
+  type          String   // 'image' | 'pdf' | 'training_plan' | 'insight' | 'note'
+  source        String   // 'user' | 'system'
+  mimeType      String
+  size          Int      // bytes
+  filePath      String?  // FS path or Vercel Blob URL; nullable for system docs
+
   description   String?  @db.Text
   extractedText String?  @db.Text
   tags          String[]
-  
-  // For system documents
-  content     Json?
-  status      String?  // 'active' | 'archived' for training plans
-  
-  uploadedAt  DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blob        MemoryBlob?
-  
+
+  // For system documents (training plans, insights, etc.)
+  content       Json?
+  status        String?  // 'active' | 'archived' for training plans
+
+  uploadedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([userId, type])
-}
-
-model MemoryBlob {
-  id          String   @id @default(cuid())
-  documentId  String   @unique
-  
-  data        Bytes    // Binary data
-  
-  document    MemoryDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================================
@@ -446,71 +527,82 @@ model MemoryBlob {
 // ============================================================================
 
 model UserSettings {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+
   // User Preferences
-  theme           String   @default("system")
-  units           String   @default("metric")
-  dateFormat      String   @default("MM/DD/YYYY")
-  timeFormat      String   @default("24h")
-  language        String   @default("en")
-  timeZone        String?
-  defaultChartType String  @default("line")
-  animationsEnabled Boolean @default(true)
-  showPromptSuggestions Boolean @default(true)
-  customPrompts   String[]
-  
+  theme                   String   @default("system")
+  units                   String   @default("metric")
+  dateFormat              String   @default("MM/DD/YYYY")
+  timeFormat              String   @default("24h")
+  language                String   @default("en")
+  timeZone                String?  @default("UTC")
+  defaultChartType        String   @default("line")
+  animationsEnabled       Boolean  @default(true)
+  showPromptSuggestions   Boolean  @default(true)
+  customPrompts           String[]
+
   // Training Settings
-  trainingZones   Json?    // Zone configuration
-  preferredMetrics String[]
-  weeklyGoalType  String   @default("sessions")
-  weeklyGoalTarget Int     @default(3)
-  restDayAlerts   Boolean  @default(true)
-  adaptationEnabled Boolean @default(true)
-  
+  trainingZones           Json?
+  preferredMetrics        String[]
+  weeklyGoalType          String   @default("sessions")
+  weeklyGoalTarget        Int      @default(3)
+  restDayAlerts           Boolean  @default(true)
+  adaptationEnabled       Boolean  @default(true)
+
   // Notification Settings
-  sessionReminders Boolean @default(false)
-  weeklyProgress   Boolean @default(true)
-  achievementAlerts Boolean @default(true)
-  planReminders    Boolean @default(true)
-  adherenceAlerts  Boolean @default(true)
-  
-  // AI Settings (sensitive - API key stored separately)
-  cloudAIEnabled  Boolean @default(false)
-  maxTokens       Int     @default(1500)
-  aiConfig        Json?   // Per-use-case config (chat, insights, etc.)
-  customPrompts_ai Json?  // System prompts, etc.
-  
+  sessionReminders        Boolean  @default(false)
+  weeklyProgress          Boolean  @default(true)
+  achievementAlerts       Boolean  @default(true)
+  planReminders           Boolean  @default(true)
+  adherenceAlerts         Boolean  @default(true)
+
+  // AI Settings (API keys stored separately in UserApiKey)
+  cloudAIEnabled          Boolean  @default(false)
+  mocapDetailedAIShare    Boolean  @default(false) // ADR-0004: opt-in to share per-stroke metrics with cloud AI
+  maxTokens               Int      @default(1500)
+  aiConfig                Json?    // Per-use-case AI config (chat, insights, plans, ...)
+  customPromptsAi         Json?    // Base / chat / plan / insights prompt overrides
+
   // Personal context for AI
-  userProfileContext  String? @db.Text
-  userProfileRawInput String? @db.Text
-  
-  // Dashboard/View Settings
-  dashboardSettings Json?
-  sessionsViewSettings Json?
+  userProfileContext      String?  @db.Text
+  userProfileRawInput     String?  @db.Text
+
+  // Mocap (posture analysis)
+  postureThresholds       Json?    // Per-fault threshold overrides; respects userOverridden flag
+  mocapPreferences        Json?    // Capture source default, live-cue verbosity, audio on/off
+
+  // Dashboard / View Settings
+  dashboardSettings       Json?
+  sessionsViewSettings    Json?
   sessionAnalysisSettings Json?
-  chartSettings Json?
-  analyticsSettings Json?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chartSettings           Json?
+  analyticsSettings       Json?
+
+  // Cache-busting revisions bumped by mutations to invalidate client caches
+  sessionsRevision        Int      @default(0)
+  insightsRevision        Int      @default(0)
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Separate table for sensitive API keys (encrypted at rest)
+// Separate table for sensitive API keys (AES-256-GCM encrypted at rest)
 model UserApiKey {
-  id          String   @id @default(cuid())
-  userId      String
-  
-  provider    String   // 'openai', etc.
-  keyHash     String   // Hashed for verification
-  encryptedKey String  @db.Text // Encrypted API key
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id           String   @id @default(cuid())
+  userId       String
+
+  provider     String   // 'openai', etc.
+  keyHash      String   // Hashed for verification
+  encryptedKey String   @db.Text // Encrypted API key
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, provider])
   @@index([userId])
 }
@@ -520,16 +612,18 @@ model UserApiKey {
 // ============================================================================
 
 model ChartExplanation {
-  id            String   @id @default(cuid())
-  userId        String
-  chartId       String   // Unique identifier for the chart
-  
-  summary       String   @db.Text
-  fullResponse  String   @db.Text
-  chartTitle    String
-  
-  generatedAt   DateTime @default(now())
-  
+  id           String   @id @default(cuid())
+  userId       String
+  chartId      String   // Unique identifier for the chart (may include time-range suffix)
+
+  summary      String   @db.Text
+  fullResponse String   @db.Text
+  chartTitle   String
+
+  generatedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, chartId])
   @@index([userId])
 }
@@ -538,7 +632,14 @@ model ChartExplanation {
 ---
 
 ## Notes & Operations
-- Indexes are defined via Prisma; main filters are on `userId`, timestamps, status/archived.
-- Security: all queries scoped by `userId`; API keys encrypted (UserApiKey, AES-256-GCM, hashed); NextAuth enforced on routes.
-- Backups: enable managed backups/PITR; allow user export if needed.
+
+- **Source of truth**: `prisma/schema.prisma`. If this document and the schema disagree, the schema wins.
+- **Indexes**: defined via Prisma; primary filters are `userId`, timestamps, `status` / `archived`, and mocap session id.
+- **Security**: all queries are scoped by `userId`; API keys are AES-256-GCM encrypted (`UserApiKey`); NextAuth is enforced on protected routes; admin endpoints additionally checked through `src/lib/adminAuth.ts`.
+- **Mocap storage**: video and `PoseFrameStream` blobs live on the storage backend (`storage/` directory or Vercel Blob), never in Postgres; see ADR-0001 and ADR-0003.
+- **Cache invalidation**: mutations bump `UserSettings.sessionsRevision` / `insightsRevision` so client caches discard stale data without a full refetch protocol.
+- **Backups**: enable managed backups / PITR on the Postgres host; user-initiated export is available via `/api/user/export`.
+- **One-off scripts**:
+  - `npm run admin:promote -- <email>` — set `User.role = 'admin'`.
+  - `npx tsx scripts/backfill-consistency.ts` — backfill `RowingSession.consistencyScore` from existing `StrokeData` and bump `sessionsRevision` for affected users.
 
