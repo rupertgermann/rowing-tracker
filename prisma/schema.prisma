@@ -31,6 +31,7 @@ model User {
   accounts              Account[]
   sessions              AuthSession[]
   rowingSessions        RowingSession[]
+  mocapSessions         MocapSession[]
   personalRecords       PersonalRecord[]
   earnedAwards          EarnedAward[]
   aiAwards              AIAwardSuggestion[]
@@ -101,30 +102,31 @@ model PasswordResetToken {
 // ============================================================================
 
 model RowingSession {
-  id        String   @id @default(cuid())
-  userId    String
-  timestamp DateTime
-  distance  Int
-  duration  Int
-  energy    Int
-  strokeCount    Int
-  avgPower       Float
-  maxPower       Float
-  wattPerKg      Float
-  avgSplit       Float
-  minSplit       Float
-  avgWork        Float
-  avgStrokeLength Float
-  avgStrokeRate  Float
-  maxStrokeRate  Float
-  consistencyScore Float?  // Pre-computed consistency score (0-100)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  importedAt     DateTime @default(now())
-  sourceFile     String?
+  id               String   @id @default(cuid())
+  userId           String
+  timestamp        DateTime
+  distance         Int
+  duration         Int
+  energy           Int
+  strokeCount      Int
+  avgPower         Float
+  maxPower         Float
+  wattPerKg        Float
+  avgSplit         Float
+  minSplit         Float
+  avgWork          Float
+  avgStrokeLength  Float
+  avgStrokeRate    Float
+  maxStrokeRate    Float
+  consistencyScore Float? // Pre-computed consistency score (0-100)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  importedAt       DateTime @default(now())
+  sourceFile       String?
 
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   strokeData           StrokeData[]
+  mocapSession         MocapSession?
   personalRecords      PersonalRecord[]
   trainingSessionLinks TrainingSessionLink[]
 
@@ -135,7 +137,7 @@ model RowingSession {
 }
 
 model StrokeData {
-  id           String  @id @default(cuid())
+  id           String @id @default(cuid())
   sessionId    String
   strokeIndex  Int
   time         Float
@@ -173,6 +175,33 @@ model PersonalRecord {
 
   @@unique([userId, distance])
   @@index([userId])
+}
+
+// ============================================================================
+// MOCAP (motion-capture posture analysis — see docs/prd-mocap-posture.md)
+// ============================================================================
+
+model MocapSession {
+  id                  String   @id @default(cuid())
+  userId              String
+  rowingSessionId     String?  @unique
+  videoStoragePath    String
+  poseStreamPath      String
+  source              String
+  captureModelVersion String
+  capturePerspective  String
+  captureFps          Float
+  durationSec         Float    @default(0)
+  qualityScore        Float?
+  status              String   @default("capturing")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rowingSession RowingSession? @relation(fields: [rowingSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userId, createdAt])
 }
 
 // ============================================================================
@@ -215,15 +244,15 @@ model AIAwardSuggestion {
 }
 
 model GeneratedAchievement {
-  id          String    @id @default(cuid())
-  userId      String
-  awardId     String
-  story       String?   @db.Text
-  imageUrl    String?
-  hasImage    Boolean   @default(false)
+  id           String    @id @default(cuid())
+  userId       String
+  awardId      String
+  story        String?   @db.Text
+  imageUrl     String?
+  hasImage     Boolean   @default(false)
   colorPalette String?   @default("classic")
-  earnedAt    DateTime?
-  generatedAt DateTime  @default(now())
+  earnedAt     DateTime?
+  generatedAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -372,7 +401,7 @@ model AIInsight {
   archived      Boolean   @default(false)
   dateGenerated DateTime  @default(now())
   archivedAt    DateTime?
-  feedback      String?   // 'helpful' | 'not_helpful' | 'action_taken'
+  feedback      String? // 'helpful' | 'not_helpful' | 'action_taken'
   feedbackAt    DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -402,7 +431,7 @@ model MemoryDocument {
   status        String?
   uploadedAt    DateTime @default(now())
 
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, type])
@@ -413,44 +442,44 @@ model MemoryDocument {
 // ============================================================================
 
 model UserSettings {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  theme                 String   @default("system")
-  units                 String   @default("metric")
-  dateFormat            String   @default("MM/DD/YYYY")
-  timeFormat            String   @default("24h")
-  language              String   @default("en")
-  timeZone              String?  @default("UTC")
-  defaultChartType      String   @default("line")
-  animationsEnabled     Boolean  @default(true)
-  showPromptSuggestions Boolean  @default(true)
-  customPrompts         String[]
-  trainingZones         Json?
-  preferredMetrics      String[]
-  weeklyGoalType        String   @default("sessions")
-  weeklyGoalTarget      Int      @default(3)
-  restDayAlerts         Boolean  @default(true)
-  adaptationEnabled     Boolean  @default(true)
-  sessionReminders      Boolean  @default(false)
-  weeklyProgress        Boolean  @default(true)
-  achievementAlerts     Boolean  @default(true)
-  planReminders         Boolean  @default(true)
-  adherenceAlerts       Boolean  @default(true)
-  cloudAIEnabled        Boolean  @default(false)
-  maxTokens             Int      @default(1500)
-  aiConfig              Json?
-  customPromptsAi       Json?
-  userProfileContext    String?  @db.Text
-  userProfileRawInput   String?  @db.Text
-  dashboardSettings     Json?
-  sessionsViewSettings  Json?
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  theme                   String   @default("system")
+  units                   String   @default("metric")
+  dateFormat              String   @default("MM/DD/YYYY")
+  timeFormat              String   @default("24h")
+  language                String   @default("en")
+  timeZone                String?  @default("UTC")
+  defaultChartType        String   @default("line")
+  animationsEnabled       Boolean  @default(true)
+  showPromptSuggestions   Boolean  @default(true)
+  customPrompts           String[]
+  trainingZones           Json?
+  preferredMetrics        String[]
+  weeklyGoalType          String   @default("sessions")
+  weeklyGoalTarget        Int      @default(3)
+  restDayAlerts           Boolean  @default(true)
+  adaptationEnabled       Boolean  @default(true)
+  sessionReminders        Boolean  @default(false)
+  weeklyProgress          Boolean  @default(true)
+  achievementAlerts       Boolean  @default(true)
+  planReminders           Boolean  @default(true)
+  adherenceAlerts         Boolean  @default(true)
+  cloudAIEnabled          Boolean  @default(false)
+  maxTokens               Int      @default(1500)
+  aiConfig                Json?
+  customPromptsAi         Json?
+  userProfileContext      String?  @db.Text
+  userProfileRawInput     String?  @db.Text
+  dashboardSettings       Json?
+  sessionsViewSettings    Json?
   sessionAnalysisSettings Json?
-  chartSettings         Json?
-  analyticsSettings     Json?
-  sessionsRevision      Int      @default(0)
-  insightsRevision      Int      @default(0)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  chartSettings           Json?
+  analyticsSettings       Json?
+  sessionsRevision        Int      @default(0)
+  insightsRevision        Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
