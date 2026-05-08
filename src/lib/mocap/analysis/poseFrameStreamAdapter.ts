@@ -69,7 +69,7 @@ function adaptFrame(bytes: Uint8Array, offset: number): PoseAnalysisFrame {
   };
 }
 
-function keypointTripletsToPosePoints(keypoints: Float32Array): PosePoint[] {
+export function keypointTripletsToPosePoints(keypoints: Float32Array): PosePoint[] {
   const points: PosePoint[] = [];
   for (let i = 0; i < keypoints.length; i += 3) {
     points.push({

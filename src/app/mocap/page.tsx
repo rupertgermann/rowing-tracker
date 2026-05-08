@@ -13,13 +13,28 @@ import {
   BrowserPoseSource,
   type PoseSourceStatus,
 } from "@/lib/mocap/browserPoseSource";
-import { QUALITY_FLAG } from "@/lib/mocap/poseFrameStream";
+import {
+  BYTES_PER_FRAME_V1,
+  QUALITY_FLAG,
+  decodeFrame,
+} from "@/lib/mocap/poseFrameStream";
 import { VideoUploader } from "@/lib/mocap/videoUploader";
 import {
   getCoachingCues,
   type CoachingCue,
 } from "@/lib/mocap/coaching/coachingAdvisor";
-import type { PostureFault } from "@/lib/mocap/analysis/types";
+import { LiveCoachingEngine } from "@/lib/mocap/coaching/liveCoachingEngine";
+import {
+  cancelSpokenCues,
+  speakCue,
+} from "@/lib/mocap/coaching/cueAudio";
+import { keypointTripletsToPosePoints } from "@/lib/mocap/analysis/poseFrameStreamAdapter";
+import type {
+  Calibration,
+  PoseAnalysisFrame,
+  PostureFault,
+} from "@/lib/mocap/analysis/types";
+import { settings } from "@/lib/settings";
 
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
@@ -109,6 +124,9 @@ export default function MocapCapturePage() {
   const startedAtRef = useRef<number>(0);
   const degradedSinceRef = useRef<number | null>(null);
   const latestPoseFrameRef = useRef<PoseQuality>(EMPTY_QUALITY);
+  const engineRef = useRef<LiveCoachingEngine | null>(null);
+  const cueDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioEnabledRef = useRef(false);
 
   const [state, setState] = useState<CaptureState>({ kind: "idle" });
   const [calibration, setCalibration] = useState<CalibrationState>({
@@ -127,6 +145,49 @@ export default function MocapCapturePage() {
   const [activeCue, setActiveCue] = useState<CoachingCue | null>(null);
   const [sessionFaults, setSessionFaults] = useState<PostureFault[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [verbosity, setVerbosity] = useState<"quiet" | "verbose">("quiet");
+
+  // Hydrate live-cue prefs from persisted settings on mount.
+  useEffect(() => {
+    const prefs = settings.getMocapSettings().mocapPreferences;
+    setAudioEnabled(prefs.audioEnabled);
+    setVerbosity(prefs.verbosity);
+    audioEnabledRef.current = prefs.audioEnabled;
+  }, []);
+
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+    if (!audioEnabled) cancelSpokenCues();
+  }, [audioEnabled]);
+
+  const updateAudioEnabled = useCallback((next: boolean) => {
+    setAudioEnabled(next);
+    const current = settings.getMocapSettings().mocapPreferences;
+    settings.updateMocapSettings({
+      mocapPreferences: { ...current, audioEnabled: next },
+    });
+  }, []);
+
+  const updateVerbosity = useCallback((next: "quiet" | "verbose") => {
+    setVerbosity(next);
+    const current = settings.getMocapSettings().mocapPreferences;
+    settings.updateMocapSettings({
+      mocapPreferences: { ...current, verbosity: next },
+    });
+  }, []);
+
+  const clearCueDismissTimer = useCallback(() => {
+    if (cueDismissTimerRef.current) {
+      clearTimeout(cueDismissTimerRef.current);
+      cueDismissTimerRef.current = null;
+    }
+  }, []);
+
+  const dismissCue = useCallback(() => {
+    clearCueDismissTimer();
+    cancelSpokenCues();
+    setActiveCue(null);
+  }, [clearCueDismissTimer]);
 
   useEffect(() => {
     if (state.kind !== "capturing") return;
@@ -153,6 +214,12 @@ export default function MocapCapturePage() {
       latestPoseFrameRef.current = nextQuality;
       setFramesEncoded(info.framesEncoded);
       setQuality(nextQuality);
+
+      // Feed the live coaching engine when active.
+      if (engineRef.current) {
+        const frame = decodeBase64PoseFrame(info.poseFrameBase64);
+        if (frame) engineRef.current.pushFrame(frame);
+      }
 
       if (!monitorDegradedFraming) return;
 
@@ -182,6 +249,9 @@ export default function MocapCapturePage() {
     sourceRef.current = null;
     recorderRef.current = null;
     uploaderRef.current = null;
+    engineRef.current = null;
+    clearCueDismissTimer();
+    cancelSpokenCues();
     if (streamRef.current) {
       for (const track of streamRef.current.getTracks()) track.stop();
       streamRef.current = null;
@@ -189,7 +259,7 @@ export default function MocapCapturePage() {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-  }, []);
+  }, [clearCueDismissTimer]);
 
   const handleError = useCallback(
     async (err: unknown, sessionId?: string) => {
@@ -332,6 +402,39 @@ export default function MocapCapturePage() {
       await calibrationSourceRef.current?.stop();
       calibrationSourceRef.current = null;
 
+      // Spin up the live coaching engine (skipped when in record-only mode).
+      const calibrationFramesForEngine = buildEngineCalibration(
+        perspective,
+        calibrationFrames.catchFrame,
+        calibrationFrames.finishFrame,
+      );
+      const mocapPrefs = settings.getMocapSettings();
+      if (!recordOnly) {
+        engineRef.current = new LiveCoachingEngine({
+          fps: CAPTURE_FPS,
+          capturePerspective: perspective,
+          calibration: calibrationFramesForEngine,
+          thresholds: mocapPrefs.postureThresholds.thresholds,
+          minSeverity:
+            mocapPrefs.mocapPreferences.verbosity === "verbose"
+              ? "info"
+              : "warning",
+          onCue: (cue) => {
+            clearCueDismissTimer();
+            setActiveCue(cue);
+            cueDismissTimerRef.current = setTimeout(() => {
+              setActiveCue(null);
+              cueDismissTimerRef.current = null;
+            }, 4000);
+            if (audioEnabledRef.current) {
+              speakCue(cue.audioHint);
+            }
+          },
+        });
+      } else {
+        engineRef.current = null;
+      }
+
       const createRes = await fetch("/api/mocap/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -398,7 +501,14 @@ export default function MocapCapturePage() {
     } catch (err) {
       await handleError(err, sessionId);
     }
-  }, [calibration, handleError, handlePoseFrame, perspective]);
+  }, [
+    calibration,
+    handleError,
+    handlePoseFrame,
+    perspective,
+    recordOnly,
+    clearCueDismissTimer,
+  ]);
 
   const stop = useCallback(async () => {
     if (state.kind !== "capturing") return;
@@ -413,6 +523,15 @@ export default function MocapCapturePage() {
         });
       }
       await sourceRef.current?.stop();
+      // Drain any pending strokes from the live engine before tearing it down.
+      try {
+        engineRef.current?.flush();
+      } catch {
+        // non-fatal
+      }
+      engineRef.current = null;
+      clearCueDismissTimer();
+      cancelSpokenCues();
       await uploaderRef.current?.drain();
 
       const durationSec = (Date.now() - startedAtRef.current) / 1000;
@@ -462,7 +581,14 @@ export default function MocapCapturePage() {
     } catch (err) {
       await handleError(err, sessionId);
     }
-  }, [state, handleError, sessionQualityFlags, teardown]);
+  }, [
+    state,
+    handleError,
+    sessionQualityFlags,
+    teardown,
+    recordOnly,
+    clearCueDismissTimer,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -568,10 +694,24 @@ export default function MocapCapturePage() {
               <input
                 type="checkbox"
                 checked={audioEnabled}
-                onChange={(e) => setAudioEnabled(e.target.checked)}
+                onChange={(e) => updateAudioEnabled(e.target.checked)}
                 data-testid="mocap-audio-toggle"
               />
               Audio cues
+            </label>
+            <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-verbosity-label">
+              Cues:
+              <select
+                className="rounded border px-2 py-1 text-sm bg-transparent"
+                value={verbosity}
+                onChange={(e) =>
+                  updateVerbosity(e.target.value as "quiet" | "verbose")
+                }
+                data-testid="mocap-verbosity"
+              >
+                <option value="quiet">Quiet</option>
+                <option value="verbose">Verbose</option>
+              </select>
             </label>
             {calibration.kind === "idle" &&
             (state.kind === "idle" || state.kind === "done") ? (
@@ -765,7 +905,7 @@ export default function MocapCapturePage() {
               <button
                 type="button"
                 className="text-xs underline opacity-60"
-                onClick={() => setActiveCue(null)}
+                onClick={dismissCue}
               >
                 Dismiss
               </button>
@@ -902,6 +1042,45 @@ function SessionCoachingSummary({ faults }: { faults: PostureFault[] }) {
       })}
     </div>
   );
+}
+
+function decodeBase64PoseFrame(
+  base64: string,
+): PoseAnalysisFrame | null {
+  if (!base64) return null;
+  try {
+    const binary = atob(base64);
+    if (binary.length < BYTES_PER_FRAME_V1) return null;
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const decoded = decodeFrame(bytes, 0);
+    return {
+      timestampMs: decoded.timestampMs,
+      keypoints: keypointTripletsToPosePoints(decoded.keypoints),
+      qualityFlags: decoded.qualityFlags,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildEngineCalibration(
+  capturePerspective: "side-left" | "side-right",
+  catchFrameBase64: { poseFrameBase64: string } | undefined,
+  finishFrameBase64: { poseFrameBase64: string } | undefined,
+): Calibration | undefined {
+  const catchFrame = catchFrameBase64?.poseFrameBase64
+    ? decodeBase64PoseFrame(catchFrameBase64.poseFrameBase64) ?? undefined
+    : undefined;
+  const finishFrame = finishFrameBase64?.poseFrameBase64
+    ? decodeBase64PoseFrame(finishFrameBase64.poseFrameBase64) ?? undefined
+    : undefined;
+  if (!catchFrame && !finishFrame) return undefined;
+  return {
+    capturePerspective,
+    catchFrame,
+    finishFrame,
+  };
 }
 
 function pickRecorderMime(): string {

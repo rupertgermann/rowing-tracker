@@ -140,6 +140,11 @@ const postureThresholdSettingsSchema = z.object({
   }
 });
 
+const mocapPreferencesSchema = z.object({
+  verbosity: z.enum(['quiet', 'verbose']),
+  audioEnabled: z.boolean(),
+});
+
 /**
  * Main settings update schema
  * All fields are optional since the API accepts partial updates
@@ -177,6 +182,7 @@ export const settingsUpdateSchema = z.object({
 
   // AI settings
   cloudAIEnabled: z.boolean(),
+  mocapDetailedAIShare: z.boolean(),
   maxTokens: z.number().int().min(100).max(128000),
   aiConfig: aiConfigSchema,
   customPromptsAi: customPromptsAiSchema,
@@ -189,6 +195,7 @@ export const settingsUpdateSchema = z.object({
   userProfileContext: z.string().max(50000).nullable(),
   userProfileRawInput: z.string().max(100000).nullable(),
   postureThresholds: postureThresholdSettingsSchema.nullable(),
+  mocapPreferences: mocapPreferencesSchema.nullable(),
 
   // View settings (flexible JSON)
   dashboardSettings: viewSettingsSchema,

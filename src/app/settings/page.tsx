@@ -1314,6 +1314,65 @@ export default function SettingsPage() {
             </ThresholdCard>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Live Coaching Cues</CardTitle>
+            <CardDescription>
+              Controls visual and audio feedback during a mocap session.
+              Cues fire post-stroke (≤ 1s after each stroke completes).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Cue Verbosity</Label>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Quiet (default):</strong> only warning + critical faults.{' '}
+                  <strong>Verbose:</strong> also surfaces info-severity cues.
+                </p>
+              </div>
+              <select
+                className="rounded border px-2 py-1 text-sm bg-transparent"
+                value={settingsData.mocapSettings.mocapPreferences.verbosity}
+                onChange={(e) =>
+                  saveSettings('mocapSettings', {
+                    mocapPreferences: {
+                      ...settingsData.mocapSettings.mocapPreferences,
+                      verbosity: e.target.value as 'quiet' | 'verbose',
+                    },
+                  })
+                }
+                data-testid="mocap-cue-verbosity"
+              >
+                <option value="quiet">Quiet</option>
+                <option value="verbose">Verbose</option>
+              </select>
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Audio Cues</Label>
+                <p className="text-sm text-muted-foreground">
+                  Speak the short audio hint for each cue using the
+                  browser&apos;s speech synthesis. Visual cues remain on regardless.
+                </p>
+              </div>
+              <Switch
+                checked={settingsData.mocapSettings.mocapPreferences.audioEnabled}
+                onCheckedChange={(checked) =>
+                  saveSettings('mocapSettings', {
+                    mocapPreferences: {
+                      ...settingsData.mocapSettings.mocapPreferences,
+                      audioEnabled: checked,
+                    },
+                  })
+                }
+                data-testid="mocap-cue-audio"
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   };
