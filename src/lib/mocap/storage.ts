@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { del, head, list, put } from "@vercel/blob";
 
 export type ByteRange = { start: number; end?: number };
 
@@ -16,7 +17,7 @@ export interface MocapStorage {
 
 const MOCAP_ROOT = "mocap";
 
-class LocalDiskStorage implements MocapStorage {
+export class LocalDiskStorage implements MocapStorage {
   constructor(private readonly root: string) {}
 
   videoPath(userId: string, sessionId: string): string {
@@ -108,6 +109,85 @@ class LocalDiskStorage implements MocapStorage {
   }
 }
 
+class VercelBlobStorage implements MocapStorage {
+  videoPath(userId: string, sessionId: string): string {
+    return path.posix.join(MOCAP_ROOT, userId, sessionId, "video.webm");
+  }
+
+  poseStreamPath(userId: string, sessionId: string): string {
+    return path.posix.join(MOCAP_ROOT, userId, sessionId, "pose-stream.bin");
+  }
+
+  async appendBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
+    const existing = await this.readIfExists(storagePath);
+    const combined = new Uint8Array(existing.byteLength + bytes.byteLength);
+    combined.set(existing, 0);
+    combined.set(bytes, existing.byteLength);
+    await this.putBytes(storagePath, combined);
+  }
+
+  async writeAt(
+    storagePath: string,
+    bytes: Uint8Array,
+    offset: number,
+  ): Promise<void> {
+    const existing = await this.read(storagePath);
+    if (offset < 0 || offset + bytes.byteLength > existing.byteLength) {
+      throw new Error(`writeAt outside blob bounds for ${storagePath}`);
+    }
+    const updated = new Uint8Array(existing);
+    updated.set(bytes, offset);
+    await this.putBytes(storagePath, updated);
+  }
+
+  async read(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
+    const meta = await head(storagePath);
+    const headers: HeadersInit = {};
+    if (range) {
+      const end = range.end === undefined ? "" : String(range.end - 1);
+      headers.Range = `bytes=${range.start}-${end}`;
+    }
+    const res = await fetch(meta.url, { headers, cache: "no-store" });
+    if (!res.ok && res.status !== 206) {
+      throw new Error(`Failed to read blob ${storagePath}: ${res.status}`);
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  async size(storagePath: string): Promise<number> {
+    const meta = await head(storagePath);
+    return meta.size;
+  }
+
+  async exists(storagePath: string): Promise<boolean> {
+    try {
+      await head(storagePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async delete(storagePath: string): Promise<void> {
+    const blobs = await list({ prefix: storagePath, limit: 1 });
+    if (blobs.blobs.length === 0) return;
+    await del(storagePath);
+  }
+
+  private async readIfExists(storagePath: string): Promise<Uint8Array> {
+    if (!(await this.exists(storagePath))) return new Uint8Array(0);
+    return this.read(storagePath);
+  }
+
+  private async putBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
+    await put(storagePath, Buffer.from(bytes), {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/octet-stream",
+    });
+  }
+}
+
 let instance: MocapStorage | null = null;
 
 export function getMocapStorage(): MocapStorage {
@@ -122,10 +202,10 @@ export function getMocapStorage(): MocapStorage {
     return instance;
   }
 
-  // Vercel Blob backend: deferred. Add @vercel/blob dependency and a
-  // VercelBlobStorage class implementing MocapStorage. Append uses overwrite
-  // via put({allowOverwrite: true}); byte-range read via fetch with Range header.
-  throw new Error(
-    `MOCAP_STORAGE_BACKEND="${backend}" not implemented. Set MOCAP_STORAGE_BACKEND=local for now.`,
-  );
+  if (backend === "vercel-blob") {
+    instance = new VercelBlobStorage();
+    return instance;
+  }
+
+  throw new Error(`Unknown MOCAP_STORAGE_BACKEND="${backend}"`);
 }

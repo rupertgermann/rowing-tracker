@@ -63,7 +63,7 @@ Pose data is stored raw (keypoints per frame) and aligned to existing `RowingSes
 - **PostureMetricsCalculator** — pure function: `Stroke → PostureMetrics`. Computes: back angle at catch, back angle at finish, layback angle, shin vertical at catch, hip-knee opening offset (drive sequence), arm-bend onset frame, left-right asymmetry index, knee track deviation.
 - **PostureFaultDetector** — pure function: `PostureMetrics + thresholds → PostureFault[]`. Severity levels: info / warning / critical. Rule-based v1; pluggable so ML model can replace later.
 - **CoachingAdvisor** — `PostureFault[] + session history → CoachingCue[]`. Rule-based default cues; cloud AI augmentation behind existing `cloudAI` gate.
-- **PostureSessionRepository** — Prisma-hidden read/write of `MocapSession`, `PoseFrame`, `StrokePostureMetric`, `PostureFault`.
+- **PostureSessionRepository** — Prisma-hidden read/write of `MocapSession`, `StrokePostureMetric`, `PostureFault`, plus byte-range access to the stored `PoseFrameStream` blob.
 
 ### Modified modules
 
@@ -89,7 +89,7 @@ Pose data is stored raw (keypoints per frame) and aligned to existing `RowingSes
 - **Pose source abstraction is the deep boundary.** Browser MediaPipe and freemocap sidecar both produce identical `PoseFrameStream` shape. All downstream analysis is source-agnostic. This is the core deepening play.
 - **Analysis is pure.** `StrokePhaseSegmenter`, `PostureMetricsCalculator`, `PostureFaultDetector` are pure functions over data structures. No I/O, no DB. Tested with fixture frame streams.
 - **Live and replay share the pipeline.** Live mode runs the same segmenter/metrics/detector incrementally as frames arrive; replay runs them on the stored stream. No duplicate logic.
-- **Storage contract.** Raw `PoseFrame` rows are large but enable full replay + re-analysis when rules improve. Stored in Postgres (JSONB columns); video file stored on existing storage backend (`storage/` dir or Vercel Blob in deployed env). User may purge raw frames per session if storage pressure rises (derived metrics retained).
+- **Storage contract.** Raw pose data is stored as one binary `PoseFrameStream` blob per `MocapSession`, alongside the video file on the same storage backend (`storage/` dir or Vercel Blob in deployed env). Postgres stores the `MocapSession` row and derived rows only.
 - **Sidecar contract.** freemocap sidecar is an opt-in local Docker service. Communicates via WebSocket on localhost. Versioned schema. App degrades cleanly if sidecar is offline.
 - **Privacy.** Video + pose data are user-scoped, never sent to cloud unless cloud-AI is explicitly enabled in `UserSettings.cloudAIEnabled`. Coaching cues by default run on local rules.
 - **Frame budget.** Browser path targets ≥ 24 fps on a mid-tier laptop. Heavier work (full re-analysis, summaries) deferred to post-session. Mobile falls back to record-only when CPU is insufficient.
@@ -101,10 +101,13 @@ Pose data is stored raw (keypoints per frame) and aligned to existing `RowingSes
 
 - `POST /api/mocap/sessions` — create new mocap session (browser uploads chunked video + pose stream, or sidecar streams directly).
 - `GET /api/mocap/sessions/:id` — full mocap detail incl. metrics + faults + frame index.
+- `POST /api/mocap/sessions/:id/pose-stream` — append complete encoded pose-frame chunks to the session's `PoseFrameStream` blob. Server validates chunk boundaries but runs no analysis.
+- `GET /api/mocap/sessions/:id/pose-stream` — byte-range reads from the session's `PoseFrameStream` blob for replay and re-analysis.
+- `POST /api/mocap/sessions/:id/video` — append recorded video chunks to the same storage backend.
+- `POST /api/mocap/sessions/:id/finalize` — finalize the pose header frame count and transition `capturing` → `ready`.
 - `POST /api/mocap/sessions/:id/reanalyze` — re-run pipeline with current rules.
 - `POST /api/mocap/sessions/:id/link/:rowingSessionId` — attach mocap to existing CSV session.
 - `DELETE /api/mocap/sessions/:id` — cascade delete frames, metrics, faults, video.
-- WebSocket `/api/mocap/live` — live capture stream from browser; server emits incremental faults / cues.
 - Sidecar local URL configurable in settings; health-check endpoint required.
 
 ## Testing Decisions
@@ -152,7 +155,7 @@ This section reflects the outcome of `/grill-with-docs` against this PRD. Where 
 
 - **ADR-0001** — raw `PoseFrameStream` is stored as one binary blob per `MocapSession` alongside the video, not as Postgres JSONB rows. The `PoseFrame` Prisma model from `### Schema additions` is dropped; replaced by `MocapSession.poseStreamPath`.
 - **ADR-0002** — sidecar contract is deferred to Phase 2. v1 `PoseFrameStream` shape is browser-2D only (`{x, y, confidence}` per keypoint, plus quality flags). No Docker image, no WebSocket sidecar protocol, no health-check API in v1.
-- **ADR-0003** — analysis pipeline runs in the browser (Web Worker, MediaPipe Tasks WASM). `WebSocket /api/mocap/live` is for persistence only; server does not emit faults during live capture. Server-side execution is for `POST /api/mocap/sessions/:id/reanalyze` only.
+- **ADR-0003** — analysis pipeline runs in the browser (Web Worker, MediaPipe Tasks WASM). Live persistence uses HTTP chunk uploads (`pose-stream`, `video`, `finalize`); the server does not emit faults during live capture. Server-side execution is for `POST /api/mocap/sessions/:id/reanalyze` only.
 - **ADR-0004** — cloud-AI mocap payload is `PostureFault` summary (tier 3) by default; per-stroke metrics (tier 2) opt-in via `UserSettings.mocapDetailedAIShare`; raw frames (tier 1) never cross to cloud.
 
 ### Domain terms (see `CONTEXT.md`)

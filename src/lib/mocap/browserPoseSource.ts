@@ -3,7 +3,7 @@
  *
  * Owns the worker, the upload queue, and the per-frame ImageBitmap pipeline.
  * Frames flow: <video> → grabFrame() → postMessage(bitmap) → worker → encoded
- * PoseFrame bytes → upload queue → POST /api/mocap/sessions/:id/pose.
+ * PoseFrame bytes → upload queue → POST /api/mocap/sessions/:id/pose-stream.
  */
 
 import { BYTES_PER_FRAME_V1 } from "./poseFrameStream";
@@ -201,7 +201,7 @@ export class BrowserPoseSource {
 
   private async upload(buf: Uint8Array): Promise<void> {
     const res = await fetch(
-      `/api/mocap/sessions/${this.opts.sessionId}/pose`,
+      `/api/mocap/sessions/${this.opts.sessionId}/pose-stream`,
       {
         method: "POST",
         body: new Blob([buf as BlobPart], {

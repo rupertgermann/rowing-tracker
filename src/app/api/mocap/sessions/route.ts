@@ -4,7 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
-import { encodeHeader } from "@/lib/mocap/poseFrameStream";
+import { initializePoseStreamBlob } from "@/lib/mocap/capturePersistence";
 
 const CreateBody = z.object({
   source: z.enum(["browser"]),
@@ -54,8 +54,7 @@ export async function POST(req: Request) {
   });
 
   try {
-    const header = encodeHeader({ fps: body.captureFps });
-    await storage.appendBytes(created.poseStreamPath, header);
+    await initializePoseStreamBlob(storage, created.poseStreamPath, body.captureFps);
   } catch (err) {
     await prisma.mocapSession.delete({ where: { id: created.id } }).catch(() => {});
     return NextResponse.json(

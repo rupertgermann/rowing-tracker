@@ -232,17 +232,29 @@ export default function MocapCapturePage() {
 
   useEffect(() => {
     if (state.kind !== "capturing") return;
-    const onUnload = () => {
+    const sessionId = state.sessionId;
+    const onPageHide = () => {
       try {
         recorderRef.current?.requestData?.();
         recorderRef.current?.stop();
       } catch {
         // ignore
       }
+      try {
+        const durationSec = (Date.now() - startedAtRef.current) / 1000;
+        navigator.sendBeacon?.(
+          `/api/mocap/sessions/${sessionId}/finalize`,
+          new Blob([JSON.stringify({ durationSec })], {
+            type: "application/json",
+          }),
+        );
+      } catch {
+        // ignore
+      }
     };
-    window.addEventListener("beforeunload", onUnload);
-    return () => window.removeEventListener("beforeunload", onUnload);
-  }, [state.kind]);
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [state]);
 
   return (
     <div className="container mx-auto max-w-4xl py-8 space-y-6">

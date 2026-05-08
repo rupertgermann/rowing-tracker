@@ -4,16 +4,10 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
-import {
-  BYTES_PER_FRAME_V1,
-  HEADER_SIZE,
-  framesFromBlobSize,
-} from "@/lib/mocap/poseFrameStream";
+import { finalizePoseStreamBlob } from "@/lib/mocap/capturePersistence";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const FRAME_COUNT_OFFSET = 16;
 
 const Body = z.object({
   durationSec: z.number().nonnegative().max(60 * 60 * 8),
@@ -64,35 +58,15 @@ export async function POST(
 
   const storage = getMocapStorage();
 
-  let poseSize = 0;
+  let finalized: Awaited<ReturnType<typeof finalizePoseStreamBlob>>;
   try {
-    poseSize = await storage.size(row.poseStreamPath);
-  } catch {
+    finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
+  } catch (err) {
     return NextResponse.json(
-      { error: "Pose stream missing" },
+      { error: err instanceof Error ? err.message : String(err) },
       { status: 500 },
     );
   }
-  if (poseSize < HEADER_SIZE) {
-    return NextResponse.json(
-      { error: "Pose stream truncated below header" },
-      { status: 500 },
-    );
-  }
-  const trailing = (poseSize - HEADER_SIZE) % BYTES_PER_FRAME_V1;
-  if (trailing !== 0) {
-    return NextResponse.json(
-      {
-        error: `Pose stream has ${trailing} trailing bytes (corrupt)`,
-      },
-      { status: 500 },
-    );
-  }
-  const frameCount = framesFromBlobSize(poseSize);
-
-  const headerPatch = new Uint8Array(4);
-  new DataView(headerPatch.buffer).setUint32(0, frameCount, true);
-  await storage.writeAt(row.poseStreamPath, headerPatch, FRAME_COUNT_OFFSET);
 
   const updated = await prisma.mocapSession.update({
     where: { id: row.id },
@@ -107,7 +81,7 @@ export async function POST(
     id: updated.id,
     status: updated.status,
     durationSec: updated.durationSec,
-    frameCount,
-    poseStreamBytes: poseSize,
+    frameCount: finalized.frameCount,
+    poseStreamBytes: finalized.poseStreamBytes,
   });
 }

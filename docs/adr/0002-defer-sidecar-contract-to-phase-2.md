@@ -39,7 +39,7 @@ Treat the sidecar as not-yet-existent. Phase 2 will design its contract against 
 
 **Neutral**
 
-- Anything in the PRD's `### API contracts` section that is sidecar-specific (sidecar local URL, sidecar health-check) is out of v1 scope. The browser API (`POST /api/mocap/sessions`, `GET /api/mocap/sessions/:id`, `POST /api/mocap/sessions/:id/reanalyze`, `POST /api/mocap/sessions/:id/link/:rowingSessionId`, `DELETE /api/mocap/sessions/:id`, `WebSocket /api/mocap/live`) stays.
+- Anything in the PRD's `### API contracts` section that is sidecar-specific (sidecar local URL, sidecar health-check) is out of v1 scope. The browser API (`POST /api/mocap/sessions`, `POST|GET /api/mocap/sessions/:id/pose-stream`, `POST /api/mocap/sessions/:id/video`, `POST /api/mocap/sessions/:id/finalize`, `GET /api/mocap/sessions/:id`, `POST /api/mocap/sessions/:id/reanalyze`, `POST /api/mocap/sessions/:id/link/:rowingSessionId`, `DELETE /api/mocap/sessions/:id`) stays.
 
 ## Alternatives considered
 
