@@ -21,6 +21,7 @@ export interface Session {
   maxStrokeRate: number;
   consistencyScore?: number | null; // Pre-computed consistency score (0-100)
   strokeData?: StrokeData[]; // Optional detailed stroke data
+  mocapSession?: { id: string } | null; // Linked mocap session (if any)
 }
 
 export interface StrokeData {

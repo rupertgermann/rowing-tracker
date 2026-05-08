@@ -6,6 +6,35 @@ import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { initializePoseStreamBlob } from "@/lib/mocap/capturePersistence";
 
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rows = await prisma.mocapSession.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      durationSec: true,
+      createdAt: true,
+      capturePerspective: true,
+      qualityScore: true,
+      qualityFlags: true,
+      _count: {
+        select: {
+          strokePostureMetrics: true,
+          postureFaults: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({ sessions: rows });
+}
+
 const CalibrationFrame = z.object({
   pose: z.enum(["catch", "finish"]),
   capturedAt: z.string().datetime(),

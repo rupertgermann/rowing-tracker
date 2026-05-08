@@ -51,6 +51,9 @@ export async function GET() {
           updatedAt: true,
           importedAt: true,
           sourceFile: true,
+          mocapSession: {
+            select: { id: true },
+          },
         },
         orderBy: {
           timestamp: 'desc',

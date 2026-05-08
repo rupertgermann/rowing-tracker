@@ -118,6 +118,7 @@ export interface UseCaseConfig {
 
 export interface AISettings {
   cloudAIEnabled: boolean;
+  mocapDetailedAIShare: boolean;
   openaiApiKey: string;
   maxTokens: number;
 
@@ -246,6 +247,7 @@ export class SettingsService {
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
+      mocapDetailedAIShare: false,
       maxTokens: 4000,
 
       // Per-use-case configurations with smart defaults
@@ -576,6 +578,7 @@ Be specific and actionable. Only include information relevant to rowing training
       aiSettings: {
         ...this.defaultSettings.aiSettings,
         cloudAIEnabled: (dbSettings.cloudAIEnabled as boolean) || false,
+        mocapDetailedAIShare: (dbSettings.mocapDetailedAIShare as boolean) || false,
         // Note: openaiApiKey is NOT loaded from DB - it's kept local only
         // Will be preserved from localStorage if present
         maxTokens: (dbSettings.maxTokens as number) || 4000,
@@ -643,6 +646,7 @@ Be specific and actionable. Only include information relevant to rowing training
       planReminders: settings.notificationSettings.planReminders,
       adherenceAlerts: settings.notificationSettings.adherenceAlerts,
       cloudAIEnabled: settings.aiSettings.cloudAIEnabled,
+      mocapDetailedAIShare: settings.aiSettings.mocapDetailedAIShare,
       maxTokens: settings.aiSettings.maxTokens,
       userProfileContext: settings.aiSettings.userProfileContext,
       userProfileRawInput: settings.aiSettings.userProfileRawInput,

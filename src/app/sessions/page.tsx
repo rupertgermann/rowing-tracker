@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles } from 'lucide-react';
+import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles, Video } from 'lucide-react';
 import { formatSessionDate } from '@/lib/dateTimeUtils';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 
@@ -362,6 +362,12 @@ export default function SessionsPage() {
                               Stroke Data
                             </div>
                           </TableHead>
+                          <TableHead className="text-right">
+                            <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                              <Video className="h-4 w-4 text-purple-500" />
+                              Mocap
+                            </div>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -427,6 +433,16 @@ export default function SessionsPage() {
                                 ) : (
                                   <span className="text-xs text-muted-foreground">No stroke file</span>
                                 )}
+                              </TableCell>
+                              <TableCell className="text-right text-sm" onClick={(e) => e.stopPropagation()}>
+                                {session.mocapSession ? (
+                                  <Link href={`/mocap/sessions/${session.mocapSession.id}`}>
+                                    <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/20 cursor-pointer">
+                                      <Video className="h-3 w-3 mr-1" />
+                                      Mocap
+                                    </Badge>
+                                  </Link>
+                                ) : null}
                               </TableCell>
                             </TableRow>
                           );

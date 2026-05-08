@@ -508,6 +508,7 @@ model UserSettings {
   planReminders           Boolean  @default(true)
   adherenceAlerts         Boolean  @default(true)
   cloudAIEnabled          Boolean  @default(false)
+  mocapDetailedAIShare    Boolean  @default(false)
   maxTokens               Int      @default(1500)
   aiConfig                Json?
   customPromptsAi         Json?

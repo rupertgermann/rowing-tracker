@@ -112,6 +112,7 @@ export default function MocapCapturePage() {
   const [quality, setQuality] = useState<PoseQuality>(EMPTY_QUALITY);
   const [framingDegraded, setFramingDegraded] = useState(false);
   const [sessionQualityFlags, setSessionQualityFlags] = useState<string[]>([]);
+  const [recordOnly, setRecordOnly] = useState(false);
 
   useEffect(() => {
     if (state.kind !== "capturing") return;
@@ -410,6 +411,7 @@ export default function MocapCapturePage() {
             durationSec,
             qualityScore: qualityScoreFor(latestPoseFrameRef.current),
             qualityFlags: sessionQualityFlags,
+            skipAnalysis: recordOnly,
           }),
         },
       );
@@ -523,6 +525,16 @@ export default function MocapCapturePage() {
                 <option value="side-right">Side (right toward camera)</option>
                 <option value="side-left">Side (left toward camera)</option>
               </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-record-only-label">
+              <input
+                type="checkbox"
+                checked={recordOnly}
+                onChange={(e) => setRecordOnly(e.target.checked)}
+                disabled={state.kind === "capturing" || state.kind === "starting" || state.kind === "stopping"}
+                data-testid="mocap-record-only"
+              />
+              Record only (skip analysis)
             </label>
             {calibration.kind === "idle" &&
             (state.kind === "idle" || state.kind === "done") ? (
@@ -664,7 +676,7 @@ export default function MocapCapturePage() {
 
           {state.kind === "done" ? (
             <div
-              className="rounded border border-green-500/40 bg-green-500/10 p-3 text-sm"
+              className="rounded border border-green-500/40 bg-green-500/10 p-3 text-sm space-y-2"
               data-testid="mocap-done"
             >
               <div>
@@ -673,6 +685,23 @@ export default function MocapCapturePage() {
               <div>
                 {state.frameCount} pose frames · {state.durationSec.toFixed(1)}s
                 duration
+              </div>
+              <div className="flex gap-2 pt-1">
+                <a
+                  href={`/mocap/sessions/${state.sessionId}`}
+                  className="underline text-green-800 dark:text-green-300"
+                  data-testid="mocap-replay-link"
+                >
+                  View replay →
+                </a>
+                <span className="text-green-700/50 dark:text-green-400/50">·</span>
+                <a
+                  href="/mocap/sessions"
+                  className="underline text-green-800 dark:text-green-300"
+                  data-testid="mocap-sessions-link"
+                >
+                  All sessions
+                </a>
               </div>
             </div>
           ) : null}

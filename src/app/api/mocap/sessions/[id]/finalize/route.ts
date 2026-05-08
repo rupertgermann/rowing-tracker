@@ -14,6 +14,7 @@ const Body = z.object({
   durationSec: z.number().nonnegative().max(60 * 60 * 8),
   qualityScore: z.number().min(0).max(1).optional(),
   qualityFlags: z.array(z.string().min(1).max(80)).max(20).optional(),
+  skipAnalysis: z.boolean().optional(),
 });
 
 export async function POST(
@@ -72,6 +73,27 @@ export async function POST(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 },
     );
+  }
+
+  if (body.skipAnalysis) {
+    const updated = await prisma.mocapSession.update({
+      where: { id: row.id },
+      data: {
+        status: "ready",
+        durationSec: body.durationSec,
+        qualityScore: body.qualityScore ?? null,
+        qualityFlags: body.qualityFlags ?? [],
+      },
+    });
+    return NextResponse.json({
+      id: updated.id,
+      status: updated.status,
+      durationSec: updated.durationSec,
+      frameCount: finalized.frameCount,
+      poseStreamBytes: finalized.poseStreamBytes,
+      strokeMetricCount: 0,
+      faultCount: 0,
+    });
   }
 
   const analyzing = await prisma.mocapSession.update({
