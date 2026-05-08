@@ -1449,6 +1449,23 @@ export default function SettingsPage() {
               />
             </div>
 
+            {/* Posture Data Sharing Tier Toggle */}
+            <div className={`flex items-start justify-between gap-4 ${!settingsData.aiSettings.cloudAIEnabled ? 'opacity-50' : ''}`}>
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Posture Analysis Data Sharing</Label>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Tier 3 (default):</strong> Sends fault counts and severity totals only — no body geometry.{' '}
+                  <strong>Tier 2 (opt-in):</strong> Also sends per-stroke back angle, layback, and recovery ratio.
+                  Raw pose keypoints are never sent to cloud AI.
+                </p>
+              </div>
+              <Switch
+                checked={settingsData.aiSettings.mocapDetailedAIShare ?? false}
+                onCheckedChange={(checked) => saveSettings('aiSettings', { mocapDetailedAIShare: checked })}
+                disabled={!settingsData.aiSettings.cloudAIEnabled}
+              />
+            </div>
+
             {settingsData.aiSettings.cloudAIEnabled && (
               <>
                 {/* API Key Input - render the input ONLY when the user clicks "Edit".

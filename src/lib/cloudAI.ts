@@ -1,5 +1,6 @@
 import { Session } from '@/types/session';
 import { TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
+import type { PostureAIPayload } from '@/lib/mocap/aiPayload';
 import { SettingsService } from '@/lib/settings';
 import {
   DEFAULT_PLAN_GENERATION_PROMPT,
@@ -982,7 +983,10 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
 
   // Generate rowing-specific insights using OpenAI
-  async generateInsights(sessions: Session[]): Promise<CloudInsight[]> {
+  async generateInsights(
+    sessions: Session[],
+    posturePayload?: PostureAIPayload | null,
+  ): Promise<CloudInsight[]> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
     }
@@ -997,7 +1001,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
     try {
       const anonymizedData = this.anonymizeSessions(sessions);
-      const prompt = this.buildInsightPrompt(anonymizedData);
+      const prompt = this.buildInsightPrompt(anonymizedData, posturePayload);
       const useCaseConfig = this.aiSettings.insights;
 
       const config: ApiRequestConfig = {
@@ -1068,7 +1072,10 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   }
 
   // Build user prompt with session data using configurable prompt
-  private buildInsightPrompt(sessions: Record<string, unknown>[]): string {
+  private buildInsightPrompt(
+    sessions: Record<string, unknown>[],
+    posturePayload?: PostureAIPayload | null,
+  ): string {
     // Include more sessions for better progress analysis
     const recentSessions = sessions.slice(-20); // Last 20 sessions for better context
     const sessionSummary = this.createSessionSummary(recentSessions);
@@ -1113,6 +1120,17 @@ JSON structure:
 ]
 
 CRITICAL: Your response must be ONLY the JSON array of insights. Do not include any explanations, markdown, or the training data itself.`;
+
+    // Append posture context block when available (tier 2 or tier 3 payload).
+    // Raw keypoint data is never included — the hard guard in aiPayload.ts
+    // enforces this before the payload reaches this point.
+    if (posturePayload) {
+      const tierLabel =
+        posturePayload.tier === 3
+          ? 'Tier 3 – Fault Summary (no body geometry)'
+          : 'Tier 2 – Fault Summary + Per-Stroke Metrics (no keypoints)';
+      return `${finalPrompt}\n\n---\nPOSTURE ANALYSIS CONTEXT [${tierLabel}]:\n${JSON.stringify(posturePayload, null, 2)}\n---`;
+    }
 
     return finalPrompt;
   }
