@@ -117,7 +117,7 @@ export function Navigation() {
             <div className="flex h-8 w-8 items-center justify-center rounded bg-primary">
               <BarChart3 className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">
+            <span className="text-xl font-bold text-foreground whitespace-nowrap pr-2">
               Rowing Tracker
             </span>
           </Link>
