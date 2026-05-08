@@ -144,6 +144,37 @@ A good test verifies external behavior of a deep module given a fixed input. It 
 - Real-time streaming of mocap to a remote coach.
 - Custom freemocap installation flows beyond the documented Docker sidecar.
 
+## Resolved Decisions (grilling 2026-05-08)
+
+This section reflects the outcome of `/grill-with-docs` against this PRD. Where it conflicts with the body of the PRD above, **this section wins** and the older sections will be updated lazily.
+
+### Architecture (see `docs/adr/`)
+
+- **ADR-0001** — raw `PoseFrameStream` is stored as one binary blob per `MocapSession` alongside the video, not as Postgres JSONB rows. The `PoseFrame` Prisma model from `### Schema additions` is dropped; replaced by `MocapSession.poseStreamPath`.
+- **ADR-0002** — sidecar contract is deferred to Phase 2. v1 `PoseFrameStream` shape is browser-2D only (`{x, y, confidence}` per keypoint, plus quality flags). No Docker image, no WebSocket sidecar protocol, no health-check API in v1.
+- **ADR-0003** — analysis pipeline runs in the browser (Web Worker, MediaPipe Tasks WASM). `WebSocket /api/mocap/live` is for persistence only; server does not emit faults during live capture. Server-side execution is for `POST /api/mocap/sessions/:id/reanalyze` only.
+- **ADR-0004** — cloud-AI mocap payload is `PostureFault` summary (tier 3) by default; per-stroke metrics (tier 2) opt-in via `UserSettings.mocapDetailedAIShare`; raw frames (tier 1) never cross to cloud.
+
+### Domain terms (see `CONTEXT.md`)
+
+`CapturePerspective`, `StrokeSegmentationSource`, `MocapSession`, `CueLatencyBand`, `PoseFrameStream`, `Calibration`, `PostureFault` (v1 catalog), `FaultThresholds`. Use these exact terms in code, issues, and UI copy.
+
+### Locked design choices
+
+- **Browser path is side-view only.** `side-left` or `side-right`. Front view, asymmetry, knee-track deviation = `requires-multi-cam`, deferred to sidecar.
+- **Live capture = `pose-segmented`.** Live SmartRow CSV streaming is not available; CSV arrives post-session. Linking a `RowingSession` to a `MocapSession` triggers mandatory atomic re-analysis to `csv-aligned` as a background job.
+- **Live cues are `post-stroke`** (≤ 1 s after stroke completes), not intra-stroke. Fault detector runs at stroke granularity only.
+- **Calibration is per-session, not per-user.** Two reference frames (catch, finish) captured at session start, stored on `MocapSession`.
+- **Auto-link prompt** on CSV import when capture window overlaps within ±2 minutes; user always confirms, never silent. Linking is bidirectional, exclusive, reversible (`unlink` endpoint).
+- **v1 fault catalog is fixed at 5 types**: `rounded_back_at_catch`, `early_arm_bend`, `back_opens_before_legs_drive`, `excessive_layback`, `slow_recovery_ratio`. Anything else is out of v1 scope.
+- **Default thresholds are hand-coded and versioned** (`postureThresholdsV1`). Conservative bands. Auto-migrate on version bump unless user has set `userOverridden: true`.
+
+### v1 ship scope (Phase 1)
+
+**Ships:** US 1-11, 13, 19-30, 35, 36 (US 36 reduced to "single-source `PoseFrameStream` shape, versioned for future widening").
+
+**Deferred to Phase 2:** US 12 (side-by-side compare), 14 (fault-frequency dashboard card), 15 (posture in `aiAnalysis.ts` insights), 16-18 (sidecar), 31 (chat tool exposure), 32-33 (posture in training plans / achievements), 34 (mobile degraded mode).
+
 ## Further Notes
 
 - freemocap upstream is GPL-licensed Python. Sidecar runs as separate process; no GPL code is linked into Next.js app. Confirm license interaction during implementation.
