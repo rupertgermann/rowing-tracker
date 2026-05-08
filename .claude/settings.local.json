@@ -17,7 +17,9 @@
       "Bash(npx tsx:*)",
       "Bash(npx eslint:*)",
       "Bash(find:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(gh repo *)",
+      "Bash(gh label *)"
     ]
   }
 }
