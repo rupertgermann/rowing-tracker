@@ -15,6 +15,11 @@ import {
 } from "@/lib/mocap/browserPoseSource";
 import { QUALITY_FLAG } from "@/lib/mocap/poseFrameStream";
 import { VideoUploader } from "@/lib/mocap/videoUploader";
+import {
+  getCoachingCues,
+  type CoachingCue,
+} from "@/lib/mocap/coaching/coachingAdvisor";
+import type { PostureFault } from "@/lib/mocap/analysis/types";
 
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
@@ -22,6 +27,12 @@ const VIDEO_TIMESLICE_MS = 1000;
 const MIN_TRACKED_KEYPOINTS = 20;
 const MIN_MEAN_CONFIDENCE = 0.5;
 const DEGRADED_FRAME_MS = 2000;
+
+const SEVERITY_WEIGHT: Record<string, number> = {
+  critical: 3,
+  warning: 2,
+  info: 1,
+};
 
 type CaptureState =
   | { kind: "idle" }
@@ -113,6 +124,9 @@ export default function MocapCapturePage() {
   const [framingDegraded, setFramingDegraded] = useState(false);
   const [sessionQualityFlags, setSessionQualityFlags] = useState<string[]>([]);
   const [recordOnly, setRecordOnly] = useState(false);
+  const [activeCue, setActiveCue] = useState<CoachingCue | null>(null);
+  const [sessionFaults, setSessionFaults] = useState<PostureFault[]>([]);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   useEffect(() => {
     if (state.kind !== "capturing") return;
@@ -425,6 +439,20 @@ export default function MocapCapturePage() {
       } = await finalizeRes.json();
       await teardown();
       setCalibration({ kind: "idle" });
+
+      // Fetch faults for end-of-session summary
+      let faults: PostureFault[] = [];
+      try {
+        const sessionRes = await fetch(`/api/mocap/sessions/${finalized.id}`);
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          faults = (sessionData.session?.postureFaults ?? []) as PostureFault[];
+          setSessionFaults(faults);
+        }
+      } catch {
+        // non-fatal — summary just won't show
+      }
+
       setState({
         kind: "done",
         sessionId: finalized.id,
@@ -535,6 +563,15 @@ export default function MocapCapturePage() {
                 data-testid="mocap-record-only"
               />
               Record only (skip analysis)
+            </label>
+            <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-audio-label">
+              <input
+                type="checkbox"
+                checked={audioEnabled}
+                onChange={(e) => setAudioEnabled(e.target.checked)}
+                data-testid="mocap-audio-toggle"
+              />
+              Audio cues
             </label>
             {calibration.kind === "idle" &&
             (state.kind === "idle" || state.kind === "done") ? (
@@ -686,6 +723,7 @@ export default function MocapCapturePage() {
                 {state.frameCount} pose frames · {state.durationSec.toFixed(1)}s
                 duration
               </div>
+              <SessionCoachingSummary faults={sessionFaults} />
               <div className="flex gap-2 pt-1">
                 <a
                   href={`/mocap/sessions/${state.sessionId}`}
@@ -703,6 +741,34 @@ export default function MocapCapturePage() {
                   All sessions
                 </a>
               </div>
+            </div>
+          ) : null}
+
+          {activeCue ? (
+            <div
+              className={`rounded border p-3 text-sm space-y-1 ${
+                activeCue.severity === "critical"
+                  ? "border-red-500/40 bg-red-500/10"
+                  : "border-yellow-500/40 bg-yellow-500/10"
+              }`}
+              data-testid="mocap-coaching-cue"
+            >
+              <div className="font-medium">
+                {activeCue.severity === "critical" ? "⚠ " : "ℹ "}
+                {activeCue.message}
+              </div>
+              {activeCue.drills.length > 0 ? (
+                <div className="text-xs text-muted-foreground">
+                  Drills: {activeCue.drills.join(" · ")}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="text-xs underline opacity-60"
+                onClick={() => setActiveCue(null)}
+              >
+                Dismiss
+              </button>
             </div>
           ) : null}
 
@@ -786,6 +852,56 @@ function qualityFlagLabel(quality: PoseQuality): string {
     labels.push("low");
   }
   return labels.length > 0 ? labels.join(", ") : "ok";
+}
+
+function SessionCoachingSummary({ faults }: { faults: PostureFault[] }) {
+  if (faults.length === 0) return null;
+
+  // Aggregate by fault type: total weight = count × severity weight
+  const typeMap = new Map<string, { count: number; weight: number; severity: string }>();
+  for (const f of faults) {
+    const existing = typeMap.get(f.faultType);
+    const w = SEVERITY_WEIGHT[f.severity] ?? 1;
+    if (!existing) {
+      typeMap.set(f.faultType, { count: 1, weight: w, severity: f.severity });
+    } else {
+      existing.count++;
+      existing.weight += w;
+      if ((SEVERITY_WEIGHT[f.severity] ?? 1) > (SEVERITY_WEIGHT[existing.severity] ?? 1)) {
+        existing.severity = f.severity;
+      }
+    }
+  }
+
+  const top3 = [...typeMap.entries()]
+    .sort((a, b) => b[1].weight - a[1].weight)
+    .slice(0, 3);
+
+  if (top3.length === 0) return null;
+
+  const cues = getCoachingCues(
+    faults.filter((f) => top3.some(([t]) => t === f.faultType)),
+    { strokeCount: faults.length },
+    { minSeverity: "info" },
+  );
+
+  return (
+    <div className="border-t border-green-500/30 pt-2 space-y-1" data-testid="mocap-session-summary">
+      <div className="font-medium text-xs uppercase tracking-wide opacity-70">Session summary</div>
+      {top3.map(([faultType, info]) => {
+        const cue = cues.find((c) => c.faultType === faultType);
+        const label = faultType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        return (
+          <div key={faultType} className="text-xs space-y-0.5">
+            <div className="font-medium">{label} <span className="opacity-60">× {info.count}</span></div>
+            {cue?.drills.map((d) => (
+              <div key={d} className="opacity-70 pl-2">→ {d}</div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function pickRecorderMime(): string {

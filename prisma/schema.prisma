@@ -515,6 +515,7 @@ model UserSettings {
   userProfileContext      String?  @db.Text
   userProfileRawInput     String?  @db.Text
   postureThresholds       Json?
+  mocapPreferences        Json?
   dashboardSettings       Json?
   sessionsViewSettings    Json?
   sessionAnalysisSettings Json?

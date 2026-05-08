@@ -105,9 +105,15 @@ export interface SmartRowSettings {
   lastSync: Date | null;
 }
 
+export interface MocapPreferences {
+  verbosity: 'quiet' | 'verbose';
+  audioEnabled: boolean;
+}
+
 export interface MocapSettings {
   postureThresholds: UserPostureThresholdSettings;
   postureThresholdWarning: string | null;
+  mocapPreferences: MocapPreferences;
 }
 
 export interface UseCaseConfig {
@@ -242,7 +248,11 @@ export class SettingsService {
     },
     mocapSettings: {
       postureThresholds: defaultPostureThresholdSettings(),
-      postureThresholdWarning: null
+      postureThresholdWarning: null,
+      mocapPreferences: {
+        verbosity: 'quiet',
+        audioEnabled: false,
+      },
     },
     aiSettings: {
       openaiApiKey: '',
@@ -573,7 +583,11 @@ Be specific and actionable. Only include information relevant to rowing training
       smartRowSettings: this.defaultSettings.smartRowSettings,
       mocapSettings: {
         postureThresholds: resolvedPostureThresholds.settings,
-        postureThresholdWarning: resolvedPostureThresholds.warning
+        postureThresholdWarning: resolvedPostureThresholds.warning,
+        mocapPreferences: {
+          verbosity: ((dbSettings.mocapPreferences as Record<string, unknown> | null)?.verbosity as 'quiet' | 'verbose') ?? 'quiet',
+          audioEnabled: ((dbSettings.mocapPreferences as Record<string, unknown> | null)?.audioEnabled as boolean) ?? false,
+        },
       },
       aiSettings: {
         ...this.defaultSettings.aiSettings,
@@ -651,6 +665,7 @@ Be specific and actionable. Only include information relevant to rowing training
       userProfileContext: settings.aiSettings.userProfileContext,
       userProfileRawInput: settings.aiSettings.userProfileRawInput,
       postureThresholds: settings.mocapSettings.postureThresholds,
+      mocapPreferences: settings.mocapSettings.mocapPreferences,
       aiConfig: {
         chat: settings.aiSettings.chat,
         insights: settings.aiSettings.insights,
