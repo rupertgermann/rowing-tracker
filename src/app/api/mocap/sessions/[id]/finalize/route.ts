@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { finalizePoseStreamBlob } from "@/lib/mocap/capturePersistence";
+import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,9 +30,13 @@ export async function POST(
     where: { id, userId: session.user.id },
     select: {
       id: true,
+      userId: true,
       status: true,
       poseStreamPath: true,
       videoStoragePath: true,
+      capturePerspective: true,
+      calibrationCatchFrame: true,
+      calibrationFinishFrame: true,
     },
   });
   if (!row) {
@@ -69,14 +74,29 @@ export async function POST(
     );
   }
 
-  const updated = await prisma.mocapSession.update({
+  const analyzing = await prisma.mocapSession.update({
     where: { id: row.id },
     data: {
-      status: "ready",
+      status: "analyzing",
       durationSec: body.durationSec,
       qualityScore: body.qualityScore ?? null,
       qualityFlags: body.qualityFlags ?? [],
     },
+  });
+
+  let analysis: Awaited<ReturnType<typeof analyzeAndPersistMocapSession>>;
+  try {
+    analysis = await analyzeAndPersistMocapSession(storage, analyzing);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+
+  const updated = await prisma.mocapSession.update({
+    where: { id: row.id },
+    data: { status: "ready" },
   });
 
   return NextResponse.json({
@@ -85,5 +105,7 @@ export async function POST(
     durationSec: updated.durationSec,
     frameCount: finalized.frameCount,
     poseStreamBytes: finalized.poseStreamBytes,
+    strokeMetricCount: analysis.strokeMetricCount,
+    faultCount: analysis.faultCount,
   });
 }

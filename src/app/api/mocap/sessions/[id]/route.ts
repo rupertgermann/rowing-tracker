@@ -16,6 +16,14 @@ export async function GET(
   const { id } = await params;
   const row = await prisma.mocapSession.findFirst({
     where: { id, userId: session.user.id },
+    include: {
+      strokePostureMetrics: {
+        orderBy: { strokeIndex: "asc" },
+      },
+      postureFaults: {
+        orderBy: [{ strokeIndex: "asc" }, { createdAt: "asc" }],
+      },
+    },
   });
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

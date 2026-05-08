@@ -8,6 +8,7 @@ import {
   PostureFaultDetector,
   PostureMetricsCalculator,
   StrokePhaseSegmenter,
+  analyzePoseFrameStream,
   migratePostureThresholdSettings,
   postureThresholdsV1,
   resolvePostureThresholdSettings,
@@ -120,6 +121,28 @@ test("crafted fault fixtures trigger exactly the expected v1 fault", () => {
 
     assert.deepEqual(faults, fixture.expected.faults, fixture.name);
   }
+});
+
+test("post-session analysis maps strokes to derived metric and fault rows", () => {
+  const clean = loadFixture("clean-reference.json");
+  const cleanResult = analyzePoseFrameStream(clean.stream);
+  assert.equal(cleanResult.metrics.length, clean.expected.strokeCount);
+  assert.equal(cleanResult.faults.length, 0);
+  assert.equal(cleanResult.metrics[0]?.segmentationSource, "pose-segmented");
+  assert.equal(
+    cleanResult.metrics[0]?.phaseBoundariesJson.catchFrameIndex,
+    clean.expected.boundaries[0]?.catchFrameIndex,
+  );
+
+  const rounded = loadFixture("rounded-back-critical.json");
+  const roundedResult = analyzePoseFrameStream(rounded.stream);
+  assert.ok(
+    roundedResult.faults.some(
+      (fault) =>
+        fault.faultType === rounded.expected.faults[0]?.faultType &&
+        fault.severity === rounded.expected.faults[0]?.severity,
+    ),
+  );
 });
 
 test("fault detector never emits outside the v1 catalog", () => {
