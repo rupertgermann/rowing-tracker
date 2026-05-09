@@ -45,7 +45,11 @@ v1 fault detector runs at the **stroke** granularity only — one pass per close
 
 A timestamped sequence of keypoint frames with confidence values, produced by a `PoseCaptureSource` and consumed by the analysis pipeline.
 
-**v1 shape:** 2D side-view keypoints — `{x, y, confidence}` per keypoint, plus per-frame source-quality flags. Browser path only (see ADR-0002). The sidecar / 3D path is deferred to Phase 2; when it lands, the schema version bumps and an optional `z` channel is added without breaking existing blobs.
+**v1 shape (`keypointSchemaVersion: 1`):** 2D side-view keypoints — `{x, y, confidence}` per keypoint, normalized [0,1] image-relative coordinates. `coordinateSpace: "normalized-2d"`. Browser path only.
+
+**v2 shape (`keypointSchemaVersion: 2`):** 3D world-space keypoints — `{x, y, z, confidence}` per keypoint, units in millimeters. `coordinateSpace: "world-mm-3d"`. Sidecar path only (see ADR-0005). Blob header adds `cameraCount` and `calibrationId`. v1 blobs remain readable — the reader branches on `keypointSchemaVersion`. All v1 fault rules ignore `z` and work on `{x, y}` projection for both versions.
+
+33 BlazePose landmarks; 13 are rowing-relevant (nose, shoulders, elbows, wrists, hips, knees, ankles). The rest are captured but unused. Confidence = MediaPipe visibility [0,1]. v2 adds `reprojectionErrorMm` quality field (triangulation accuracy).
 
 ### PostureFault (v1 catalog)
 
@@ -65,6 +69,10 @@ Stroke-granular faults the v1 detector emits. All computable from a 2D side-view
 - `knee_track_deviation` — needs front view or `sidecar-3d`
 - `shin_not_vertical_at_catch` — disambiguating near-side shin from far-side shin in 2D is unreliable
 
+**Unlocked by `sidecar-3d` (Phase 2):** all three deferred faults above become computable. Lateral displacement is unambiguous in 3D; near/far shin disambiguated by z-coordinate. Fault rules and thresholds to be defined in follow-up implementation issues.
+
+`perspective` field on each fault: `"browser"` or `"sidecar-3d"`. When perspective is browser, the three sidecar-3d-only faults surface as "requires multi-camera capture" — never silently zeroed.
+
 This catalog is the canonical vocabulary. Test fixtures, threshold tuning, coaching cue copy, and AI prompt context all reference these exact keys. Anything outside this list is out of v1 scope.
 
 ### FaultThresholds
@@ -77,8 +85,10 @@ Migration: when a new defaults version ships, users who haven't touched their th
 
 ### Calibration
 
-A pair of reference pose frames captured before recording starts: one at **catch** position, one at **finish** position. Used as pixel-space baselines for downstream metric calculations (e.g. "back angle delta from this rower's own catch baseline").
+Two distinct calibration concepts — do not conflate:
 
-**Stored per `MocapSession`, not per `User`.** 2D side-view baselines are only meaningful for the camera setup that produced them — angle, distance, and framing change between sessions even when the rower doesn't. Storing on the user would imply a stable camera position the system can't verify. Recapture (~10 s) is required at the start of each session.
+**Browser calibration** — a pair of reference pose frames captured before recording starts: one at **catch** position, one at **finish** position. Used as pixel-space baselines for downstream metric calculations. Stored per `MocapSession` (see ADR-0001). Recapture (~10 s) required at the start of each session.
 
-**Storage:** persisted as one binary blob per `MocapSession`, alongside the video file (see ADR-0001). Not a Postgres table. The `MocapSession` row points at it via `poseStreamPath`. Header carries `fps`, `keypointSchemaVersion`, `frameCount`. Random access by frame index = byte-range read.
+**Sidecar Charuco calibration** — a multi-camera extrinsic calibration using a Charuco board. Establishes shared 3D world-space coordinate frame across cameras. Owned and executed by the freemocap sidecar, not by the app. The app stores `calibrationId` (UUID) in `MocapSession` for traceability, but does not own the calibration workflow. Charuco calibration is reusable across sessions as long as cameras don't move; users re-run it when the rig changes.
+
+**Storage:** persisted as one binary blob per `MocapSession`, alongside the video file (see ADR-0001). Not a Postgres table. The `MocapSession` row points at it via `poseStreamPath`. Blob header carries `fps`, `keypointSchemaVersion`, `frameCount`, `coordinateSpace`, and (v2 only) `calibrationId`, `cameraCount`. Random access by frame index = byte-range read.
