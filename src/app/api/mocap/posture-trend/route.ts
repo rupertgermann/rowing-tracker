@@ -48,5 +48,5 @@ export async function GET() {
 
   const result = aggregatePostureTrend(inputs);
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, sessions: inputs });
 }

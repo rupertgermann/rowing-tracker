@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRowingStore } from '@/lib/store';
 import {
   LineChart,
   Line,
@@ -14,7 +15,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, AlertTriangle } from 'lucide-react';
 import type { PostureFaultType } from '@/lib/mocap/analysis/types';
-import type { PostureTrendResult, FaultTrendPoint } from '@/lib/mocap/postureTrendAggregation';
+import type { PostureTrendResult, FaultTrendPoint, SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
 
 const FAULT_LABELS: Record<PostureFaultType, string> = {
   rounded_back_at_catch: 'Rounded Back',
@@ -85,21 +86,34 @@ function CustomDot(props: {
   );
 }
 
+type PostureTrendApiResponse = PostureTrendResult & { sessions?: Array<SessionFaultInput & { sessionDate: string }> };
+
+function deserializeSessions(raw: PostureTrendApiResponse['sessions']): SessionFaultInput[] {
+  if (!raw) return [];
+  return raw.map((s) => ({ ...s, sessionDate: new Date(s.sessionDate) }));
+}
+
 export function PostureFaultTrendCard() {
   const [data, setData] = useState<PostureTrendResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const evaluatePostureAwards = useRowingStore((s) => s.evaluatePostureAwards);
 
   useEffect(() => {
     fetch('/api/mocap/posture-trend')
       .then((r) => {
         if (!r.ok) throw new Error('Failed to load posture trend data');
-        return r.json() as Promise<PostureTrendResult>;
+        return r.json() as Promise<PostureTrendApiResponse>;
       })
-      .then(setData)
+      .then((response) => {
+        const { sessions: rawSessions, ...trendResult } = response;
+        setData(trendResult);
+        const sessions = deserializeSessions(rawSessions);
+        if (sessions.length > 0) evaluatePostureAwards(sessions);
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Unknown error'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [evaluatePostureAwards]);
 
   const lowQualityDates = data ? lowQualitySessionDates(data) : new Set<string>();
   const chartData = data ? buildChartData(data) : [];

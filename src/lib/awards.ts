@@ -1,16 +1,19 @@
 import { Session } from '@/types/session';
-import { 
-  Trophy, 
-  Timer, 
-  Flame, 
-  Medal, 
-  Award as AwardIcon, 
+import {
+  Trophy,
+  Timer,
+  Flame,
+  Medal,
+  Award as AwardIcon,
   Zap,
   Activity,
   TrendingUp,
   Target,
-  Crown
+  Crown,
+  ShieldCheck
 } from 'lucide-react';
+import { cleanCatchQualifies } from './postureAchievements';
+import type { SessionFaultInput } from './mocap/postureTrendAggregation';
 
 export interface Award {
   id: string;
@@ -501,5 +504,18 @@ export const AWARDS: Award[] = [
       const date = new Date(s.timestamp);
       return date.getHours() >= 21;
     })
+  },
+
+  // Posture Achievements
+  {
+    id: 'posture-clean-catch',
+    title: 'Clean Catch',
+    description: 'Row a mocap-linked session with ≤10% rounded-back-at-catch faults (min. 20 strokes, quality capture required)',
+    icon: ShieldCheck,
+    color: 'text-cyan-500',
+    condition: (_sessions: Session[], stats?: { postureSessions?: SessionFaultInput[] }): boolean => {
+      const postureSessions = stats?.postureSessions;
+      return postureSessions ? postureSessions.some(cleanCatchQualifies) : false;
+    }
   }
 ];
