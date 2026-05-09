@@ -7,6 +7,8 @@ import { processZipFile, ZipImportResult, ZipProcessProgress } from '@/lib/zipPa
 import { formatValidationErrors, hasCriticalErrors } from '@/lib/validation';
 import { ImportResult, Session } from '@/types/session';
 import { saveSessionsToDBChunked, UploadProgress } from '@/lib/dataSync';
+import { clearSessionsCache } from '@/lib/services/sessionsCache';
+import { confirmMocapSessionLink } from '@/lib/mocap/linking';
 import { useSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,9 +16,13 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive, Database, RefreshCw, Settings, Video } from 'lucide-react';
 import Link from 'next/link';
 
+type MocapOverlapStatus = 'idle' | 'linking' | 'linked' | 'conflict' | 'error';
+
 interface MocapOverlap {
   rowingSessionId: string;
   mocapSessionId: string;
+  status?: MocapOverlapStatus;
+  message?: string;
 }
 
 type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' | 'syncing' | 'success' | 'error';
@@ -87,13 +93,72 @@ export default function UploadPage() {
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data.overlaps) && data.overlaps.length > 0) {
-        setMocapOverlaps(data.overlaps);
+        setMocapOverlaps(data.overlaps.map((overlap: MocapOverlap) => ({
+          ...overlap,
+          status: 'idle',
+        })));
         setDismissedOverlaps(false);
       }
     } catch {
       // Non-critical — silently ignore overlap check errors
     }
   }, []);
+
+  const handleConfirmMocapLink = useCallback(async (overlap: MocapOverlap) => {
+    const matchesOverlap = (candidate: MocapOverlap) =>
+      candidate.mocapSessionId === overlap.mocapSessionId &&
+      candidate.rowingSessionId === overlap.rowingSessionId;
+
+    setMocapOverlaps((current) => current.map((candidate) =>
+      matchesOverlap(candidate)
+        ? { ...candidate, status: 'linking', message: undefined }
+        : candidate
+    ));
+
+    try {
+      const result = await confirmMocapSessionLink(overlap);
+
+      if (result.ok) {
+        const linkedSession = getSessions().find((session) => session.id === result.rowingSessionId);
+        if (linkedSession) {
+          updateSessionsInStore([
+            {
+              ...linkedSession,
+              mocapSession: { id: result.mocapSessionId },
+            },
+          ]);
+        }
+        clearSessionsCache();
+
+        setMocapOverlaps((current) => current.map((candidate) =>
+          matchesOverlap(candidate)
+            ? { ...candidate, status: 'linked', message: 'Linked and re-analyzed with csv-aligned posture data.' }
+            : candidate
+        ));
+        return;
+      }
+
+      setMocapOverlaps((current) => current.map((candidate) =>
+        matchesOverlap(candidate)
+          ? {
+              ...candidate,
+              status: result.reason === 'conflict' ? 'conflict' : 'error',
+              message: result.message,
+            }
+          : candidate
+      ));
+    } catch (err) {
+      setMocapOverlaps((current) => current.map((candidate) =>
+        matchesOverlap(candidate)
+          ? {
+              ...candidate,
+              status: 'error',
+              message: err instanceof Error ? err.message : 'Failed to link mocap session.',
+            }
+          : candidate
+      ));
+    }
+  }, [getSessions, updateSessionsInStore]);
 
   const processFile = async (file: File) => {
     setSelectedFile(file);
@@ -103,6 +168,8 @@ export default function UploadPage() {
     setZipResult(null);
     setUploadProgress(null);
     setZipProgress(null);
+    setMocapOverlaps([]);
+    setDismissedOverlaps(false);
 
     try {
       // Check if it's a ZIP file
@@ -690,16 +757,42 @@ export default function UploadPage() {
                             ? 'A motion-capture session was recorded within 2 minutes of your imported rowing session. Link them to enable csv-aligned posture analysis.'
                             : `${mocapOverlaps.length} motion-capture sessions were recorded within 2 minutes of your imported rowing sessions. Link them to enable csv-aligned posture analysis.`}
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="space-y-2">
                           {mocapOverlaps.map((overlap) => (
-                            <Link
-                              key={overlap.mocapSessionId}
-                              href={`/mocap/sessions/${overlap.mocapSessionId}`}
-                              className="inline-flex items-center gap-1 text-xs bg-purple-100 dark:bg-purple-800/40 text-purple-700 dark:text-purple-300 rounded px-2 py-1 hover:bg-purple-200 dark:hover:bg-purple-700/40 transition-colors"
-                            >
-                              <Video className="h-3 w-3" />
-                              View Mocap Session
-                            </Link>
+                            <div key={`${overlap.mocapSessionId}-${overlap.rowingSessionId}`}>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleConfirmMocapLink(overlap)}
+                                  disabled={overlap.status === 'linking' || overlap.status === 'linked'}
+                                  data-testid={`mocap-link-${overlap.mocapSessionId}`}
+                                >
+                                  {overlap.status === 'linking' ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : overlap.status === 'linked' ? (
+                                    <CheckCircle className="h-3 w-3" />
+                                  ) : (
+                                    <Video className="h-3 w-3" />
+                                  )}
+                                  {overlap.status === 'linked' ? 'Linked' : 'Link Mocap'}
+                                </Button>
+                                <Button asChild size="sm" variant="outline">
+                                  <Link href={`/mocap/sessions/${overlap.mocapSessionId}`}>
+                                    <Video className="h-3 w-3" />
+                                    View
+                                  </Link>
+                                </Button>
+                              </div>
+                              {overlap.message && (
+                                <p className={`mt-1 text-xs ${
+                                  overlap.status === 'linked'
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : 'text-red-700 dark:text-red-300'
+                                }`}>
+                                  {overlap.message}
+                                </p>
+                              )}
+                            </div>
                           ))}
                           <button
                             onClick={() => setDismissedOverlaps(true)}
@@ -719,10 +812,10 @@ export default function UploadPage() {
                     Upload Another File
                   </Button>
                   <Button asChild>
-                    <a href="/" className="flex items-center space-x-2">
+                    <Link href="/" className="flex items-center space-x-2">
                       <span>Go to Dashboard</span>
                       <ArrowRight className="h-4 w-4" />
-                    </a>
+                    </Link>
                   </Button>
                 </div>
               </div>

@@ -75,11 +75,27 @@ export async function POST(
     );
   }
 
-  // Atomically create the link and set status to "analyzing"
-  await prisma.mocapSession.update({
-    where: { id },
-    data: { rowingSessionId, status: "analyzing" },
-  });
+  try {
+    const linkUpdate = await prisma.mocapSession.updateMany({
+      where: { id, userId, rowingSessionId: null, status: "ready" },
+      data: { rowingSessionId, status: "analyzing" },
+    });
+
+    if (linkUpdate.count !== 1) {
+      return NextResponse.json(
+        { error: "Mocap session is already linked to a rowing session. Unlink first." },
+        { status: 409 },
+      );
+    }
+  } catch (err) {
+    if ((err as { code?: string })?.code === "P2002") {
+      return NextResponse.json(
+        { error: "Rowing session is already linked to another mocap session." },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
 
   const storage = getMocapStorage();
 
@@ -101,6 +117,26 @@ export async function POST(
     where: { id },
     data: { status: "ready" },
     select: { id: true, rowingSessionId: true, status: true },
+  });
+
+  await prisma.userSettings.upsert({
+    where: { userId },
+    update: {
+      sessionsRevision: { increment: 1 },
+    },
+    create: {
+      userId,
+      theme: "system",
+      units: "metric",
+      dateFormat: "MM/DD/YYYY",
+      timeFormat: "24h",
+      language: "en",
+      defaultChartType: "line",
+      animationsEnabled: true,
+      cloudAIEnabled: false,
+      maxTokens: 4000,
+      sessionsRevision: 1,
+    },
   });
 
   return NextResponse.json({
