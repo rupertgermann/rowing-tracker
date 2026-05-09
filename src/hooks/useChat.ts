@@ -271,6 +271,18 @@ export function useChat() {
         .pop();
       const previousResponseId = lastAIMessage?.responseId;
 
+      // Fetch posture context from server (non-blocking; omit on error)
+      let posturePayload = null;
+      try {
+        const ctxRes = await fetch('/api/chat/posture-context');
+        if (ctxRes.ok) {
+          const ctxData = await ctxRes.json();
+          posturePayload = ctxData.payload ?? null;
+        }
+      } catch {
+        // proceed without posture context
+      }
+
       const aiResponse = await cloudAI.sendChatMessage(
         content.trim(),
         conversationHistory,
@@ -296,7 +308,8 @@ export function useChat() {
             };
           });
         },
-        attachments
+        attachments,
+        posturePayload,
       );
 
       // Add AI response (only if not empty)

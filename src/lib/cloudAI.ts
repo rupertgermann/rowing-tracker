@@ -162,7 +162,8 @@ export class CloudAIService {
     userSessions?: Session[],
     previousResponseId?: string,
     onToken?: (token: string) => void,
-    attachments?: FileAttachment[]
+    attachments?: FileAttachment[],
+    posturePayload?: PostureAIPayload | null,
   ): Promise<{ content: string; responseId: string }> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
@@ -274,7 +275,7 @@ export class CloudAIService {
 
       // Prepare initial input messages
       const messages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: string; file?: { file_data: string; filename: string } }> }> = [
-        { role: 'system', content: this.getChatSystemPrompt() },
+        { role: 'system', content: this.getChatSystemPrompt(posturePayload) },
         ...conversationHistory.slice(-10).map(msg => ({
           role: msg.role,
           content: msg.content
@@ -813,7 +814,7 @@ export class CloudAIService {
 
 
   // Get system prompt for chat AI trainer
-  private getChatSystemPrompt(_sessions?: Session[]): string {
+  private getChatSystemPrompt(posturePayload?: PostureAIPayload | null, _sessions?: Session[]): string {
     return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
 
 CRITICAL FORMATTING RULES - READ CAREFULLY:
@@ -930,7 +931,7 @@ COMMUNICATION STYLE:
 - Keep responses focused and practical
 - Structure responses with clear headers for easy scanning
 
-Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.${this.getUserProfileContext()}`;
+Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.${this.getUserProfileContext()}${this.buildPostureContextBlock(posturePayload)}`;
   }
 
   // Get user's session context for personalized coaching
@@ -1061,6 +1062,18 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
       return `\n\n${context}\n\nIMPORTANT: Always take the above personal context into account when providing advice. Adjust your recommendations to accommodate any medical conditions, limitations, or preferences mentioned.`;
     }
     return '';
+  }
+
+  // Append posture context block to system prompt when a cloud-safe payload exists.
+  // Raw keypoints are never present here — the hard guard ran server-side before
+  // the payload reached the client.
+  private buildPostureContextBlock(payload?: PostureAIPayload | null): string {
+    if (!payload) return '';
+    const tierLabel =
+      payload.tier === 3
+        ? 'Tier 3 – Fault Summary (no body geometry)'
+        : 'Tier 2 – Fault Summary + Per-Stroke Metrics (no keypoints)';
+    return `\n\n---\nPOSTURE ANALYSIS CONTEXT [${tierLabel}]:\n${JSON.stringify(payload, null, 2)}\n\nUse this posture data to answer questions about the user's technique and form. Do not speculate about raw pose coordinates — only the summarised fault counts and scalar metrics above are available.\n---`;
   }
 
   // Get system prompt for rowing performance analysis
