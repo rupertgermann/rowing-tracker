@@ -102,6 +102,7 @@ export interface CloudInsight {
   confidence: number; // 0-1 from AI
   evidence: string[]; // Supporting data points
   dateGenerated: Date;
+  category?: 'posture';
 }
 
 export class CloudAIService {
@@ -1275,17 +1276,26 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       // Ensure we have an array
       const insightsArray = Array.isArray(insightsData) ? insightsData : [insightsData];
 
-      return insightsArray.map((insight: Record<string, unknown>, index: number) => ({
-        id: `cloud-insight-${Date.now()}-${index}`,
-        type: (insight.type as string) || 'recommendation',
-        title: (insight.title as string) || 'Performance Insight',
-        description: (insight.description as string) || 'No description provided',
-        actionable: Boolean(insight.actionable),
-        priority: (insight.priority as string) || 'medium',
-        confidence: Math.max(0, Math.min(1, Number(insight.confidence) || 0.5)),
-        evidence: Array.isArray(insight.evidence) ? insight.evidence as string[] : [],
-        dateGenerated: new Date()
-      })) as CloudInsight[];
+      const POSTURE_TERMS = /posture|back angle|rounded back|layback|arm bend|drive ratio|recovery ratio|catch position|finish position|spine|trunk lean/i;
+
+      return insightsArray.map((insight: Record<string, unknown>, index: number) => {
+        const title = (insight.title as string) || 'Performance Insight';
+        const description = (insight.description as string) || 'No description provided';
+        const isPosture = POSTURE_TERMS.test(title) || POSTURE_TERMS.test(description);
+
+        return {
+          id: `cloud-insight-${Date.now()}-${index}`,
+          type: (insight.type as string) || 'recommendation',
+          title,
+          description,
+          actionable: Boolean(insight.actionable),
+          priority: (insight.priority as string) || 'medium',
+          confidence: Math.max(0, Math.min(1, Number(insight.confidence) || 0.5)),
+          evidence: Array.isArray(insight.evidence) ? insight.evidence as string[] : [],
+          dateGenerated: new Date(),
+          ...(isPosture ? { category: 'posture' as const } : {}),
+        };
+      }) as CloudInsight[];
     } catch (error) {
       console.error('Failed to parse AI response:', error);
       console.error('Response content:', response);
