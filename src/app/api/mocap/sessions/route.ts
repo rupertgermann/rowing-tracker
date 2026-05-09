@@ -49,11 +49,13 @@ const CalibrationFrame = z.object({
 
 const CreateBody = z
   .object({
-    source: z.enum(["browser"]),
+    source: z.enum(["browser", "sidecar"]),
     captureModelVersion: z.string().min(1).max(120),
-    capturePerspective: z.enum(["side-left", "side-right"]),
+    capturePerspective: z.enum(["side-left", "side-right", "sidecar-3d"]),
     captureFps: z.number().positive().max(240),
     recordOnly: z.boolean().optional(),
+    calibrationId: z.string().uuid().optional(),
+    cameraCount: z.number().int().positive().max(16).optional(),
     calibrationCatchFrame: CalibrationFrame.extend({
       pose: z.literal("catch"),
     }).optional(),
@@ -62,6 +64,7 @@ const CreateBody = z
     }).optional(),
   })
   .superRefine((body, ctx) => {
+    if (body.source === "sidecar") return; // sidecar sessions have no browser calibration frames
     for (const field of ["calibrationCatchFrame", "calibrationFinishFrame"] as const) {
       if (body.recordOnly && body[field] === undefined) continue;
       if (!body[field]) {
@@ -111,6 +114,8 @@ export async function POST(req: Request) {
         captureFps: body.captureFps,
         calibrationCatchFrame: body.calibrationCatchFrame,
         calibrationFinishFrame: body.calibrationFinishFrame,
+        calibrationId: body.calibrationId,
+        cameraCount: body.cameraCount,
         videoStoragePath: "pending",
         poseStreamPath: "pending",
         status: "capturing",

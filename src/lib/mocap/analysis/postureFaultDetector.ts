@@ -1,5 +1,5 @@
 import { postureThresholdsV1, type PostureThresholdBands } from "./postureThresholds";
-import type { PostureFault, PostureMetrics } from "./types";
+import type { PostureFault, PostureMetrics, Sidecar3DMetrics } from "./types";
 
 export function PostureFaultDetector(
   metrics: PostureMetrics,
@@ -152,6 +152,71 @@ export function PostureFaultDetector(
         metric: "recoveryDriveRatio",
         value: metrics.recoveryDriveRatio,
         threshold: thresholds.slow_recovery_ratio.warningAboveRatio,
+      },
+    });
+  }
+
+  // Sidecar-3D fault stubs — thresholds defined in follow-up issues
+  if (metrics.sidecar3D) {
+    faults.push(...detectSidecar3DFaults(metrics.strokeIndex, metrics.sidecar3D));
+  }
+
+  return faults;
+}
+
+function detectSidecar3DFaults(
+  strokeIndex: number,
+  sidecar3D: Sidecar3DMetrics,
+): PostureFault[] {
+  const faults: PostureFault[] = [];
+
+  if (sidecar3D.lateralShoulderSymmetryMm !== undefined) {
+    // Threshold TBD — emit pending stub so UI can show "detection coming soon"
+    faults.push({
+      strokeIndex,
+      faultType: "left_right_asymmetry",
+      severity: "pending",
+      phase: "drive",
+      evidence: {
+        metric: "leftRightAsymmetry",
+        value: sidecar3D.lateralShoulderSymmetryMm,
+        threshold: 0,
+      },
+    });
+  }
+
+  if (
+    sidecar3D.leftKneeTrackDeviationMm !== undefined ||
+    sidecar3D.rightKneeTrackDeviationMm !== undefined
+  ) {
+    const value =
+      Math.max(
+        sidecar3D.leftKneeTrackDeviationMm ?? 0,
+        sidecar3D.rightKneeTrackDeviationMm ?? 0,
+      );
+    faults.push({
+      strokeIndex,
+      faultType: "knee_track_deviation",
+      severity: "pending",
+      phase: "drive",
+      evidence: {
+        metric: "kneeTrackDeviation",
+        value,
+        threshold: 0,
+      },
+    });
+  }
+
+  if (sidecar3D.nearShinAngleDeg !== undefined) {
+    faults.push({
+      strokeIndex,
+      faultType: "shin_not_vertical_at_catch",
+      severity: "pending",
+      phase: "catch",
+      evidence: {
+        metric: "shinVerticalAtCatchDeg",
+        value: sidecar3D.nearShinAngleDeg,
+        threshold: 0,
       },
     });
   }

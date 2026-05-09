@@ -7,9 +7,12 @@ export type PostureFaultType =
   | "early_arm_bend"
   | "back_opens_before_legs_drive"
   | "excessive_layback"
-  | "slow_recovery_ratio";
+  | "slow_recovery_ratio"
+  | "left_right_asymmetry"
+  | "knee_track_deviation"
+  | "shin_not_vertical_at_catch";
 
-export type FaultSeverity = "info" | "warning" | "critical";
+export type FaultSeverity = "info" | "warning" | "critical" | "pending";
 
 export type PoseLandmarkName =
   | "leftShoulder"
@@ -43,6 +46,7 @@ export const POSE_LANDMARK_INDEX: Record<PoseLandmarkName, number> = {
 export interface PosePoint {
   x: number;
   y: number;
+  z?: number; // world-mm-3d only (sidecar-3d, keypointSchemaVersion 2)
   confidence: number;
 }
 
@@ -60,6 +64,8 @@ export interface PoseFrameStream {
   fps: number;
   capturePerspective: CapturePerspective;
   frames: readonly PoseAnalysisFrame[];
+  coordinateSpace?: "normalized-2d" | "world-mm-3d";
+  cameraCount?: number;
 }
 
 export interface Stroke {
@@ -91,6 +97,14 @@ export interface AvailableMetric<T> {
 
 export type MaybeMetric<T> = AvailableMetric<T> | UnavailableMetric;
 
+export interface Sidecar3DMetrics {
+  lateralShoulderSymmetryMm?: number;
+  lateralHipSymmetryMm?: number;
+  leftKneeTrackDeviationMm?: number;
+  rightKneeTrackDeviationMm?: number;
+  nearShinAngleDeg?: number;
+}
+
 export interface PostureMetrics {
   strokeIndex: number;
   segmentationSource: StrokeSegmentationSource;
@@ -105,6 +119,7 @@ export interface PostureMetrics {
   leftRightAsymmetry: MaybeMetric<number>;
   shinVerticalAtCatchDeg: MaybeMetric<number>;
   kneeTrackDeviation: MaybeMetric<number>;
+  sidecar3D?: Sidecar3DMetrics;
 }
 
 export interface PostureFault {
@@ -140,5 +155,6 @@ function isPosePointArray(keypoints: PoseKeypoints): keypoints is readonly PoseP
 export function landmarkSide(
   perspective: CapturePerspective,
 ): "left" | "right" {
+  // sidecar-3d uses right-side projection for v1-compatible fault rules
   return perspective === "side-left" ? "left" : "right";
 }

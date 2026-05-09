@@ -59,6 +59,7 @@ const SEVERITY_RANK: Record<FaultSeverity, number> = {
   info: 0,
   warning: 1,
   critical: 2,
+  pending: -1,
 };
 
 export class LiveCoachingEngine {

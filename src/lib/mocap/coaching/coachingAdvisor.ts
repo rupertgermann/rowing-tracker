@@ -37,6 +37,18 @@ const DRILL_CATALOG: Record<PostureFaultType, string[]> = {
     "Controlled recovery timing drill",
     "Pause at the finish drill",
   ],
+  left_right_asymmetry: [
+    "Eyes-closed sculling drill",
+    "Single-arm rowing alternate sides",
+  ],
+  knee_track_deviation: [
+    "Slow-motion drive with knee-track focus",
+    "Legs-only rowing with band resistance",
+  ],
+  shin_not_vertical_at_catch: [
+    "Pause drill at the catch — check shin angle",
+    "Footstretcher adjustment check",
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -74,6 +86,21 @@ const CUE_COPY: Record<PostureFaultType, CueCopy> = {
       "Your recovery is very slow relative to the drive. Control the slide speed but aim to keep the recovery-to-drive ratio below 2.5 to maintain a good rhythm.",
     audioHint: "Control your slide",
   },
+  left_right_asymmetry: {
+    message:
+      "Left-right asymmetry detected in your shoulder or hip position. Focus on applying equal pressure through both feet and keeping the handle level.",
+    audioHint: "Even pressure both sides",
+  },
+  knee_track_deviation: {
+    message:
+      "Your knee is tracking away from the straight line during the drive. Keep the knees tracking over your feet throughout the stroke.",
+    audioHint: "Knees over feet",
+  },
+  shin_not_vertical_at_catch: {
+    message:
+      "Your shin is not vertical at the catch. Check your foot stretcher position and ensure you reach the correct compression before taking the stroke.",
+    audioHint: "Vertical shin at catch",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -84,6 +111,7 @@ const SEVERITY_RANK: Record<FaultSeverity, number> = {
   info: 0,
   warning: 1,
   critical: 2,
+  pending: -1, // pending faults are never surfaced as coaching cues
 };
 
 // ---------------------------------------------------------------------------

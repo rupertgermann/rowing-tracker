@@ -7,6 +7,7 @@ import {
   type PoseLandmarkName,
   type PosePoint,
   type PostureMetrics,
+  type Sidecar3DMetrics,
   type Stroke,
 } from "./types";
 
@@ -18,13 +19,14 @@ export function PostureMetricsCalculator(
   calibration?: Calibration,
 ): PostureMetrics {
   void calibration;
-  const catchFrame = frameAt(stream, stroke.catchFrameIndex);
-  const finishFrame = frameAt(stream, stroke.finishFrameIndex);
-  const backAngleAtCatchDeg = torsoBackAngleDeg(stream, catchFrame);
-  const backAngleAtFinishDeg = torsoBackAngleDeg(stream, finishFrame);
+  const projectedStream = toProjectedStream(stream);
+  const catchFrame = frameAt(projectedStream, stroke.catchFrameIndex);
+  const finishFrame = frameAt(projectedStream, stroke.finishFrameIndex);
+  const backAngleAtCatchDeg = torsoBackAngleDeg(projectedStream, catchFrame);
+  const backAngleAtFinishDeg = torsoBackAngleDeg(projectedStream, finishFrame);
   const laybackAngleDeg = Math.max(0, 90 - backAngleAtFinishDeg);
 
-  const legSignal = legExtensionSignal(stream, stroke);
+  const legSignal = legExtensionSignal(projectedStream, stroke);
   const catchLeg = legSignal[0]?.value ?? 0;
   const finishLeg = legSignal[stroke.finishFrameIndex - stroke.catchFrameIndex]
     ?.value ?? catchLeg;
@@ -39,11 +41,11 @@ export function PostureMetricsCalculator(
     catchLeg + legRange * 0.8,
   );
   const torsoOpenFrameIndex = firstTorsoChangeFrame(
-    stream,
+    projectedStream,
     stroke,
     backAngleAtCatchDeg,
   );
-  const armBendOnsetFrameIndex = firstArmBendFrame(stream, stroke);
+  const armBendOnsetFrameIndex = firstArmBendFrame(projectedStream, stroke);
 
   return {
     strokeIndex: stroke.strokeIndex,
@@ -74,6 +76,10 @@ export function PostureMetricsCalculator(
       stream.capturePerspective === "sidecar-3d"
         ? { available: false, reason: "insufficient-tracking" }
         : { available: false, reason: "requires-sidecar-3d" },
+    sidecar3D:
+      stream.capturePerspective === "sidecar-3d"
+        ? computeSidecar3DMetrics(stream, stroke)
+        : undefined,
   };
 }
 
@@ -230,4 +236,136 @@ function recoveryDriveRatio(stroke: Stroke): number {
 
 function radiansToDegrees(radians: number): number {
   return (radians * 180) / Math.PI;
+}
+
+// --- Coordinate-space adapter (ADR-0005 §3) ---
+
+interface SessionBounds {
+  yMin: number;
+  yMax: number;
+  zMin: number;
+  zMax: number;
+}
+
+function computeSessionBounds(stream: PoseFrameStream): SessionBounds {
+  let yMin = Infinity, yMax = -Infinity, zMin = Infinity, zMax = -Infinity;
+  for (const frame of stream.frames) {
+    const kps = Array.isArray(frame.keypoints) ? frame.keypoints : Object.values(frame.keypoints);
+    for (const kp of kps) {
+      if (!kp || kp.confidence < MIN_CONFIDENCE) continue;
+      if (kp.y < yMin) yMin = kp.y;
+      if (kp.y > yMax) yMax = kp.y;
+      if (kp.z !== undefined) {
+        if (kp.z < zMin) zMin = kp.z;
+        if (kp.z > zMax) zMax = kp.z;
+      }
+    }
+  }
+  return { yMin, yMax, zMin, zMax };
+}
+
+function projectToNormalized(point: PosePoint, bounds: SessionBounds): PosePoint {
+  if (point.z === undefined) return point;
+  const yRange = bounds.yMax - bounds.yMin;
+  const zRange = bounds.zMax - bounds.zMin;
+  return {
+    x: zRange > 0 ? (point.z - bounds.zMin) / zRange : 0.5,
+    y: yRange > 0 ? (point.y - bounds.yMin) / yRange : 0.5,
+    confidence: point.confidence,
+  };
+}
+
+function toProjectedStream(stream: PoseFrameStream): PoseFrameStream {
+  if (stream.coordinateSpace !== "world-mm-3d") return stream;
+  const bounds = computeSessionBounds(stream);
+  const projectedFrames = stream.frames.map((frame) => {
+    const kps = frame.keypoints;
+    const projected = Array.isArray(kps)
+      ? (kps as PosePoint[]).map((kp) => projectToNormalized(kp, bounds))
+      : Object.fromEntries(
+          Object.entries(kps as Record<string, PosePoint>).map(([k, v]) => [
+            k,
+            projectToNormalized(v, bounds),
+          ]),
+        );
+    return { ...frame, keypoints: projected };
+  });
+  return { ...stream, frames: projectedFrames as PoseFrameStream["frames"] };
+}
+
+// --- Sidecar-3D specific metrics ---
+
+function computeSidecar3DMetrics(
+  stream: PoseFrameStream,
+  stroke: Stroke,
+): Sidecar3DMetrics {
+  const metrics: Sidecar3DMetrics = {};
+  const frames = stream.frames.slice(stroke.catchFrameIndex, stroke.finishFrameIndex + 1);
+  if (frames.length === 0) return metrics;
+
+  // lateralShoulderSymmetryMm: mean absolute x-displacement left vs right shoulder
+  const shoulderDeltas: number[] = [];
+  const hipDeltas: number[] = [];
+  for (const frame of frames) {
+    const ls = getPosePoint(frame, "leftShoulder");
+    const rs = getPosePoint(frame, "rightShoulder");
+    const lh = getPosePoint(frame, "leftHip");
+    const rh = getPosePoint(frame, "rightHip");
+    if (ls && rs && ls.confidence >= MIN_CONFIDENCE && rs.confidence >= MIN_CONFIDENCE) {
+      shoulderDeltas.push(Math.abs(ls.x - rs.x));
+    }
+    if (lh && rh && lh.confidence >= MIN_CONFIDENCE && rh.confidence >= MIN_CONFIDENCE) {
+      hipDeltas.push(Math.abs(lh.x - rh.x));
+    }
+  }
+  if (shoulderDeltas.length > 0) {
+    metrics.lateralShoulderSymmetryMm =
+      shoulderDeltas.reduce((a, b) => a + b, 0) / shoulderDeltas.length;
+  }
+  if (hipDeltas.length > 0) {
+    metrics.lateralHipSymmetryMm =
+      hipDeltas.reduce((a, b) => a + b, 0) / hipDeltas.length;
+  }
+
+  // knee track deviation: peak |knee.x - ankle.x| during drive
+  let leftKneePeak = 0;
+  let rightKneePeak = 0;
+  for (const frame of frames) {
+    const lk = getPosePoint(frame, "leftKnee");
+    const la = getPosePoint(frame, "leftAnkle");
+    const rk = getPosePoint(frame, "rightKnee");
+    const ra = getPosePoint(frame, "rightAnkle");
+    if (lk && la && lk.confidence >= MIN_CONFIDENCE && la.confidence >= MIN_CONFIDENCE) {
+      leftKneePeak = Math.max(leftKneePeak, Math.abs(lk.x - la.x));
+    }
+    if (rk && ra && rk.confidence >= MIN_CONFIDENCE && ra.confidence >= MIN_CONFIDENCE) {
+      rightKneePeak = Math.max(rightKneePeak, Math.abs(rk.x - ra.x));
+    }
+  }
+  if (leftKneePeak > 0) metrics.leftKneeTrackDeviationMm = leftKneePeak;
+  if (rightKneePeak > 0) metrics.rightKneeTrackDeviationMm = rightKneePeak;
+
+  // nearShinAngleDeg: shin angle from nearer (lower |z|) ankle/knee pair at catch
+  const catchFrame = stream.frames[stroke.catchFrameIndex];
+  if (catchFrame) {
+    const lk = getPosePoint(catchFrame, "leftKnee");
+    const la = getPosePoint(catchFrame, "leftAnkle");
+    const rk = getPosePoint(catchFrame, "rightKnee");
+    const ra = getPosePoint(catchFrame, "rightAnkle");
+    const leftZ = lk?.z ?? Infinity;
+    const rightZ = rk?.z ?? Infinity;
+    const [knee, ankle] = Math.abs(leftZ) <= Math.abs(rightZ)
+      ? [lk, la]
+      : [rk, ra];
+    if (
+      knee && ankle &&
+      knee.confidence >= MIN_CONFIDENCE && ankle.confidence >= MIN_CONFIDENCE
+    ) {
+      const dx = knee.x - ankle.x;
+      const dy = knee.y - ankle.y;
+      metrics.nearShinAngleDeg = radiansToDegrees(Math.atan2(Math.abs(dx), Math.abs(dy)));
+    }
+  }
+
+  return metrics;
 }

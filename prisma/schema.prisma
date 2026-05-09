@@ -194,6 +194,8 @@ model MocapSession {
   captureFps          Float
   calibrationCatchFrame Json?
   calibrationFinishFrame Json?
+  calibrationId       String?
+  cameraCount         Int?
   durationSec         Float    @default(0)
   qualityScore        Float?
   qualityFlags        String[] @default([])
@@ -530,6 +532,7 @@ model UserSettings {
   userProfileRawInput     String?  @db.Text
   postureThresholds       Json?
   mocapPreferences        Json?
+  sidecarPort             Int?
   dashboardSettings       Json?
   sessionsViewSettings    Json?
   sessionAnalysisSettings Json?

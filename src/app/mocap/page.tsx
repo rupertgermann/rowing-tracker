@@ -51,6 +51,7 @@ import type {
   PostureFault,
 } from "@/lib/mocap/analysis/types";
 import { settings } from "@/lib/settings";
+import { checkSidecarHealth, SIDECAR_DEFAULT_PORT, type SidecarHealth } from "@/lib/mocap/sidecarClient";
 
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
@@ -162,6 +163,9 @@ export default function MocapCapturePage() {
   const [framingDegraded, setFramingDegraded] = useState(false);
   const [sessionQualityFlags, setSessionQualityFlags] = useState<string[]>([]);
   const [recordOnly, setRecordOnly] = useState(false);
+  const [useSidecar, setUseSidecar] = useState(false);
+  const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth | null>(null);
+  const [sidecarError, setSidecarError] = useState<string | null>(null);
   const [recordOnlyReason, setRecordOnlyReason] =
     useState<RecordOnlyReason | null>(null);
   const [captureSupport, setCaptureSupport] =
@@ -453,6 +457,45 @@ export default function MocapCapturePage() {
   );
 
   const start = useCallback(async () => {
+    // Sidecar path: skip browser camera/calibration, use sidecar-3d perspective
+    if (useSidecar) {
+      setState({ kind: "starting" });
+      try {
+        const health = await checkSidecarHealth(SIDECAR_DEFAULT_PORT);
+        setSidecarHealth(health);
+        setSidecarError(null);
+        if (health.status !== "ready") {
+          setState({ kind: "error", message: `Sidecar not ready: ${health.status}` });
+          return;
+        }
+        const createRes = await fetch("/api/mocap/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "sidecar",
+            captureModelVersion: `freemocap-sidecar@schemaV${health.schemaVersion}`,
+            capturePerspective: "sidecar-3d",
+            captureFps: health.fps,
+            cameraCount: health.cameras,
+          }),
+        });
+        if (!createRes.ok) throw new Error(`Create session failed: ${createRes.status}`);
+        const created: { id: string } = await createRes.json();
+        // Arm the sidecar via the connect endpoint
+        await fetch(`/api/mocap/sessions/${created.id}/sidecar/connect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        setState({ kind: "capturing", sessionId: created.id, startedAt: Date.now() });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Sidecar error";
+        setSidecarError(msg);
+        setState({ kind: "error", message: msg });
+      }
+      return;
+    }
+
     const captureRecordOnly =
       recordOnly ||
       Boolean(
@@ -612,6 +655,7 @@ export default function MocapCapturePage() {
     perspective,
     recordOnly,
     recordOnlyReason,
+    useSidecar,
     clearCueDismissTimer,
   ]);
 
@@ -831,6 +875,39 @@ export default function MocapCapturePage() {
               />
               Audio cues
             </label>
+            <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-sidecar-label">
+              <input
+                type="checkbox"
+                checked={useSidecar}
+                onChange={async (e) => {
+                  const checked = e.target.checked;
+                  setUseSidecar(checked);
+                  setSidecarError(null);
+                  setSidecarHealth(null);
+                  if (checked) {
+                    try {
+                      const h = await checkSidecarHealth(SIDECAR_DEFAULT_PORT);
+                      setSidecarHealth(h);
+                    } catch {
+                      setSidecarError("Sidecar not reachable on port 8765. Install rowing-tracker-sidecar and run it first.");
+                    }
+                  }
+                }}
+                disabled={state.kind !== "idle" && state.kind !== "done"}
+                data-testid="mocap-sidecar-toggle"
+              />
+              Multi-camera sidecar
+            </label>
+            {useSidecar && sidecarHealth && (
+              <span className="text-xs text-green-600" data-testid="mocap-sidecar-status">
+                Sidecar ready — {sidecarHealth.cameras} camera{sidecarHealth.cameras !== 1 ? "s" : ""}, {sidecarHealth.fps} fps
+              </span>
+            )}
+            {useSidecar && sidecarError && (
+              <span className="text-xs text-red-500" data-testid="mocap-sidecar-error">
+                {sidecarError}
+              </span>
+            )}
             <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-verbosity-label">
               Cues:
               <select

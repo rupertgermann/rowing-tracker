@@ -1,7 +1,11 @@
 import {
   BYTES_PER_FRAME_V1,
+  BYTES_PER_FRAME_V2,
   HEADER_SIZE,
+  KEYPOINT_SCHEMA_V1,
+  KEYPOINT_SCHEMA_V2,
   KEYPOINTS_PER_FRAME_V1,
+  KEYPOINTS_PER_FRAME_V2,
   OPEN_FRAME_COUNT,
   PoseStreamFormatError,
   decodeFrame,
@@ -31,11 +35,17 @@ export function adaptPoseFrameStreamBytes(
   capturePerspective: CapturePerspective,
 ): PoseFrameStream {
   const header = decodeHeader(headerBytes);
+  const isV2 = header.keypointSchemaVersion === KEYPOINT_SCHEMA_V2;
+  const expectedKeypoints = isV2 ? KEYPOINTS_PER_FRAME_V2 : KEYPOINTS_PER_FRAME_V1;
+  const expectedBytesPerFrame = isV2 ? BYTES_PER_FRAME_V2 : BYTES_PER_FRAME_V1;
+
   if (
-    header.keypointsPerFrame !== KEYPOINTS_PER_FRAME_V1 ||
-    header.bytesPerFrame !== BYTES_PER_FRAME_V1
+    header.keypointsPerFrame !== expectedKeypoints ||
+    header.bytesPerFrame !== expectedBytesPerFrame
   ) {
-    throw new PoseStreamFormatError("PoseFrameStream header does not match v1 frame layout");
+    throw new PoseStreamFormatError(
+      `PoseFrameStream header does not match v${header.keypointSchemaVersion} frame layout`,
+    );
   }
 
   if (packedFrames.byteLength % header.bytesPerFrame !== 0) {
@@ -51,20 +61,30 @@ export function adaptPoseFrameStreamBytes(
     );
   }
 
+  const schema = header.keypointSchemaVersion;
   return {
     fps: header.fps,
     capturePerspective,
+    coordinateSpace: header.coordinateSpace,
+    cameraCount: header.cameraCount,
     frames: Array.from({ length: frameCount }, (_, frameIndex) =>
-      adaptFrame(packedFrames, frameIndex * header.bytesPerFrame),
+      adaptFrame(packedFrames, frameIndex * header.bytesPerFrame, schema),
     ),
   };
 }
 
-function adaptFrame(bytes: Uint8Array, offset: number): PoseAnalysisFrame {
-  const frame = decodeFrame(bytes, offset);
+function adaptFrame(
+  bytes: Uint8Array,
+  offset: number,
+  schema: number,
+): PoseAnalysisFrame {
+  const frame = decodeFrame(bytes, offset, schema);
   return {
     timestampMs: frame.timestampMs,
-    keypoints: keypointTripletsToPosePoints(frame.keypoints),
+    keypoints:
+      schema === KEYPOINT_SCHEMA_V2
+        ? keypointQuadsToPosePoints(frame.keypoints)
+        : keypointTripletsToPosePoints(frame.keypoints),
     qualityFlags: frame.qualityFlags,
   };
 }
@@ -76,6 +96,19 @@ export function keypointTripletsToPosePoints(keypoints: Float32Array): PosePoint
       x: keypoints[i],
       y: keypoints[i + 1],
       confidence: keypoints[i + 2],
+    });
+  }
+  return points;
+}
+
+export function keypointQuadsToPosePoints(keypoints: Float32Array): PosePoint[] {
+  const points: PosePoint[] = [];
+  for (let i = 0; i < keypoints.length; i += 4) {
+    points.push({
+      x: keypoints[i],
+      y: keypoints[i + 1],
+      z: keypoints[i + 2],
+      confidence: keypoints[i + 3],
     });
   }
   return points;

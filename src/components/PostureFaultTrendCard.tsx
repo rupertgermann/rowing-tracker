@@ -23,6 +23,9 @@ const FAULT_LABELS: Record<PostureFaultType, string> = {
   back_opens_before_legs_drive: 'Back Opens Early',
   excessive_layback: 'Excessive Layback',
   slow_recovery_ratio: 'Slow Recovery',
+  left_right_asymmetry: 'L/R Asymmetry',
+  knee_track_deviation: 'Knee Track',
+  shin_not_vertical_at_catch: 'Shin Angle',
 };
 
 const FAULT_COLORS: Record<PostureFaultType, string> = {
@@ -31,6 +34,9 @@ const FAULT_COLORS: Record<PostureFaultType, string> = {
   back_opens_before_legs_drive: '#eab308',
   excessive_layback: '#8b5cf6',
   slow_recovery_ratio: '#06b6d4',
+  left_right_asymmetry: '#10b981',
+  knee_track_deviation: '#3b82f6',
+  shin_not_vertical_at_catch: '#f59e0b',
 };
 
 interface ChartPoint {
