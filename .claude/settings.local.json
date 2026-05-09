@@ -33,7 +33,10 @@
       "Bash(git commit *)",
       "Bash(xargs -I{} echo {})",
       "Bash(npm test *)",
-      "Bash(git worktree *)"
+      "Bash(git worktree *)",
+      "WebSearch",
+      "Bash(node *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.get\\('scripts',{}\\).items\\(\\)}, indent=2\\)\\); print\\('devdeps:', list\\(d.get\\('devDependencies',{}\\).keys\\(\\)\\)[:20]\\)\")"
     ]
   }
 }
