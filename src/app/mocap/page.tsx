@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +15,13 @@ import {
   type PoseSourceStatus,
 } from "@/lib/mocap/browserPoseSource";
 import {
+  cameraQualityFlagLabel,
+  evaluateCameraReadiness,
+  type CameraReadinessFrame,
+  type CameraReadinessResult,
+} from "@/lib/mocap/cameraReadiness";
+import {
   BYTES_PER_FRAME_V1,
-  QUALITY_FLAG,
   decodeFrame,
 } from "@/lib/mocap/poseFrameStream";
 import { VideoUploader } from "@/lib/mocap/videoUploader";
@@ -39,9 +45,7 @@ import { settings } from "@/lib/settings";
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
 const VIDEO_TIMESLICE_MS = 1000;
-const MIN_TRACKED_KEYPOINTS = 20;
-const MIN_MEAN_CONFIDENCE = 0.5;
-const DEGRADED_FRAME_MS = 2000;
+const QUALITY_HISTORY_MS = 5000;
 
 const SEVERITY_WEIGHT: Record<string, number> = {
   critical: 3,
@@ -122,8 +126,9 @@ export default function MocapCapturePage() {
   const sourceRef = useRef<BrowserPoseSource | null>(null);
   const calibrationSourceRef = useRef<BrowserPoseSource | null>(null);
   const startedAtRef = useRef<number>(0);
-  const degradedSinceRef = useRef<number | null>(null);
   const latestPoseFrameRef = useRef<PoseQuality>(EMPTY_QUALITY);
+  const qualityHistoryRef = useRef<CameraReadinessFrame[]>([]);
+  const latestCameraReadinessRef = useRef<CameraReadinessResult | null>(null);
   const engineRef = useRef<LiveCoachingEngine | null>(null);
   const cueDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioEnabledRef = useRef(false);
@@ -139,6 +144,8 @@ export default function MocapCapturePage() {
   );
   const [elapsedSec, setElapsedSec] = useState(0);
   const [quality, setQuality] = useState<PoseQuality>(EMPTY_QUALITY);
+  const [cameraReadiness, setCameraReadiness] =
+    useState<CameraReadinessResult | null>(null);
   const [framingDegraded, setFramingDegraded] = useState(false);
   const [sessionQualityFlags, setSessionQualityFlags] = useState<string[]>([]);
   const [recordOnly, setRecordOnly] = useState(false);
@@ -215,33 +222,50 @@ export default function MocapCapturePage() {
       setFramesEncoded(info.framesEncoded);
       setQuality(nextQuality);
 
+      const nowMs = Date.now();
+      const decodedFrame = decodeBase64PoseFrame(info.poseFrameBase64);
+      qualityHistoryRef.current = [
+        ...qualityHistoryRef.current.filter(
+          (frame) => frame.timestampMs >= nowMs - QUALITY_HISTORY_MS,
+        ),
+        {
+          timestampMs: nowMs,
+          trackedKeypointCount: info.trackedKeypointCount,
+          meanConfidence: info.meanConfidence,
+          qualityFlags: info.qualityFlags,
+          keypoints: Array.isArray(decodedFrame?.keypoints)
+            ? decodedFrame.keypoints
+            : undefined,
+        },
+      ];
+      const readiness = evaluateCameraReadiness(qualityHistoryRef.current, {
+        capturePerspective: perspective,
+        nowMs,
+      });
+      latestCameraReadinessRef.current = readiness;
+      setCameraReadiness(readiness);
+
       // Feed the live coaching engine when active.
       if (engineRef.current) {
-        const frame = decodeBase64PoseFrame(info.poseFrameBase64);
-        if (frame) engineRef.current.pushFrame(frame);
+        if (decodedFrame) engineRef.current.pushFrame(decodedFrame);
       }
 
       if (!monitorDegradedFraming) return;
 
-      const degraded = isDegradedFraming(nextQuality);
-      if (!degraded) {
-        degradedSinceRef.current = null;
+      if (!readiness.sustainedDegraded) {
         setFramingDegraded(false);
         return;
       }
 
-      const now = Date.now();
-      degradedSinceRef.current ??= now;
-      if (now - degradedSinceRef.current >= DEGRADED_FRAME_MS) {
-        setFramingDegraded(true);
-        setSessionQualityFlags((flags) =>
-          flags.includes("framing-degraded")
-            ? flags
-            : [...flags, "framing-degraded"],
-        );
-      }
+      setFramingDegraded(true);
+      setSessionQualityFlags((flags) =>
+        appendUniqueFlags(flags, [
+          "camera-readiness-degraded",
+          ...readiness.qualityFlags.filter((flag) => flag !== "ok"),
+        ]),
+      );
     },
-    [],
+    [perspective],
   );
 
   const teardown = useCallback(async () => {
@@ -297,6 +321,9 @@ export default function MocapCapturePage() {
     setPoseStatus("idle");
     setFramesEncoded(0);
     setQuality(EMPTY_QUALITY);
+    setCameraReadiness(null);
+    qualityHistoryRef.current = [];
+    latestCameraReadinessRef.current = null;
     latestPoseFrameRef.current = EMPTY_QUALITY;
     try {
       if (!streamRef.current) {
@@ -334,7 +361,7 @@ export default function MocapCapturePage() {
   const captureCalibrationFrame = useCallback(
     (pose: CalibrationPose) => {
       const latest = latestPoseFrameRef.current;
-      if (!isCameraReadyForCapture(latest)) {
+      if (!latestCameraReadinessRef.current?.ready) {
         setCalibration((current) => ({
           ...current,
           hint:
@@ -377,7 +404,7 @@ export default function MocapCapturePage() {
 
   const start = useCallback(async () => {
     const calibrationFrames = getCalibrationFrames(calibration);
-    if (!calibrationFrames || !isCameraReadyForCapture(latestPoseFrameRef.current)) {
+    if (!calibrationFrames || !latestCameraReadinessRef.current?.ready) {
       setCalibration((current) => ({
         ...current,
         hint:
@@ -492,7 +519,9 @@ export default function MocapCapturePage() {
       setFramesEncoded(0);
       setFramingDegraded(false);
       setSessionQualityFlags([]);
-      degradedSinceRef.current = null;
+      qualityHistoryRef.current = [];
+      latestCameraReadinessRef.current = null;
+      setCameraReadiness(null);
       setState({
         kind: "capturing",
         sessionId,
@@ -642,7 +671,7 @@ export default function MocapCapturePage() {
     : !("finishFrame" in calibration && calibration.finishFrame)
       ? "finish"
       : null;
-  const cameraReady = isCameraReadyForCapture(quality);
+  const cameraReady = cameraReadiness?.ready ?? false;
   const canRecord =
     state.kind !== "capturing" &&
     state.kind !== "starting" &&
@@ -790,6 +819,15 @@ export default function MocapCapturePage() {
             <CalibrationStep label="Camera check" done={cameraReady} />
           </div>
 
+          {cameraReadiness && !cameraReady ? (
+            <div
+              className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
+              data-testid="mocap-camera-readiness-hint"
+            >
+              {cameraReadiness.message}
+            </div>
+          ) : null}
+
           {calibration.hint ? (
             <div
               className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
@@ -823,8 +861,8 @@ export default function MocapCapturePage() {
               className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
               data-testid="mocap-framing-degraded"
             >
-              Framing degraded. Check lighting and keep the rower fully in the
-              side view.
+              Camera readiness degraded for several seconds. Check lighting,
+              tracking, and side-view framing before continuing.
             </div>
           ) : null}
 
@@ -834,21 +872,20 @@ export default function MocapCapturePage() {
             <Stat label="Frames encoded" value={framesEncoded.toString()} />
             <Stat
               label="Effective FPS"
-              value={
-                elapsedSec > 0
-                  ? (framesEncoded / elapsedSec).toFixed(1)
-                  : "0.0"
-              }
+              value={(cameraReadiness?.effectiveFps ?? 0).toFixed(1)}
             />
             <Stat
-              label="Mean confidence"
-              value={`${Math.round(quality.meanConfidence * 100)}%`}
+              label="Model confidence"
+              value={`${Math.round((cameraReadiness?.modelConfidence ?? quality.meanConfidence) * 100)}%`}
             />
             <Stat
               label="Tracked keypoints"
-              value={`${quality.trackedKeypointCount}/33`}
+              value={`${cameraReadiness?.trackedKeypointCount ?? quality.trackedKeypointCount}/33`}
             />
-            <Stat label="Quality flags" value={qualityFlagLabel(quality)} />
+            <Stat
+              label="Quality flags"
+              value={cameraQualityFlagLabel(cameraReadiness?.qualityFlags ?? ["no-pose"])}
+            />
           </div>
 
           {state.kind === "done" ? (
@@ -865,21 +902,21 @@ export default function MocapCapturePage() {
               </div>
               <SessionCoachingSummary faults={sessionFaults} />
               <div className="flex gap-2 pt-1">
-                <a
+                <Link
                   href={`/mocap/sessions/${state.sessionId}`}
                   className="underline text-green-800 dark:text-green-300"
                   data-testid="mocap-replay-link"
                 >
                   View replay →
-                </a>
+                </Link>
                 <span className="text-green-700/50 dark:text-green-400/50">·</span>
-                <a
+                <Link
                   href="/mocap/sessions"
                   className="underline text-green-800 dark:text-green-300"
                   data-testid="mocap-sessions-link"
                 >
                   All sessions
-                </a>
+                </Link>
               </div>
             </div>
           ) : null}
@@ -960,38 +997,16 @@ function getCalibrationFrames(
   return null;
 }
 
-function isCameraReadyForCapture(quality: PoseQuality): boolean {
-  return (
-    quality.trackedKeypointCount >= MIN_TRACKED_KEYPOINTS &&
-    quality.meanConfidence >= MIN_MEAN_CONFIDENCE &&
-    (quality.qualityFlags & QUALITY_FLAG.OUT_OF_FRAME) === 0
-  );
-}
-
-function isDegradedFraming(quality: PoseQuality): boolean {
-  return (
-    quality.trackedKeypointCount < MIN_TRACKED_KEYPOINTS ||
-    quality.meanConfidence < MIN_MEAN_CONFIDENCE ||
-    (quality.qualityFlags &
-      (QUALITY_FLAG.OUT_OF_FRAME | QUALITY_FLAG.LOW_CONFIDENCE)) !==
-      0
-  );
-}
-
 function qualityScoreFor(quality: PoseQuality): number {
   const trackedRatio = quality.trackedKeypointCount / 33;
   return Math.max(0, Math.min(1, quality.meanConfidence * trackedRatio));
 }
 
-function qualityFlagLabel(quality: PoseQuality): string {
-  const labels = [];
-  if ((quality.qualityFlags & QUALITY_FLAG.OUT_OF_FRAME) !== 0) {
-    labels.push("out");
-  }
-  if ((quality.qualityFlags & QUALITY_FLAG.LOW_CONFIDENCE) !== 0) {
-    labels.push("low");
-  }
-  return labels.length > 0 ? labels.join(", ") : "ok";
+function appendUniqueFlags(
+  current: readonly string[],
+  next: readonly string[],
+): string[] {
+  return [...new Set([...current, ...next])];
 }
 
 function SessionCoachingSummary({ faults }: { faults: PostureFault[] }) {
