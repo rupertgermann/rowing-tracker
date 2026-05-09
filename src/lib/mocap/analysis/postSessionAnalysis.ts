@@ -37,6 +37,7 @@ export interface StrokePhaseBoundariesJson {
   recoveryStartFrameIndex: number;
   nextCatchFrameIndex: number;
   confidence: number;
+  csvMatchOffsetMs?: number | null; // present when segmentationSource === "csv-aligned"; null = unmatched
 }
 
 export type PostureMetricsJson = Omit<

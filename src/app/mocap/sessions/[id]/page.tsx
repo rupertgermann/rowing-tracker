@@ -40,6 +40,7 @@ interface PhaseBoundaries {
   recoveryStartFrameIndex: number;
   nextCatchFrameIndex: number;
   confidence: number;
+  csvMatchOffsetMs?: number | null;
 }
 
 interface SessionStrokeMetric {
@@ -531,6 +532,7 @@ export default function MocapReplayPage() {
   const fps = poseHeader?.fps ?? session.captureFps;
   const hasMetrics = session.strokePostureMetrics.length > 0;
   const hasPoseStream = Boolean(poseHeader);
+  const segmentationSource = session.strokePostureMetrics[0]?.segmentationSource ?? null;
   const isRecordOnly = session.qualityFlags.includes("record-only");
   const compareFaultMetric =
     compareFaultStroke === null ? null : metricsByStroke.get(compareFaultStroke) ?? null;
@@ -551,6 +553,9 @@ export default function MocapReplayPage() {
               {session.capturePerspective} · {fmtTime(duration)}
               {session.qualityScore !== null
                 ? ` · quality ${Math.round(session.qualityScore * 100)}%`
+                : ""}
+              {segmentationSource
+                ? ` · ${segmentationSource === "csv-aligned" ? "CSV-aligned" : "pose-segmented"}`
                 : ""}
             </p>
           </div>

@@ -5,3 +5,4 @@ export * from "./postureFaultDetector";
 export * from "./postureThresholds";
 export * from "./poseFrameStreamAdapter";
 export * from "./postSessionAnalysis";
+export * from "./strokeAlignment";

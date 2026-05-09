@@ -4,7 +4,9 @@ import {
   adaptPoseFrameStreamBlob,
   analyzePoseFrameStream,
   resolvePostureThresholdSettings,
+  alignStrokesToCsv,
   type CapturePerspective,
+  type CsvStrokeTarget,
 } from "@/lib/mocap/analysis";
 import type { MocapStorage } from "@/lib/mocap/storage";
 
@@ -84,9 +86,10 @@ export async function analyzeAndPersistMocapSession(
 
 /**
  * Run analysis for a MocapSession that is linked to a RowingSession.
- * Fetches StrokeData rows for the linked rowing session and aligns
- * pose-derived strokes to them by index order (simple cross-correlation v1).
- * Sets segmentationSource = "csv-aligned" and strokeDataId on each metric row.
+ * Aligns pose-derived strokes to StrokeData rows by timestamp cross-correlation
+ * rather than array position. Sets segmentationSource = "csv-aligned" and
+ * strokeDataId on each metric row. Unmatched pose strokes get strokeDataId=null
+ * and csvMatchOffsetMs=null in phaseBoundariesJson.
  */
 export async function analyzeAndPersistMocapSessionLinked(
   storage: MocapStorage,
@@ -102,7 +105,7 @@ export async function analyzeAndPersistMocapSessionLinked(
     prisma.strokeData.findMany({
       where: { sessionId: rowingSessionId },
       orderBy: { strokeIndex: "asc" },
-      select: { id: true, strokeIndex: true },
+      select: { id: true, strokeIndex: true, time: true },
     }),
   ]);
 
@@ -115,11 +118,19 @@ export async function analyzeAndPersistMocapSessionLinked(
   );
   const result = analyzePoseFrameStream(stream, { thresholds });
 
-  // Build an index map: position (0-based array index) → StrokeData id
-  const strokeDataIdByPosition = new Map<number, string>();
-  strokeDataRows.forEach((sd, pos) => {
-    strokeDataIdByPosition.set(pos, sd.id);
-  });
+  // Build CSV stroke targets with elapsed ms for alignment
+  const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map((sd) => ({
+    id: sd.id,
+    strokeIndex: sd.strokeIndex,
+    timeMs: sd.time * 1000, // StrokeData.time is elapsed seconds from session start
+  }));
+
+  // Extract pose catch timestamps (elapsed ms from pose session start)
+  const poseCatchTimesMs = result.metrics.map(
+    (m) => stream.frames[m.phaseBoundariesJson.catchFrameIndex]?.timestampMs ?? 0,
+  );
+
+  const alignment = alignStrokesToCsv(poseCatchTimesMs, csvStrokes);
 
   await prisma.$transaction(async (tx) => {
     await tx.postureFault.deleteMany({
@@ -130,15 +141,21 @@ export async function analyzeAndPersistMocapSessionLinked(
     });
     if (result.metrics.length > 0) {
       await tx.strokePostureMetric.createMany({
-        data: result.metrics.map((metric) => ({
-          mocapSessionId: session.id,
-          strokeIndex: metric.strokeIndex,
-          phaseBoundariesJson:
-            metric.phaseBoundariesJson as unknown as Prisma.InputJsonValue,
-          metricsJson: metric.metricsJson as unknown as Prisma.InputJsonValue,
-          segmentationSource: "csv-aligned",
-          strokeDataId: strokeDataIdByPosition.get(metric.strokeIndex) ?? null,
-        })),
+        data: result.metrics.map((metric) => {
+          const match = alignment.matches.get(metric.strokeIndex);
+          const phaseBoundariesJson = {
+            ...metric.phaseBoundariesJson,
+            csvMatchOffsetMs: match ? match.offsetMs : null,
+          };
+          return {
+            mocapSessionId: session.id,
+            strokeIndex: metric.strokeIndex,
+            phaseBoundariesJson: phaseBoundariesJson as unknown as Prisma.InputJsonValue,
+            metricsJson: metric.metricsJson as unknown as Prisma.InputJsonValue,
+            segmentationSource: "csv-aligned",
+            strokeDataId: match?.csvStrokeDataId ?? null,
+          };
+        }),
       });
     }
     if (result.faults.length > 0) {
