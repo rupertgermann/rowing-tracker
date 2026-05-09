@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ import {
   frameByteOffset,
   type PoseStreamHeader,
 } from "@/lib/mocap/poseFrameStream";
+import {
+  buildReplayComparisonOptions,
+  countFaultsForStroke,
+} from "@/lib/mocap/replayComparison";
 
 // MediaPipe 33-keypoint skeleton connections for side-view rowing
 const SKELETON_CONNECTIONS: [number, number][] = [
@@ -42,7 +46,17 @@ interface SessionStrokeMetric {
   id: string;
   strokeIndex: number;
   phaseBoundariesJson: PhaseBoundaries;
+  metricsJson: SessionPostureMetrics;
   segmentationSource: string;
+}
+
+interface SessionPostureMetrics {
+  backAngleAtCatchDeg?: number;
+  backAngleAtFinishDeg?: number;
+  laybackAngleDeg?: number;
+  hipKneeOpeningOffsetFrames?: number | null;
+  armBendBeforeLegsCompleteFrames?: number | null;
+  recoveryDriveRatio?: number;
 }
 
 interface FaultEvidence {
@@ -188,6 +202,13 @@ function fmtDate(iso: string): string {
   });
 }
 
+type CompareRole = "fault" | "comparison";
+type ComparePhase = "catch" | "finish";
+
+function comparisonFrameKey(role: CompareRole, phase: ComparePhase): string {
+  return `${role}-${phase}`;
+}
+
 export default function MocapReplayPage() {
   const { id } = useParams<{ id: string }>();
 
@@ -199,12 +220,53 @@ export default function MocapReplayPage() {
 
   const [session, setSession] = useState<MocapSessionDetail | null>(null);
   const [poseHeader, setPoseHeader] = useState<PoseStreamHeader | null>(null);
+  const [poseHeaderChecked, setPoseHeaderChecked] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedFault, setSelectedFault] = useState<SessionFault | null>(null);
   const [selectedStroke, setSelectedStroke] = useState<number | null>(null);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+  const [compareFaultStroke, setCompareFaultStroke] = useState<number | null>(null);
+  const [compareStroke, setCompareStroke] = useState<number | null>(null);
+  const [comparisonFrames, setComparisonFrames] = useState<
+    Record<string, Float32Array | null>
+  >({});
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+
+  const comparisonOptions = useMemo(
+    () =>
+      session
+        ? buildReplayComparisonOptions(
+            session.strokePostureMetrics,
+            session.postureFaults,
+            compareFaultStroke,
+          )
+        : {
+            faultStrokeOptions: [],
+            cleanStrokeOptions: [],
+            defaultFaultStrokeIndex: null,
+            defaultComparisonStrokeIndex: null,
+          },
+    [compareFaultStroke, session],
+  );
+
+  const metricsByStroke = useMemo(() => {
+    const map = new Map<number, SessionStrokeMetric>();
+    for (const metric of session?.strokePostureMetrics ?? []) {
+      map.set(metric.strokeIndex, metric);
+    }
+    return map;
+  }, [session]);
+
+  const faultsByStroke = useMemo(() => {
+    const map = new Map<number, SessionFault[]>();
+    for (const fault of session?.postureFaults ?? []) {
+      if (!map.has(fault.strokeIndex)) map.set(fault.strokeIndex, []);
+      map.get(fault.strokeIndex)!.push(fault);
+    }
+    return map;
+  }, [session]);
 
   // Load session data
   useEffect(() => {
@@ -220,8 +282,93 @@ export default function MocapReplayPage() {
   // Load pose stream header
   useEffect(() => {
     if (!session || session.status !== "ready") return;
-    fetchPoseHeader(id).then(setPoseHeader);
+    setPoseHeaderChecked(false);
+    fetchPoseHeader(id).then((header) => {
+      setPoseHeader(header);
+      setPoseHeaderChecked(true);
+    });
   }, [id, session]);
+
+  useEffect(() => {
+    if (!session || session.strokePostureMetrics.length === 0) return;
+    const isValidFaultStroke = comparisonOptions.faultStrokeOptions.some(
+      (option) => option.strokeIndex === compareFaultStroke,
+    );
+    if (!isValidFaultStroke) {
+      setCompareFaultStroke(comparisonOptions.defaultFaultStrokeIndex);
+    }
+  }, [compareFaultStroke, comparisonOptions, session]);
+
+  useEffect(() => {
+    if (!session || session.strokePostureMetrics.length === 0) return;
+    const isValidComparisonStroke =
+      compareStroke !== null &&
+      compareStroke !== compareFaultStroke &&
+      comparisonOptions.cleanStrokeOptions.includes(compareStroke);
+
+    if (!isValidComparisonStroke) {
+      setCompareStroke(comparisonOptions.defaultComparisonStrokeIndex);
+    }
+  }, [compareFaultStroke, compareStroke, comparisonOptions, session]);
+
+  useEffect(() => {
+    if (
+      !session ||
+      !poseHeader ||
+      compareFaultStroke === null ||
+      compareStroke === null
+    ) {
+      setComparisonFrames({});
+      return;
+    }
+
+    const faultMetric = metricsByStroke.get(compareFaultStroke);
+    const comparisonMetric = metricsByStroke.get(compareStroke);
+    if (!faultMetric || !comparisonMetric) {
+      setComparisonFrames({});
+      return;
+    }
+
+    let cancelled = false;
+    setComparisonLoading(true);
+
+    const frameRequests: Array<[string, number]> = [
+      [
+        comparisonFrameKey("fault", "catch"),
+        faultMetric.phaseBoundariesJson.catchFrameIndex,
+      ],
+      [
+        comparisonFrameKey("fault", "finish"),
+        faultMetric.phaseBoundariesJson.finishFrameIndex,
+      ],
+      [
+        comparisonFrameKey("comparison", "catch"),
+        comparisonMetric.phaseBoundariesJson.catchFrameIndex,
+      ],
+      [
+        comparisonFrameKey("comparison", "finish"),
+        comparisonMetric.phaseBoundariesJson.finishFrameIndex,
+      ],
+    ];
+
+    Promise.all(
+      frameRequests.map(async ([key, frameIndex]) => [
+        key,
+        await fetchPoseFrameAtIndex(id, frameIndex),
+      ] as const),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setComparisonFrames(Object.fromEntries(entries));
+      })
+      .finally(() => {
+        if (!cancelled) setComparisonLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [compareFaultStroke, compareStroke, id, metricsByStroke, poseHeader, session]);
 
   // Resize canvas to match video display dimensions
   useEffect(() => {
@@ -346,7 +493,7 @@ export default function MocapReplayPage() {
   }, [id]);
 
   const freezeAtCatch = useCallback(() => {
-    if (!selectedStroke || !session || !poseHeader) return;
+    if (selectedStroke === null || !session || !poseHeader) return;
     const metric = session.strokePostureMetrics.find(
       (m) => m.strokeIndex === selectedStroke,
     );
@@ -354,7 +501,7 @@ export default function MocapReplayPage() {
   }, [selectedStroke, session, poseHeader, seekToFrame]);
 
   const freezeAtFinish = useCallback(() => {
-    if (!selectedStroke || !session || !poseHeader) return;
+    if (selectedStroke === null || !session || !poseHeader) return;
     const metric = session.strokePostureMetrics.find(
       (m) => m.strokeIndex === selectedStroke,
     );
@@ -383,11 +530,12 @@ export default function MocapReplayPage() {
   const duration = session.durationSec;
   const fps = poseHeader?.fps ?? session.captureFps;
   const hasMetrics = session.strokePostureMetrics.length > 0;
-  const faultsByStroke = new Map<number, SessionFault[]>();
-  for (const f of session.postureFaults) {
-    if (!faultsByStroke.has(f.strokeIndex)) faultsByStroke.set(f.strokeIndex, []);
-    faultsByStroke.get(f.strokeIndex)!.push(f);
-  }
+  const hasPoseStream = Boolean(poseHeader);
+  const isRecordOnly = session.qualityFlags.includes("record-only");
+  const compareFaultMetric =
+    compareFaultStroke === null ? null : metricsByStroke.get(compareFaultStroke) ?? null;
+  const compareMetric =
+    compareStroke === null ? null : metricsByStroke.get(compareStroke) ?? null;
 
   return (
     <div className="container mx-auto max-w-4xl py-8 space-y-4">
@@ -533,23 +681,29 @@ export default function MocapReplayPage() {
       ) : null}
 
       {/* Not-yet-analyzed state */}
-      {!hasMetrics && session.status === "ready" ? (
+      {!hasMetrics && session.status === "ready" && poseHeaderChecked ? (
         <Card data-testid="mocap-no-analysis">
           <CardContent className="py-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              No posture analysis for this session.
+              {hasPoseStream
+                ? "No posture analysis for this session."
+                : isRecordOnly
+                  ? "This is a record-only video. Live pose analysis was unavailable during capture, so there is no pose stream to re-analyze."
+                  : "Posture analysis is unavailable because this session has no pose stream."}
             </p>
             {reanalyzeError ? (
               <p className="text-sm text-red-600">Analysis failed: {reanalyzeError}</p>
             ) : null}
-            <Button
-              size="sm"
-              onClick={runAnalysis}
-              disabled={reanalyzing}
-              data-testid="mocap-run-analysis"
-            >
-              {reanalyzing ? "Analyzing…" : "Run analysis"}
-            </Button>
+            {hasPoseStream ? (
+              <Button
+                size="sm"
+                onClick={runAnalysis}
+                disabled={reanalyzing}
+                data-testid="mocap-run-analysis"
+              >
+                {reanalyzing ? "Analyzing…" : "Run analysis"}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -574,6 +728,117 @@ export default function MocapReplayPage() {
             }
           />
         </div>
+      ) : null}
+
+      {hasMetrics ? (
+        <Card data-testid="mocap-stroke-compare">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">
+              Side-by-side stroke compare
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {comparisonOptions.faultStrokeOptions.length === 0 ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="mocap-compare-no-faults"
+              >
+                No fault-heavy strokes yet. Once analysis detects a posture fault,
+                comparison mode can pair that stroke with a clean stroke from this
+                mocap session.
+              </p>
+            ) : comparisonOptions.cleanStrokeOptions.length === 0 ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="mocap-compare-no-clean"
+              >
+                No clean comparison stroke exists in this mocap session. Every
+                analyzed stroke currently has at least one detected fault.
+              </p>
+            ) : (
+              <>
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <label className="space-y-1">
+                    <span className="text-xs text-muted-foreground">
+                      Fault-heavy stroke
+                    </span>
+                    <select
+                      className="w-full rounded border bg-transparent px-2 py-1 text-sm"
+                      value={compareFaultStroke ?? ""}
+                      onChange={(e) =>
+                        setCompareFaultStroke(
+                          e.target.value ? Number(e.target.value) : null,
+                        )
+                      }
+                      data-testid="mocap-compare-fault-stroke"
+                    >
+                      {comparisonOptions.faultStrokeOptions.map((option) => (
+                        <option key={option.strokeIndex} value={option.strokeIndex}>
+                          Stroke {option.strokeIndex + 1} · {option.faultCount}{" "}
+                          {option.faultCount === 1 ? "fault" : "faults"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs text-muted-foreground">
+                      Clean comparison stroke
+                    </span>
+                    <select
+                      className="w-full rounded border bg-transparent px-2 py-1 text-sm"
+                      value={compareStroke ?? ""}
+                      onChange={(e) =>
+                        setCompareStroke(e.target.value ? Number(e.target.value) : null)
+                      }
+                      data-testid="mocap-compare-clean-stroke"
+                    >
+                      {comparisonOptions.cleanStrokeOptions
+                        .filter((strokeIndex) => strokeIndex !== compareFaultStroke)
+                        .map((strokeIndex) => (
+                          <option key={strokeIndex} value={strokeIndex}>
+                            Stroke {strokeIndex + 1}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+
+                {compareFaultMetric && compareMetric ? (
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <CompareStrokePanel
+                      title="Fault-heavy"
+                      metric={compareFaultMetric}
+                      faults={faultsByStroke.get(compareFaultMetric.strokeIndex) ?? []}
+                      catchFrame={
+                        comparisonFrames[comparisonFrameKey("fault", "catch")] ?? null
+                      }
+                      finishFrame={
+                        comparisonFrames[comparisonFrameKey("fault", "finish")] ?? null
+                      }
+                      loading={comparisonLoading}
+                    />
+                    <CompareStrokePanel
+                      title="Clean comparison"
+                      metric={compareMetric}
+                      faults={faultsByStroke.get(compareMetric.strokeIndex) ?? []}
+                      catchFrame={
+                        comparisonFrames[
+                          comparisonFrameKey("comparison", "catch")
+                        ] ?? null
+                      }
+                      finishFrame={
+                        comparisonFrames[
+                          comparisonFrameKey("comparison", "finish")
+                        ] ?? null
+                      }
+                      loading={comparisonLoading}
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
+          </CardContent>
+        </Card>
       ) : null}
 
       {/* Fault detail panel */}
@@ -656,4 +921,170 @@ function StatBox({ label, value }: { label: string; value: string }) {
       <div className="font-mono text-sm">{value}</div>
     </div>
   );
+}
+
+function CompareStrokePanel({
+  title,
+  metric,
+  faults,
+  catchFrame,
+  finishFrame,
+  loading,
+}: {
+  title: string;
+  metric: SessionStrokeMetric;
+  faults: SessionFault[];
+  catchFrame: Float32Array | null;
+  finishFrame: Float32Array | null;
+  loading: boolean;
+}) {
+  const faultCount = countFaultsForStroke(faults, metric.strokeIndex);
+
+  return (
+    <div className="rounded border p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium">{title}</div>
+          <div className="text-xs text-muted-foreground">
+            Stroke {metric.strokeIndex + 1}
+          </div>
+        </div>
+        <Badge variant={faultCount > 0 ? "destructive" : "secondary"}>
+          {faultCount > 0
+            ? `${faultCount} ${faultCount === 1 ? "fault" : "faults"}`
+            : "clean"}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <PhaseSkeletonCanvas
+          label="Catch"
+          keypoints={catchFrame}
+          loading={loading}
+        />
+        <PhaseSkeletonCanvas
+          label="Finish"
+          keypoints={finishFrame}
+          loading={loading}
+        />
+      </div>
+
+      <div className="grid gap-1 text-xs">
+        {metricRows(metric.metricsJson).map((row) => (
+          <div key={row.label} className="flex justify-between gap-3">
+            <span className="text-muted-foreground">{row.label}</span>
+            <span className="font-mono text-right">{row.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1 text-xs">
+        <div className="text-muted-foreground">Fault summary</div>
+        {faults.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {faults.map((fault) => (
+              <Badge
+                key={fault.id}
+                variant={fault.severity === "critical" ? "destructive" : "secondary"}
+                className="text-[11px]"
+              >
+                {faultLabel(fault.faultType)}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <div className="text-muted-foreground">No detected faults.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PhaseSkeletonCanvas({
+  label,
+  keypoints,
+  loading,
+}: {
+  label: string;
+  keypoints: Float32Array | null;
+  loading: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = canvas.clientWidth || 320;
+    canvas.height = canvas.clientHeight || 180;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (keypoints) {
+      drawSkeleton(ctx, keypoints, canvas.width, canvas.height, 1280, 720);
+    }
+  }, [keypoints]);
+
+  return (
+    <div className="space-y-1">
+      <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
+      <div className="relative aspect-video overflow-hidden rounded bg-black">
+        <canvas
+          ref={canvasRef}
+          className="h-full w-full"
+          data-testid={`mocap-compare-${label.toLowerCase()}-canvas`}
+        />
+        {loading ? (
+          <div className="absolute inset-0 grid place-items-center bg-black/40 text-[11px] text-white">
+            Loading
+          </div>
+        ) : !keypoints ? (
+          <div className="absolute inset-0 grid place-items-center px-2 text-center text-[11px] text-white/70">
+            Frame unavailable
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function metricRows(metrics: SessionPostureMetrics): Array<{
+  label: string;
+  value: string;
+}> {
+  return [
+    {
+      label: "Back angle at catch",
+      value: formatMetric(metrics.backAngleAtCatchDeg, "deg"),
+    },
+    {
+      label: "Back angle at finish",
+      value: formatMetric(metrics.backAngleAtFinishDeg, "deg"),
+    },
+    {
+      label: "Layback angle",
+      value: formatMetric(metrics.laybackAngleDeg, "deg"),
+    },
+    {
+      label: "Hip-knee timing offset",
+      value: formatMetric(metrics.hipKneeOpeningOffsetFrames, "frames"),
+    },
+    {
+      label: "Arm bend before legs",
+      value: formatMetric(metrics.armBendBeforeLegsCompleteFrames, "frames"),
+    },
+    {
+      label: "Recovery / drive ratio",
+      value: formatMetric(metrics.recoveryDriveRatio, "ratio"),
+    },
+  ];
+}
+
+function formatMetric(
+  value: number | null | undefined,
+  unit: "deg" | "frames" | "ratio",
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "n/a";
+  if (unit === "ratio") return value.toFixed(2);
+  if (unit === "frames") return `${value.toFixed(0)} fr`;
+  return `${value.toFixed(1)} deg`;
 }

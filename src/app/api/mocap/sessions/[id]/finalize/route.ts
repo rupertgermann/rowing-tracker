@@ -65,24 +65,25 @@ export async function POST(
 
   const storage = getMocapStorage();
 
-  let finalized: Awaited<ReturnType<typeof finalizePoseStreamBlob>>;
-  try {
-    finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
-  }
-
   if (body.skipAnalysis) {
+    let finalized = { frameCount: 0, poseStreamBytes: 0 };
+    if (await storage.exists(row.poseStreamPath)) {
+      try {
+        finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
+      } catch (err) {
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : String(err) },
+          { status: 500 },
+        );
+      }
+    }
     const updated = await prisma.mocapSession.update({
       where: { id: row.id },
       data: {
         status: "ready",
         durationSec: body.durationSec,
         qualityScore: body.qualityScore ?? null,
-        qualityFlags: body.qualityFlags ?? [],
+        qualityFlags: [...new Set([...(body.qualityFlags ?? []), "record-only"])],
       },
     });
     return NextResponse.json({
@@ -94,6 +95,16 @@ export async function POST(
       strokeMetricCount: 0,
       faultCount: 0,
     });
+  }
+
+  let finalized: Awaited<ReturnType<typeof finalizePoseStreamBlob>>;
+  try {
+    finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
   }
 
   const analyzing = await prisma.mocapSession.update({

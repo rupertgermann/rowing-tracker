@@ -21,6 +21,16 @@ import {
   type CameraReadinessResult,
 } from "@/lib/mocap/cameraReadiness";
 import {
+  evaluateMocapCaptureSupport,
+  hasSustainedLowEffectiveFps,
+  lowFpsRecordOnlySupport,
+  readBrowserMocapCapabilities,
+  recordOnlyQualityFlag,
+  type EffectiveFpsSample,
+  type MocapCaptureSupport,
+  type RecordOnlyReason,
+} from "@/lib/mocap/degradedMode";
+import {
   BYTES_PER_FRAME_V1,
   decodeFrame,
 } from "@/lib/mocap/poseFrameStream";
@@ -70,6 +80,7 @@ type CaptureState =
       sessionId: string;
       durationSec: number;
       frameCount: number;
+      recordOnly: boolean;
   }
   | { kind: "error"; message: string };
 
@@ -128,10 +139,12 @@ export default function MocapCapturePage() {
   const startedAtRef = useRef<number>(0);
   const latestPoseFrameRef = useRef<PoseQuality>(EMPTY_QUALITY);
   const qualityHistoryRef = useRef<CameraReadinessFrame[]>([]);
+  const effectiveFpsSamplesRef = useRef<EffectiveFpsSample[]>([]);
   const latestCameraReadinessRef = useRef<CameraReadinessResult | null>(null);
   const engineRef = useRef<LiveCoachingEngine | null>(null);
   const cueDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioEnabledRef = useRef(false);
+  const recordOnlyRef = useRef(false);
 
   const [state, setState] = useState<CaptureState>({ kind: "idle" });
   const [calibration, setCalibration] = useState<CalibrationState>({
@@ -149,6 +162,10 @@ export default function MocapCapturePage() {
   const [framingDegraded, setFramingDegraded] = useState(false);
   const [sessionQualityFlags, setSessionQualityFlags] = useState<string[]>([]);
   const [recordOnly, setRecordOnly] = useState(false);
+  const [recordOnlyReason, setRecordOnlyReason] =
+    useState<RecordOnlyReason | null>(null);
+  const [captureSupport, setCaptureSupport] =
+    useState<MocapCaptureSupport | null>(null);
   const [activeCue, setActiveCue] = useState<CoachingCue | null>(null);
   const [sessionFaults, setSessionFaults] = useState<PostureFault[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -160,12 +177,27 @@ export default function MocapCapturePage() {
     setAudioEnabled(prefs.audioEnabled);
     setVerbosity(prefs.verbosity);
     audioEnabledRef.current = prefs.audioEnabled;
+
+    const support = evaluateMocapCaptureSupport(readBrowserMocapCapabilities());
+    setCaptureSupport(support);
+    if (support.recordOnlyRecommended) {
+      setRecordOnly(true);
+      setRecordOnlyReason(support.reason);
+    }
   }, []);
 
   useEffect(() => {
     audioEnabledRef.current = audioEnabled;
     if (!audioEnabled) cancelSpokenCues();
   }, [audioEnabled]);
+
+  useEffect(() => {
+    recordOnlyRef.current =
+      recordOnly ||
+      Boolean(
+        captureSupport?.recordOnlyRecommended && !captureSupport.livePoseSupported,
+      );
+  }, [recordOnly, captureSupport]);
 
   const updateAudioEnabled = useCallback((next: boolean) => {
     setAudioEnabled(next);
@@ -245,6 +277,23 @@ export default function MocapCapturePage() {
       latestCameraReadinessRef.current = readiness;
       setCameraReadiness(readiness);
 
+      effectiveFpsSamplesRef.current = [
+        ...effectiveFpsSamplesRef.current.filter(
+          (sample) => sample.timestampMs >= nowMs - 5000,
+        ),
+        { timestampMs: nowMs, effectiveFps: readiness.effectiveFps },
+      ];
+      if (
+        !monitorDegradedFraming &&
+        !recordOnlyRef.current &&
+        hasSustainedLowEffectiveFps(effectiveFpsSamplesRef.current, { nowMs })
+      ) {
+        const support = lowFpsRecordOnlySupport();
+        setCaptureSupport(support);
+        setRecordOnly(true);
+        setRecordOnlyReason(support.reason);
+      }
+
       // Feed the live coaching engine when active.
       if (engineRef.current) {
         if (decodedFrame) engineRef.current.pushFrame(decodedFrame);
@@ -323,6 +372,7 @@ export default function MocapCapturePage() {
     setQuality(EMPTY_QUALITY);
     setCameraReadiness(null);
     qualityHistoryRef.current = [];
+    effectiveFpsSamplesRef.current = [];
     latestCameraReadinessRef.current = null;
     latestPoseFrameRef.current = EMPTY_QUALITY;
     try {
@@ -403,8 +453,21 @@ export default function MocapCapturePage() {
   );
 
   const start = useCallback(async () => {
+    const captureRecordOnly =
+      recordOnly ||
+      Boolean(
+        captureSupport?.recordOnlyRecommended && !captureSupport.livePoseSupported,
+      );
+    if (captureSupport && !captureSupport.videoCaptureSupported) {
+      setState({ kind: "error", message: captureSupport.message });
+      return;
+    }
+
     const calibrationFrames = getCalibrationFrames(calibration);
-    if (!calibrationFrames || !latestCameraReadinessRef.current?.ready) {
+    if (
+      !captureRecordOnly &&
+      (!calibrationFrames || !latestCameraReadinessRef.current?.ready)
+    ) {
       setCalibration((current) => ({
         ...current,
         hint:
@@ -432,11 +495,11 @@ export default function MocapCapturePage() {
       // Spin up the live coaching engine (skipped when in record-only mode).
       const calibrationFramesForEngine = buildEngineCalibration(
         perspective,
-        calibrationFrames.catchFrame,
-        calibrationFrames.finishFrame,
+        calibrationFrames?.catchFrame,
+        calibrationFrames?.finishFrame,
       );
       const mocapPrefs = settings.getMocapSettings();
-      if (!recordOnly) {
+      if (!captureRecordOnly) {
         engineRef.current = new LiveCoachingEngine({
           fps: CAPTURE_FPS,
           capturePerspective: perspective,
@@ -470,8 +533,9 @@ export default function MocapCapturePage() {
           captureModelVersion: CAPTURE_MODEL_VERSION,
           capturePerspective: perspective,
           captureFps: CAPTURE_FPS,
-          calibrationCatchFrame: calibrationFrames.catchFrame,
-          calibrationFinishFrame: calibrationFrames.finishFrame,
+          recordOnly: captureRecordOnly,
+          calibrationCatchFrame: calibrationFrames?.catchFrame,
+          calibrationFinishFrame: calibrationFrames?.finishFrame,
         }),
       });
       if (!createRes.ok) {
@@ -502,24 +566,34 @@ export default function MocapCapturePage() {
       };
       recorderRef.current = recorder;
 
-      const source = new BrowserPoseSource({
-        sessionId,
-        videoEl: video,
-        onStatus: (s) => setPoseStatus(s),
-        onFrame: (info) => handlePoseFrame(info, true),
-        onError: (err) => handleError(err, sessionId),
-      });
-      sourceRef.current = source;
-      await source.init();
+      if (!captureRecordOnly) {
+        const source = new BrowserPoseSource({
+          sessionId,
+          videoEl: video,
+          onStatus: (s) => setPoseStatus(s),
+          onFrame: (info) => handlePoseFrame(info, true),
+          onError: (err) => handleError(err, sessionId),
+        });
+        sourceRef.current = source;
+        await source.init();
+      } else {
+        sourceRef.current = null;
+        setPoseStatus("stopped");
+      }
 
       recorder.start(VIDEO_TIMESLICE_MS);
-      source.start();
+      sourceRef.current?.start();
       startedAtRef.current = Date.now();
       setElapsedSec(0);
       setFramesEncoded(0);
       setFramingDegraded(false);
-      setSessionQualityFlags([]);
+      setSessionQualityFlags(
+        captureRecordOnly
+          ? recordOnlySessionFlags([], recordOnlyReason)
+          : [],
+      );
       qualityHistoryRef.current = [];
+      effectiveFpsSamplesRef.current = [];
       latestCameraReadinessRef.current = null;
       setCameraReadiness(null);
       setState({
@@ -532,16 +606,19 @@ export default function MocapCapturePage() {
     }
   }, [
     calibration,
+    captureSupport,
     handleError,
     handlePoseFrame,
     perspective,
     recordOnly,
+    recordOnlyReason,
     clearCueDismissTimer,
   ]);
 
   const stop = useCallback(async () => {
     if (state.kind !== "capturing") return;
     const sessionId = state.sessionId;
+    const captureWasRecordOnly = recordOnlyRef.current;
     setState({ kind: "stopping", sessionId });
     try {
       const recorder = recorderRef.current;
@@ -564,6 +641,9 @@ export default function MocapCapturePage() {
       await uploaderRef.current?.drain();
 
       const durationSec = (Date.now() - startedAtRef.current) / 1000;
+      const finalizeQualityFlags = captureWasRecordOnly
+        ? recordOnlySessionFlags(sessionQualityFlags, recordOnlyReason)
+        : sessionQualityFlags;
       const finalizeRes = await fetch(
         `/api/mocap/sessions/${sessionId}/finalize`,
         {
@@ -571,9 +651,11 @@ export default function MocapCapturePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             durationSec,
-            qualityScore: qualityScoreFor(latestPoseFrameRef.current),
-            qualityFlags: sessionQualityFlags,
-            skipAnalysis: recordOnly,
+            qualityScore: captureWasRecordOnly
+              ? undefined
+              : qualityScoreFor(latestPoseFrameRef.current),
+            qualityFlags: finalizeQualityFlags,
+            skipAnalysis: captureWasRecordOnly,
           }),
         },
       );
@@ -606,6 +688,7 @@ export default function MocapCapturePage() {
         sessionId: finalized.id,
         durationSec: finalized.durationSec,
         frameCount: finalized.frameCount,
+        recordOnly: captureWasRecordOnly,
       });
     } catch (err) {
       await handleError(err, sessionId);
@@ -615,7 +698,7 @@ export default function MocapCapturePage() {
     handleError,
     sessionQualityFlags,
     teardown,
-    recordOnly,
+    recordOnlyReason,
     clearCueDismissTimer,
   ]);
 
@@ -640,14 +723,20 @@ export default function MocapCapturePage() {
       }
       try {
         const durationSec = (Date.now() - startedAtRef.current) / 1000;
+        const captureWasRecordOnly = recordOnlyRef.current;
         navigator.sendBeacon?.(
           `/api/mocap/sessions/${sessionId}/finalize`,
           new Blob(
             [
               JSON.stringify({
                 durationSec,
-                qualityScore: qualityScoreFor(latestPoseFrameRef.current),
-                qualityFlags: sessionQualityFlags,
+                qualityScore: captureWasRecordOnly
+                  ? undefined
+                  : qualityScoreFor(latestPoseFrameRef.current),
+                qualityFlags: captureWasRecordOnly
+                  ? recordOnlySessionFlags(sessionQualityFlags, recordOnlyReason)
+                  : sessionQualityFlags,
+                skipAnalysis: captureWasRecordOnly,
               }),
             ],
             {
@@ -661,7 +750,7 @@ export default function MocapCapturePage() {
     };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [state, sessionQualityFlags]);
+  }, [state, sessionQualityFlags, recordOnlyReason]);
 
   const calibrationFrames = getCalibrationFrames(calibration);
   const nextCalibrationPose: CalibrationPose | null = !(
@@ -672,13 +761,24 @@ export default function MocapCapturePage() {
       ? "finish"
       : null;
   const cameraReady = cameraReadiness?.ready ?? false;
+  const videoCaptureSupported = captureSupport?.videoCaptureSupported ?? true;
+  const livePoseSupported = captureSupport?.livePoseSupported ?? true;
+  const recordOnlyForced = Boolean(
+    captureSupport?.recordOnlyRecommended && !captureSupport.livePoseSupported,
+  );
+  const recordOnlyActive = recordOnly || recordOnlyForced;
+  const captureBusy =
+    state.kind === "capturing" ||
+    state.kind === "starting" ||
+    state.kind === "stopping";
   const canRecord =
-    state.kind !== "capturing" &&
-    state.kind !== "starting" &&
-    state.kind !== "stopping" &&
-    calibration.kind === "ready" &&
-    Boolean(calibrationFrames) &&
-    cameraReady;
+    !captureBusy &&
+    videoCaptureSupported &&
+    (recordOnlyActive ||
+      (livePoseSupported &&
+        calibration.kind === "ready" &&
+        Boolean(calibrationFrames) &&
+        cameraReady));
 
   return (
     <div className="container mx-auto max-w-4xl py-8 space-y-6">
@@ -712,12 +812,15 @@ export default function MocapCapturePage() {
             <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-record-only-label">
               <input
                 type="checkbox"
-                checked={recordOnly}
-                onChange={(e) => setRecordOnly(e.target.checked)}
-                disabled={state.kind === "capturing" || state.kind === "starting" || state.kind === "stopping"}
+                checked={recordOnlyActive}
+                onChange={(e) => {
+                  setRecordOnly(e.target.checked);
+                  setRecordOnlyReason(e.target.checked ? null : null);
+                }}
+                disabled={captureBusy || recordOnlyForced}
                 data-testid="mocap-record-only"
               />
-              Record only (skip analysis)
+              Record-only mode
             </label>
             <label className="flex items-center gap-2 text-sm select-none" data-testid="mocap-audio-label">
               <input
@@ -743,7 +846,9 @@ export default function MocapCapturePage() {
               </select>
             </label>
             {calibration.kind === "idle" &&
-            (state.kind === "idle" || state.kind === "done") ? (
+            (state.kind === "idle" || state.kind === "done") &&
+            livePoseSupported &&
+            !recordOnlyActive ? (
               <Button
                 onClick={startCalibration}
                 data-testid="mocap-start-calibration"
@@ -766,7 +871,9 @@ export default function MocapCapturePage() {
               </Button>
             ) : null}
             {calibration.kind === "ready" &&
-            (state.kind === "idle" || state.kind === "done") ? (
+            (state.kind === "idle" || state.kind === "done") &&
+            livePoseSupported &&
+            !recordOnlyActive ? (
               <Button
                 variant="outline"
                 onClick={startCalibration}
@@ -781,7 +888,7 @@ export default function MocapCapturePage() {
                 disabled={!canRecord}
                 data-testid="mocap-start"
               >
-                Start mocap session
+                {recordOnlyActive ? "Start video recording" : "Start mocap session"}
               </Button>
             ) : null}
             {state.kind === "starting" ? (
@@ -805,21 +912,48 @@ export default function MocapCapturePage() {
             ) : null}
           </div>
 
+          {captureSupport && !captureSupport.videoCaptureSupported ? (
+            <div
+              className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm"
+              data-testid="mocap-capture-unsupported"
+            >
+              {captureSupport.message}
+            </div>
+          ) : null}
+
+          {recordOnlyActive && videoCaptureSupported ? (
+            <div
+              className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
+              data-testid="mocap-record-only-notice"
+            >
+              {captureSupport?.recordOnlyRecommended
+                ? captureSupport.message
+                : "Record-only mode saves video without live posture analysis. You can review the video later, but no posture rows are created during capture."}
+            </div>
+          ) : null}
+
           <div className="grid gap-3 text-sm sm:grid-cols-3">
             <CalibrationStep
               label="Catch"
-              done={"catchFrame" in calibration && Boolean(calibration.catchFrame)}
+              done={
+                recordOnlyActive ||
+                ("catchFrame" in calibration && Boolean(calibration.catchFrame))
+              }
             />
             <CalibrationStep
               label="Finish"
               done={
-                "finishFrame" in calibration && Boolean(calibration.finishFrame)
+                recordOnlyActive ||
+                ("finishFrame" in calibration && Boolean(calibration.finishFrame))
               }
             />
-            <CalibrationStep label="Camera check" done={cameraReady} />
+            <CalibrationStep
+              label="Camera check"
+              done={recordOnlyActive || cameraReady}
+            />
           </div>
 
-          {cameraReadiness && !cameraReady ? (
+          {cameraReadiness && !cameraReady && !recordOnlyActive ? (
             <div
               className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
               data-testid="mocap-camera-readiness-hint"
@@ -897,10 +1031,14 @@ export default function MocapCapturePage() {
                 Session <code>{state.sessionId}</code> stored.
               </div>
               <div>
-                {state.frameCount} pose frames · {state.durationSec.toFixed(1)}s
-                duration
+                {state.recordOnly
+                  ? "Video-only recording"
+                  : `${state.frameCount} pose frames`}{" "}
+                · {state.durationSec.toFixed(1)}s duration
               </div>
-              <SessionCoachingSummary faults={sessionFaults} />
+              {!state.recordOnly ? (
+                <SessionCoachingSummary faults={sessionFaults} />
+              ) : null}
               <div className="flex gap-2 pt-1">
                 <Link
                   href={`/mocap/sessions/${state.sessionId}`}
@@ -1000,6 +1138,13 @@ function getCalibrationFrames(
 function qualityScoreFor(quality: PoseQuality): number {
   const trackedRatio = quality.trackedKeypointCount / 33;
   return Math.max(0, Math.min(1, quality.meanConfidence * trackedRatio));
+}
+
+function recordOnlySessionFlags(
+  current: readonly string[],
+  reason: RecordOnlyReason | null,
+): string[] {
+  return appendUniqueFlags(current, ["record-only", recordOnlyQualityFlag(reason)]);
 }
 
 function appendUniqueFlags(
@@ -1108,6 +1253,7 @@ function pickRecorderMime(): string {
   for (const c of candidates) {
     if (
       typeof MediaRecorder !== "undefined" &&
+      typeof MediaRecorder.isTypeSupported === "function" &&
       MediaRecorder.isTypeSupported(c)
     ) {
       return c;

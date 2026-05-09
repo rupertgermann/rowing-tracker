@@ -53,15 +53,25 @@ const CreateBody = z
     captureModelVersion: z.string().min(1).max(120),
     capturePerspective: z.enum(["side-left", "side-right"]),
     captureFps: z.number().positive().max(240),
+    recordOnly: z.boolean().optional(),
     calibrationCatchFrame: CalibrationFrame.extend({
       pose: z.literal("catch"),
-    }),
+    }).optional(),
     calibrationFinishFrame: CalibrationFrame.extend({
       pose: z.literal("finish"),
-    }),
+    }).optional(),
   })
   .superRefine((body, ctx) => {
     for (const field of ["calibrationCatchFrame", "calibrationFinishFrame"] as const) {
+      if (body.recordOnly && body[field] === undefined) continue;
+      if (!body[field]) {
+        ctx.addIssue({
+          code: "custom",
+          path: [field],
+          message: "Calibration frame is required unless recordOnly is true",
+        });
+        continue;
+      }
       if (body[field].capturePerspective !== body.capturePerspective) {
         ctx.addIssue({
           code: "custom",
@@ -114,14 +124,16 @@ export async function POST(req: Request) {
     });
   });
 
-  try {
-    await initializePoseStreamBlob(storage, created.poseStreamPath, body.captureFps);
-  } catch (err) {
-    await prisma.mocapSession.delete({ where: { id: created.id } }).catch(() => {});
-    return NextResponse.json(
-      { error: "Failed to initialize pose stream blob", details: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
+  if (!body.recordOnly) {
+    try {
+      await initializePoseStreamBlob(storage, created.poseStreamPath, body.captureFps);
+    } catch (err) {
+      await prisma.mocapSession.delete({ where: { id: created.id } }).catch(() => {});
+      return NextResponse.json(
+        { error: "Failed to initialize pose stream blob", details: err instanceof Error ? err.message : String(err) },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({

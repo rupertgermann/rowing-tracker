@@ -104,6 +104,9 @@ export async function GET(
   }
 
   const storage = getMocapStorage();
+  if (!(await storage.exists(row.poseStreamPath))) {
+    return NextResponse.json({ error: "Pose stream unavailable" }, { status: 404 });
+  }
   const totalSize = await storage.size(row.poseStreamPath);
   const range = parseRange(req.headers.get("range"), totalSize);
 

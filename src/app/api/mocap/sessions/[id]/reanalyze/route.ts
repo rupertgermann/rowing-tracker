@@ -41,12 +41,18 @@ export async function POST(
     );
   }
 
+  const storage = getMocapStorage();
+  if (!(await storage.exists(row.poseStreamPath))) {
+    return NextResponse.json(
+      { error: "Cannot re-analyze a record-only session without a pose stream" },
+      { status: 409 },
+    );
+  }
+
   await prisma.mocapSession.update({
     where: { id: row.id },
     data: { status: "analyzing" },
   });
-
-  const storage = getMocapStorage();
 
   let analysis: Awaited<ReturnType<typeof analyzeAndPersistMocapSession>>;
   try {
