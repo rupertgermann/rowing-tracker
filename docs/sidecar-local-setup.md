@@ -4,16 +4,22 @@ This guide covers how to run the minimal freemocap sidecar integration for local
 
 ## Prerequisites
 
-- Python 3.10+ with pip
-- `rowing-tracker-sidecar` PyPI package (or the mock server below)
+- Python 3.10+ with `venv`
 - The app running locally (`npm run dev`)
 
 ## Option A — real freemocap sidecar
 
+`rowing-tracker-sidecar` is not currently available on PyPI as of May 10, 2026, so the commands below will only work once that package is published or if you have access to an internal distribution.
+
 ```bash
-pip install rowing-tracker-sidecar
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install rowing-tracker-sidecar
 rowing-tracker-sidecar --port 8765
 ```
+
+If `python -m pip install rowing-tracker-sidecar` fails with `No matching distribution found`, use Option B for local app development.
 
 The sidecar exposes:
 - `ws://localhost:8765/pose-stream` — streams `KeypointFrame` JSON
@@ -88,7 +94,10 @@ asyncio.run(main())
 Save as `scripts/sidecar-mock.py` and run:
 
 ```bash
-pip install websockets
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install websockets
 python scripts/sidecar-mock.py
 ```
 
