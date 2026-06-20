@@ -8,8 +8,8 @@ export interface SidecarHealth {
 }
 
 export interface SidecarSessionInfo {
-  sessionId: string;
-  calibrationId: string;
+  sessionId?: string;
+  calibrationId?: string;
 }
 
 export interface SidecarKeypointFrame {
@@ -39,16 +39,22 @@ export async function checkSidecarHealth(port = SIDECAR_DEFAULT_PORT): Promise<S
 export async function startSidecarSession(port = SIDECAR_DEFAULT_PORT): Promise<SidecarSessionInfo> {
   const res = await fetch(`http://localhost:${port}/session/start`, { method: "POST" });
   if (!res.ok) throw new Error(`Sidecar session/start failed: ${res.status}`);
-  return res.json() as Promise<SidecarSessionInfo>;
+  const body = (await res.json().catch(() => ({}))) as unknown;
+  if (!isRecord(body)) return {};
+  return {
+    sessionId: optionalString(body.sessionId),
+    calibrationId: optionalString(body.calibrationId),
+  };
 }
 
 export async function stopSidecarSession(port = SIDECAR_DEFAULT_PORT): Promise<void> {
-  await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  const res = await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  if (!res.ok) throw new Error(`Sidecar session/stop failed: ${res.status}`);
 }
 
 export function connectSidecarStream(
   port: number,
-  onFrame: (frame: SidecarKeypointFrame) => void,
+  onFrame: (frame: unknown) => void,
   onError: (err: Error) => void,
 ): () => void {
   const ws = new WebSocket(`ws://localhost:${port}/pose-stream`);
@@ -61,4 +67,12 @@ export function connectSidecarStream(
   };
   ws.onerror = () => onError(new Error("Sidecar WebSocket error"));
   return () => ws.close();
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -145,6 +145,26 @@ test("post-session analysis maps strokes to derived metric and fault rows", () =
   );
 });
 
+test("stroke segmenter projects sidecar world-mm frames before finding phases", () => {
+  const stream: PoseFrameStream = {
+    fps: 10,
+    capturePerspective: "sidecar-3d",
+    coordinateSpace: "world-mm-3d",
+    cameraCount: 3,
+    frames: [0.1, 0.25, 0.45, 0.75, 1, 0.75, 0.45, 0.25, 0.1].map(
+      (hipKneeDepth, frameIndex) =>
+        sidecarProjectionFrame(frameIndex, hipKneeDepth),
+    ),
+  };
+
+  const strokes = StrokePhaseSegmenter(stream);
+
+  assert.equal(strokes.length, 1);
+  assert.equal(strokes[0]?.catchFrameIndex, 0);
+  assert.equal(strokes[0]?.finishFrameIndex, 4);
+  assert.equal(strokes[0]?.nextCatchFrameIndex, 8);
+});
+
 test("fault detector never emits outside the v1 catalog", () => {
   const catalog = new Set<PostureFaultType>(POSTURE_FAULT_CATALOG_V1);
   for (const fixture of loadFixtures()) {
@@ -253,4 +273,19 @@ function assertWithin(actual: number, expected: number, tolerance: number): void
     Math.abs(actual - expected) <= tolerance,
     `expected ${actual} within ${tolerance} of ${expected}`,
   );
+}
+
+function sidecarProjectionFrame(frameIndex: number, hipKneeDepth: number) {
+  const keypoints = Array.from({ length: 33 }, () => ({
+    x: 0,
+    y: 1000,
+    z: 0,
+    confidence: 0,
+  }));
+  keypoints[24] = { x: 0, y: 1000, z: 0, confidence: 1 };
+  keypoints[26] = { x: 0, y: 1000, z: hipKneeDepth, confidence: 1 };
+  return {
+    timestampMs: frameIndex * 100,
+    keypoints,
+  };
 }

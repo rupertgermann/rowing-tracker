@@ -11,11 +11,10 @@ import { useRowingStore } from "@/lib/store";
 import { clearSessionsCache } from "@/lib/services/sessionsCache";
 import {
   HEADER_SIZE,
-  BYTES_PER_FRAME_V1,
+  KEYPOINT_SCHEMA_V2,
   KEYPOINTS_PER_FRAME_V1,
   decodeHeader,
   decodeFrame,
-  frameByteOffset,
   type PoseStreamHeader,
 } from "@/lib/mocap/poseFrameStream";
 import {
@@ -143,20 +142,58 @@ async function fetchPoseHeader(id: string): Promise<PoseStreamHeader | null> {
 async function fetchPoseFrameAtIndex(
   id: string,
   frameIndex: number,
+  header: PoseStreamHeader,
 ): Promise<Float32Array | null> {
   try {
-    const start = frameByteOffset(frameIndex);
-    const end = start + BYTES_PER_FRAME_V1 - 1;
+    const start = HEADER_SIZE + frameIndex * header.bytesPerFrame;
+    const end = start + header.bytesPerFrame - 1;
     const res = await fetch(`/api/mocap/sessions/${id}/pose-stream`, {
       headers: { Range: `bytes=${start}-${end}` },
     });
     if (!res.ok && res.status !== 206) return null;
     const buf = new Uint8Array(await res.arrayBuffer());
-    const frame = decodeFrame(buf, 0);
-    return frame.keypoints;
+    const frame = decodeFrame(buf, 0, header.keypointSchemaVersion);
+    return drawingKeypointsFromFrame(frame.keypoints, header);
   } catch {
     return null;
   }
+}
+
+function drawingKeypointsFromFrame(
+  keypoints: Float32Array,
+  header: PoseStreamHeader,
+): Float32Array {
+  if (header.keypointSchemaVersion !== KEYPOINT_SCHEMA_V2) return keypoints;
+
+  const out = new Float32Array(KEYPOINTS_PER_FRAME_V1 * 3);
+  let yMin = Infinity;
+  let yMax = -Infinity;
+  let zMin = Infinity;
+  let zMax = -Infinity;
+  for (let i = 0; i < KEYPOINTS_PER_FRAME_V1; i++) {
+    const offset = i * 4;
+    const confidence = keypoints[offset + 3];
+    if (confidence < 0.25) continue;
+    const y = keypoints[offset + 1];
+    const z = keypoints[offset + 2];
+    if (y < yMin) yMin = y;
+    if (y > yMax) yMax = y;
+    if (z < zMin) zMin = z;
+    if (z > zMax) zMax = z;
+  }
+
+  const yRange = yMax - yMin;
+  const zRange = zMax - zMin;
+  for (let i = 0; i < KEYPOINTS_PER_FRAME_V1; i++) {
+    const sourceOffset = i * 4;
+    const targetOffset = i * 3;
+    out[targetOffset] =
+      zRange > 0 ? (keypoints[sourceOffset + 2] - zMin) / zRange : 0.5;
+    out[targetOffset + 1] =
+      yRange > 0 ? (keypoints[sourceOffset + 1] - yMin) / yRange : 0.5;
+    out[targetOffset + 2] = keypoints[sourceOffset + 3];
+  }
+  return out;
 }
 
 function drawSkeleton(
@@ -288,6 +325,7 @@ export default function MocapReplayPage() {
   const [linkError, setLinkError] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState(false);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
+  const isSidecarReplay = session?.capturePerspective === "sidecar-3d";
 
   const comparisonOptions = useMemo(
     () =>
@@ -461,7 +499,7 @@ export default function MocapReplayPage() {
     Promise.all(
       frameRequests.map(async ([key, frameIndex]) => [
         key,
-        await fetchPoseFrameAtIndex(id, frameIndex),
+        await fetchPoseFrameAtIndex(id, frameIndex, poseHeader),
       ] as const),
     )
       .then((entries) => {
@@ -477,31 +515,41 @@ export default function MocapReplayPage() {
     };
   }, [compareFaultStroke, compareStroke, id, metricsByStroke, poseHeader, session]);
 
-  // Resize canvas to match video display dimensions
+  // Resize canvas to match video display dimensions or the sidecar canvas surface
   useEffect(() => {
-    const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!canvas) return;
+    if (isSidecarReplay) {
+      canvas.width = canvas.clientWidth || 1280;
+      canvas.height = canvas.clientHeight || 720;
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) return;
     const onMeta = () => {
       canvas.width = video.clientWidth || 1280;
       canvas.height = video.clientHeight || 720;
     };
     video.addEventListener("loadedmetadata", onMeta);
+    onMeta();
     return () => video.removeEventListener("loadedmetadata", onMeta);
-  }, []);
+  }, [isSidecarReplay, poseHeader]);
 
   const renderFrame = useCallback(
     async (frameIndex: number) => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      if (!video || !canvas || fetchingRef.current) return;
+      if (!canvas || !poseHeader || fetchingRef.current) return;
+      if (!isSidecarReplay && !video) return;
       if (frameIndex === lastFrameIndexRef.current) return;
 
       fetchingRef.current = true;
       try {
-        const keypoints = await fetchPoseFrameAtIndex(id, frameIndex);
+        const keypoints = await fetchPoseFrameAtIndex(id, frameIndex, poseHeader);
         if (keypoints && canvas) {
           lastFrameIndexRef.current = frameIndex;
+          canvas.width = canvas.width || canvas.clientWidth || 1280;
+          canvas.height = canvas.height || canvas.clientHeight || 720;
           const ctx = canvas.getContext("2d");
           if (ctx) {
             drawSkeleton(
@@ -509,8 +557,8 @@ export default function MocapReplayPage() {
               keypoints,
               canvas.width,
               canvas.height,
-              video.videoWidth || 1280,
-              video.videoHeight || 720,
+              isSidecarReplay ? 1280 : video?.videoWidth || 1280,
+              isSidecarReplay ? 720 : video?.videoHeight || 720,
             );
           }
         }
@@ -518,11 +566,18 @@ export default function MocapReplayPage() {
         fetchingRef.current = false;
       }
     },
-    [id],
+    [id, isSidecarReplay, poseHeader],
   );
+
+  useEffect(() => {
+    if (!isSidecarReplay || !poseHeader) return;
+    setCurrentTime(0);
+    void renderFrame(0);
+  }, [isSidecarReplay, poseHeader, renderFrame]);
 
   // rAF loop during playback + seeked handler
   useEffect(() => {
+    if (isSidecarReplay) return;
     const video = videoRef.current;
     if (!video || !poseHeader) return;
 
@@ -562,22 +617,37 @@ export default function MocapReplayPage() {
       video.removeEventListener("seeked", onSeeked);
       video.removeEventListener("timeupdate", onTimeUpdate);
     };
-  }, [poseHeader, renderFrame]);
+  }, [isSidecarReplay, poseHeader, renderFrame]);
 
   const seekToFrame = useCallback(
     (frameIndex: number) => {
+      if (!poseHeader) return;
+      if (isSidecarReplay) {
+        setCurrentTime(frameIndex / poseHeader.fps);
+        void renderFrame(frameIndex);
+        return;
+      }
       const video = videoRef.current;
-      if (!video || !poseHeader) return;
+      if (!video) return;
       video.currentTime = frameIndex / poseHeader.fps;
     },
-    [poseHeader],
+    [isSidecarReplay, poseHeader, renderFrame],
   );
 
-  const seekToTime = useCallback((time: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
-  }, []);
+  const seekToTime = useCallback(
+    (time: number) => {
+      if (isSidecarReplay && poseHeader) {
+        const clamped = Math.max(0, Math.min(time, session?.durationSec ?? 0));
+        setCurrentTime(clamped);
+        void renderFrame(Math.floor(clamped * poseHeader.fps));
+        return;
+      }
+      const video = videoRef.current;
+      if (!video) return;
+      video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
+    },
+    [isSidecarReplay, poseHeader, renderFrame, session?.durationSec],
+  );
 
   const runAnalysis = useCallback(async () => {
     setReanalyzing(true);
@@ -774,24 +844,39 @@ export default function MocapReplayPage() {
       </div>
 
       {/* Video + skeleton overlay */}
-      <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
-        <video
-          ref={videoRef}
-          className="absolute inset-0 h-full w-full object-contain"
-          src={`/api/mocap/sessions/${id}/video`}
-          controls
-          playsInline
-          preload="metadata"
-          data-testid="mocap-replay-video"
-        />
-        {poseHeader ? (
-          <canvas
-            ref={canvasRef}
-            className="pointer-events-none absolute inset-0 h-full w-full"
-            data-testid="mocap-skeleton-canvas"
+      {isSidecarReplay ? (
+        <div
+          className="relative aspect-video w-full overflow-hidden rounded bg-black"
+          data-testid="mocap-replay-sidecar"
+        >
+          {poseHeader ? (
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 h-full w-full"
+              data-testid="mocap-skeleton-canvas"
+            />
+          ) : null}
+        </div>
+      ) : (
+        <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
+          <video
+            ref={videoRef}
+            className="absolute inset-0 h-full w-full object-contain"
+            src={`/api/mocap/sessions/${id}/video`}
+            controls
+            playsInline
+            preload="metadata"
+            data-testid="mocap-replay-video"
           />
-        ) : null}
-      </div>
+          {poseHeader ? (
+            <canvas
+              ref={canvasRef}
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              data-testid="mocap-skeleton-canvas"
+            />
+          ) : null}
+        </div>
+      )}
 
       {session.rowingSession ? (
         <Card data-testid="mocap-linked-session">

@@ -5,6 +5,7 @@ import {
   type PoseLandmarkName,
   type Stroke,
 } from "./types";
+import { toProjectedStream } from "./projection";
 
 interface SignalPoint {
   frameIndex: number;
@@ -15,8 +16,12 @@ interface SignalPoint {
 export function StrokePhaseSegmenter(stream: PoseFrameStream): Stroke[] {
   if (stream.frames.length < 3) return [];
 
-  const signal = smoothSignal(buildHipKneeDistanceSignal(stream), stream.fps);
-  const catches = findCatchCandidates(signal, stream.fps);
+  const projectedStream = toProjectedStream(stream);
+  const signal = smoothSignal(
+    buildHipKneeDistanceSignal(projectedStream),
+    projectedStream.fps,
+  );
+  const catches = findCatchCandidates(signal, projectedStream.fps);
   const strokes: Stroke[] = [];
 
   for (let i = 0; i < catches.length - 1; i++) {

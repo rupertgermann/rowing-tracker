@@ -1,6 +1,7 @@
 import {
   BYTES_PER_FRAME_V1,
   HEADER_SIZE,
+  type CoordinateSpace,
   decodeHeader,
   framesFromBlobSize,
   encodeHeader,
@@ -14,22 +15,32 @@ export interface FinalizedPoseStream {
   poseStreamBytes: number;
 }
 
-export function validatePoseFrameChunk(bytes: Uint8Array): number {
+export interface InitializePoseStreamBlobOptions {
+  keypointSchemaVersion?: number;
+  coordinateSpace?: CoordinateSpace;
+  cameraCount?: number;
+}
+
+export function validatePoseFrameChunk(
+  bytes: Uint8Array,
+  bytesPerFrame = BYTES_PER_FRAME_V1,
+): number {
   if (bytes.byteLength === 0) return 0;
-  if (bytes.byteLength % BYTES_PER_FRAME_V1 !== 0) {
+  if (bytes.byteLength % bytesPerFrame !== 0) {
     throw new Error(
-      `Body length ${bytes.byteLength} not multiple of frame size ${BYTES_PER_FRAME_V1}`,
+      `Body length ${bytes.byteLength} not multiple of frame size ${bytesPerFrame}`,
     );
   }
-  return bytes.byteLength / BYTES_PER_FRAME_V1;
+  return bytes.byteLength / bytesPerFrame;
 }
 
 export async function initializePoseStreamBlob(
   storage: MocapStorage,
   poseStreamPath: string,
   fps: number,
+  opts: InitializePoseStreamBlobOptions = {},
 ): Promise<void> {
-  await storage.appendBytes(poseStreamPath, encodeHeader({ fps }));
+  await storage.appendBytes(poseStreamPath, encodeHeader({ fps, ...opts }));
 }
 
 export async function appendPoseFrames(
@@ -37,7 +48,14 @@ export async function appendPoseFrames(
   poseStreamPath: string,
   bytes: Uint8Array,
 ): Promise<number> {
-  const framesAppended = validatePoseFrameChunk(bytes);
+  let bytesPerFrame = BYTES_PER_FRAME_V1;
+  if (bytes.byteLength > 0) {
+    const header = decodeHeader(
+      await storage.read(poseStreamPath, { start: 0, end: HEADER_SIZE }),
+    );
+    bytesPerFrame = header.bytesPerFrame;
+  }
+  const framesAppended = validatePoseFrameChunk(bytes, bytesPerFrame);
   if (framesAppended > 0) {
     await storage.appendBytes(poseStreamPath, bytes);
   }

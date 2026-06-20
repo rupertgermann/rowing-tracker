@@ -70,7 +70,10 @@ test("finalize uses the pose-stream header frame size for v2 sidecar blobs", asy
         cameraCount: 3,
       }),
     );
-    await storage.appendBytes(posePath, concat(frames.map(encodeFrameV2)));
+    assert.equal(
+      await appendPoseFrames(storage, posePath, concat(frames.map(encodeFrameV2))),
+      2,
+    );
 
     const finalized = await finalizePoseStreamBlob(storage, posePath);
     assert.equal(finalized.frameCount, 2);

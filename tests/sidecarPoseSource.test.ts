@@ -113,7 +113,7 @@ test("sidecar source reports non-ready health through status and error callbacks
   );
 });
 
-test("sidecar source stops sidecar after start response parse failures", async () => {
+test("sidecar source stops sidecar after start response omits metadata", async () => {
   await withSidecarGlobals(
     async ({ fetchCalls }) => {
       const statuses: PoseCaptureSourceStatus[] = [];
@@ -122,7 +122,7 @@ test("sidecar source stops sidecar after start response parse failures", async (
       });
 
       await source.init();
-      await assert.rejects(() => source.start(), SyntaxError);
+      await source.start();
       await source.stop();
 
       assert.deepEqual(fetchCalls.map((call) => String(call.input)), [
@@ -133,7 +133,7 @@ test("sidecar source stops sidecar after start response parse failures", async (
       assert.deepEqual(statuses, [
         "loading",
         "ready",
-        "error",
+        "capturing",
         "stopping",
         "stopped",
       ]);
