@@ -3,7 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
-import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
+import {
+  analyzeAndPersistMocapSession,
+  analyzeAndPersistMocapSessionLinked,
+} from "@/lib/mocap/sessionAnalysis";
+import { reanalyzeMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,66 +22,51 @@ export async function POST(
   }
 
   const { id } = await params;
-  const row = await prisma.mocapSession.findFirst({
-    where: { id, userId: session.user.id },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      poseStreamPath: true,
-      videoStoragePath: true,
-      capturePerspective: true,
-      calibrationCatchFrame: true,
-      calibrationFinishFrame: true,
-    },
-  });
-  if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  if (row.status !== "ready") {
-    return NextResponse.json(
-      { error: `Session not ready (status=${row.status})` },
-      { status: 409 },
-    );
-  }
-
   const storage = getMocapStorage();
-  if (!(await storage.exists(row.poseStreamPath))) {
+  const result = await reanalyzeMocapSessionLifecycle(
+    {
+      storage,
+      findSession: (userId, mocapSessionId) =>
+        prisma.mocapSession.findFirst({
+          where: { id: mocapSessionId, userId },
+          select: {
+            id: true,
+            userId: true,
+            status: true,
+            rowingSessionId: true,
+            poseStreamPath: true,
+            capturePerspective: true,
+            calibrationCatchFrame: true,
+            calibrationFinishFrame: true,
+          },
+        }),
+      setStatus: (mocapSessionId, status) =>
+        prisma.mocapSession.update({
+          where: { id: mocapSessionId },
+          data: { status },
+          select: { status: true },
+        }),
+      analyzePoseSegmented: analyzeAndPersistMocapSession,
+      analyzeCsvAligned: analyzeAndPersistMocapSessionLinked,
+    },
+    {
+      userId: session.user.id,
+      mocapSessionId: id,
+    },
+  );
+
+  if (!result.ok) {
     return NextResponse.json(
-      { error: "Cannot re-analyze a record-only session without a pose stream" },
-      { status: 409 },
+      { error: result.error },
+      { status: result.status },
     );
   }
-
-  await prisma.mocapSession.update({
-    where: { id: row.id },
-    data: { status: "analyzing" },
-  });
-
-  let analysis: Awaited<ReturnType<typeof analyzeAndPersistMocapSession>>;
-  try {
-    analysis = await analyzeAndPersistMocapSession(storage, row);
-  } catch (err) {
-    // Revert status so the session stays usable
-    await prisma.mocapSession.update({
-      where: { id: row.id },
-      data: { status: "ready" },
-    });
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
-  }
-
-  const updated = await prisma.mocapSession.update({
-    where: { id: row.id },
-    data: { status: "ready" },
-  });
 
   return NextResponse.json({
-    id: updated.id,
-    status: updated.status,
-    strokeMetricCount: analysis.strokeMetricCount,
-    faultCount: analysis.faultCount,
+    id: result.id,
+    status: result.status,
+    analysisMode: result.analysisMode,
+    strokeMetricCount: result.strokeMetricCount,
+    faultCount: result.faultCount,
   });
 }
