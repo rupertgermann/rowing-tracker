@@ -6,9 +6,9 @@
 import { Session, PersonalRecord } from '@/types/session';
 import { EarnedAward } from '@/lib/awards';
 import {
-  getCachedSessions,
-  cacheSessionsData,
-} from '@/lib/services/sessionsCache';
+  fetchRowingSessionList,
+  loadRowingSessionList,
+} from '@/lib/services/rowingSessionPersistence';
 
 export interface SyncResult {
   success: boolean;
@@ -28,18 +28,11 @@ export interface SessionsListResponse {
  */
 export async function fetchSessionsListFromDB(): Promise<SessionsListResponse> {
   try {
-    const response = await fetch('/api/sessions/list');
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[SYNC] Failed to fetch sessions list:', errorText);
-      throw new Error('Failed to fetch sessions list');
-    }
-    const data = await response.json();
+    const data = await fetchRowingSessionList();
     return {
-      sessions: data.sessions || [],
-      sessionsRevision: data.sessionsRevision ?? 0,
-      count: data.count ?? 0,
+      sessions: data.sessions,
+      sessionsRevision: data.revision,
+      count: data.count,
     };
   } catch (error) {
     console.error('[SYNC] Error fetching sessions list:', error);
@@ -58,32 +51,8 @@ export async function fetchSessionsListFromDB(): Promise<SessionsListResponse> {
  * 4. If revisions differ, use fresh data and update cache
  */
 export async function fetchSessionsFromDBWithCache(): Promise<Session[]> {
-  const cached = getCachedSessions();
-
-  try {
-    const { sessions, sessionsRevision } = await fetchSessionsListFromDB();
-
-    // Check if cache is still valid
-    if (cached && cached.sessionsRevision === sessionsRevision) {
-      console.log('[SYNC] Sessions cache hit (revision match)');
-      return cached.sessions;
-    }
-
-    // Cache miss or stale - update cache
-    console.log('[SYNC] Sessions cache miss - caching fresh data');
-    cacheSessionsData(sessions, sessionsRevision);
-    return sessions;
-  } catch (error) {
-    console.error('[SYNC] Error fetching sessions:', error);
-
-    // Return cached data if available
-    if (cached) {
-      console.log('[SYNC] Using stale cache due to fetch error');
-      return cached.sessions;
-    }
-
-    return [];
-  }
+  const result = await loadRowingSessionList();
+  return result.sessions;
 }
 
 /**
@@ -729,7 +698,7 @@ export async function initializeStoreFromDB() {
     generatedAchievements,
     memoryDocuments,
   ] = await Promise.all([
-    fetchSessionsFromDB(), // Full sessions with strokeData for session details
+    fetchSessionsFromDBWithCache(),
     fetchPRsFromDB(),
     fetchAwardsFromDB(),
     fetchTrainingPlansFromDB(),
