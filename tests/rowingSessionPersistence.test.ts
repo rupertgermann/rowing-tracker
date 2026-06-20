@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import {
   loadRowingSessionList,
   reviveRowingSessionTimestamps,
+  saveRowingSessions,
 } from "../src/lib/services/rowingSessionPersistence";
 import {
   cacheSessionsData,
@@ -154,4 +155,82 @@ test("reviveRowingSessionTimestamps revives list timestamps before UI state", ()
 
   assert.ok(revived.timestamp instanceof Date);
   assert.equal(revived.timestamp.toISOString(), "2026-05-10T14:30:00.000Z");
+});
+
+test("saveRowingSessions posts CSV import rows, returns database ids, and clears caches once", async () => {
+  cacheSessionsData([session({ id: "cached-session" })], 7);
+  localStorage.setItem("rowing_analytics_cache", JSON.stringify({ stale: true }));
+
+  const submitted = session({ id: "client-generated-id" });
+  const requests: Array<{ input: string; body: { sessions: Session[] } }> = [];
+  const progressMessages: string[] = [];
+
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      input: String(input),
+      body: JSON.parse(String(init?.body)),
+    });
+
+    return jsonResponse({
+      sessions: [
+        {
+          ...submitted,
+          id: "db-session-id",
+          timestamp: submitted.timestamp.toISOString(),
+        },
+      ],
+    });
+  };
+
+  const result = await saveRowingSessions([submitted], {
+    onProgress: (progress) => progressMessages.push(progress.message),
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.sessions?.[0].id, "db-session-id");
+  assert.ok(result.sessions?.[0].timestamp instanceof Date);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].input, "/api/sessions");
+  assert.equal(requests[0].body.sessions[0].id, "client-generated-id");
+  assert.equal(getCachedSessions(), null);
+  assert.equal(localStorage.getItem("rowing_analytics_cache"), null);
+  assert.equal(progressMessages.at(-1), "Upload complete!");
+});
+
+test("saveRowingSessions preserves ZIP stroke data and linked mocap marker when API returns a lean row", async () => {
+  const strokeData = [
+    {
+      strokeIndex: 0,
+      time: 1,
+      timestamp: "00:01",
+      distance: 5,
+      work: 10,
+      power: 100,
+      avgPower: 100,
+      split: 200,
+      avgSplit: 200,
+      strokeRate: 24,
+      heartRate: null,
+    },
+  ];
+  const submitted = session({
+    id: "db-session-id",
+    strokeData,
+    mocapSession: { id: "mocap-1" },
+  });
+
+  globalThis.fetch = async () => jsonResponse({
+    sessions: [
+      {
+        ...session({ id: "db-session-id" }),
+        timestamp: "2026-05-08T14:30:00.000Z",
+      },
+    ],
+  });
+
+  const result = await saveRowingSessions([submitted]);
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.sessions?.[0].strokeData, strokeData);
+  assert.deepEqual(result.sessions?.[0].mocapSession, { id: "mocap-1" });
 });

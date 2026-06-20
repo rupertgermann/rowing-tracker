@@ -631,10 +631,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
   addSessions: (newSessions, options) => {
     console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
 
-    // Clear caches when adding new sessions (triggers refetch on next load)
-    clearSessionsCache();
-    clearAnalyticsCache();
-
     // Ensure all new sessions have Date objects for timestamps (revive from JSON strings)
     const revivedSessions = newSessions.map(s => ({
       ...s,
@@ -797,20 +793,12 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     console.log('[STORE] updateSession called with session:', updatedSession.id);
     console.log('[STORE] Has stroke data:', !!updatedSession.strokeData, 'Count:', updatedSession.strokeData?.length);
 
-    // Clear caches (triggers refetch on next load)
-    clearSessionsCache();
-    clearAnalyticsCache();
-
     // Save to database
     try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: [updatedSession] }),
-      });
+      const result = await saveSessionsToDB([updatedSession]);
 
-      if (!response.ok) {
-        console.error('[STORE] Failed to save updated session to database');
+      if (!result.success) {
+        console.error('[STORE] Failed to save updated session to database:', result.error);
       } else {
         console.log('[STORE] Successfully saved updated session with stroke data to database');
       }
@@ -844,7 +832,15 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     }));
 
     set((state) => {
-      const sessionMap = new Map(revivedUpdate.map(s => [s.id, s]));
+      const existingById = new Map(state.sessions.map(s => [s.id, s]));
+      const sessionMap = new Map(revivedUpdate.map(s => {
+        const existing = existingById.get(s.id);
+        return [s.id, {
+          ...s,
+          strokeData: s.strokeData ?? existing?.strokeData,
+          mocapSession: s.mocapSession === undefined ? existing?.mocapSession : s.mocapSession,
+        }];
+      }));
       const updatedSessions = state.sessions.map(s =>
         sessionMap.has(s.id) ? sessionMap.get(s.id)! : s
       );
