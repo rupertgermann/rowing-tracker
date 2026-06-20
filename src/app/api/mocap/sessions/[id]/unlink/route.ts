@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
+import { unlinkMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,73 +20,73 @@ export async function POST(
 
   const { id } = await params;
   const userId = session.user.id;
-
-  const mocapSession = await prisma.mocapSession.findFirst({
-    where: { id, userId },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      rowingSessionId: true,
-      poseStreamPath: true,
-      capturePerspective: true,
-      calibrationCatchFrame: true,
-      calibrationFinishFrame: true,
-    },
-  });
-
-  if (!mocapSession) {
-    return NextResponse.json({ error: "Mocap session not found" }, { status: 404 });
-  }
-
-  if (mocapSession.status !== "ready") {
-    return NextResponse.json(
-      { error: `Mocap session not ready (status=${mocapSession.status})` },
-      { status: 409 },
-    );
-  }
-
-  const previousRowingSessionId = mocapSession.rowingSessionId;
-  if (previousRowingSessionId === null) {
-    return NextResponse.json(
-      { error: "Mocap session is not linked to a rowing session." },
-      { status: 409 },
-    );
-  }
-
-  // Clear the link and set status to "analyzing"
-  await prisma.mocapSession.update({
-    where: { id },
-    data: { rowingSessionId: null, status: "analyzing" },
-  });
-
   const storage = getMocapStorage();
 
-  try {
-    // Re-run pose-segmented analysis, which sets segmentationSource = "pose-segmented"
-    // and clears strokeDataId (analyzeAndPersistMocapSession does not set strokeDataId)
-    await analyzeAndPersistMocapSession(storage, mocapSession);
-  } catch (err) {
-    // Roll back: restore the previous link and revert status
-    await prisma.mocapSession.update({
-      where: { id },
-      data: {
-        rowingSessionId: previousRowingSessionId ?? null,
-        status: "ready",
+  const result = await unlinkMocapSessionLifecycle(
+    {
+      storage,
+      findSession: (ownerId, mocapSessionId) =>
+        prisma.mocapSession.findFirst({
+          where: { id: mocapSessionId, userId: ownerId },
+          select: {
+            id: true,
+            userId: true,
+            status: true,
+            rowingSessionId: true,
+            poseStreamPath: true,
+            capturePerspective: true,
+            calibrationCatchFrame: true,
+            calibrationFinishFrame: true,
+          },
+        }),
+      setStatus: (mocapSessionId, status) =>
+        prisma.mocapSession.update({
+          where: { id: mocapSessionId },
+          data: { status },
+          select: { status: true },
+        }),
+      unassignMocapSession: async (mocapSessionId, ownerId, rowingSessionId) => {
+        const update = await prisma.mocapSession.updateMany({
+          where: {
+            id: mocapSessionId,
+            userId: ownerId,
+            rowingSessionId,
+            status: "ready",
+          },
+          data: { rowingSessionId: null, status: "analyzing" },
+        });
+        return update.count === 1;
       },
-    });
+      restoreMocapSessionAssignment: (mocapSessionId, restoredRowingSessionId, status) =>
+        prisma.mocapSession
+          .update({
+            where: { id: mocapSessionId },
+            data: { rowingSessionId: restoredRowingSessionId, status },
+          })
+          .then(() => undefined),
+      bumpSessionsRevision: (ownerId) => bumpSessionsRevision(ownerId),
+      analyzePoseSegmented: analyzeAndPersistMocapSession,
+      analyzeCsvAligned: async () => {
+        throw new Error("Unlink lifecycle must use pose-segmented analysis");
+      },
+    },
+    { userId, mocapSessionId: id },
+  );
+
+  if (!result.ok) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
+      { error: result.error },
+      { status: result.status },
     );
   }
 
-  const updated = await prisma.mocapSession.update({
-    where: { id },
-    data: { status: "ready" },
-    select: { id: true, status: true },
+  return NextResponse.json({
+    id: result.id,
+    status: result.status,
   });
+}
 
+async function bumpSessionsRevision(userId: string): Promise<void> {
   await prisma.userSettings.upsert({
     where: { userId },
     update: {
@@ -104,10 +105,5 @@ export async function POST(
       maxTokens: 4000,
       sessionsRevision: 1,
     },
-  });
-
-  return NextResponse.json({
-    id: updated.id,
-    status: updated.status,
   });
 }
