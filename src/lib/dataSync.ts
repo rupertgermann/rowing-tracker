@@ -698,7 +698,7 @@ export async function initializeStoreFromDB() {
     generatedAchievements,
     memoryDocuments,
   ] = await Promise.all([
-    fetchSessionsFromDBWithCache(),
+    fetchSessionsFromDB(),
     fetchPRsFromDB(),
     fetchAwardsFromDB(),
     fetchTrainingPlansFromDB(),
