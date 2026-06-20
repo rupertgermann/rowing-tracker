@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles, Video } from 'lucide-react';
 import { formatSessionDate } from '@/lib/dateTimeUtils';
-import { cacheSessionsData } from '@/lib/services/sessionsCache';
+import { loadRowingSessionList } from '@/lib/services/rowingSessionPersistence';
 import { TimeRangeSelector } from '@/components/ui/time-range-selector';
 import type { Session } from '@/types/session';
 
@@ -90,19 +90,10 @@ export default function SessionsPage() {
 
     async function refreshSessions() {
       try {
-        const response = await fetch('/api/sessions/list', { cache: 'no-store' });
-        if (!response.ok) throw new Error(`${response.status}`);
-        const data: {
-          sessions?: Session[];
-          sessionsRevision?: number;
-        } = await response.json();
-        const freshSessions = data.sessions ?? [];
+        const result = await loadRowingSessionList({ cache: 'no-store' });
 
         if (cancelled) return;
-        replaceSessionsInStore(freshSessions);
-        if (typeof data.sessionsRevision === 'number') {
-          cacheSessionsData(freshSessions, data.sessionsRevision);
-        }
+        replaceSessionsInStore(result.sessions);
       } catch (error) {
         console.error('[SessionsPage] Failed to refresh sessions:', error);
       }

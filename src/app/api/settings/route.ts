@@ -43,6 +43,7 @@ export async function GET() {
           userProfileContext: null,
           userProfileRawInput: null,
           postureThresholds: null,
+          sidecarPort: null,
           aiConfig: null,
           customPromptsAi: null,
         }
@@ -138,6 +139,7 @@ export async function POST(req: Request) {
     if (settingsData.userProfileRawInput !== undefined) updateData.userProfileRawInput = settingsData.userProfileRawInput;
     if (settingsData.postureThresholds !== undefined) updateData.postureThresholds = settingsData.postureThresholds;
     if (settingsData.mocapPreferences !== undefined) updateData.mocapPreferences = settingsData.mocapPreferences;
+    if (settingsData.sidecarPort !== undefined) updateData.sidecarPort = settingsData.sidecarPort;
     
     // Dashboard and view settings
     if (settingsData.dashboardSettings !== undefined) updateData.dashboardSettings = settingsData.dashboardSettings;
@@ -165,6 +167,7 @@ export async function POST(req: Request) {
         maxTokens: settingsData.maxTokens || 4000,
         userProfileContext: settingsData.userProfileContext,
         userProfileRawInput: settingsData.userProfileRawInput,
+        sidecarPort: settingsData.sidecarPort,
       },
     });
 

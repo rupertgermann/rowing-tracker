@@ -6,9 +6,11 @@
 import { Session, PersonalRecord } from '@/types/session';
 import { EarnedAward } from '@/lib/awards';
 import {
-  getCachedSessions,
-  cacheSessionsData,
-} from '@/lib/services/sessionsCache';
+  fetchRowingSessionList,
+  loadRowingSessionList,
+  saveRowingSessions,
+  type RowingSessionSaveProgress,
+} from '@/lib/services/rowingSessionPersistence';
 
 export interface SyncResult {
   success: boolean;
@@ -28,18 +30,11 @@ export interface SessionsListResponse {
  */
 export async function fetchSessionsListFromDB(): Promise<SessionsListResponse> {
   try {
-    const response = await fetch('/api/sessions/list');
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[SYNC] Failed to fetch sessions list:', errorText);
-      throw new Error('Failed to fetch sessions list');
-    }
-    const data = await response.json();
+    const data = await fetchRowingSessionList();
     return {
-      sessions: data.sessions || [],
-      sessionsRevision: data.sessionsRevision ?? 0,
-      count: data.count ?? 0,
+      sessions: data.sessions,
+      sessionsRevision: data.revision,
+      count: data.count,
     };
   } catch (error) {
     console.error('[SYNC] Error fetching sessions list:', error);
@@ -58,32 +53,8 @@ export async function fetchSessionsListFromDB(): Promise<SessionsListResponse> {
  * 4. If revisions differ, use fresh data and update cache
  */
 export async function fetchSessionsFromDBWithCache(): Promise<Session[]> {
-  const cached = getCachedSessions();
-
-  try {
-    const { sessions, sessionsRevision } = await fetchSessionsListFromDB();
-
-    // Check if cache is still valid
-    if (cached && cached.sessionsRevision === sessionsRevision) {
-      console.log('[SYNC] Sessions cache hit (revision match)');
-      return cached.sessions;
-    }
-
-    // Cache miss or stale - update cache
-    console.log('[SYNC] Sessions cache miss - caching fresh data');
-    cacheSessionsData(sessions, sessionsRevision);
-    return sessions;
-  } catch (error) {
-    console.error('[SYNC] Error fetching sessions:', error);
-
-    // Return cached data if available
-    if (cached) {
-      console.log('[SYNC] Using stale cache due to fetch error');
-      return cached.sessions;
-    }
-
-    return [];
-  }
+  const result = await loadRowingSessionList();
+  return result.sessions;
 }
 
 /**
@@ -111,13 +82,7 @@ export async function fetchSessionsFromDB(): Promise<Session[]> {
 /**
  * Progress callback for chunked uploads
  */
-export interface UploadProgress {
-  current: number;    // Current chunk being processed
-  total: number;      // Total number of chunks
-  sessionsProcessed: number;  // Total sessions processed so far
-  totalSessions: number;      // Total sessions to process
-  message: string;    // Human-readable progress message
-}
+export type UploadProgress = RowingSessionSaveProgress;
 
 /**
  * Save sessions to database in chunks for large uploads
@@ -127,100 +92,14 @@ export async function saveSessionsToDBChunked(
   onProgress?: (progress: UploadProgress) => void,
   chunkSize: number = 25
 ): Promise<SyncResult> {
-  if (sessions.length === 0) {
-    return { success: true, sessions: [] };
-  }
-
-  const totalChunks = Math.ceil(sessions.length / chunkSize);
-  let sessionsProcessed = 0;
-  const allCreatedSessions: Session[] = [];
-
-  console.log(`[SYNC] Starting chunked upload: ${sessions.length} sessions in ${totalChunks} chunks`);
-
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, sessions.length);
-    const chunk = sessions.slice(start, end);
-
-    const progress: UploadProgress = {
-      current: i + 1,
-      total: totalChunks,
-      sessionsProcessed,
-      totalSessions: sessions.length,
-      message: `Processing sessions ${start + 1}-${end} of ${sessions.length}...`
-    };
-    onProgress?.(progress);
-
-    try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: chunk }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error(`[SYNC] Chunk ${i + 1}/${totalChunks} failed:`, error);
-        return {
-          success: false,
-          error: `Failed at chunk ${i + 1}/${totalChunks}: ${error.error || 'Unknown error'}`
-        };
-      }
-
-      const data = await response.json();
-      allCreatedSessions.push(...data.sessions);
-
-      sessionsProcessed += chunk.length;
-      console.log(`[SYNC] Chunk ${i + 1}/${totalChunks} complete (${sessionsProcessed}/${sessions.length} sessions)`);
-    } catch (error) {
-      console.error(`[SYNC] Error in chunk ${i + 1}/${totalChunks}:`, error);
-      return {
-        success: false,
-        error: `Network error at chunk ${i + 1}/${totalChunks}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  // Final progress update
-  onProgress?.({
-    current: totalChunks,
-    total: totalChunks,
-    sessionsProcessed: sessions.length,
-    totalSessions: sessions.length,
-    message: 'Upload complete!'
-  });
-
-  return { success: true, sessions: allCreatedSessions };
+  return saveRowingSessions(sessions, { onProgress, chunkSize });
 }
 
 /**
  * Save sessions to database (simple version for small batches)
  */
 export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult> {
-  // For large uploads, use chunked upload
-  if (sessions.length > 25) {
-    return saveSessionsToDBChunked(sessions);
-  }
-
-  try {
-    const response = await fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('[SYNC] Save failed:', error);
-      return { success: false, error: error.error || 'Failed to save sessions' };
-    }
-
-    const data = await response.json();
-    return { success: true, sessions: data.sessions || [] };
-  } catch (error) {
-    console.error('[SYNC] Error saving sessions:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-  }
+  return saveRowingSessions(sessions);
 }
 
 /**
@@ -729,7 +608,7 @@ export async function initializeStoreFromDB() {
     generatedAchievements,
     memoryDocuments,
   ] = await Promise.all([
-    fetchSessionsFromDB(), // Full sessions with strokeData for session details
+    fetchSessionsFromDB(),
     fetchPRsFromDB(),
     fetchAwardsFromDB(),
     fetchTrainingPlansFromDB(),

@@ -11,7 +11,7 @@
  * 3. Processing hundreds of sessions client-side
  */
 
-import { ChartMetric } from '@/lib/store';
+import type { ChartMetric } from '@/lib/store';
 
 // Chart data point as displayed in charts
 export interface ChartDataPoint {

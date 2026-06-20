@@ -60,9 +60,9 @@ import type {
 import { settings } from "@/lib/settings";
 import {
   checkSidecarHealth,
-  SIDECAR_DEFAULT_PORT,
   type SidecarHealth,
 } from "@/lib/mocap/sidecarClient";
+import { resolveSidecarPort } from "@/lib/mocap/sidecarPoseSource";
 
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
@@ -234,6 +234,51 @@ export default function MocapCapturePage() {
       mocapPreferences: { ...current, verbosity: next },
     });
   }, []);
+
+  const getSidecarPort = useCallback(
+    () => resolveSidecarPort(settings.getMocapSettings().sidecarPort),
+    [],
+  );
+
+  const handleSidecarAdapterStatus = useCallback(
+    (status: PoseCaptureSourceStatus, detail?: string) => {
+      setPoseStatus(status);
+      if (status === "error") {
+        setSidecarHealth(null);
+        setSidecarError(detail ?? "Sidecar error");
+      }
+    },
+    [],
+  );
+
+  const handleSidecarAdapterError = useCallback((err: Error) => {
+    setSidecarHealth(null);
+    setSidecarError(err.message);
+  }, []);
+
+  const checkSidecarReadiness = useCallback(async () => {
+    const port = getSidecarPort();
+    setPoseStatus("loading");
+    try {
+      const health = await checkSidecarHealth(port);
+      if (health.status !== "ready") {
+        throw new Error(`Sidecar not ready: ${health.status}`);
+      }
+      setPoseStatus("ready");
+      setSidecarHealth(health);
+      setSidecarError(null);
+      return health;
+    } catch (err) {
+      const error =
+        err instanceof Error && err.message.startsWith("Sidecar not ready:")
+          ? err
+          : new Error(`Sidecar not reachable on port ${port}`);
+      setPoseStatus("error");
+      setSidecarHealth(null);
+      setSidecarError(error.message);
+      throw error;
+    }
+  }, [getSidecarPort]);
 
   const clearCueDismissTimer = useCallback(() => {
     if (cueDismissTimerRef.current) {
@@ -482,13 +527,8 @@ export default function MocapCapturePage() {
       setState({ kind: "starting" });
       let sessionId: string | undefined;
       try {
-        const health = await checkSidecarHealth(SIDECAR_DEFAULT_PORT);
-        setSidecarHealth(health);
-        setSidecarError(null);
-        if (health.status !== "ready") {
-          setState({ kind: "error", message: `Sidecar not ready: ${health.status}` });
-          return;
-        }
+        const port = getSidecarPort();
+        const health = await checkSidecarReadiness();
         const createRes = await fetch("/api/mocap/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -518,14 +558,17 @@ export default function MocapCapturePage() {
         latestCameraReadinessRef.current = null;
         const source = new FreemocapSidecarSource({
           sessionId: created.id,
-          port: SIDECAR_DEFAULT_PORT,
+          port,
           cameraCount: health.cameras,
-          onStatus: (s) => setPoseStatus(s),
+          onStatus: handleSidecarAdapterStatus,
           onFrame: (info) =>
             handlePoseFrame(info, false, {
               allowRecordOnlyDowngrade: false,
             }),
-          onError: (err) => handleError(err, created.id),
+          onError: (err) => {
+            handleSidecarAdapterError(err);
+            void handleError(err, created.id);
+          },
         });
         sourceRef.current = source;
         await source.init();
@@ -707,7 +750,11 @@ export default function MocapCapturePage() {
     recordOnly,
     recordOnlyReason,
     useSidecar,
+    checkSidecarReadiness,
     clearCueDismissTimer,
+    getSidecarPort,
+    handleSidecarAdapterError,
+    handleSidecarAdapterStatus,
   ]);
 
   const stop = useCallback(async () => {
@@ -818,6 +865,22 @@ export default function MocapCapturePage() {
     const sessionId = state.sessionId;
     const onPageHide = () => {
       try {
+        if (state.source === "sidecar") {
+          const stopBody = JSON.stringify({ port: getSidecarPort() });
+          const stopUrl = `/api/mocap/sessions/${sessionId}/sidecar/stop`;
+          const sent = navigator.sendBeacon?.(
+            stopUrl,
+            new Blob([stopBody], { type: "application/json" }),
+          );
+          if (!sent) {
+            fetch(stopUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: stopBody,
+              keepalive: true,
+            }).catch(() => {});
+          }
+        }
         recorderRef.current?.requestData?.();
         recorderRef.current?.stop();
       } catch {
@@ -853,7 +916,7 @@ export default function MocapCapturePage() {
     };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [state, sessionQualityFlags, recordOnlyReason]);
+  }, [state, sessionQualityFlags, recordOnlyReason, getSidecarPort]);
 
   const calibrationFrames = getCalibrationFrames(calibration);
   const nextCalibrationPose: CalibrationPose | null = !(
@@ -959,10 +1022,9 @@ export default function MocapCapturePage() {
                   setSidecarHealth(null);
                   if (checked) {
                     try {
-                      const h = await checkSidecarHealth(SIDECAR_DEFAULT_PORT);
-                      setSidecarHealth(h);
+                      await checkSidecarReadiness();
                     } catch {
-                      setSidecarError("Sidecar not reachable on port 8765. Install rowing-tracker-sidecar and run it first.");
+                      // Adapter callbacks populate the user-visible error.
                     }
                   }
                 }}
@@ -971,7 +1033,7 @@ export default function MocapCapturePage() {
               />
               Multi-camera sidecar
             </label>
-            {useSidecar && sidecarHealth && (
+            {useSidecar && sidecarReady && sidecarHealth && (
               <span className="text-xs text-green-600" data-testid="mocap-sidecar-status">
                 Sidecar ready — {sidecarHealth.cameras} camera{sidecarHealth.cameras !== 1 ? "s" : ""}, {sidecarHealth.fps} fps
               </span>

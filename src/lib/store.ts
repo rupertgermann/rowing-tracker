@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
 import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
-import { clearSessionsCache } from '@/lib/services/sessionsCache';
-import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 import { firstCleanCatchDate, CLEAN_CATCH_AWARD_ID } from '@/lib/postureAchievements';
 import type { SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
 
@@ -159,8 +157,8 @@ interface RowingStore {
   clearSessions: () => void;
   updateFilters: (filters: Partial<SessionFilters>) => void;
   resetFilters: () => void;
-  deleteSession: (sessionId: string) => void;
-  updateSession: (updatedSession: Session) => void;
+  removeSessionFromStore: (sessionId: string) => void;
+  updateSessionInStore: (updatedSession: Session) => void;
   updateSessionsInStore: (sessions: Session[]) => void;  // Update local state only, no DB save
   replaceSessionsInStore: (sessions: Session[]) => void;  // Replace local state only, no DB save
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
@@ -631,10 +629,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
   addSessions: (newSessions, options) => {
     console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
 
-    // Clear caches when adding new sessions (triggers refetch on next load)
-    clearSessionsCache();
-    clearAnalyticsCache();
-
     // Ensure all new sessions have Date objects for timestamps (revive from JSON strings)
     const revivedSessions = newSessions.map(s => ({
       ...s,
@@ -754,33 +748,9 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     set({ filters: defaultFilters });
   },
 
-  deleteSession: async (sessionId) => {
-    console.log('[STORE] deleteSession called for:', sessionId);
+  removeSessionFromStore: (sessionId) => {
+    console.log('[STORE] removeSessionFromStore called for:', sessionId);
 
-    // Clear caches (triggers refetch on next load)
-    clearSessionsCache();
-    clearAnalyticsCache();
-
-    // Delete from database first
-    try {
-      const response = await fetch(`/api/sessions?id=${sessionId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        console.error('[STORE] Failed to delete session from database');
-        const error = await response.json();
-        console.error('[STORE] Error:', error);
-        return;
-      }
-
-      console.log('[STORE] Successfully deleted session from database');
-    } catch (error) {
-      console.error('[STORE] Error deleting session from database:', error);
-      return;
-    }
-
-    // Update local state
     set((state) => {
       const updatedSessions = state.sessions.filter(s => s.id !== sessionId);
       const updatedRecords = calculatePersonalRecords(updatedSessions);
@@ -793,35 +763,24 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     });
   },
 
-  updateSession: async (updatedSession) => {
-    console.log('[STORE] updateSession called with session:', updatedSession.id);
+  updateSessionInStore: (updatedSession) => {
+    console.log('[STORE] updateSessionInStore called with session:', updatedSession.id);
     console.log('[STORE] Has stroke data:', !!updatedSession.strokeData, 'Count:', updatedSession.strokeData?.length);
 
-    // Clear caches (triggers refetch on next load)
-    clearSessionsCache();
-    clearAnalyticsCache();
-
-    // Save to database
-    try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: [updatedSession] }),
-      });
-
-      if (!response.ok) {
-        console.error('[STORE] Failed to save updated session to database');
-      } else {
-        console.log('[STORE] Successfully saved updated session with stroke data to database');
-      }
-    } catch (error) {
-      console.error('[STORE] Error saving updated session:', error);
-    }
-
     set((state) => {
+      const revivedSession = {
+        ...updatedSession,
+        timestamp: updatedSession.timestamp instanceof Date
+          ? updatedSession.timestamp
+          : new Date(updatedSession.timestamp)
+      };
+      const hasExistingSession = state.sessions.some(s => s.id === updatedSession.id);
       const updatedSessions = state.sessions.map(s =>
-        s.id === updatedSession.id ? updatedSession : s
+        s.id === updatedSession.id ? revivedSession : s
       );
+      if (!hasExistingSession) {
+        updatedSessions.push(revivedSession);
+      }
       // Recalculate records in case this update improved something (unlikely for just adding strokeData, but good practice)
       const updatedRecords = calculatePersonalRecords(updatedSessions);
 
@@ -844,7 +803,15 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     }));
 
     set((state) => {
-      const sessionMap = new Map(revivedUpdate.map(s => [s.id, s]));
+      const existingById = new Map(state.sessions.map(s => [s.id, s]));
+      const sessionMap = new Map(revivedUpdate.map(s => {
+        const existing = existingById.get(s.id);
+        return [s.id, {
+          ...s,
+          strokeData: s.strokeData ?? existing?.strokeData,
+          mocapSession: s.mocapSession === undefined ? existing?.mocapSession : s.mocapSession,
+        }];
+      }));
       const updatedSessions = state.sessions.map(s =>
         sessionMap.has(s.id) ? sessionMap.get(s.id)! : s
       );

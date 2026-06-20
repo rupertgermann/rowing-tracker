@@ -196,6 +196,7 @@ export const settingsUpdateSchema = z.object({
   userProfileRawInput: z.string().max(100000).nullable(),
   postureThresholds: postureThresholdSettingsSchema.nullable(),
   mocapPreferences: mocapPreferencesSchema.nullable(),
+  sidecarPort: z.number().int().min(1).max(65535).nullable(),
 
   // View settings (flexible JSON)
   dashboardSettings: viewSettingsSchema,
