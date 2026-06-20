@@ -64,6 +64,16 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
       }),
     });
   });
+  await page.route("http://localhost:8765/session/start", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sessionId: "sidecar-session",
+        calibrationId: "calibration-1",
+      }),
+    });
+  });
   await page.route("http://localhost:8765/session/stop", async (route) => {
     await route.fulfill({ status: 200, body: "" });
   });
@@ -81,6 +91,7 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
   await page.route(
     "**/api/mocap/sessions/mock-sidecar/sidecar/connect",
     async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ port: 8765 });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
