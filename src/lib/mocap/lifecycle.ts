@@ -1,4 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import { MOCAP_RECORD_ONLY_FLAG } from "@/lib/mocap/assignment";
+import type { FinalizedPoseStream } from "@/lib/mocap/capturePersistence";
 import type { MocapStorage } from "@/lib/mocap/storage";
 import type { PersistedMocapAnalysisSummary } from "@/lib/mocap/sessionAnalysis";
 
@@ -26,12 +28,38 @@ export interface LinkMocapSessionInput {
   rowingSessionId: string;
 }
 
+export interface FinalizeMocapSessionInput {
+  userId: string;
+  mocapSessionId: string;
+  durationSec: number;
+  qualityScore?: number;
+  qualityFlags?: string[];
+  skipAnalysis?: boolean;
+}
+
 export type ReanalyzeMocapSessionResult =
   | {
       ok: true;
       id: string;
       status: string;
       analysisMode: MocapAnalysisMode;
+      strokeMetricCount: number;
+      faultCount: number;
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+    };
+
+export type FinalizeMocapSessionResult =
+  | {
+      ok: true;
+      id: string;
+      status: string;
+      durationSec: number;
+      frameCount: number;
+      poseStreamBytes: number;
       strokeMetricCount: number;
       faultCount: number;
     }
@@ -84,6 +112,13 @@ export type MocapAssignmentResult =
   | "mocap-conflict"
   | "rowing-conflict";
 
+export interface MocapCaptureFinalizationState {
+  status: "analyzing" | "ready";
+  durationSec: number;
+  qualityScore: number | null;
+  qualityFlags: string[];
+}
+
 export interface MocapLifecycleDependencies {
   storage: Pick<MocapStorage, "exists">;
   findSession(
@@ -96,7 +131,7 @@ export interface MocapLifecycleDependencies {
   ): Promise<MocapLifecycleRowingSession | null>;
   setStatus(
     mocapSessionId: string,
-    status: "analyzing" | "ready",
+    status: "capturing" | "analyzing" | "ready",
   ): Promise<{ status: string }>;
   assignMocapSession?(
     mocapSessionId: string,
@@ -123,6 +158,112 @@ export interface MocapLifecycleDependencies {
     session: MocapLifecycleSession,
     rowingSessionId: string,
   ): Promise<PersistedMocapAnalysisSummary>;
+}
+
+export interface FinalizeMocapSessionDependencies
+  extends MocapLifecycleDependencies {
+  finalizePoseStream(
+    storage: MocapStorage,
+    poseStreamPath: string,
+  ): Promise<FinalizedPoseStream>;
+  setCaptureFinalizationState(
+    mocapSessionId: string,
+    state: MocapCaptureFinalizationState,
+  ): Promise<{ status: string; durationSec: number }>;
+}
+
+export async function finalizeMocapSessionLifecycle(
+  deps: FinalizeMocapSessionDependencies,
+  input: FinalizeMocapSessionInput,
+): Promise<FinalizeMocapSessionResult> {
+  const session = await deps.findSession(input.userId, input.mocapSessionId);
+  if (!session) {
+    return { ok: false, status: 404, error: "Not found" };
+  }
+  if (session.status !== "capturing") {
+    return {
+      ok: false,
+      status: 409,
+      error: `Session not capturing (status=${session.status})`,
+    };
+  }
+
+  const captureState = {
+    durationSec: input.durationSec,
+    qualityScore: input.qualityScore ?? null,
+    qualityFlags: input.qualityFlags ?? [],
+  };
+
+  if (input.skipAnalysis) {
+    let finalized = { frameCount: 0, poseStreamBytes: 0 };
+    if (await deps.storage.exists(session.poseStreamPath)) {
+      try {
+        finalized = await deps.finalizePoseStream(
+          deps.storage as MocapStorage,
+          session.poseStreamPath,
+        );
+      } catch (err) {
+        return finalizeFailure(err);
+      }
+    }
+    const updated = await deps.setCaptureFinalizationState(session.id, {
+      status: "ready",
+      ...captureState,
+      qualityFlags: uniqueFlags([
+        ...captureState.qualityFlags,
+        MOCAP_RECORD_ONLY_FLAG,
+      ]),
+    });
+    return {
+      ok: true,
+      id: session.id,
+      status: updated.status,
+      durationSec: updated.durationSec,
+      frameCount: finalized.frameCount,
+      poseStreamBytes: finalized.poseStreamBytes,
+      strokeMetricCount: 0,
+      faultCount: 0,
+    };
+  }
+
+  const analyzing = await deps.setCaptureFinalizationState(session.id, {
+    status: "analyzing",
+    ...captureState,
+  });
+
+  let finalized: FinalizedPoseStream;
+  try {
+    finalized = await deps.finalizePoseStream(
+      deps.storage as MocapStorage,
+      session.poseStreamPath,
+    );
+  } catch (err) {
+    await deps.setStatus(session.id, "capturing");
+    return finalizeFailure(err);
+  }
+
+  let analysis: PersistedMocapAnalysisSummary;
+  try {
+    analysis = await deps.analyzePoseSegmented(deps.storage as MocapStorage, {
+      ...session,
+      status: "analyzing",
+    });
+  } catch (err) {
+    await deps.setStatus(session.id, "ready");
+    return analysisFailure(err);
+  }
+
+  const updated = await deps.setStatus(session.id, "ready");
+  return {
+    ok: true,
+    id: session.id,
+    status: updated.status,
+    durationSec: analyzing.durationSec,
+    frameCount: finalized.frameCount,
+    poseStreamBytes: finalized.poseStreamBytes,
+    strokeMetricCount: analysis.strokeMetricCount,
+    faultCount: analysis.faultCount,
+  };
 }
 
 export async function reanalyzeMocapSessionLifecycle(
@@ -381,4 +522,16 @@ function analysisFailure(err: unknown): { ok: false; status: 500; error: string 
     status: 500,
     error: err instanceof Error ? err.message : String(err),
   };
+}
+
+function finalizeFailure(err: unknown): { ok: false; status: 500; error: string } {
+  return {
+    ok: false,
+    status: 500,
+    error: err instanceof Error ? err.message : String(err),
+  };
+}
+
+function uniqueFlags(flags: string[]): string[] {
+  return [...new Set(flags)];
 }

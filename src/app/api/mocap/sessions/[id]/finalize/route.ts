@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { finalizePoseStreamBlob } from "@/lib/mocap/capturePersistence";
 import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
+import { finalizeMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,29 +28,6 @@ export async function POST(
   }
 
   const { id } = await params;
-  const row = await prisma.mocapSession.findFirst({
-    where: { id, userId: session.user.id },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      poseStreamPath: true,
-      videoStoragePath: true,
-      capturePerspective: true,
-      calibrationCatchFrame: true,
-      calibrationFinishFrame: true,
-    },
-  });
-  if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  if (row.status !== "capturing") {
-    return NextResponse.json(
-      { error: `Session not capturing (status=${row.status})` },
-      { status: 409 },
-    );
-  }
-
   let body: z.infer<typeof Body>;
   try {
     body = Body.parse(await req.json());
@@ -64,85 +42,65 @@ export async function POST(
   }
 
   const storage = getMocapStorage();
-
-  if (body.skipAnalysis) {
-    let finalized = { frameCount: 0, poseStreamBytes: 0 };
-    if (await storage.exists(row.poseStreamPath)) {
-      try {
-        finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
-      } catch (err) {
-        return NextResponse.json(
-          { error: err instanceof Error ? err.message : String(err) },
-          { status: 500 },
-        );
-      }
-    }
-    const updated = await prisma.mocapSession.update({
-      where: { id: row.id },
-      data: {
-        status: "ready",
-        durationSec: body.durationSec,
-        qualityScore: body.qualityScore ?? null,
-        qualityFlags: [...new Set([...(body.qualityFlags ?? []), "record-only"])],
+  const result = await finalizeMocapSessionLifecycle(
+    {
+      storage,
+      findSession: (userId, mocapSessionId) =>
+        prisma.mocapSession.findFirst({
+          where: { id: mocapSessionId, userId },
+          select: {
+            id: true,
+            userId: true,
+            status: true,
+            rowingSessionId: true,
+            poseStreamPath: true,
+            capturePerspective: true,
+            calibrationCatchFrame: true,
+            calibrationFinishFrame: true,
+          },
+        }),
+      setStatus: (mocapSessionId, status) =>
+        prisma.mocapSession.update({
+          where: { id: mocapSessionId },
+          data: { status },
+          select: { status: true },
+        }),
+      setCaptureFinalizationState: (mocapSessionId, state) =>
+        prisma.mocapSession.update({
+          where: { id: mocapSessionId },
+          data: state,
+          select: { status: true, durationSec: true },
+        }),
+      finalizePoseStream: finalizePoseStreamBlob,
+      analyzePoseSegmented: analyzeAndPersistMocapSession,
+      analyzeCsvAligned: async () => {
+        throw new Error("Finalize lifecycle must use pose-segmented analysis");
       },
-    });
-    return NextResponse.json({
-      id: updated.id,
-      status: updated.status,
-      durationSec: updated.durationSec,
-      frameCount: finalized.frameCount,
-      poseStreamBytes: finalized.poseStreamBytes,
-      strokeMetricCount: 0,
-      faultCount: 0,
-    });
-  }
-
-  let finalized: Awaited<ReturnType<typeof finalizePoseStreamBlob>>;
-  try {
-    finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
-  }
-
-  const analyzing = await prisma.mocapSession.update({
-    where: { id: row.id },
-    data: {
-      status: "analyzing",
-      durationSec: body.durationSec,
-      qualityScore: body.qualityScore ?? null,
-      qualityFlags: body.qualityFlags ?? [],
     },
-  });
+    {
+      userId: session.user.id,
+      mocapSessionId: id,
+      durationSec: body.durationSec,
+      qualityScore: body.qualityScore,
+      qualityFlags: body.qualityFlags,
+      skipAnalysis: body.skipAnalysis,
+    },
+  );
 
-  let analysis: Awaited<ReturnType<typeof analyzeAndPersistMocapSession>>;
-  try {
-    analysis = await analyzeAndPersistMocapSession(storage, analyzing);
-  } catch (err) {
-    await prisma.mocapSession.update({
-      where: { id: row.id },
-      data: { status: "ready" },
-    });
+  if (!result.ok) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
+      { error: result.error },
+      { status: result.status },
     );
   }
-
-  const updated = await prisma.mocapSession.update({
-    where: { id: row.id },
-    data: { status: "ready" },
-  });
 
   return NextResponse.json({
-    id: updated.id,
-    status: updated.status,
-    durationSec: updated.durationSec,
-    frameCount: finalized.frameCount,
-    poseStreamBytes: finalized.poseStreamBytes,
-    strokeMetricCount: analysis.strokeMetricCount,
-    faultCount: analysis.faultCount,
+    id: result.id,
+    status: result.status,
+    durationSec: result.durationSec,
+    frameCount: result.frameCount,
+    poseStreamBytes: result.poseStreamBytes,
+    strokeMetricCount: result.strokeMetricCount,
+    faultCount: result.faultCount,
   });
 }
