@@ -184,7 +184,7 @@ export default function PlansPage() {
   const loadPlans = async () => {
     try {
       const allPlans = await trainingPlans.getPlans();
-      const active = await trainingPlans.getActivePlan();
+      const active = await trainingPlans.getActivePlan({ skipSettingsFallback: true });
       setPlans(allPlans);
       setActivePlan(active);
       setError(null);

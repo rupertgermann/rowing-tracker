@@ -8,7 +8,7 @@ import { calculateConsistencyScore } from "@/lib/analysisUtils";
  * GET /api/sessions
  * Fetch all sessions for the authenticated user
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     
@@ -17,6 +17,37 @@ export async function GET() {
         { error: "Unauthorized" },
         { status: 401 }
       );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('id');
+
+    if (sessionId) {
+      const rowingSession = await prisma.rowingSession.findFirst({
+        where: {
+          id: sessionId,
+          userId: session.user.id,
+        },
+        include: {
+          strokeData: {
+            orderBy: {
+              strokeIndex: 'asc',
+            },
+          },
+          mocapSession: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (!rowingSession) {
+        return NextResponse.json(
+          { error: "Session not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ session: rowingSession });
     }
 
     const sessions = await prisma.rowingSession.findMany({

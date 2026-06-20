@@ -28,7 +28,6 @@ import {
 } from '@/lib/mocap/analysis/postureThresholds';
 import { cloudAI } from '@/lib/cloudAI';
 import { deleteAllInsightsFromDB } from '@/lib/dataSync';
-import { useAIInsights } from '@/hooks/useAIInsights';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   DEFAULT_SYSTEM_PROMPT,
@@ -104,17 +103,18 @@ export default function SettingsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [storageUsage, setStorageUsage] = useState<DataManagement['storageUsage'] | null>(null);
 
-  // Get refreshArchivedInsights from useAIInsights hook
-  const { refreshArchivedInsights } = useAIInsights();
-
   // Load storage usage
   useEffect(() => {
+    if (activeCategory !== 'dataManagement') {
+      return;
+    }
+
     const loadStorageUsage = async () => {
       const usage = await settings.calculateStorageUsage();
       setStorageUsage(usage);
     };
     loadStorageUsage();
-  }, [settingsData]);
+  }, [activeCategory, settingsData]);
 
   // Toast component for overlay notifications
   const Toast = ({ message, type, onExit }: { message: string; type: 'success' | 'error'; onExit: () => void }) => {
@@ -245,7 +245,8 @@ export default function SettingsPage() {
         console.error('Failed to load memory documents:', error);
       }
     };
-    loadDocuments();
+    const timeout = window.setTimeout(loadDocuments, 1500);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   // Check for legacy IndexedDB images that need migration
@@ -283,7 +284,6 @@ export default function SettingsPage() {
         return;
       }
 
-      await refreshArchivedInsights?.();
       setSuccessMessage('Insights archive cleared');
     } catch (error) {
       setErrorMessage('Failed to clear insights archive');

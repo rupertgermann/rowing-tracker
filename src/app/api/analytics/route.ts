@@ -3,6 +3,28 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 
+const MAX_CHART_POINTS = 240;
+
+function downsample<T>(items: T[], maxItems: number): T[] {
+  if (items.length <= maxItems) return items;
+  if (maxItems <= 1) return items.slice(0, 1);
+
+  const lastIndex = items.length - 1;
+  const step = lastIndex / (maxItems - 1);
+  const result: T[] = [];
+  const seen = new Set<number>();
+
+  for (let i = 0; i < maxItems; i++) {
+    const index = Math.round(i * step);
+    if (!seen.has(index)) {
+      seen.add(index);
+      result.push(items[index]);
+    }
+  }
+
+  return result;
+}
+
 /**
  * GET /api/analytics
  *
@@ -129,11 +151,17 @@ export async function GET(request: Request) {
 
     // Available dates for date picker
     const availableDates = sessions.map(s => s.timestamp.toISOString());
+    const downsampledChartData = Object.fromEntries(
+      Object.entries(chartData).map(([metric, values]) => [
+        metric,
+        downsample(values, MAX_CHART_POINTS),
+      ]),
+    );
 
     return NextResponse.json({
-      chartData,
+      chartData: downsampledChartData,
       summary,
-      scatterData,
+      scatterData: downsample(scatterData, MAX_CHART_POINTS),
       availableDates,
       sessionsRevision: settings?.sessionsRevision ?? 0,
       sessionCount,

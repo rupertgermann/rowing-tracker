@@ -1,0 +1,453 @@
+{
+  "label": "after",
+  "baseUrl": "http://localhost:3000",
+  "mode": "browser-settled",
+  "thresholdMs": 50,
+  "warmups": 1,
+  "samples": 3,
+  "apiQuietMs": 750,
+  "settleTimeoutMs": 10000,
+  "benchmarkUserId": "benchmark-user",
+  "sessionId": "mock-session-0501",
+  "mocapSessionId": "benchmark-mocap-session",
+  "mockMetadata": {
+    "userId": "benchmark-user",
+    "email": "benchmark@example.com",
+    "sessionCount": 1000,
+    "strokeCount": 203940,
+    "sampleSessionId": "mock-session-0501",
+    "sampleMocapSessionId": "benchmark-mocap-session",
+    "generatedAt": "2026-06-20T10:12:17.507Z",
+    "sourceFiles": {
+      "summaryCsv": "docs/csvs/SmartRow workouts.csv",
+      "detailCsv": "docs/csvs/2025-11-16T143854_1000m.csv"
+    }
+  },
+  "generatedAt": "2026-06-20T10:56:42.479Z",
+  "rows": [
+    {
+      "route": "/",
+      "status": 200,
+      "finalPath": "/dashboard",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 0.7732500000056461
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 47.959499999997206,
+      "p95": 53.15166700000191,
+      "min": 41.02154200000223,
+      "max": 53.15166700000191
+    },
+    {
+      "route": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 4.863624999998137
+        },
+        {
+          "path": "/api/admin/users",
+          "durationMs": 6.762291999999434
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 45.46716699999888,
+      "p95": 48.7028749999954,
+      "min": 42.8045839999977,
+      "max": 48.7028749999954
+    },
+    {
+      "route": "/analytics",
+      "status": 200,
+      "finalPath": "/analytics",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 7.002416999996058
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 39.38591699999961,
+      "p95": 40.324415999999474,
+      "min": 36.52700000000186,
+      "max": 40.324415999999474
+    },
+    {
+      "route": "/auth/error",
+      "status": 200,
+      "finalPath": "/auth/error",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 5.051625000000058
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 34.216333999997005,
+      "p95": 36.52566699999443,
+      "min": 30.673875000000407,
+      "max": 36.52566699999443
+    },
+    {
+      "route": "/auth/forgot-password",
+      "status": 200,
+      "finalPath": "/auth/forgot-password",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 1.5015409999978147
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 25.867207999999664,
+      "p95": 39.31487499999639,
+      "min": 20.452625000005355,
+      "max": 39.31487499999639
+    },
+    {
+      "route": "/auth/login",
+      "status": 200,
+      "finalPath": "/auth/login",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 3.114916999998968
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 31.578333999997994,
+      "p95": 32.370875000000524,
+      "min": 30.3212910000002,
+      "max": 32.370875000000524
+    },
+    {
+      "route": "/auth/register",
+      "status": 200,
+      "finalPath": "/auth/register",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 2.3765829999974812
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 35.54349999999977,
+      "p95": 36.375584000001254,
+      "min": 24.112042000000656,
+      "max": 36.375584000001254
+    },
+    {
+      "route": "/auth/reset-password",
+      "status": 200,
+      "finalPath": "/auth/reset-password",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 1.4465419999978621
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 32.22750000000087,
+      "p95": 33.44479200000205,
+      "min": 30.463833000001614,
+      "max": 33.44479200000205
+    },
+    {
+      "route": "/auth/verify-email",
+      "status": 200,
+      "finalPath": "/auth/verify-email",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 1.2846659999995609
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 32.935041000004276,
+      "p95": 36.38433300000179,
+      "min": 20.51758400000108,
+      "max": 36.38433300000179
+    },
+    {
+      "route": "/chat",
+      "status": 200,
+      "finalPath": "/chat",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 0.29754200000024866
+        },
+        {
+          "path": "/api/chat",
+          "durationMs": 6.365208999995957
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 45.55091700000048,
+      "p95": 48.710542000000714,
+      "min": 31.393874999994296,
+      "max": 48.710542000000714
+    },
+    {
+      "route": "/dashboard",
+      "status": 200,
+      "finalPath": "/dashboard",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 0.7375000000029104
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 38.92016700000022,
+      "p95": 40.37212500000169,
+      "min": 32.208582999999635,
+      "max": 40.37212500000169
+    },
+    {
+      "route": "/insights",
+      "status": 200,
+      "finalPath": "/insights",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 3.872625000003609
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 28.865583999999217,
+      "p95": 36.95700000000943,
+      "min": 27.63220800000272,
+      "max": 36.95700000000943
+    },
+    {
+      "route": "/mocap",
+      "status": 200,
+      "finalPath": "/mocap",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 2.8665000000037253
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 38.91387499999837,
+      "p95": 38.98320799999783,
+      "min": 36.850500000000466,
+      "max": 38.98320799999783
+    },
+    {
+      "route": "/mocap/sessions",
+      "status": 200,
+      "finalPath": "/mocap/sessions",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 4.379415999996127
+        },
+        {
+          "path": "/api/mocap/sessions",
+          "durationMs": 6.810083000003942
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 35.44458299998951,
+      "p95": 36.27704200000153,
+      "min": 32.70850000000064,
+      "max": 36.27704200000153
+    },
+    {
+      "route": "/mocap/sessions/benchmark-mocap-session",
+      "status": 200,
+      "finalPath": "/mocap/sessions/benchmark-mocap-session",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 6.214334000003873
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 42.06966700000339,
+      "p95": 54.1038750000007,
+      "min": 41.91804200000115,
+      "max": 54.1038750000007
+    },
+    {
+      "route": "/plans",
+      "status": 200,
+      "finalPath": "/plans",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 3.7389580000017304
+        },
+        {
+          "path": "/api/training-plans",
+          "durationMs": 10.522209000002476
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 34.846583999998984,
+      "p95": 42.417999999997846,
+      "min": 27.026207999995677,
+      "max": 42.417999999997846
+    },
+    {
+      "route": "/profile",
+      "status": 200,
+      "finalPath": "/profile",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 4.16229100000055
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 33.17354200000409,
+      "p95": 37.17791700000089,
+      "min": 21.060042000004614,
+      "max": 37.17791700000089
+    },
+    {
+      "route": "/prs",
+      "status": 200,
+      "finalPath": "/prs",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 6.466042000000016
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 39.5358750000014,
+      "p95": 46.97579100000439,
+      "min": 31.2374159999963,
+      "max": 46.97579100000439
+    },
+    {
+      "route": "/sessions",
+      "status": 200,
+      "finalPath": "/sessions",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 0.8453750000044238
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 31.533291999992798,
+      "p95": 37.10008299999754,
+      "min": 23.851541999996698,
+      "max": 37.10008299999754
+    },
+    {
+      "route": "/sessions/mock-session-0501",
+      "status": 200,
+      "finalPath": "/sessions/mock-session-0501",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 1.1133330000011483
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 45.395416999999725,
+      "p95": 47.79716599999665,
+      "min": 39.83987500000512,
+      "max": 47.79716599999665
+    },
+    {
+      "route": "/settings",
+      "status": 200,
+      "finalPath": "/settings",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 5.414541000005556
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 40.68183300000237,
+      "p95": 41.146874999998545,
+      "min": 37.669249999991735,
+      "max": 41.146874999998545
+    },
+    {
+      "route": "/sync",
+      "status": 200,
+      "finalPath": "/sync",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 3.274875000002794
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 6.150041999993846
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 42.52520899999945,
+      "p95": 44.15704099999857,
+      "min": 36.29145800000697,
+      "max": 44.15704099999857
+    }
+  ],
+  "summary": {
+    "pageCount": 22,
+    "slowCount": 0,
+    "badStatusCount": 0,
+    "apiFailureCount": 0,
+    "maxMedian": 47.959499999997206,
+    "maxP95": 54.1038750000007
+  }
+}

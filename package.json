@@ -27,6 +27,9 @@
     "admin:promote": "npx tsx scripts/promote-admin.ts",
     "test": "npx tsx --test tests/*.test.ts",
     "test:e2e": "npx playwright test",
+    "perf:pages": "node scripts/benchmark-page-loads.mjs",
+    "perf:report": "node scripts/generate-page-load-report.mjs",
+    "seed:mock": "npx tsx scripts/seed-mock-data.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

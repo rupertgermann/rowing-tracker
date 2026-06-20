@@ -32,11 +32,6 @@ export function useMemory() {
 
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
 
-  // Load documents on mount
-  useEffect(() => {
-    loadDocuments();
-  }, []);
-
   const loadDocuments = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
@@ -58,6 +53,12 @@ export function useMemory() {
       }));
     }
   }, []);
+
+  // Load documents after first paint; the chat shell can render without memory metadata.
+  useEffect(() => {
+    const timeout = window.setTimeout(loadDocuments, 1500);
+    return () => window.clearTimeout(timeout);
+  }, [loadDocuments]);
 
   // Upload a document
   const uploadDocument = useCallback(async (

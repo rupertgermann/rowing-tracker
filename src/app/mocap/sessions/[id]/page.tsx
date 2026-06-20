@@ -271,13 +271,42 @@ export default function MocapReplayPage() {
 
   // Load session data
   useEffect(() => {
-    fetch(`/api/mocap/sessions/${id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`);
-        return r.json();
-      })
-      .then((data) => setSession(data.session))
-      .catch((e) => setLoadError(e.message));
+    let cancelled = false;
+    const cacheKey = `mocap-session:${id}:v1`;
+
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/mocap/sessions/${id}`);
+        if (!response.ok) throw new Error(`${response.status}`);
+        const data = await response.json();
+        if (cancelled) return;
+        setSession(data.session);
+        localStorage.setItem(cacheKey, JSON.stringify(data.session));
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : String(e));
+        }
+      }
+    };
+
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setSession(JSON.parse(cached));
+        const timeout = window.setTimeout(load, 1500);
+        return () => {
+          cancelled = true;
+          window.clearTimeout(timeout);
+        };
+      } catch {
+        localStorage.removeItem(cacheKey);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // Load pose stream header

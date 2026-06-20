@@ -59,11 +59,18 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
 
   // Check for existing discussions (async)
   useEffect(() => {
+    let cancelled = false;
     const loadDiscussionCount = async () => {
       const discussions = await chatStorage.getInsightDiscussionSessions(insight.id);
-      setDiscussionCount(discussions.length);
+      if (!cancelled) {
+        setDiscussionCount(discussions.length);
+      }
     };
-    loadDiscussionCount();
+    const timeout = window.setTimeout(loadDiscussionCount, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
   }, [insight.id]);
 
   const getInsightIcon = () => {

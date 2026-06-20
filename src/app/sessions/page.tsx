@@ -28,6 +28,8 @@ const distanceRangeOptions = [
   { value: '5000+', label: '5000m+' }
 ];
 
+const INITIAL_SESSION_ROWS = 10;
+
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
   if (meters >= 1000) {
@@ -68,6 +70,8 @@ export default function SessionsPage() {
   const sessions = getSessions();
   const personalRecords = getPersonalRecords();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [showAllRows, setShowAllRows] = useState(false);
 
   // Helper function to check if session is a personal record
   const isPersonalRecord = (session: any): { isPR: boolean; distances: string[] } => {
@@ -80,13 +84,16 @@ export default function SessionsPage() {
       distances: prDistances
     };
   };
-  const [mounted, setMounted] = useState(false);
-
   const sortConfig = sessionsViewSettings.sortConfig;
   const filters = sessionsViewSettings.filters;
 
   useEffect(() => {
     setMounted(true);
+    const timer = window.setTimeout(() => {
+      setShowAllRows(true);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Apply filters to sessions
@@ -147,6 +154,10 @@ export default function SessionsPage() {
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
   const hasActiveFilters = filters.dateRange !== 'all' || filters.distanceRange !== 'all';
+  const visibleSessions = showAllRows
+    ? sortedSessions
+    : sortedSessions.slice(0, INITIAL_SESSION_ROWS);
+  const isShowingInitialSlice = visibleSessions.length < sortedSessions.length;
 
   // Handle column sort
   const handleSort = (field: SortField) => {
@@ -279,8 +290,8 @@ export default function SessionsPage() {
                     <Calendar className="h-4 w-4" />
                     <span>
                       {hasFilteredData ?
-                        `${sortedSessions.length} of ${sessions.length} sessions` :
-                        `${sortedSessions.length} sessions`
+                        `${visibleSessions.length} of ${sessions.length} sessions` :
+                        `${visibleSessions.length} sessions`
                       }
                     </span>
                   </div>
@@ -371,7 +382,7 @@ export default function SessionsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedSessions.map((session) => {
+                        {visibleSessions.map((session) => {
                           const prInfo = isPersonalRecord(session);
                           const hasStrokeData = !!(session.strokeData && session.strokeData.length > 0);
                           return (
@@ -470,7 +481,9 @@ export default function SessionsPage() {
 
                 {/* Summary */}
                 <div className="mt-6 text-center text-sm text-muted-foreground">
-                  {hasActiveFilters ?
+                  {isShowingInitialSlice ?
+                    `Showing first ${visibleSessions.length} of ${sortedSessions.length} sessions` :
+                    hasActiveFilters ?
                     `Showing ${sortedSessions.length} filtered sessions` :
                     `Showing all ${sessions.length} sessions`
                   } • Sorted by {sortConfig.field} ({sortConfig.direction})

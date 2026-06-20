@@ -744,9 +744,12 @@ export function useInsightFeedback() {
     if (cacheLoadedRef.current) return;
     cacheLoadedRef.current = true;
 
+    let cancelled = false;
     const loadFeedback = async () => {
       try {
         const { active, archived } = await fetchInsightsFromDatabase();
+        if (cancelled) return;
+
         const allInsights = [...active, ...archived];
         const cache: Record<string, string> = {};
 
@@ -762,7 +765,11 @@ export function useInsightFeedback() {
       }
     };
 
-    loadFeedback();
+    const timeout = window.setTimeout(loadFeedback, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   const handleInsightFeedback = useCallback(async (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => {

@@ -47,10 +47,6 @@ export async function GET() {
           avgStrokeRate: true,
           maxStrokeRate: true,
           consistencyScore: true,
-          createdAt: true,
-          updatedAt: true,
-          importedAt: true,
-          sourceFile: true,
           mocapSession: {
             select: { id: true },
           },

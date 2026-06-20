@@ -30,13 +30,13 @@ function AuthErrorContent() {
       </div>
 
       <div className="space-y-4">
-        <Link href="/auth/login">
+        <Link href="/auth/login" prefetch={false}>
           <Button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
             Try Again
           </Button>
         </Link>
 
-        <Link href="/">
+        <Link href="/" prefetch={false}>
           <Button
             variant="outline"
             className="w-full py-3 border-slate-600 text-slate-300 hover:bg-slate-700 font-medium rounded-lg transition-colors"
@@ -47,7 +47,7 @@ function AuthErrorContent() {
       </div>
 
       <div className="mt-8 text-center">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-300">
+        <Link href="/" prefetch={false} className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-300">
           <Waves className="w-4 h-4" />
           <span>Rowing Tracker</span>
         </Link>

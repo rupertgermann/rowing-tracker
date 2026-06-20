@@ -97,13 +97,13 @@ export class TrainingPlansService {
   }
 
   // Get active training plan
-  async getActivePlan(): Promise<TrainingPlan | null> {
+  async getActivePlan(options: { skipSettingsFallback?: boolean } = {}): Promise<TrainingPlan | null> {
     try {
       // Try localStorage cache first
       let activePlanId = localStorage.getItem(this.ACTIVE_PLAN_KEY);
       
       // If not in localStorage, check DB (via settings)
-      if (!activePlanId) {
+      if (!activePlanId && !options.skipSettingsFallback) {
         try {
           const response = await fetch('/api/settings');
           if (response.ok) {

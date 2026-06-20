@@ -1,0 +1,323 @@
+{
+  "label": "diagnostic",
+  "baseUrl": "http://localhost:3000",
+  "mode": "browser-settled",
+  "thresholdMs": 50,
+  "warmups": 0,
+  "samples": 1,
+  "apiQuietMs": 750,
+  "settleTimeoutMs": 10000,
+  "benchmarkUserId": "benchmark-user",
+  "sessionId": "mock-session-0501",
+  "mocapSessionId": "benchmark-mocap-session",
+  "mockMetadata": {
+    "userId": "benchmark-user",
+    "email": "benchmark@example.com",
+    "sessionCount": 1000,
+    "strokeCount": 203940,
+    "sampleSessionId": "mock-session-0501",
+    "sampleMocapSessionId": "benchmark-mocap-session",
+    "generatedAt": "2026-06-20T10:12:17.507Z",
+    "sourceFiles": {
+      "summaryCsv": "docs/csvs/SmartRow workouts.csv",
+      "detailCsv": "docs/csvs/2025-11-16T143854_1000m.csv"
+    }
+  },
+  "generatedAt": "2026-06-20T10:21:31.193Z",
+  "rows": [
+    {
+      "route": "/",
+      "status": 200,
+      "finalPath": "/dashboard",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 2.66195799999997
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 23.386625000000038
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 27.797334000000035
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 29.186959
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 26.585207999999966
+        },
+        {
+          "path": "/api/sessions/list",
+          "durationMs": 27.758125000000007
+        },
+        {
+          "path": "/api/generated-achievements",
+          "durationMs": 34.544583000000046
+        },
+        {
+          "path": "/api/awards",
+          "durationMs": 35.223832999999956
+        },
+        {
+          "path": "/api/mocap/posture-trend",
+          "durationMs": 21.324792000000002
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 21.061959
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 21.045583999999963
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 21.032332999999994
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 409.85175000000004,
+      "p95": 409.85175000000004,
+      "min": 409.85175000000004,
+      "max": 409.85175000000004
+    },
+    {
+      "route": "/analytics",
+      "status": 200,
+      "finalPath": "/analytics",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 3.6593330000000606
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 6.387875000000122
+        },
+        {
+          "path": "/api/analytics",
+          "durationMs": 86.7777500000002
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 490.90141700000004
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 539.403,
+      "p95": 539.403,
+      "min": 539.403,
+      "max": 539.403
+    },
+    {
+      "route": "/auth/error",
+      "status": 200,
+      "finalPath": "/auth/error",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 3.5068750000000364
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 144.75870900000018,
+      "p95": 144.75870900000018,
+      "min": 144.75870900000018,
+      "max": 144.75870900000018
+    },
+    {
+      "route": "/dashboard",
+      "status": 200,
+      "finalPath": "/dashboard",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 6.04220899999973
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 15.570459000000028
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 15.661000000000058
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 16.081375000000207
+        },
+        {
+          "path": "/api/awards",
+          "durationMs": 7.7914160000000265
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 9.275874999999814
+        },
+        {
+          "path": "/api/sessions/list",
+          "durationMs": 23.661416999999346
+        },
+        {
+          "path": "/api/generated-achievements",
+          "durationMs": 32.90612499999952
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 6.949542000000292
+        },
+        {
+          "path": "/api/mocap/posture-trend",
+          "durationMs": 7.236542000000554
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 7.005333000000064
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 6.997582999999395
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 311.0534160000002,
+      "p95": 311.0534160000002,
+      "min": 311.0534160000002,
+      "max": 311.0534160000002
+    },
+    {
+      "route": "/insights",
+      "status": 200,
+      "finalPath": "/insights",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 1.2507919999998194
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 4.555457999999817
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 6.670082999999977
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 4.065832999999657
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 13.195040999999947
+        },
+        {
+          "path": "/api/insights",
+          "durationMs": 19.711750000000393
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 60.43487499999992,
+      "p95": 60.43487499999992,
+      "min": 60.43487499999992,
+      "max": 60.43487499999992
+    },
+    {
+      "route": "/prs",
+      "status": 200,
+      "finalPath": "/prs",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 2.6812079999999696
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 6.977208000000246
+        },
+        {
+          "path": "/api/awards",
+          "durationMs": 7.871957999999722
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 13.602375000000393
+        },
+        {
+          "path": "/api/generated-achievements",
+          "durationMs": 13.830917000000227
+        },
+        {
+          "path": "/api/sessions/list",
+          "durationMs": 20.24920800000018
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 56.12475000000086,
+      "p95": 56.12475000000086,
+      "min": 56.12475000000086,
+      "max": 56.12475000000086
+    },
+    {
+      "route": "/sessions",
+      "status": 200,
+      "finalPath": "/sessions",
+      "apiFailures": [],
+      "apiEvents": [
+        {
+          "path": "/api/auth/session",
+          "durationMs": 2.8510409999998956
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 4.34558399999969
+        },
+        {
+          "path": "/api/awards",
+          "durationMs": 6.117416000000048
+        },
+        {
+          "path": "/api/settings",
+          "durationMs": 11.143333999999413
+        },
+        {
+          "path": "/api/generated-achievements",
+          "durationMs": 11.373875000000226
+        },
+        {
+          "path": "/api/sessions/list",
+          "durationMs": 18.32429200000024
+        }
+      ],
+      "apiTimedOut": false,
+      "pendingApis": [],
+      "median": 45.574125000000095,
+      "p95": 45.574125000000095,
+      "min": 45.574125000000095,
+      "max": 45.574125000000095
+    }
+  ],
+  "summary": {
+    "pageCount": 7,
+    "slowCount": 6,
+    "badStatusCount": 0,
+    "apiFailureCount": 0,
+    "maxMedian": 539.403,
+    "maxP95": 539.403
+  }
+}

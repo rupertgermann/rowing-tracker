@@ -40,13 +40,25 @@ function formatPace(secondsPer500m: number): string {
 }
 
 export default function PRsPage() {
-  const { getPersonalRecords, getSessions, getStats } = useRowingStore();
+  const { getPersonalRecords, getSessions, getStats, initializeFromDB } = useRowingStore();
   const [mounted, setMounted] = useState(false);
+  const [showAwards, setShowAwards] = useState(false);
   const [awardSuggestionsOpen, setAwardSuggestionsOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    const timer = window.setTimeout(() => {
+      initializeFromDB({
+        includeSessions: false,
+        includeAwards: true,
+        includeSettings: false,
+        includeGeneratedAchievements: true,
+      });
+      setShowAwards(true);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [initializeFromDB]);
 
   const personalRecords = getPersonalRecords();
   const sessions = getSessions();
@@ -475,12 +487,18 @@ export default function PRsPage() {
                   AI Suggestions
                 </Button>
               </div>
-              <AwardsList />
+              {showAwards ? (
+                <>
+                  <AwardsList />
 
-              <AwardSuggestionsModal
-                open={awardSuggestionsOpen}
-                onOpenChange={setAwardSuggestionsOpen}
-              />
+                  <AwardSuggestionsModal
+                    open={awardSuggestionsOpen}
+                    onOpenChange={setAwardSuggestionsOpen}
+                  />
+                </>
+              ) : (
+                <div className="h-72 w-full animate-pulse rounded-xl border bg-muted/30" />
+              )}
             </div>
 
             {/* Summary */}

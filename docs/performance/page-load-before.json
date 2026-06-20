@@ -1,0 +1,261 @@
+{
+  "label": "before",
+  "baseUrl": "http://localhost:3000",
+  "mode": "browser-settled",
+  "thresholdMs": 50,
+  "warmups": 1,
+  "samples": 3,
+  "apiQuietMs": 750,
+  "settleTimeoutMs": 10000,
+  "benchmarkUserId": "benchmark-user",
+  "sessionId": "mock-session-0501",
+  "mocapSessionId": "benchmark-mocap-session",
+  "mockMetadata": {
+    "userId": "benchmark-user",
+    "email": "benchmark@example.com",
+    "sessionCount": 1000,
+    "strokeCount": 203940,
+    "sampleSessionId": "mock-session-0501",
+    "generatedAt": "2026-06-20T09:45:42.112Z",
+    "sourceFiles": {
+      "summaryCsv": "docs/csvs/SmartRow workouts.csv",
+      "detailCsv": "docs/csvs/2025-11-16T143854_1000m.csv"
+    }
+  },
+  "generatedAt": "2026-06-20T09:58:09.834Z",
+  "rows": [
+    {
+      "route": "/",
+      "status": 200,
+      "finalPath": "/dashboard",
+      "apiFailures": [],
+      "median": 10123.604083999991,
+      "p95": 10133.270667000004,
+      "min": 10098.522666999954,
+      "max": 10133.270667000004
+    },
+    {
+      "route": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "apiFailures": [],
+      "median": 1125.4212079999998,
+      "p95": 1159.6110829999961,
+      "min": 1103.6818750000093,
+      "max": 1159.6110829999961
+    },
+    {
+      "route": "/analytics",
+      "status": 200,
+      "finalPath": "/analytics",
+      "apiFailures": [],
+      "median": 2614.534750000006,
+      "p95": 2664.087124999991,
+      "min": 2599.63049999997,
+      "max": 2664.087124999991
+    },
+    {
+      "route": "/auth/error",
+      "status": 200,
+      "finalPath": "/auth/error",
+      "apiFailures": [],
+      "median": 1261.359666999997,
+      "p95": 1262.129499999981,
+      "min": 1201.723874999996,
+      "max": 1262.129499999981
+    },
+    {
+      "route": "/auth/forgot-password",
+      "status": 200,
+      "finalPath": "/auth/forgot-password",
+      "apiFailures": [],
+      "median": 2098.3327910000226,
+      "p95": 2110.348125000004,
+      "min": 1142.8424159999995,
+      "max": 2110.348125000004
+    },
+    {
+      "route": "/auth/login",
+      "status": 200,
+      "finalPath": "/auth/login",
+      "apiFailures": [],
+      "median": 1216.2293339999887,
+      "p95": 1248.2522919999901,
+      "min": 1166.1357500000158,
+      "max": 1248.2522919999901
+    },
+    {
+      "route": "/auth/register",
+      "status": 200,
+      "finalPath": "/auth/register",
+      "apiFailures": [],
+      "median": 1136.0528339999728,
+      "p95": 1181.8218330000236,
+      "min": 1120.7136249999894,
+      "max": 1181.8218330000236
+    },
+    {
+      "route": "/auth/reset-password",
+      "status": 200,
+      "finalPath": "/auth/reset-password",
+      "apiFailures": [],
+      "median": 1122.2668330000015,
+      "p95": 1131.7753750000265,
+      "min": 1118.8407499999885,
+      "max": 1131.7753750000265
+    },
+    {
+      "route": "/auth/verify-email",
+      "status": 200,
+      "finalPath": "/auth/verify-email",
+      "apiFailures": [],
+      "median": 1121.0796669999836,
+      "p95": 1159.2682500000083,
+      "min": 1112.3724999999977,
+      "max": 1159.2682500000083
+    },
+    {
+      "route": "/chat",
+      "status": 200,
+      "finalPath": "/chat",
+      "apiFailures": [],
+      "median": 1117.8832500000135,
+      "p95": 1143.3653330000088,
+      "min": 1103.0412919999799,
+      "max": 1143.3653330000088
+    },
+    {
+      "route": "/dashboard",
+      "status": 200,
+      "finalPath": "/dashboard",
+      "apiFailures": [],
+      "median": 10095.883750000037,
+      "p95": 10114.303542000009,
+      "min": 10092.55795800002,
+      "max": 10114.303542000009
+    },
+    {
+      "route": "/insights",
+      "status": 200,
+      "finalPath": "/insights",
+      "apiFailures": [],
+      "median": 10055.88616699999,
+      "p95": 10062.846250000002,
+      "min": 10054.17624999999,
+      "max": 10062.846250000002
+    },
+    {
+      "route": "/mocap",
+      "status": 200,
+      "finalPath": "/mocap",
+      "apiFailures": [],
+      "median": 1143.7192909999867,
+      "p95": 1175.3642080000136,
+      "min": 1128.2297909999616,
+      "max": 1175.3642080000136
+    },
+    {
+      "route": "/mocap/sessions",
+      "status": 200,
+      "finalPath": "/mocap/sessions",
+      "apiFailures": [],
+      "median": 1240.020709000004,
+      "p95": 1325.0305419999931,
+      "min": 1130.1543749999837,
+      "max": 1325.0305419999931
+    },
+    {
+      "route": "/mocap/sessions/benchmark-mocap-session",
+      "status": 200,
+      "finalPath": "/mocap/sessions/benchmark-mocap-session",
+      "apiFailures": [
+        {
+          "path": "/api/mocap/sessions/benchmark-mocap-session",
+          "status": 404
+        }
+      ],
+      "median": 1162.7152500000084,
+      "p95": 1181.294791000022,
+      "min": 1143.7329579999787,
+      "max": 1181.294791000022
+    },
+    {
+      "route": "/plans",
+      "status": 200,
+      "finalPath": "/plans",
+      "apiFailures": [],
+      "median": 1130.4508750000386,
+      "p95": 1144.9540829999896,
+      "min": 1115.6483750000189,
+      "max": 1144.9540829999896
+    },
+    {
+      "route": "/profile",
+      "status": 200,
+      "finalPath": "/profile",
+      "apiFailures": [],
+      "median": 1108.0034999999916,
+      "p95": 1128.6927909999795,
+      "min": 1097.691083999991,
+      "max": 1128.6927909999795
+    },
+    {
+      "route": "/prs",
+      "status": 200,
+      "finalPath": "/prs",
+      "apiFailures": [],
+      "median": 1135.240832999989,
+      "p95": 1139.7510000000184,
+      "min": 1131.8467079999973,
+      "max": 1139.7510000000184
+    },
+    {
+      "route": "/sessions",
+      "status": 200,
+      "finalPath": "/sessions",
+      "apiFailures": [],
+      "median": 1150.65295899997,
+      "p95": 1150.8202909999818,
+      "min": 1108.4774170000164,
+      "max": 1150.8202909999818
+    },
+    {
+      "route": "/sessions/mock-session-0501",
+      "status": 200,
+      "finalPath": "/sessions/mock-session-0501",
+      "apiFailures": [],
+      "median": 1149.0671249999723,
+      "p95": 1188.2941249999858,
+      "min": 1134.6920829999726,
+      "max": 1188.2941249999858
+    },
+    {
+      "route": "/settings",
+      "status": 200,
+      "finalPath": "/settings",
+      "apiFailures": [],
+      "median": 10076.147583000013,
+      "p95": 10079.681082999974,
+      "min": 10069.060624999984,
+      "max": 10079.681082999974
+    },
+    {
+      "route": "/sync",
+      "status": 200,
+      "finalPath": "/sync",
+      "apiFailures": [],
+      "median": 1146.9582910000172,
+      "p95": 1172.3640000000014,
+      "min": 1129.751500000013,
+      "max": 1172.3640000000014
+    }
+  ],
+  "summary": {
+    "pageCount": 22,
+    "slowCount": 22,
+    "badStatusCount": 0,
+    "apiFailureCount": 1,
+    "maxMedian": 10123.604083999991,
+    "maxP95": 10133.270667000004
+  }
+}

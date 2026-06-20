@@ -1,129 +1,35 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRowingStore, ChartMetric } from '@/lib/store';
+import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, Trophy, Medal, BarChart3 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
-import { InsightCard } from '@/components/ai/InsightCard';
-import { useAIInsights } from '@/hooks/useAIInsights';
-import { SettingsService } from '@/lib/settings';
-import { SplitTimeChart } from '@/components/SplitTimeChart';
-import { Insight } from '@/lib/aiAnalysis';
-import { calculateAdvancedStats } from '@/lib/analysisUtils';
-import { formatChartDate, formatSessionDate, formatDateOnly, formatTime } from '@/lib/dateTimeUtils';
-import { chartTheme } from '@/lib/chartUtils';
-import { CloudInsight } from '@/lib/cloudAI';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Trophy } from 'lucide-react';
 import { MigrationPrompt } from '@/components/MigrationPrompt';
 
-import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
-import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 
-// Chart type options
-type ChartType = 'line' | 'bar' | 'area';
+const DeferredDashboardWidget = () => (
+  <div className="h-64 w-full animate-pulse rounded-xl border bg-muted/30" />
+);
 
-// Chart configuration options
+const MetricComparisonWidget = dynamic(
+  () => import('@/components/MetricComparisonWidget').then((mod) => mod.MetricComparisonWidget),
+  { ssr: false, loading: DeferredDashboardWidget }
+);
 
-interface ChartConfig {
-  metric: ChartMetric;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  fillOpacity?: number;
-  formatter: (value: number) => string;
-  yAxisFormatter: (value: number) => string;
-  unit: string;
-  isSpecial?: boolean; // For charts that don't follow standard metric pattern
-}
+const PostureFaultTrendCard = dynamic(
+  () => import('@/components/PostureFaultTrendCard').then((mod) => mod.PostureFaultTrendCard),
+  { ssr: false, loading: DeferredDashboardWidget }
+);
 
-const chartConfigs: Record<ChartMetric, ChartConfig> = {
-  distance: {
-    metric: 'distance',
-    label: 'Distance',
-    icon: TrendingUp,
-    color: '#3b82f6', // Blue-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${value}m`,
-    yAxisFormatter: (value: number) => `${value}m`,
-    unit: 'meters'
-  },
-  pace: {
-    metric: 'pace',
-    label: 'Average Pace',
-    icon: Target,
-    color: '#10b981', // Emerald-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => formatPace(value),
-    yAxisFormatter: (value: number) => formatPace(value),
-    unit: 'time per 500m'
-  },
-  power: {
-    metric: 'power',
-    label: 'Average Power',
-    icon: Zap,
-    color: '#f59e0b', // Amber-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)}W`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}W`,
-    unit: 'watts'
-  },
-  strokeRate: {
-    metric: 'strokeRate',
-    label: 'Stroke Rate',
-    icon: Activity,
-    color: '#8b5cf6', // Violet-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)} SPM`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'strokes per minute'
-  },
-  energy: {
-    metric: 'energy',
-    label: 'Energy',
-    icon: Flame,
-    color: '#ef4444', // Red-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)} kCal`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'kilocalories'
-  },
-  duration: {
-    metric: 'duration',
-    label: 'Duration',
-    icon: Clock,
-    color: '#06b6d4', // Cyan-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => formatDuration(value),
-    yAxisFormatter: (value: number) => `${Math.round(value / 60)}m`,
-    unit: 'minutes'
-  },
-  splitTime: {
-    metric: 'splitTime',
-    label: 'Pace Analysis',
-    icon: Target,
-    color: '#f97316', // Orange-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => formatPace(value),
-    yAxisFormatter: (value: number) => formatPace(value),
-    unit: 'time per 500m',
-    isSpecial: true
-  },
-  consistencyScore: {
-    metric: 'consistencyScore',
-    label: 'Consistency Score',
-    icon: BarChart3,
-    color: '#14b8a6', // Teal-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)}/100`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'score (0-100)'
-  }
-};
+const DashboardInsightsSection = dynamic(
+  () => import('@/components/dashboard/DashboardInsightsSection').then((mod) => mod.DashboardInsightsSection),
+  { ssr: false, loading: DeferredDashboardWidget }
+);
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -151,73 +57,24 @@ function formatPace(secondsPer500m: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')} / 500m`;
 }
 
-function formatPower(watts: number): string {
-  if (watts <= 0) return '--W';
-  return `${Math.round(watts)}W`;
-}
-
-
-// Prepare chart data for distance over time
-function prepareChartData(sessions: any[]) {
-  return sessions
-    .slice()
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .map(session => ({
-      date: formatChartDate(new Date(session.timestamp)),
-      distance: session.distance,
-      fullDate: session.timestamp
-    }));
-}
-
-// Custom tooltip component with full styling control
-const CustomTooltip = ({ active, payload, label, config }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div style={chartTheme.tooltip.contentStyle}>
-        <p style={chartTheme.tooltip.labelStyle}>{label}</p>
-        <p style={chartTheme.tooltip.itemStyle}>
-          {config.formatter(payload[0].value)} - {config.label}
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
 const Dashboard = () => {
-  const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
+  const { getSessions, getStats, dashboardSettings, updateDashboardSettings } = useRowingStore();
   const sessions = getSessions();
   const stats = getStats();
 
-  const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);
+  const [showDeferredWidgets, setShowDeferredWidgets] = useState(false);
 
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
 
-  // AI Insights hook
-  const {
-    insights,
-    trends,
-    trainingLoad,
-    anomalies,
-    isAnalyzable,
-    lastAnalyzed,
-    refreshInsights,
-    archivedInsights,
-    archiveInsight,
-    unarchiveInsight,
-    deleteInsight,
-    isArchivedView,
-    setIsArchivedView,
-    isGenerating,
-    cloudAIError,
-    isCloudAIConfigured
-  } = useAIInsights();
-
   useEffect(() => {
     setMounted(true);
+    const timer = window.setTimeout(() => {
+      setShowDeferredWidgets(true);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Filter sessions based on selected time range
@@ -257,157 +114,6 @@ const Dashboard = () => {
 
   // Check if user has data
   const hasData = sessions.length > 0;
-  const hasFilteredData = filteredSessions.length > 0;
-
-  // Prepare chart data for different metrics
-  const prepareChartData = (sessions: any[], metric: ChartMetric) => {
-    return sessions
-      .map(session => ({
-        date: formatChartDate(new Date(session.timestamp)),
-        [metric]: getMetricValue(session, metric),
-        fullDate: session.timestamp,
-        sessionId: session.id
-      }))
-      // Filter out sessions without data (e.g., consistency score requires strokeData)
-      .filter(dataPoint => dataPoint[metric] !== -1);
-  };
-
-  // Get metric value from session based on metric type
-  const getMetricValue = (session: any, metric: ChartMetric): number => {
-    switch (metric) {
-      case 'distance': return session.distance;
-      case 'pace': return session.avgSplit;
-      case 'power': return session.avgPower;
-      case 'strokeRate': return session.avgStrokeRate;
-      case 'energy': return session.energy;
-      case 'duration': return session.duration;
-      case 'splitTime': return session.avgSplit;
-      case 'consistencyScore': {
-        // Calculate consistency score from stroke data if available
-        if (session.strokeData && session.strokeData.length > 0) {
-          const stats = calculateAdvancedStats(session.strokeData);
-          return stats.consistencyScore;
-        }
-        return -1; // Return -1 to indicate no data available
-      }
-      default: return 0;
-    }
-  };
-
-  // Toggle chart visibility
-  const toggleChart = (metric: ChartMetric) => {
-    const currentCharts = chartSettings.enabledCharts;
-    const updatedCharts = currentCharts.includes(metric)
-      ? currentCharts.filter(m => m !== metric)
-      : [...currentCharts, metric];
-
-    updateChartSettings({ enabledCharts: updatedCharts });
-  };
-
-  // Prepare chart data for each enabled metric
-  const chartDataMap = useMemo(() => {
-    return chartSettings.enabledCharts.reduce((acc, metric) => {
-      acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
-      return acc;
-    }, {} as Record<ChartMetric, any[]>);
-  }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData]);
-
-  // Handle chart data point click
-  const handleChartClick = (data: any, chartData: any[]) => {
-    if (data && data.activeIndex !== undefined && chartData[data.activeIndex]) {
-      const dataPoint = chartData[data.activeIndex];
-      if (dataPoint.sessionId) {
-        router.push(`/sessions/${dataPoint.sessionId}`);
-      }
-    }
-  };
-
-  // Render chart based on selected type
-  const renderChart = (metric: ChartMetric, chartData: any[], config: ChartConfig) => {
-    const commonProps = {
-      width: '100%' as const,
-      height: 300,
-      data: chartData,
-      margin: { top: 5, right: 30, left: 20, bottom: 5 }
-    };
-
-    // Props for Bar/Area charts (need container onClick)
-    const barAreaProps = {
-      ...commonProps,
-      onClick: (data: any) => handleChartClick(data, chartData)
-    };
-
-    const commonChartElements = (
-      <>
-        <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
-        <XAxis
-          dataKey="date"
-          stroke={chartTheme.axis.strokeColor}
-          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
-        />
-        <YAxis
-          stroke={chartTheme.axis.strokeColor}
-          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
-          tickFormatter={config.yAxisFormatter}
-        />
-        <Tooltip content={<CustomTooltip config={config} />} />
-      </>
-    );
-
-    switch (chartSettings.chartType) {
-      case 'bar':
-        return (
-          <BarChart {...barAreaProps}>
-            {commonChartElements}
-            <Bar
-              dataKey={metric}
-              fill={config.color}
-              radius={[4, 4, 0, 0]}
-              cursor="pointer"
-            />
-          </BarChart>
-        );
-      case 'area':
-        return (
-          <AreaChart {...barAreaProps}>
-            {commonChartElements}
-            <Area
-              type="monotone"
-              dataKey={metric}
-              stroke={config.color}
-              fill={config.color}
-              fillOpacity={config.fillOpacity}
-              strokeWidth={2}
-              cursor="pointer"
-            />
-          </AreaChart>
-        );
-      default: // line
-        return (
-          <LineChart {...commonProps}>
-            {commonChartElements}
-            <Line
-              type="monotone"
-              dataKey={metric}
-              stroke={config.color}
-              strokeWidth={2}
-              dot={{ fill: config.color, strokeWidth: 2, r: 4, cursor: 'pointer' }}
-              activeDot={{
-                r: 6,
-                cursor: 'pointer',
-                onClick: (e: any, payload: any) => {
-                  // For Line charts, payload is the data point, but let's be safe and use index lookup
-                  const dataIndex = chartData.findIndex(item => item.date === payload.date);
-                  if (dataIndex !== -1) {
-                    handleChartClick({ activeIndex: dataIndex }, chartData);
-                  }
-                }
-              }}
-            />
-          </LineChart>
-        );
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -635,174 +341,12 @@ const Dashboard = () => {
             <PeriodComparisonStats />
 
             {/* Posture Fault Frequency Trend */}
-            <PostureFaultTrendCard />
+            {showDeferredWidgets ? <PostureFaultTrendCard /> : <DeferredDashboardWidget />}
 
-            {/* AI Insights Section */}
-            {isAnalyzable && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
-                      <Brain className="h-6 w-6 text-blue-600" />
-                      AI Insights
-                    </h2>
-                    <p className="text-muted-foreground">
-                      Personalized recommendations based on your training data
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={refreshInsights}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Refresh
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <Link href="/insights">
-                        View All ({(insights?.length || 0) + (archivedInsights?.length || 0)})
-                      </Link>
-                    </Button>
-                    {lastAnalyzed && (
-                      <div className="text-xs text-muted-foreground">
-                        Last analyzed: {formatDateOnly(lastAnalyzed)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {(insights ?? [])?.length > 0 ? (
-                  (() => {
-                    const insightsList = insights ?? [];
-                    // Sort by priority to find the highest priority insight
-                    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-                    const sorted = [...insightsList].sort((a, b) =>
-                      (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
-                    );
-                    const [featured, ...rest] = sorted;
-
-                    return (
-                      <div className="space-y-4">
-                        {/* Featured (highest priority) insight - full width */}
-                        {featured && (
-                          <InsightCard
-                            key={featured.id || 'featured'}
-                            insight={featured}
-                            onFeedback={() => { }}
-                            isArchived={false}
-                            onArchive={archiveInsight}
-                          />
-                        )}
-                        {/* Remaining insights in 2 columns */}
-                        {rest.length > 0 && (
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {rest.map((insight: Insight | CloudInsight, index: number) => (
-                              <InsightCard
-                                key={insight.id || `local-${insight.type}-${index}`}
-                                insight={insight}
-                                onFeedback={() => { }}
-                                isArchived={false}
-                                onArchive={archiveInsight}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-8">
-                        {isGenerating ? (
-                          <>
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                            <h3 className="text-lg font-semibold text-foreground mb-2">
-                              Generating Insights...
-                            </h3>
-                            <p className="text-muted-foreground mb-4">
-                              AI is analyzing your training patterns. This may take a moment.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                              <Brain className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground mb-2">
-                              {cloudAIError && !isCloudAIConfigured ? 'AI Not Configured' : 'No Current Insights'}
-                            </h3>
-                            <p className="text-muted-foreground mb-4">
-                              {cloudAIError && !isCloudAIConfigured
-                                ? cloudAIError
-                                : 'Click Refresh to generate new personalized insights.'
-                              }
-                            </p>
-                            {cloudAIError && !isCloudAIConfigured && (
-                              <Button variant="outline" size="sm" asChild className="mb-4">
-                                <Link href="/settings#aiSettings">
-                                  Configure AI Settings
-                                </Link>
-                              </Button>
-                            )}
-                          </>
-                        )}
-                        {(archivedInsights?.length || 0) > 0 && (
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href="/insights">
-                              View {archivedInsights?.length} Archived Insights
-                            </Link>
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {/* Empty State for AI Insights */}
-            {!isAnalyzable && sessions.length > 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <div className="bg-muted rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                      <Brain className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      {cloudAIError && !isCloudAIConfigured ? 'AI Not Configured' : 'AI Insights Coming Soon'}
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      {cloudAIError && !isCloudAIConfigured
-                        ? cloudAIError
-                        : 'Complete at least 5 sessions to unlock personalized AI recommendations and insights.'
-                      }
-                    </p>
-                    {cloudAIError && !isCloudAIConfigured ? (
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href="/settings#aiSettings">
-                          Configure AI Settings
-                        </Link>
-                      </Button>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Sessions needed: {sessions.length}/5
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {showDeferredWidgets ? <DashboardInsightsSection sessionCount={sessions.length} /> : <DeferredDashboardWidget />}
 
             {/* Metric Comparison Widget */}
-            <MetricComparisonWidget />
+            {showDeferredWidgets ? <MetricComparisonWidget /> : <DeferredDashboardWidget />}
 
           </div>
         )}

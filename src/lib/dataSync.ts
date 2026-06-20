@@ -22,6 +22,31 @@ export interface SessionsListResponse {
   count: number;
 }
 
+export interface InitializeStoreOptions {
+  includeSessions?: boolean;
+  includeAwards?: boolean;
+  includeSettings?: boolean;
+  includeGeneratedAchievements?: boolean;
+}
+
+let sessionsRevalidationInFlight = false;
+
+function revalidateCachedSessionsLater(cachedRevision: number) {
+  if (typeof window === 'undefined' || sessionsRevalidationInFlight) return;
+
+  sessionsRevalidationInFlight = true;
+  window.setTimeout(async () => {
+    try {
+      const { sessions, sessionsRevision } = await fetchSessionsListFromDB();
+      if (sessionsRevision !== cachedRevision) {
+        cacheSessionsData(sessions, sessionsRevision);
+      }
+    } finally {
+      sessionsRevalidationInFlight = false;
+    }
+  }, 1500);
+}
+
 /**
  * Fetch sessions from the lightweight list endpoint (no strokeData).
  * This is MUCH faster than the full /api/sessions endpoint.
@@ -60,14 +85,14 @@ export async function fetchSessionsListFromDB(): Promise<SessionsListResponse> {
 export async function fetchSessionsFromDBWithCache(): Promise<Session[]> {
   const cached = getCachedSessions();
 
+  if (cached) {
+    console.log('[SYNC] Sessions cache hit');
+    revalidateCachedSessionsLater(cached.sessionsRevision);
+    return cached.sessions;
+  }
+
   try {
     const { sessions, sessionsRevision } = await fetchSessionsListFromDB();
-
-    // Check if cache is still valid
-    if (cached && cached.sessionsRevision === sessionsRevision) {
-      console.log('[SYNC] Sessions cache hit (revision match)');
-      return cached.sessions;
-    }
 
     // Cache miss or stale - update cache
     console.log('[SYNC] Sessions cache miss - caching fresh data');
@@ -75,13 +100,6 @@ export async function fetchSessionsFromDBWithCache(): Promise<Session[]> {
     return sessions;
   } catch (error) {
     console.error('[SYNC] Error fetching sessions:', error);
-
-    // Return cached data if available
-    if (cached) {
-      console.log('[SYNC] Using stale cache due to fetch error');
-      return cached.sessions;
-    }
-
     return [];
   }
 }
@@ -717,40 +735,39 @@ export async function saveMemoryDocumentsToDB(documents: any[]): Promise<SyncRes
  * Initialize store with data from database
  * Call this when user logs in or app loads.
  */
-export async function initializeStoreFromDB() {
+export async function initializeStoreFromDB(options: InitializeStoreOptions = {}) {
+  const {
+    includeSessions = true,
+    includeAwards = true,
+    includeSettings = true,
+    includeGeneratedAchievements = true,
+  } = options;
+
   const [
     sessions,
-    prs,
     awards,
-    trainingPlans,
-    insights,
-    chatSessions,
     settings,
     generatedAchievements,
-    memoryDocuments,
   ] = await Promise.all([
-    fetchSessionsFromDB(), // Full sessions with strokeData for session details
-    fetchPRsFromDB(),
-    fetchAwardsFromDB(),
-    fetchTrainingPlansFromDB(),
-    fetchInsightsFromDB(),
-    fetchChatSessionsFromDB(),
-    fetchSettingsFromDB(),
-    fetchGeneratedAchievementsFromDB(),
-    fetchMemoryDocumentsFromDB(),
+    includeSessions
+      ? fetchSessionsFromDBWithCache()
+      : Promise.resolve(null), // Lightweight session metadata; details fetch strokeData on demand
+    includeAwards ? fetchAwardsFromDB() : Promise.resolve(null),
+    includeSettings ? fetchSettingsFromDB() : Promise.resolve(undefined),
+    includeGeneratedAchievements ? fetchGeneratedAchievementsFromDB() : Promise.resolve(null),
   ]);
 
   return {
     sessions,
-    personalRecords: prs,
+    personalRecords: [],
     earnedAwards: awards,
-    trainingPlans,
-    insights,
-    chatSessions,
+    trainingPlans: [],
+    insights: [],
+    chatSessions: [],
     settings,
     generatedAchievements,
-    memoryDocuments,
-    chartSettings: settings?.chartSettings || null,
-    sessionAnalysisSettings: settings?.sessionAnalysisSettings || null,
+    memoryDocuments: [],
+    chartSettings: settings === undefined ? undefined : settings?.chartSettings || null,
+    sessionAnalysisSettings: settings === undefined ? undefined : settings?.sessionAnalysisSettings || null,
   };
 }

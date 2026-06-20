@@ -65,6 +65,7 @@ export default function SessionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [strokeData, setStrokeData] = useState<StrokeData[] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showClearAnalysisConfirm, setShowClearAnalysisConfirm] = useState(false);
 
@@ -79,6 +80,14 @@ export default function SessionDetailPage() {
   const currentIndex = sortedSessions.findIndex(s => s.id === currentSessionId);
   const previousSession = currentIndex > 0 ? sortedSessions[currentIndex - 1] : null;
   const nextSession = currentIndex < sortedSessions.length - 1 ? sortedSessions[currentIndex + 1] : null;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowAnalysis(true);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -140,14 +149,69 @@ export default function SessionDetailPage() {
   useEffect(() => {
     const sessionId = params.id as string;
     const foundSession = sessions.find(s => s.id === sessionId);
+    let cancelled = false;
+    const cacheKey = `session-detail:${sessionId}:v1`;
 
-    if (foundSession) {
-      setSession(foundSession);
-      if (foundSession.strokeData) {
-        setStrokeData(foundSession.strokeData);
+    const loadSession = async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      if (foundSession) {
+        setSession(foundSession);
+        setStrokeData(foundSession.strokeData || null);
+      }
+
+      try {
+        const response = await fetch(`/api/sessions?id=${encodeURIComponent(sessionId)}`);
+        if (!response.ok) {
+          if (!foundSession) {
+            setSession(null);
+          }
+          return;
+        }
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        setSession(data.session);
+        setStrokeData(data.session?.strokeData || null);
+        localStorage.setItem(cacheKey, JSON.stringify(data.session));
+      } catch (error) {
+        console.error('Failed to load session details:', error);
+        if (!foundSession && !cancelled) {
+          setSession(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const cachedSession = JSON.parse(cached);
+        setSession(cachedSession);
+        setStrokeData(cachedSession?.strokeData || null);
+        setLoading(false);
+
+        const timeout = window.setTimeout(() => loadSession(false), 1500);
+        return () => {
+          cancelled = true;
+          window.clearTimeout(timeout);
+        };
+      } catch {
+        localStorage.removeItem(cacheKey);
       }
     }
-    setLoading(false);
+
+    loadSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [params.id, sessions]);
 
   if (loading) {
@@ -473,6 +537,8 @@ export default function SessionDetailPage() {
                 </div>
               </CardContent>
             </Card>
+          ) : !showAnalysis ? (
+            <div className="h-96 w-full animate-pulse rounded-xl border bg-muted/30" />
           ) : (
             <div className="space-y-6">
               <SessionAnalysis data={strokeData} sessionId={session.id} />
