@@ -10,6 +10,10 @@
 
 ## Agent skills
 
+### PR conveyor
+
+Use the repo-local `pr-conveyor` skill for Codex-orchestrated PR workflows that create builder/reviewer threads, loop on review feedback, gate merges, and continue to the next ready issue.
+
 ### Issue tracker
 
 Issues and PRDs are tracked in GitHub Issues for `rupertgermann/rowing-tracker`. See `docs/agents/issue-tracker.md`.
