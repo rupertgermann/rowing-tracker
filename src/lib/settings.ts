@@ -114,6 +114,7 @@ export interface MocapSettings {
   postureThresholds: UserPostureThresholdSettings;
   postureThresholdWarning: string | null;
   mocapPreferences: MocapPreferences;
+  sidecarPort: number | null;
 }
 
 export interface UseCaseConfig {
@@ -253,6 +254,7 @@ export class SettingsService {
         verbosity: 'quiet',
         audioEnabled: false,
       },
+      sidecarPort: null,
     },
     aiSettings: {
       openaiApiKey: '',
@@ -588,6 +590,9 @@ Be specific and actionable. Only include information relevant to rowing training
           verbosity: ((dbSettings.mocapPreferences as Record<string, unknown> | null)?.verbosity as 'quiet' | 'verbose') ?? 'quiet',
           audioEnabled: ((dbSettings.mocapPreferences as Record<string, unknown> | null)?.audioEnabled as boolean) ?? false,
         },
+        sidecarPort: Number.isInteger(dbSettings.sidecarPort)
+          ? (dbSettings.sidecarPort as number)
+          : null,
       },
       aiSettings: {
         ...this.defaultSettings.aiSettings,
@@ -666,6 +671,7 @@ Be specific and actionable. Only include information relevant to rowing training
       userProfileRawInput: settings.aiSettings.userProfileRawInput,
       postureThresholds: settings.mocapSettings.postureThresholds,
       mocapPreferences: settings.mocapSettings.mocapPreferences,
+      sidecarPort: settings.mocapSettings.sidecarPort,
       aiConfig: {
         chat: settings.aiSettings.chat,
         insights: settings.aiSettings.insights,

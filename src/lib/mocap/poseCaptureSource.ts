@@ -32,7 +32,7 @@ export interface PoseCaptureSource {
   readonly status: PoseCaptureSourceStatus;
   readonly framesCaptured: number;
   init(): Promise<void>;
-  start(): void;
+  start(): void | Promise<void>;
   stop(): Promise<void>;
   drain(): Promise<void>;
 }
