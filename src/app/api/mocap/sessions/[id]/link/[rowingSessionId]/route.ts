@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { analyzeAndPersistMocapSessionLinked } from "@/lib/mocap/sessionAnalysis";
+import { linkMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,106 +20,92 @@ export async function POST(
 
   const { id, rowingSessionId } = await params;
   const userId = session.user.id;
-
-  // Validate: MocapSession belongs to user and is "ready"
-  const mocapSession = await prisma.mocapSession.findFirst({
-    where: { id, userId },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      rowingSessionId: true,
-      poseStreamPath: true,
-      capturePerspective: true,
-      calibrationCatchFrame: true,
-      calibrationFinishFrame: true,
-    },
-  });
-
-  if (!mocapSession) {
-    return NextResponse.json({ error: "Mocap session not found" }, { status: 404 });
-  }
-
-  if (mocapSession.status !== "ready") {
-    return NextResponse.json(
-      { error: `Mocap session not ready (status=${mocapSession.status})` },
-      { status: 409 },
-    );
-  }
-
-  // Enforce 1:1 — reject if mocap session already linked
-  if (mocapSession.rowingSessionId !== null) {
-    return NextResponse.json(
-      { error: "Mocap session is already linked to a rowing session. Unlink first." },
-      { status: 409 },
-    );
-  }
-
-  // Validate: RowingSession belongs to user
-  const rowingSession = await prisma.rowingSession.findFirst({
-    where: { id: rowingSessionId, userId },
-    select: {
-      id: true,
-      mocapSession: { select: { id: true } },
-    },
-  });
-
-  if (!rowingSession) {
-    return NextResponse.json({ error: "Rowing session not found" }, { status: 404 });
-  }
-
-  // Enforce 1:1 — reject if rowing session already linked to another MocapSession
-  if (rowingSession.mocapSession !== null) {
-    return NextResponse.json(
-      { error: "Rowing session is already linked to another mocap session." },
-      { status: 409 },
-    );
-  }
-
-  try {
-    const linkUpdate = await prisma.mocapSession.updateMany({
-      where: { id, userId, rowingSessionId: null, status: "ready" },
-      data: { rowingSessionId, status: "analyzing" },
-    });
-
-    if (linkUpdate.count !== 1) {
-      return NextResponse.json(
-        { error: "Mocap session is already linked to a rowing session. Unlink first." },
-        { status: 409 },
-      );
-    }
-  } catch (err) {
-    if ((err as { code?: string })?.code === "P2002") {
-      return NextResponse.json(
-        { error: "Rowing session is already linked to another mocap session." },
-        { status: 409 },
-      );
-    }
-    throw err;
-  }
-
   const storage = getMocapStorage();
 
-  try {
-    await analyzeAndPersistMocapSessionLinked(storage, mocapSession, rowingSessionId);
-  } catch (err) {
-    // Roll back: clear the link and revert status
-    await prisma.mocapSession.update({
-      where: { id },
-      data: { rowingSessionId: null, status: "ready" },
-    });
+  const result = await linkMocapSessionLifecycle(
+    {
+      storage,
+      findSession: (ownerId, mocapSessionId) =>
+        prisma.mocapSession.findFirst({
+          where: { id: mocapSessionId, userId: ownerId },
+          select: {
+            id: true,
+            userId: true,
+            status: true,
+            rowingSessionId: true,
+            poseStreamPath: true,
+            capturePerspective: true,
+            calibrationCatchFrame: true,
+            calibrationFinishFrame: true,
+          },
+        }),
+      findRowingSession: (ownerId, targetRowingSessionId) =>
+        prisma.rowingSession.findFirst({
+          where: { id: targetRowingSessionId, userId: ownerId },
+          select: {
+            id: true,
+            mocapSession: { select: { id: true } },
+          },
+        }),
+      setStatus: (mocapSessionId, status) =>
+        prisma.mocapSession.update({
+          where: { id: mocapSessionId },
+          data: { status },
+          select: { status: true },
+        }),
+      assignMocapSession: async (mocapSessionId, ownerId, targetRowingSessionId) => {
+        try {
+          const update = await prisma.mocapSession.updateMany({
+            where: {
+              id: mocapSessionId,
+              userId: ownerId,
+              rowingSessionId: null,
+              status: "ready",
+            },
+            data: {
+              rowingSessionId: targetRowingSessionId,
+              status: "analyzing",
+            },
+          });
+          return update.count === 1 ? "assigned" : "mocap-conflict";
+        } catch (err) {
+          if ((err as { code?: string })?.code === "P2002") {
+            return "rowing-conflict";
+          }
+          throw err;
+        }
+      },
+      restoreMocapSessionAssignment: (mocapSessionId, restoredRowingSessionId, status) =>
+        prisma.mocapSession
+          .update({
+            where: { id: mocapSessionId },
+            data: { rowingSessionId: restoredRowingSessionId, status },
+          })
+          .then(() => undefined),
+      bumpSessionsRevision: (ownerId) => bumpSessionsRevision(ownerId),
+      analyzePoseSegmented: async () => {
+        throw new Error("Link lifecycle must use csv-aligned analysis");
+      },
+      analyzeCsvAligned: analyzeAndPersistMocapSessionLinked,
+    },
+    { userId, mocapSessionId: id, rowingSessionId },
+  );
+
+  if (!result.ok) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
+      { error: result.error },
+      { status: result.status },
     );
   }
 
-  const updated = await prisma.mocapSession.update({
-    where: { id },
-    data: { status: "ready" },
-    select: { id: true, rowingSessionId: true, status: true },
+  return NextResponse.json({
+    id: result.id,
+    rowingSessionId: result.rowingSessionId,
+    status: result.status,
   });
+}
 
+async function bumpSessionsRevision(userId: string): Promise<void> {
   await prisma.userSettings.upsert({
     where: { userId },
     update: {
@@ -137,11 +124,5 @@ export async function POST(
       maxTokens: 4000,
       sessionsRevision: 1,
     },
-  });
-
-  return NextResponse.json({
-    id: updated.id,
-    rowingSessionId: updated.rowingSessionId,
-    status: updated.status,
   });
 }
