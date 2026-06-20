@@ -19,6 +19,26 @@ export interface RowingSessionListResponse {
   count: number;
 }
 
+export interface RowingSessionSaveResult {
+  success: boolean;
+  error?: string;
+  sessions?: Session[];
+}
+
+export interface RowingSessionSaveProgress {
+  current: number;
+  total: number;
+  sessionsProcessed: number;
+  totalSessions: number;
+  message: string;
+}
+
+export interface SaveRowingSessionsOptions {
+  onProgress?: (progress: RowingSessionSaveProgress) => void;
+  chunkSize?: number;
+  fetchImpl?: typeof fetch;
+}
+
 interface SessionsListApiResponse {
   sessions?: Session[];
   sessionsRevision?: number;
@@ -44,9 +64,47 @@ export function reviveRowingSessionTimestamps(sessions: Session[]): Session[] {
   return sessions.map(reviveSession);
 }
 
-function clearRowingSessionCaches(): void {
+export function invalidateRowingSessionCaches(): void {
   clearSessionsCache();
   clearAnalyticsCache();
+}
+
+function sessionTimestampMs(session: Session): number {
+  return session.timestamp instanceof Date
+    ? session.timestamp.getTime()
+    : new Date(session.timestamp).getTime();
+}
+
+function findSubmittedSessionForSaved(
+  savedSession: Session,
+  submittedSessions: Session[],
+): Session | undefined {
+  const byId = submittedSessions.find((session) => session.id === savedSession.id);
+  if (byId) return byId;
+
+  const savedTimestamp = sessionTimestampMs(savedSession);
+  return submittedSessions.find((session) =>
+    Math.abs(sessionTimestampMs(session) - savedTimestamp) < 1000 &&
+    session.distance === savedSession.distance
+  );
+}
+
+function mergeSavedSessionsWithSubmittedMetadata(
+  savedSessions: Session[],
+  submittedSessions: Session[],
+): Session[] {
+  return reviveRowingSessionTimestamps(savedSessions).map((savedSession) => {
+    const submittedSession = findSubmittedSessionForSaved(savedSession, submittedSessions);
+
+    return {
+      ...submittedSession,
+      ...savedSession,
+      strokeData: savedSession.strokeData ?? submittedSession?.strokeData,
+      mocapSession: 'mocapSession' in savedSession
+        ? savedSession.mocapSession
+        : submittedSession?.mocapSession,
+    };
+  });
 }
 
 export async function fetchRowingSessionList(
@@ -123,6 +181,78 @@ export async function loadRowingSessionList(
   }
 }
 
+export async function saveRowingSessions(
+  sessions: Session[],
+  options: SaveRowingSessionsOptions = {},
+): Promise<RowingSessionSaveResult> {
+  if (sessions.length === 0) {
+    return { success: true, sessions: [] };
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const chunkSize = options.chunkSize ?? 25;
+  const totalChunks = Math.ceil(sessions.length / chunkSize);
+  let sessionsProcessed = 0;
+  const savedSessions: Session[] = [];
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, sessions.length);
+    const chunk = sessions.slice(start, end);
+
+    options.onProgress?.({
+      current: i + 1,
+      total: totalChunks,
+      sessionsProcessed,
+      totalSessions: sessions.length,
+      message: `Processing sessions ${start + 1}-${end} of ${sessions.length}...`,
+    });
+
+    try {
+      const response = await fetchImpl('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessions: chunk }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        console.error(`[RowingSessionPersistence] Save chunk ${i + 1}/${totalChunks} failed:`, error);
+        return {
+          success: false,
+          error: `Failed at chunk ${i + 1}/${totalChunks}: ${error.error || 'Unknown error'}`,
+        };
+      }
+
+      const data = await response.json();
+      savedSessions.push(...mergeSavedSessionsWithSubmittedMetadata(data.sessions ?? [], chunk));
+
+      sessionsProcessed += chunk.length;
+    } catch (error) {
+      console.error(`[RowingSessionPersistence] Error saving chunk ${i + 1}/${totalChunks}:`, error);
+      return {
+        success: false,
+        error: `Network error at chunk ${i + 1}/${totalChunks}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  options.onProgress?.({
+    current: totalChunks,
+    total: totalChunks,
+    sessionsProcessed: sessions.length,
+    totalSessions: sessions.length,
+    message: 'Upload complete!',
+  });
+
+  invalidateRowingSessionCaches();
+
+  return {
+    success: true,
+    sessions: savedSessions,
+  };
+}
+
 export async function saveRowingSession(
   session: Session,
   init?: RequestInit,
@@ -148,7 +278,7 @@ export async function saveRowingSession(
     ? reviveSession(data.sessions[0])
     : reviveSession(session);
 
-  clearRowingSessionCaches();
+  invalidateRowingSessionCaches();
 
   return {
     ...session,
@@ -207,7 +337,7 @@ export async function deleteRowingSession(
   }
 
   const data: RowingSessionMutationApiResponse = await response.json();
-  clearRowingSessionCaches();
+  invalidateRowingSessionCaches();
 
   return data.sessionId ?? sessionId;
 }

@@ -6,7 +6,12 @@ import { parseSmartRowCsv, validateSmartRowCsv } from '@/lib/csvParser';
 import { processZipFile, ZipImportResult, ZipProcessProgress } from '@/lib/zipParser';
 import { formatValidationErrors, hasCriticalErrors } from '@/lib/validation';
 import { ImportResult, Session } from '@/types/session';
-import { saveSessionsToDBChunked, UploadProgress } from '@/lib/dataSync';
+import {
+  persistCsvImportSessions,
+  persistSmartRowSyncImport,
+  persistZipImportSessions,
+} from '@/lib/smartrowImportPersistence';
+import type { RowingSessionSaveProgress } from '@/lib/services/rowingSessionPersistence';
 import { clearSessionsCache } from '@/lib/services/sessionsCache';
 import { confirmMocapSessionLink } from '@/lib/mocap/linking';
 import { useSettings } from '@/hooks/useSettings';
@@ -35,7 +40,7 @@ export default function UploadPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [zipResult, setZipResult] = useState<ZipImportResult | null>(null);
   const [error, setError] = useState<string>('');
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<RowingSessionSaveProgress | null>(null);
   const [zipProgress, setZipProgress] = useState<ZipProcessProgress | null>(null);
   const [syncMessage, setSyncMessage] = useState<string>('');
   const [mocapOverlaps, setMocapOverlaps] = useState<MocapOverlap[]>([]);
@@ -196,10 +201,13 @@ export default function UploadPage() {
             message: 'Saving stroke data to database...'
           });
 
-          // Save to database with progress tracking
-          const saveResult = await saveSessionsToDBChunked(
+          const saveResult = await persistZipImportSessions(
             result.sessionsToSave,
-            (progress) => setUploadProgress(progress)
+            { addSessions, updateSessionsInStore },
+            {
+              onProgress: (progress) => setUploadProgress(progress),
+              checkMocapOverlap,
+            }
           );
 
           if (!saveResult.success) {
@@ -208,12 +216,6 @@ export default function UploadPage() {
             return;
           }
 
-          // Update local store state with sessions returned from database (with correct CUIDs)
-          // skip DB save since we already saved with chunked upload
-          if (saveResult.sessions && saveResult.sessions.length > 0) {
-            updateSessionsInStore(saveResult.sessions);
-            await checkMocapOverlap(saveResult.sessions);
-          }
         }
 
         setZipResult(result);
@@ -252,10 +254,13 @@ export default function UploadPage() {
           message: 'Preparing to save sessions...'
         });
 
-        // Save to database with progress tracking
-        const saveResult = await saveSessionsToDBChunked(
+        const saveResult = await persistCsvImportSessions(
           sessions,
-          (progress) => setUploadProgress(progress)
+          { addSessions, updateSessionsInStore },
+          {
+            onProgress: (progress) => setUploadProgress(progress),
+            checkMocapOverlap,
+          }
         );
 
         if (!saveResult.success) {
@@ -264,12 +269,6 @@ export default function UploadPage() {
           return;
         }
 
-        // Update local store state with sessions returned from database (with correct CUIDs)
-        // skip DB save since we already saved with chunked upload
-        if (saveResult.sessions && saveResult.sessions.length > 0) {
-          addSessions(saveResult.sessions, { skipDbSave: true });
-          await checkMocapOverlap(saveResult.sessions);
-        }
       }
 
       setImportResult(result);
@@ -370,6 +369,10 @@ export default function UploadPage() {
       let totalDistance = 0;
       let totalTime = 0;
       let duplicatesSkipped = 0;
+      let csvImportResult: ImportResult | null = null;
+      let csvSessionsToSave: Session[] = [];
+      let processedZipResult: ZipImportResult | null = null;
+      let processedZipUpdatedSessions = 0;
       const existingSessions = getSessions();
       console.log(`Starting processing with ${existingSessions.length} existing sessions in store.`);
 
@@ -386,33 +389,10 @@ export default function UploadPage() {
         if (validation.isValid) {
           const { sessions, result } = await parseSmartRowCsv(csvFile, existingSessions);
           console.log(`Parsed ${sessions.length} sessions from CSV. Result stats:`, result);
+          csvImportResult = result;
 
           if (result.importedSessions > 0) {
-            setUploadState('saving');
-            setUploadProgress({
-              current: 0,
-              total: 1,
-              sessionsProcessed: 0,
-              totalSessions: sessions.length,
-              message: 'Saving sessions to database...'
-            });
-
-            const saveResult = await saveSessionsToDBChunked(
-              sessions,
-              (progress) => setUploadProgress(progress)
-            );
-            console.log('DB Save Result (CSV):', saveResult);
-
-            if (saveResult.success) {
-              addSessions(sessions, { skipDbSave: true });
-              if (saveResult.sessions && saveResult.sessions.length > 0) {
-                await checkMocapOverlap(saveResult.sessions);
-              }
-              totalImported += result.importedSessions;
-              totalDistance += result.totalDistance;
-              totalTime += result.totalTime;
-              duplicatesSkipped += result.duplicatesSkipped;
-            }
+            csvSessionsToSave = sessions;
           } else {
             console.log('No new sessions to import from CSV (all duplicates or invalid).');
           }
@@ -420,39 +400,92 @@ export default function UploadPage() {
         console.groupEnd();
       }
 
-      // Process ZIP data if available
-      if (data.zipData) {
+      const loadZipSessions = data.zipData ? async () => {
         console.group('Processing ZIP Data');
-        setSyncMessage('Processing workout details...');
-        const zipBuffer = Uint8Array.from(atob(data.zipData), c => c.charCodeAt(0));
-        const zipBlob = new Blob([zipBuffer], { type: 'application/zip' });
-        const zipFile = new File([zipBlob], 'smartrow-workouts.zip', { type: 'application/zip' });
-        console.log(`Created ZIP file of size: ${zipFile.size} bytes`);
+        try {
+          setUploadState('processing');
+          setSyncMessage('Processing workout details...');
+          const zipBuffer = Uint8Array.from(atob(data.zipData), c => c.charCodeAt(0));
+          const zipBlob = new Blob([zipBuffer], { type: 'application/zip' });
+          const zipFile = new File([zipBlob], 'smartrow-workouts.zip', { type: 'application/zip' });
+          console.log(`Created ZIP file of size: ${zipFile.size} bytes`);
 
-        const updatedExistingSessions = getSessions();
-        const zipResult = await processZipFile(
-          zipFile,
-          updatedExistingSessions,
-          (progress) => setZipProgress(progress)
-        );
-        console.log('ZIP Processing Result:', zipResult);
-
-        if (zipResult.sessionsToSave.length > 0) {
-          setUploadState('saving');
-          const saveResult = await saveSessionsToDBChunked(
-            zipResult.sessionsToSave,
-            (progress) => setUploadProgress(progress)
+          const updatedExistingSessions = getSessions();
+          processedZipResult = await processZipFile(
+            zipFile,
+            updatedExistingSessions,
+            (progress) => setZipProgress(progress)
           );
-          console.log('DB Save Result (ZIP):', saveResult);
+          processedZipUpdatedSessions = processedZipResult.updatedSessions;
+          setZipResult(processedZipResult);
+          console.log('ZIP Processing Result:', processedZipResult);
 
-          if (saveResult.success) {
-            updateSessionsInStore(zipResult.sessionsToSave);
-            totalUpdated += zipResult.updatedSessions;
+          if (processedZipResult.sessionsToSave.length > 0) {
+            setUploadState('saving');
+            setZipProgress(null);
+            setUploadProgress({
+              current: 0,
+              total: 1,
+              sessionsProcessed: 0,
+              totalSessions: processedZipResult.sessionsToSave.length,
+              message: 'Saving stroke data to database...'
+            });
+            return processedZipResult.sessionsToSave;
           }
-        } else {
+
           console.log('No sessions to save from ZIP.');
+          return [];
+        } finally {
+          console.groupEnd();
         }
-        console.groupEnd();
+      } : undefined;
+
+      if (csvSessionsToSave.length > 0) {
+        setUploadState('saving');
+        setUploadProgress({
+          current: 0,
+          total: 1,
+          sessionsProcessed: 0,
+          totalSessions: csvSessionsToSave.length,
+          message: 'Saving sessions to database...'
+        });
+      }
+
+      const syncPersistence = await persistSmartRowSyncImport(
+        {
+          csvSessions: csvSessionsToSave,
+          loadZipSessions,
+          store: { addSessions, updateSessionsInStore },
+        },
+        {
+          onProgress: (progress) => setUploadProgress(progress),
+          checkMocapOverlap,
+        }
+      );
+
+      console.log('SmartRow sync persistence result:', syncPersistence);
+
+      if (syncPersistence.csvResult && !syncPersistence.csvResult.success) {
+        setError(syncPersistence.csvResult.error || 'Failed to save sessions to database');
+        setUploadState('error');
+        return;
+      }
+
+      if (syncPersistence.zipResult && !syncPersistence.zipResult.success) {
+        setError(syncPersistence.zipResult.error || 'Failed to save stroke data to database');
+        setUploadState('error');
+        return;
+      }
+
+      if (csvImportResult && syncPersistence.csvResult?.success) {
+        totalImported += csvImportResult.importedSessions;
+        totalDistance += csvImportResult.totalDistance;
+        totalTime += csvImportResult.totalTime;
+        duplicatesSkipped += csvImportResult.duplicatesSkipped;
+      }
+
+      if (syncPersistence.zipResult?.success) {
+        totalUpdated += processedZipUpdatedSessions;
       }
 
       setImportResult({

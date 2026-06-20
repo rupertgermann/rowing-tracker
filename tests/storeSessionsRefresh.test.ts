@@ -100,6 +100,30 @@ test("replaceSessionsInStore refreshes stale sessions and keeps linked mocap mar
   assert.ok(sessions[1].timestamp instanceof Date);
 });
 
+test("updateSessionsInStore keeps linked mocap markers visible when saved ZIP rows omit them", () => {
+  useRowingStore.setState({
+    sessions: [
+      session({
+        id: "linked-session",
+        mocapSession: { id: "mocap-1" },
+      }),
+    ],
+    personalRecords: [],
+  });
+
+  useRowingStore.getState().updateSessionsInStore([
+    session({
+      id: "linked-session",
+      avgPower: 140,
+      mocapSession: undefined,
+    }),
+  ]);
+
+  const [updated] = useRowingStore.getState().getSessions();
+  assert.equal(updated.avgPower, 140);
+  assert.deepEqual(updated.mocapSession, { id: "mocap-1" });
+});
+
 test("updateSessionInStore projects added stroke data and refreshes derived PR state", () => {
   const targetSession = session({
     id: "target-session",

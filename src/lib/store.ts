@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 import { AWARDS, EarnedAward } from '@/lib/awards';
 import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
-import { clearSessionsCache } from '@/lib/services/sessionsCache';
-import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 import { firstCleanCatchDate, CLEAN_CATCH_AWARD_ID } from '@/lib/postureAchievements';
 import type { SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
 
@@ -631,10 +629,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
   addSessions: (newSessions, options) => {
     console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
 
-    // Clear caches when adding new sessions (triggers refetch on next load)
-    clearSessionsCache();
-    clearAnalyticsCache();
-
     // Ensure all new sessions have Date objects for timestamps (revive from JSON strings)
     const revivedSessions = newSessions.map(s => ({
       ...s,
@@ -809,7 +803,15 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     }));
 
     set((state) => {
-      const sessionMap = new Map(revivedUpdate.map(s => [s.id, s]));
+      const existingById = new Map(state.sessions.map(s => [s.id, s]));
+      const sessionMap = new Map(revivedUpdate.map(s => {
+        const existing = existingById.get(s.id);
+        return [s.id, {
+          ...s,
+          strokeData: s.strokeData ?? existing?.strokeData,
+          mocapSession: s.mocapSession === undefined ? existing?.mocapSession : s.mocapSession,
+        }];
+      }));
       const updatedSessions = state.sessions.map(s =>
         sessionMap.has(s.id) ? sessionMap.get(s.id)! : s
       );

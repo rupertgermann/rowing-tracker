@@ -8,6 +8,8 @@ import { EarnedAward } from '@/lib/awards';
 import {
   fetchRowingSessionList,
   loadRowingSessionList,
+  saveRowingSessions,
+  type RowingSessionSaveProgress,
 } from '@/lib/services/rowingSessionPersistence';
 
 export interface SyncResult {
@@ -80,13 +82,7 @@ export async function fetchSessionsFromDB(): Promise<Session[]> {
 /**
  * Progress callback for chunked uploads
  */
-export interface UploadProgress {
-  current: number;    // Current chunk being processed
-  total: number;      // Total number of chunks
-  sessionsProcessed: number;  // Total sessions processed so far
-  totalSessions: number;      // Total sessions to process
-  message: string;    // Human-readable progress message
-}
+export type UploadProgress = RowingSessionSaveProgress;
 
 /**
  * Save sessions to database in chunks for large uploads
@@ -96,100 +92,14 @@ export async function saveSessionsToDBChunked(
   onProgress?: (progress: UploadProgress) => void,
   chunkSize: number = 25
 ): Promise<SyncResult> {
-  if (sessions.length === 0) {
-    return { success: true, sessions: [] };
-  }
-
-  const totalChunks = Math.ceil(sessions.length / chunkSize);
-  let sessionsProcessed = 0;
-  const allCreatedSessions: Session[] = [];
-
-  console.log(`[SYNC] Starting chunked upload: ${sessions.length} sessions in ${totalChunks} chunks`);
-
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, sessions.length);
-    const chunk = sessions.slice(start, end);
-
-    const progress: UploadProgress = {
-      current: i + 1,
-      total: totalChunks,
-      sessionsProcessed,
-      totalSessions: sessions.length,
-      message: `Processing sessions ${start + 1}-${end} of ${sessions.length}...`
-    };
-    onProgress?.(progress);
-
-    try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: chunk }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error(`[SYNC] Chunk ${i + 1}/${totalChunks} failed:`, error);
-        return {
-          success: false,
-          error: `Failed at chunk ${i + 1}/${totalChunks}: ${error.error || 'Unknown error'}`
-        };
-      }
-
-      const data = await response.json();
-      allCreatedSessions.push(...data.sessions);
-
-      sessionsProcessed += chunk.length;
-      console.log(`[SYNC] Chunk ${i + 1}/${totalChunks} complete (${sessionsProcessed}/${sessions.length} sessions)`);
-    } catch (error) {
-      console.error(`[SYNC] Error in chunk ${i + 1}/${totalChunks}:`, error);
-      return {
-        success: false,
-        error: `Network error at chunk ${i + 1}/${totalChunks}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  // Final progress update
-  onProgress?.({
-    current: totalChunks,
-    total: totalChunks,
-    sessionsProcessed: sessions.length,
-    totalSessions: sessions.length,
-    message: 'Upload complete!'
-  });
-
-  return { success: true, sessions: allCreatedSessions };
+  return saveRowingSessions(sessions, { onProgress, chunkSize });
 }
 
 /**
  * Save sessions to database (simple version for small batches)
  */
 export async function saveSessionsToDB(sessions: Session[]): Promise<SyncResult> {
-  // For large uploads, use chunked upload
-  if (sessions.length > 25) {
-    return saveSessionsToDBChunked(sessions);
-  }
-
-  try {
-    const response = await fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('[SYNC] Save failed:', error);
-      return { success: false, error: error.error || 'Failed to save sessions' };
-    }
-
-    const data = await response.json();
-    return { success: true, sessions: data.sessions || [] };
-  } catch (error) {
-    console.error('[SYNC] Error saving sessions:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-  }
+  return saveRowingSessions(sessions);
 }
 
 /**
