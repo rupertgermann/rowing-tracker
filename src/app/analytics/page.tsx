@@ -23,6 +23,7 @@ import { DateRange } from 'react-day-picker';
 import { chatStorage } from '@/lib/chatStorage';
 import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
+import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { StrokeData, Session } from '@/types/session';
 
 // Chart type options
@@ -1542,6 +1543,9 @@ ${explainChartPrompt}`;
                 </CardContent>
               </Card>
             )}
+
+            {/* Posture Fault Frequency Trend */}
+            <PostureFaultTrendCard />
 
             {/* Correlations Section - Scatter Plots */}
             {scatterPlotData.length >= 2 && (

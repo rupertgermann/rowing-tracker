@@ -21,7 +21,6 @@ import { MigrationPrompt } from '@/components/MigrationPrompt';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
-import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
 
 // Chart type options
@@ -633,9 +632,6 @@ const Dashboard = () => {
 
             {/* Monthly Comparison Header Cards */}
             <PeriodComparisonStats />
-
-            {/* Posture Fault Frequency Trend */}
-            <PostureFaultTrendCard />
 
             {/* AI Insights Section */}
             {isAnalyzable && (
