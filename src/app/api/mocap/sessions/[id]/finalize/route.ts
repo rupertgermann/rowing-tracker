@@ -121,6 +121,10 @@ export async function POST(
   try {
     analysis = await analyzeAndPersistMocapSession(storage, analyzing);
   } catch (err) {
+    await prisma.mocapSession.update({
+      where: { id: row.id },
+      data: { status: "ready" },
+    });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 },
