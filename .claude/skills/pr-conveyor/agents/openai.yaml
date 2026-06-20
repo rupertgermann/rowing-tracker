@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Conveyor"
+  short_description: "Coordinate builder and reviewer threads for GitHub PRs."
+  default_prompt: "Run the PR conveyor workflow for the current repo."

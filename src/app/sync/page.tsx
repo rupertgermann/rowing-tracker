@@ -7,12 +7,23 @@ import { processZipFile, ZipImportResult, ZipProcessProgress } from '@/lib/zipPa
 import { formatValidationErrors, hasCriticalErrors } from '@/lib/validation';
 import { ImportResult, Session } from '@/types/session';
 import { saveSessionsToDBChunked, UploadProgress } from '@/lib/dataSync';
+import { clearSessionsCache } from '@/lib/services/sessionsCache';
+import { confirmMocapSessionLink } from '@/lib/mocap/linking';
 import { useSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive, Database, RefreshCw, Settings } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, ArrowRight, FileArchive, Database, RefreshCw, Settings, Video } from 'lucide-react';
 import Link from 'next/link';
+
+type MocapOverlapStatus = 'idle' | 'linking' | 'linked' | 'conflict' | 'error';
+
+interface MocapOverlap {
+  rowingSessionId: string;
+  mocapSessionId: string;
+  status?: MocapOverlapStatus;
+  message?: string;
+}
 
 type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' | 'syncing' | 'success' | 'error';
 
@@ -27,6 +38,8 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [zipProgress, setZipProgress] = useState<ZipProcessProgress | null>(null);
   const [syncMessage, setSyncMessage] = useState<string>('');
+  const [mocapOverlaps, setMocapOverlaps] = useState<MocapOverlap[]>([]);
+  const [dismissedOverlaps, setDismissedOverlaps] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -68,6 +81,85 @@ export default function UploadPage() {
     processFile(file);
   }, []);
 
+  const checkMocapOverlap = useCallback(async (savedSessions: Session[]) => {
+    if (savedSessions.length === 0) return;
+    try {
+      const ids = savedSessions.map((s) => s.id).filter(Boolean);
+      const res = await fetch('/api/mocap/sessions/overlap-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowingSessionIds: ids }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.overlaps) && data.overlaps.length > 0) {
+        setMocapOverlaps(data.overlaps.map((overlap: MocapOverlap) => ({
+          ...overlap,
+          status: 'idle',
+        })));
+        setDismissedOverlaps(false);
+      }
+    } catch {
+      // Non-critical — silently ignore overlap check errors
+    }
+  }, []);
+
+  const handleConfirmMocapLink = useCallback(async (overlap: MocapOverlap) => {
+    const matchesOverlap = (candidate: MocapOverlap) =>
+      candidate.mocapSessionId === overlap.mocapSessionId &&
+      candidate.rowingSessionId === overlap.rowingSessionId;
+
+    setMocapOverlaps((current) => current.map((candidate) =>
+      matchesOverlap(candidate)
+        ? { ...candidate, status: 'linking', message: undefined }
+        : candidate
+    ));
+
+    try {
+      const result = await confirmMocapSessionLink(overlap);
+
+      if (result.ok) {
+        const linkedSession = getSessions().find((session) => session.id === result.rowingSessionId);
+        if (linkedSession) {
+          updateSessionsInStore([
+            {
+              ...linkedSession,
+              mocapSession: { id: result.mocapSessionId },
+            },
+          ]);
+        }
+        clearSessionsCache();
+
+        setMocapOverlaps((current) => current.map((candidate) =>
+          matchesOverlap(candidate)
+            ? { ...candidate, status: 'linked', message: 'Linked and re-analyzed with csv-aligned posture data.' }
+            : candidate
+        ));
+        return;
+      }
+
+      setMocapOverlaps((current) => current.map((candidate) =>
+        matchesOverlap(candidate)
+          ? {
+              ...candidate,
+              status: result.reason === 'conflict' ? 'conflict' : 'error',
+              message: result.message,
+            }
+          : candidate
+      ));
+    } catch (err) {
+      setMocapOverlaps((current) => current.map((candidate) =>
+        matchesOverlap(candidate)
+          ? {
+              ...candidate,
+              status: 'error',
+              message: err instanceof Error ? err.message : 'Failed to link mocap session.',
+            }
+          : candidate
+      ));
+    }
+  }, [getSessions, updateSessionsInStore]);
+
   const processFile = async (file: File) => {
     setSelectedFile(file);
     setError('');
@@ -76,6 +168,8 @@ export default function UploadPage() {
     setZipResult(null);
     setUploadProgress(null);
     setZipProgress(null);
+    setMocapOverlaps([]);
+    setDismissedOverlaps(false);
 
     try {
       // Check if it's a ZIP file
@@ -118,6 +212,7 @@ export default function UploadPage() {
           // skip DB save since we already saved with chunked upload
           if (saveResult.sessions && saveResult.sessions.length > 0) {
             updateSessionsInStore(saveResult.sessions);
+            await checkMocapOverlap(saveResult.sessions);
           }
         }
 
@@ -173,6 +268,7 @@ export default function UploadPage() {
         // skip DB save since we already saved with chunked upload
         if (saveResult.sessions && saveResult.sessions.length > 0) {
           addSessions(saveResult.sessions, { skipDbSave: true });
+          await checkMocapOverlap(saveResult.sessions);
         }
       }
 
@@ -195,6 +291,8 @@ export default function UploadPage() {
     setSyncMessage('');
     setUploadProgress(null);
     setZipProgress(null);
+    setMocapOverlaps([]);
+    setDismissedOverlaps(false);
   }, []);
 
   const formatDuration = (seconds: number): string => {
@@ -307,6 +405,9 @@ export default function UploadPage() {
 
             if (saveResult.success) {
               addSessions(sessions, { skipDbSave: true });
+              if (saveResult.sessions && saveResult.sessions.length > 0) {
+                await checkMocapOverlap(saveResult.sessions);
+              }
               totalImported += result.importedSessions;
               totalDistance += result.totalDistance;
               totalTime += result.totalTime;
@@ -642,16 +743,79 @@ export default function UploadPage() {
                   </div>
                 )}
 
+                {/* Mocap Overlap Prompt */}
+                {mocapOverlaps.length > 0 && !dismissedOverlaps && (
+                  <div className="w-full max-w-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 text-left">
+                    <div className="flex items-start gap-3">
+                      <Video className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-purple-800 dark:text-purple-200 mb-1">
+                          Mocap session detected nearby
+                        </p>
+                        <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
+                          {mocapOverlaps.length === 1
+                            ? 'A motion-capture session was recorded within 2 minutes of your imported rowing session. Link them to enable csv-aligned posture analysis.'
+                            : `${mocapOverlaps.length} motion-capture sessions were recorded within 2 minutes of your imported rowing sessions. Link them to enable csv-aligned posture analysis.`}
+                        </p>
+                        <div className="space-y-2">
+                          {mocapOverlaps.map((overlap) => (
+                            <div key={`${overlap.mocapSessionId}-${overlap.rowingSessionId}`}>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleConfirmMocapLink(overlap)}
+                                  disabled={overlap.status === 'linking' || overlap.status === 'linked'}
+                                  data-testid={`mocap-link-${overlap.mocapSessionId}`}
+                                >
+                                  {overlap.status === 'linking' ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : overlap.status === 'linked' ? (
+                                    <CheckCircle className="h-3 w-3" />
+                                  ) : (
+                                    <Video className="h-3 w-3" />
+                                  )}
+                                  {overlap.status === 'linked' ? 'Linked' : 'Link Mocap'}
+                                </Button>
+                                <Button asChild size="sm" variant="outline">
+                                  <Link href={`/mocap/sessions/${overlap.mocapSessionId}`}>
+                                    <Video className="h-3 w-3" />
+                                    View
+                                  </Link>
+                                </Button>
+                              </div>
+                              {overlap.message && (
+                                <p className={`mt-1 text-xs ${
+                                  overlap.status === 'linked'
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : 'text-red-700 dark:text-red-300'
+                                }`}>
+                                  {overlap.message}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => setDismissedOverlaps(true)}
+                            className="text-xs text-purple-500 dark:text-purple-400 hover:underline px-1"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex space-x-3">
                   <Button onClick={resetUpload} variant="outline">
                     Upload Another File
                   </Button>
                   <Button asChild>
-                    <a href="/" className="flex items-center space-x-2">
+                    <Link href="/" className="flex items-center space-x-2">
                       <span>Go to Dashboard</span>
                       <ArrowRight className="h-4 w-4" />
-                    </a>
+                    </Link>
                   </Button>
                 </div>
               </div>

@@ -1,5 +1,10 @@
 import { Session } from '@/types/session';
 import { cloudAI } from '@/lib/cloudAI';
+import {
+  buildPostureAIPayload,
+  assertNoKeypointsInPayload,
+  type PostureAIPayload,
+} from '@/lib/mocap/aiPayload';
 
 // Types for AI analysis results
 export interface TrendData {
@@ -401,3 +406,65 @@ export class AIAnalysisService {
 
 // Export singleton instance
 export const aiAnalysis = AIAnalysisService.getInstance();
+
+// ============================================================================
+// Posture AI Payload Integration
+// ============================================================================
+
+/**
+ * Input type for posture data fetched server-side (from DB records).
+ * No keypoints — only aggregated fault/metric rows.
+ */
+export interface MocapSessionPostureData {
+  faults: Array<{ faultType: string; severity: string }>;
+  metrics: Array<{
+    strokeIndex: number;
+    segmentationSource: string;
+    metricsJson: unknown;
+  }>;
+  qualityFlags: string[];
+  qualityScore: number | null;
+}
+
+/**
+ * Build a cloud-safe posture AI payload from DB-fetched mocap data and user
+ * settings, then verify the hard keypoint guard.
+ *
+ * Returns null when cloudAI is disabled (no posture data leaves the device).
+ * Call this server-side (e.g. in an API route) where DB access is available;
+ * pass the returned payload into the cloud AI prompt builder.
+ */
+export function buildAndValidatePosturePayload(
+  postureData: MocapSessionPostureData,
+  opts: { cloudAIEnabled: boolean; mocapDetailedAIShare: boolean },
+): PostureAIPayload | null {
+  const payload = buildPostureAIPayload(
+    postureData.faults,
+    postureData.metrics,
+    postureData.qualityFlags,
+    postureData.qualityScore,
+    opts,
+  );
+
+  if (payload !== null) {
+    // Hard guard: must never contain keypoint arrays.
+    assertNoKeypointsInPayload(payload);
+  }
+
+  return payload;
+}
+
+/**
+ * Serialise a validated PostureAIPayload as a JSON context block suitable
+ * for appending to an AI prompt string.
+ */
+export function formatPosturePayloadForPrompt(
+  payload: PostureAIPayload,
+): string {
+  const tierLabel =
+    payload.tier === 3
+      ? 'Tier 3 – Fault Summary (no body geometry)'
+      : 'Tier 2 – Fault Summary + Per-Stroke Metrics (no keypoints)';
+
+  return `\n\n---\nPOSTURE ANALYSIS CONTEXT [${tierLabel}]:\n${JSON.stringify(payload, null, 2)}\n---`;
+}

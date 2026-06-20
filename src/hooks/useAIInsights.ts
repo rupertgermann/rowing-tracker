@@ -6,6 +6,31 @@ import { cloudAI, CloudInsight } from '@/lib/cloudAI';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 import { memoryStorage } from '@/lib/memoryStorage';
 import { saveInsightsToDB, fetchInsightsFromDB } from '@/lib/dataSync';
+import { SettingsService } from '@/lib/settings';
+import { buildPostureAIPayload, assertNoKeypointsInPayload, PostureAIPayload } from '@/lib/mocap/aiPayload';
+
+async function fetchPosturePayload(): Promise<PostureAIPayload | null> {
+  const settings = SettingsService.getInstance().getSettings();
+  const { cloudAIEnabled, mocapDetailedAIShare } = settings.aiSettings;
+  if (!cloudAIEnabled) return null;
+
+  try {
+    const res = await fetch('/api/mocap/posture-summary');
+    if (!res.ok) return null;
+    const { faults, metrics, qualityFlags, qualityScore } = await res.json();
+
+    if (!faults?.length && !metrics?.length) return null;
+
+    const payload = buildPostureAIPayload(faults, metrics, qualityFlags ?? [], qualityScore ?? null, {
+      cloudAIEnabled,
+      mocapDetailedAIShare,
+    });
+    if (payload) assertNoKeypointsInPayload(payload);
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 export interface AIInsightData {
   insights: (Insight | CloudInsight)[];
@@ -483,8 +508,11 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         // Initialize cloud AI with latest settings
         initializeCloudAI();
 
+        // Build tiered posture payload (null when cloud AI disabled or no data)
+        const posturePayload = await fetchPosturePayload();
+
         // Generate insights using cloud AI
-        const cloudInsights = await cloudAI.generateInsights(sessions);
+        const cloudInsights = await cloudAI.generateInsights(sessions, posturePayload);
 
         // Generate local trends and other data (cloud AI only handles insights)
         const trends = [

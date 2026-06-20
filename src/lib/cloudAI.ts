@@ -1,5 +1,6 @@
 import { Session } from '@/types/session';
 import { TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
+import type { PostureAIPayload } from '@/lib/mocap/aiPayload';
 import { SettingsService } from '@/lib/settings';
 import {
   DEFAULT_PLAN_GENERATION_PROMPT,
@@ -101,6 +102,7 @@ export interface CloudInsight {
   confidence: number; // 0-1 from AI
   evidence: string[]; // Supporting data points
   dateGenerated: Date;
+  category?: 'posture';
 }
 
 export class CloudAIService {
@@ -160,7 +162,8 @@ export class CloudAIService {
     userSessions?: Session[],
     previousResponseId?: string,
     onToken?: (token: string) => void,
-    attachments?: FileAttachment[]
+    attachments?: FileAttachment[],
+    posturePayload?: PostureAIPayload | null,
   ): Promise<{ content: string; responseId: string }> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
@@ -272,7 +275,7 @@ export class CloudAIService {
 
       // Prepare initial input messages
       const messages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: string; file?: { file_data: string; filename: string } }> }> = [
-        { role: 'system', content: this.getChatSystemPrompt() },
+        { role: 'system', content: this.getChatSystemPrompt(posturePayload) },
         ...conversationHistory.slice(-10).map(msg => ({
           role: msg.role,
           content: msg.content
@@ -811,7 +814,7 @@ export class CloudAIService {
 
 
   // Get system prompt for chat AI trainer
-  private getChatSystemPrompt(_sessions?: Session[]): string {
+  private getChatSystemPrompt(posturePayload?: PostureAIPayload | null, _sessions?: Session[]): string {
     return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
 
 CRITICAL FORMATTING RULES - READ CAREFULLY:
@@ -928,7 +931,7 @@ COMMUNICATION STYLE:
 - Keep responses focused and practical
 - Structure responses with clear headers for easy scanning
 
-Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.${this.getUserProfileContext()}`;
+Remember: You're building a long-term coaching relationship. Be supportive, knowledgeable, and genuinely helpful in their rowing journey.${this.getUserProfileContext()}${this.buildPostureContextBlock(posturePayload)}`;
   }
 
   // Get user's session context for personalized coaching
@@ -982,7 +985,10 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
 
   // Generate rowing-specific insights using OpenAI
-  async generateInsights(sessions: Session[]): Promise<CloudInsight[]> {
+  async generateInsights(
+    sessions: Session[],
+    posturePayload?: PostureAIPayload | null,
+  ): Promise<CloudInsight[]> {
     if (!this.config) {
       throw new Error('Cloud AI service not configured');
     }
@@ -997,7 +1003,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
     try {
       const anonymizedData = this.anonymizeSessions(sessions);
-      const prompt = this.buildInsightPrompt(anonymizedData);
+      const prompt = this.buildInsightPrompt(anonymizedData, posturePayload);
       const useCaseConfig = this.aiSettings.insights;
 
       const config: ApiRequestConfig = {
@@ -1058,6 +1064,18 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
     return '';
   }
 
+  // Append posture context block to system prompt when a cloud-safe payload exists.
+  // Raw keypoints are never present here — the hard guard ran server-side before
+  // the payload reached the client.
+  private buildPostureContextBlock(payload?: PostureAIPayload | null): string {
+    if (!payload) return '';
+    const tierLabel =
+      payload.tier === 3
+        ? 'Tier 3 – Fault Summary (no body geometry)'
+        : 'Tier 2 – Fault Summary + Per-Stroke Metrics (no keypoints)';
+    return `\n\n---\nPOSTURE ANALYSIS CONTEXT [${tierLabel}]:\n${JSON.stringify(payload, null, 2)}\n\nUse this posture data to answer questions about the user's technique and form. Do not speculate about raw pose coordinates — only the summarised fault counts and scalar metrics above are available.\n---`;
+  }
+
   // Get system prompt for rowing performance analysis
   private getSystemPrompt(): string {
     const userContext = this.getUserProfileContext();
@@ -1068,7 +1086,10 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
   }
 
   // Build user prompt with session data using configurable prompt
-  private buildInsightPrompt(sessions: Record<string, unknown>[]): string {
+  private buildInsightPrompt(
+    sessions: Record<string, unknown>[],
+    posturePayload?: PostureAIPayload | null,
+  ): string {
     // Include more sessions for better progress analysis
     const recentSessions = sessions.slice(-20); // Last 20 sessions for better context
     const sessionSummary = this.createSessionSummary(recentSessions);
@@ -1113,6 +1134,17 @@ JSON structure:
 ]
 
 CRITICAL: Your response must be ONLY the JSON array of insights. Do not include any explanations, markdown, or the training data itself.`;
+
+    // Append posture context block when available (tier 2 or tier 3 payload).
+    // Raw keypoint data is never included — the hard guard in aiPayload.ts
+    // enforces this before the payload reaches this point.
+    if (posturePayload) {
+      const tierLabel =
+        posturePayload.tier === 3
+          ? 'Tier 3 – Fault Summary (no body geometry)'
+          : 'Tier 2 – Fault Summary + Per-Stroke Metrics (no keypoints)';
+      return `${finalPrompt}\n\n---\nPOSTURE ANALYSIS CONTEXT [${tierLabel}]:\n${JSON.stringify(posturePayload, null, 2)}\n---`;
+    }
 
     return finalPrompt;
   }
@@ -1257,17 +1289,26 @@ Average sessions per week: ${(totalSessions / Math.max(1, Math.ceil((dates[dates
       // Ensure we have an array
       const insightsArray = Array.isArray(insightsData) ? insightsData : [insightsData];
 
-      return insightsArray.map((insight: Record<string, unknown>, index: number) => ({
-        id: `cloud-insight-${Date.now()}-${index}`,
-        type: (insight.type as string) || 'recommendation',
-        title: (insight.title as string) || 'Performance Insight',
-        description: (insight.description as string) || 'No description provided',
-        actionable: Boolean(insight.actionable),
-        priority: (insight.priority as string) || 'medium',
-        confidence: Math.max(0, Math.min(1, Number(insight.confidence) || 0.5)),
-        evidence: Array.isArray(insight.evidence) ? insight.evidence as string[] : [],
-        dateGenerated: new Date()
-      })) as CloudInsight[];
+      const POSTURE_TERMS = /posture|back angle|rounded back|layback|arm bend|drive ratio|recovery ratio|catch position|finish position|spine|trunk lean/i;
+
+      return insightsArray.map((insight: Record<string, unknown>, index: number) => {
+        const title = (insight.title as string) || 'Performance Insight';
+        const description = (insight.description as string) || 'No description provided';
+        const isPosture = POSTURE_TERMS.test(title) || POSTURE_TERMS.test(description);
+
+        return {
+          id: `cloud-insight-${Date.now()}-${index}`,
+          type: (insight.type as string) || 'recommendation',
+          title,
+          description,
+          actionable: Boolean(insight.actionable),
+          priority: (insight.priority as string) || 'medium',
+          confidence: Math.max(0, Math.min(1, Number(insight.confidence) || 0.5)),
+          evidence: Array.isArray(insight.evidence) ? insight.evidence as string[] : [],
+          dateGenerated: new Date(),
+          ...(isPosture ? { category: 'posture' as const } : {}),
+        };
+      }) as CloudInsight[];
     } catch (error) {
       console.error('Failed to parse AI response:', error);
       console.error('Response content:', response);

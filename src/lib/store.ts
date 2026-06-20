@@ -4,6 +4,8 @@ import { AWARDS, EarnedAward } from '@/lib/awards';
 import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
 import { clearSessionsCache } from '@/lib/services/sessionsCache';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
+import { firstCleanCatchDate, CLEAN_CATCH_AWARD_ID } from '@/lib/postureAchievements';
+import type { SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
 
 // Chart configuration types
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
@@ -160,9 +162,11 @@ interface RowingStore {
   deleteSession: (sessionId: string) => void;
   updateSession: (updatedSession: Session) => void;
   updateSessionsInStore: (sessions: Session[]) => void;  // Update local state only, no DB save
+  replaceSessionsInStore: (sessions: Session[]) => void;  // Replace local state only, no DB save
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
   dismissNewAward: () => void;
+  evaluatePostureAwards: (postureSessions: SessionFaultInput[]) => void;
 
   upsertAIAwardSuggestion: (suggestion: Omit<AIAwardSuggestion, 'suggestedAt'> & { suggestedAt?: Date }) => void;
   approveAIAwardSuggestion: (id: string) => void;
@@ -853,6 +857,28 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     });
   },
 
+  replaceSessionsInStore: (sessionsToReplace) => {
+    console.log('[STORE] replaceSessionsInStore called with', sessionsToReplace.length, 'sessions');
+
+    set((state) => {
+      const existingById = new Map(state.sessions.map(s => [s.id, s]));
+      const revivedSessions = sessionsToReplace.map(s => {
+        const existing = existingById.get(s.id);
+        return {
+          ...s,
+          timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp),
+          strokeData: s.strokeData ?? existing?.strokeData,
+        };
+      });
+      const personalRecords = calculatePersonalRecords(revivedSessions);
+
+      return {
+        sessions: revivedSessions,
+        personalRecords,
+      };
+    });
+  },
+
   updateChartSettings: (newSettings) => {
     set((state) => {
       const updatedChartSettings = { ...state.chartSettings, ...newSettings };
@@ -882,6 +908,27 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
   dismissNewAward: () => {
     set({ newlyEarnedAward: null });
+  },
+
+  evaluatePostureAwards: (postureSessions: SessionFaultInput[]) => {
+    const state = get();
+    const existingIds = new Set(state.earnedAwards.map((a) => a.awardId));
+    if (existingIds.has(CLEAN_CATCH_AWARD_ID)) return;
+
+    const earnedAt = firstCleanCatchDate(postureSessions);
+    if (!earnedAt) return;
+
+    const newAward: EarnedAward = { awardId: CLEAN_CATCH_AWARD_ID, earnedAt };
+    const updatedAwards = [...state.earnedAwards, newAward];
+
+    saveAwardsToDB([newAward]).catch((err) => {
+      console.error('[STORE] Failed to save posture award:', err);
+    });
+
+    set({
+      earnedAwards: updatedAwards,
+      newlyEarnedAward: state.newlyEarnedAward || newAward,
+    });
   },
 
   upsertAIAwardSuggestion: (suggestion) => {

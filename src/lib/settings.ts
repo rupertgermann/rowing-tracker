@@ -1,4 +1,9 @@
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
+import {
+  defaultPostureThresholdSettings,
+  resolvePostureThresholdSettings,
+  type UserPostureThresholdSettings
+} from '@/lib/mocap/analysis/postureThresholds';
 
 export const AI_TEXT_MODELS = ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano'] as const;
 
@@ -100,6 +105,17 @@ export interface SmartRowSettings {
   lastSync: Date | null;
 }
 
+export interface MocapPreferences {
+  verbosity: 'quiet' | 'verbose';
+  audioEnabled: boolean;
+}
+
+export interface MocapSettings {
+  postureThresholds: UserPostureThresholdSettings;
+  postureThresholdWarning: string | null;
+  mocapPreferences: MocapPreferences;
+}
+
 export interface UseCaseConfig {
   reasoning: 'none' | 'low' | 'medium' | 'high';
   verbosity: 'low' | 'medium' | 'high';
@@ -108,6 +124,7 @@ export interface UseCaseConfig {
 
 export interface AISettings {
   cloudAIEnabled: boolean;
+  mocapDetailedAIShare: boolean;
   openaiApiKey: string;
   maxTokens: number;
 
@@ -147,6 +164,7 @@ export interface Settings {
   notificationSettings: NotificationSettings;
   privacySettings: PrivacySettings;
   smartRowSettings: SmartRowSettings;
+  mocapSettings: MocapSettings;
   aiSettings: AISettings;
   version: string; // For migration purposes
   updatedAt: Date;
@@ -155,7 +173,7 @@ export interface Settings {
 export class SettingsService {
   private static instance: SettingsService;
   private readonly STORAGE_KEY = 'rowing_app_settings';
-  private readonly CURRENT_VERSION = '1.6.0'; // GPT-5.5 and GPT Image 2 model refresh
+  private readonly CURRENT_VERSION = '1.7.0'; // Mocap posture threshold settings
   private dbInitialized = false;
   private initPromise: Promise<void> | null = null;
   private syncTimeout: NodeJS.Timeout | null = null;
@@ -228,9 +246,18 @@ export class SettingsService {
       password: '',
       lastSync: null
     },
+    mocapSettings: {
+      postureThresholds: defaultPostureThresholdSettings(),
+      postureThresholdWarning: null,
+      mocapPreferences: {
+        verbosity: 'quiet',
+        audioEnabled: false,
+      },
+    },
     aiSettings: {
       openaiApiKey: '',
       cloudAIEnabled: false,
+      mocapDetailedAIShare: false,
       maxTokens: 4000,
 
       // Per-use-case configurations with smart defaults
@@ -434,6 +461,13 @@ Be specific and actionable. Only include information relevant to rowing training
         const dbAiConfig = dbSettings.aiConfig as Record<string, unknown> | null;
         const needsColorFieldMigration = !dbAiConfig?.achievementImageColors;
 
+        if (dbSettings.postureThresholds) {
+          const resolved = resolvePostureThresholdSettings(dbSettings.postureThresholds);
+          if (resolved.warning) {
+            console.warn('[SETTINGS] Invalid postureThresholds from DB:', resolved.warning);
+          }
+        }
+
         // Transform DB settings to app format and cache in localStorage
         const appSettings = this.transformDBToAppSettings(dbSettings);
         const migrated = this.migrateSettings(appSettings);
@@ -489,6 +523,16 @@ Be specific and actionable. Only include information relevant to rowing training
    * Transform database settings format to app Settings format
    */
   private transformDBToAppSettings(dbSettings: Record<string, unknown>): Settings {
+    const resolvedPostureThresholds = resolvePostureThresholdSettings(
+      dbSettings.postureThresholds
+    );
+    if (resolvedPostureThresholds.warning) {
+      console.warn(
+        '[SETTINGS] Invalid postureThresholds from DB:',
+        resolvedPostureThresholds.warning
+      );
+    }
+
     return {
       userPreferences: {
         theme: (dbSettings.theme as 'light' | 'dark' | 'system') || 'system',
@@ -537,9 +581,18 @@ Be specific and actionable. Only include information relevant to rowing training
       privacySettings: this.defaultSettings.privacySettings,
       // SmartRow credentials are NOT synced to DB - kept local only like API key
       smartRowSettings: this.defaultSettings.smartRowSettings,
+      mocapSettings: {
+        postureThresholds: resolvedPostureThresholds.settings,
+        postureThresholdWarning: resolvedPostureThresholds.warning,
+        mocapPreferences: {
+          verbosity: ((dbSettings.mocapPreferences as Record<string, unknown> | null)?.verbosity as 'quiet' | 'verbose') ?? 'quiet',
+          audioEnabled: ((dbSettings.mocapPreferences as Record<string, unknown> | null)?.audioEnabled as boolean) ?? false,
+        },
+      },
       aiSettings: {
         ...this.defaultSettings.aiSettings,
         cloudAIEnabled: (dbSettings.cloudAIEnabled as boolean) || false,
+        mocapDetailedAIShare: (dbSettings.mocapDetailedAIShare as boolean) || false,
         // Note: openaiApiKey is NOT loaded from DB - it's kept local only
         // Will be preserved from localStorage if present
         maxTokens: (dbSettings.maxTokens as number) || 4000,
@@ -607,9 +660,12 @@ Be specific and actionable. Only include information relevant to rowing training
       planReminders: settings.notificationSettings.planReminders,
       adherenceAlerts: settings.notificationSettings.adherenceAlerts,
       cloudAIEnabled: settings.aiSettings.cloudAIEnabled,
+      mocapDetailedAIShare: settings.aiSettings.mocapDetailedAIShare,
       maxTokens: settings.aiSettings.maxTokens,
       userProfileContext: settings.aiSettings.userProfileContext,
       userProfileRawInput: settings.aiSettings.userProfileRawInput,
+      postureThresholds: settings.mocapSettings.postureThresholds,
+      mocapPreferences: settings.mocapSettings.mocapPreferences,
       aiConfig: {
         chat: settings.aiSettings.chat,
         insights: settings.aiSettings.insights,
@@ -700,6 +756,10 @@ Be specific and actionable. Only include information relevant to rowing training
     return this.getSettings().smartRowSettings;
   }
 
+  getMocapSettings(): MocapSettings {
+    return this.getSettings().mocapSettings;
+  }
+
   getAISettings(): AISettings {
     return this.getSettings().aiSettings;
   }
@@ -743,6 +803,20 @@ Be specific and actionable. Only include information relevant to rowing training
   updateSmartRowSettings(updates: Partial<SmartRowSettings>): void {
     const settings = this.getSettings();
     settings.smartRowSettings = { ...settings.smartRowSettings, ...updates };
+    settings.updatedAt = new Date();
+    this.saveSettings(settings);
+  }
+
+  updateMocapSettings(updates: Partial<MocapSettings>): void {
+    const settings = this.getSettings();
+    settings.mocapSettings = {
+      ...settings.mocapSettings,
+      ...updates,
+      postureThresholdWarning:
+        updates.postureThresholdWarning === undefined
+          ? null
+          : updates.postureThresholdWarning
+    };
     settings.updatedAt = new Date();
     this.saveSettings(settings);
   }
@@ -968,6 +1042,22 @@ Be specific and actionable. Only include information relevant to rowing training
     migratedSettings.smartRowSettings = {
       ...this.defaultSettings.smartRowSettings,
       ...migratedSettings.smartRowSettings
+    };
+
+    const resolvedPostureThresholds = resolvePostureThresholdSettings(
+      migratedSettings.mocapSettings?.postureThresholds
+    );
+    if (resolvedPostureThresholds.warning) {
+      console.warn(
+        '[SETTINGS] Invalid stored posture thresholds:',
+        resolvedPostureThresholds.warning
+      );
+    }
+    migratedSettings.mocapSettings = {
+      ...this.defaultSettings.mocapSettings,
+      ...migratedSettings.mocapSettings,
+      postureThresholds: resolvedPostureThresholds.settings,
+      postureThresholdWarning: resolvedPostureThresholds.warning
     };
 
     // Handle AI settings migration from old flat structure to new nested structure

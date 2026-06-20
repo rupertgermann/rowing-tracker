@@ -1,0 +1,148 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { z } from "zod";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/db/prisma";
+import { getMocapStorage } from "@/lib/mocap/storage";
+import { finalizePoseStreamBlob } from "@/lib/mocap/capturePersistence";
+import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const Body = z.object({
+  durationSec: z.number().nonnegative().max(60 * 60 * 8),
+  qualityScore: z.number().min(0).max(1).optional(),
+  qualityFlags: z.array(z.string().min(1).max(80)).max(20).optional(),
+  skipAnalysis: z.boolean().optional(),
+});
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const row = await prisma.mocapSession.findFirst({
+    where: { id, userId: session.user.id },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      poseStreamPath: true,
+      videoStoragePath: true,
+      capturePerspective: true,
+      calibrationCatchFrame: true,
+      calibrationFinishFrame: true,
+    },
+  });
+  if (!row) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (row.status !== "capturing") {
+    return NextResponse.json(
+      { error: `Session not capturing (status=${row.status})` },
+      { status: 409 },
+    );
+  }
+
+  let body: z.infer<typeof Body>;
+  try {
+    body = Body.parse(await req.json());
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error: "Invalid request body",
+        details: err instanceof Error ? err.message : String(err),
+      },
+      { status: 400 },
+    );
+  }
+
+  const storage = getMocapStorage();
+
+  if (body.skipAnalysis) {
+    let finalized = { frameCount: 0, poseStreamBytes: 0 };
+    if (await storage.exists(row.poseStreamPath)) {
+      try {
+        finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
+      } catch (err) {
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : String(err) },
+          { status: 500 },
+        );
+      }
+    }
+    const updated = await prisma.mocapSession.update({
+      where: { id: row.id },
+      data: {
+        status: "ready",
+        durationSec: body.durationSec,
+        qualityScore: body.qualityScore ?? null,
+        qualityFlags: [...new Set([...(body.qualityFlags ?? []), "record-only"])],
+      },
+    });
+    return NextResponse.json({
+      id: updated.id,
+      status: updated.status,
+      durationSec: updated.durationSec,
+      frameCount: finalized.frameCount,
+      poseStreamBytes: finalized.poseStreamBytes,
+      strokeMetricCount: 0,
+      faultCount: 0,
+    });
+  }
+
+  let finalized: Awaited<ReturnType<typeof finalizePoseStreamBlob>>;
+  try {
+    finalized = await finalizePoseStreamBlob(storage, row.poseStreamPath);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+
+  const analyzing = await prisma.mocapSession.update({
+    where: { id: row.id },
+    data: {
+      status: "analyzing",
+      durationSec: body.durationSec,
+      qualityScore: body.qualityScore ?? null,
+      qualityFlags: body.qualityFlags ?? [],
+    },
+  });
+
+  let analysis: Awaited<ReturnType<typeof analyzeAndPersistMocapSession>>;
+  try {
+    analysis = await analyzeAndPersistMocapSession(storage, analyzing);
+  } catch (err) {
+    await prisma.mocapSession.update({
+      where: { id: row.id },
+      data: { status: "ready" },
+    });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+
+  const updated = await prisma.mocapSession.update({
+    where: { id: row.id },
+    data: { status: "ready" },
+  });
+
+  return NextResponse.json({
+    id: updated.id,
+    status: updated.status,
+    durationSec: updated.durationSec,
+    frameCount: finalized.frameCount,
+    poseStreamBytes: finalized.poseStreamBytes,
+    strokeMetricCount: analysis.strokeMetricCount,
+    faultCount: analysis.faultCount,
+  });
+}

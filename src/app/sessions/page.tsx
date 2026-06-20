@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRowingStore } from '@/lib/store';
+import { useRowingStore, type SessionsDistanceFilter } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,11 +15,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles } from 'lucide-react';
+import { ArrowUpDown, Calendar, TrendingUp, Clock, Zap, Target, ArrowUp, ArrowDown, Filter, X, Trophy, Sparkles, Video } from 'lucide-react';
 import { formatSessionDate } from '@/lib/dateTimeUtils';
-import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
+import { cacheSessionsData } from '@/lib/services/sessionsCache';
+import { TimeRangeSelector } from '@/components/ui/time-range-selector';
+import type { Session } from '@/types/session';
 
-const distanceRangeOptions = [
+const distanceRangeOptions: Array<{ value: SessionsDistanceFilter; label: string }> = [
   { value: 'all', label: 'All Distances' },
   { value: '100', label: '100m' },
   { value: '500', label: '500m' },
@@ -56,21 +58,15 @@ function formatPace(secondsPer500m: number): string {
 
 // Sort configuration
 type SortField = 'date' | 'distance' | 'pace' | 'power';
-type SortDirection = 'asc' | 'desc';
-
-interface SortConfig {
-  field: SortField;
-  direction: SortDirection;
-}
 
 export default function SessionsPage() {
-  const { getSessions, getPersonalRecords, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
+  const { getSessions, getPersonalRecords, replaceSessionsInStore, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
   const sessions = getSessions();
   const personalRecords = getPersonalRecords();
   const router = useRouter();
 
   // Helper function to check if session is a personal record
-  const isPersonalRecord = (session: any): { isPR: boolean; distances: string[] } => {
+  const isPersonalRecord = (session: Session): { isPR: boolean; distances: string[] } => {
     const prDistances = personalRecords
       .filter(pr => pr.sessionId === session.id)
       .map(pr => formatDistance(pr.distance));
@@ -88,6 +84,36 @@ export default function SessionsPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshSessions() {
+      try {
+        const response = await fetch('/api/sessions/list', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`${response.status}`);
+        const data: {
+          sessions?: Session[];
+          sessionsRevision?: number;
+        } = await response.json();
+        const freshSessions = data.sessions ?? [];
+
+        if (cancelled) return;
+        replaceSessionsInStore(freshSessions);
+        if (typeof data.sessionsRevision === 'number') {
+          cacheSessionsData(freshSessions, data.sessionsRevision);
+        }
+      } catch (error) {
+        console.error('[SessionsPage] Failed to refresh sessions:', error);
+      }
+    }
+
+    refreshSessions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [replaceSessionsInStore]);
 
   // Apply filters to sessions
   const filteredSessions = sessions.filter(session => {
@@ -255,7 +281,7 @@ export default function SessionsPage() {
                         key={option.value}
                         variant={filters.distanceRange === option.value ? "default" : "outline"}
                         size="sm"
-                        onClick={() => updateSessionsViewSettings({ distanceRange: option.value as any })}
+                        onClick={() => updateSessionsViewSettings({ distanceRange: option.value })}
                       >
                         {option.label}
                       </Button>
@@ -362,12 +388,21 @@ export default function SessionsPage() {
                               Stroke Data
                             </div>
                           </TableHead>
+                          <TableHead className="text-right">
+                            <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                              <Video className="h-4 w-4 text-purple-500" />
+                              Mocap
+                            </div>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {sortedSessions.map((session) => {
                           const prInfo = isPersonalRecord(session);
-                          const hasStrokeData = !!(session.strokeData && session.strokeData.length > 0);
+                          const hasStrokeData = Boolean(
+                            (session.strokeData && session.strokeData.length > 0) ||
+                            (session.strokeDataCount && session.strokeDataCount > 0)
+                          );
                           return (
                             <TableRow
                               key={session.id}
@@ -427,6 +462,16 @@ export default function SessionsPage() {
                                 ) : (
                                   <span className="text-xs text-muted-foreground">No stroke file</span>
                                 )}
+                              </TableCell>
+                              <TableCell className="text-right text-sm" onClick={(e) => e.stopPropagation()}>
+                                {session.mocapSession ? (
+                                  <Link href={`/mocap/sessions/${session.mocapSession.id}`}>
+                                    <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/20 cursor-pointer">
+                                      <Video className="h-3 w-3 mr-1" />
+                                      Mocap
+                                    </Badge>
+                                  </Link>
+                                ) : null}
                               </TableCell>
                             </TableRow>
                           );

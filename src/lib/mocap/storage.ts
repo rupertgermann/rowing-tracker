@@ -1,0 +1,211 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { del, head, list, put } from "@vercel/blob";
+
+export type ByteRange = { start: number; end?: number };
+
+export interface MocapStorage {
+  videoPath(userId: string, sessionId: string): string;
+  poseStreamPath(userId: string, sessionId: string): string;
+  appendBytes(storagePath: string, bytes: Uint8Array): Promise<void>;
+  writeAt(storagePath: string, bytes: Uint8Array, offset: number): Promise<void>;
+  read(storagePath: string, range?: ByteRange): Promise<Uint8Array>;
+  size(storagePath: string): Promise<number>;
+  exists(storagePath: string): Promise<boolean>;
+  delete(storagePath: string): Promise<void>;
+}
+
+const MOCAP_ROOT = "mocap";
+
+export class LocalDiskStorage implements MocapStorage {
+  constructor(private readonly root: string) {}
+
+  videoPath(userId: string, sessionId: string): string {
+    return path.posix.join(MOCAP_ROOT, userId, sessionId, "video.webm");
+  }
+
+  poseStreamPath(userId: string, sessionId: string): string {
+    return path.posix.join(MOCAP_ROOT, userId, sessionId, "pose-stream.bin");
+  }
+
+  private resolve(storagePath: string): string {
+    const abs = path.resolve(this.root, storagePath);
+    const rootAbs = path.resolve(this.root);
+    if (!abs.startsWith(rootAbs + path.sep) && abs !== rootAbs) {
+      throw new Error(`Path escapes storage root: ${storagePath}`);
+    }
+    return abs;
+  }
+
+  async appendBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
+    const abs = this.resolve(storagePath);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.appendFile(abs, bytes);
+  }
+
+  async writeAt(
+    storagePath: string,
+    bytes: Uint8Array,
+    offset: number,
+  ): Promise<void> {
+    const abs = this.resolve(storagePath);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const fh = await fs.open(abs, "r+");
+    try {
+      await fh.write(bytes, 0, bytes.byteLength, offset);
+    } finally {
+      await fh.close();
+    }
+  }
+
+  async read(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
+    const abs = this.resolve(storagePath);
+    if (!range) {
+      const buf = await fs.readFile(abs);
+      return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    }
+    const fh = await fs.open(abs, "r");
+    try {
+      const stat = await fh.stat();
+      const end = range.end ?? stat.size;
+      const length = Math.max(0, end - range.start);
+      const buf = Buffer.alloc(length);
+      if (length > 0) {
+        await fh.read(buf, 0, length, range.start);
+      }
+      return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    } finally {
+      await fh.close();
+    }
+  }
+
+  async size(storagePath: string): Promise<number> {
+    const abs = this.resolve(storagePath);
+    const stat = await fs.stat(abs);
+    return stat.size;
+  }
+
+  async exists(storagePath: string): Promise<boolean> {
+    try {
+      await fs.access(this.resolve(storagePath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async delete(storagePath: string): Promise<void> {
+    const abs = this.resolve(storagePath);
+    await fs.rm(abs, { force: true });
+    const dir = path.dirname(abs);
+    try {
+      const entries = await fs.readdir(dir);
+      if (entries.length === 0) {
+        await fs.rmdir(dir);
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
+class VercelBlobStorage implements MocapStorage {
+  videoPath(userId: string, sessionId: string): string {
+    return path.posix.join(MOCAP_ROOT, userId, sessionId, "video.webm");
+  }
+
+  poseStreamPath(userId: string, sessionId: string): string {
+    return path.posix.join(MOCAP_ROOT, userId, sessionId, "pose-stream.bin");
+  }
+
+  async appendBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
+    const existing = await this.readIfExists(storagePath);
+    const combined = new Uint8Array(existing.byteLength + bytes.byteLength);
+    combined.set(existing, 0);
+    combined.set(bytes, existing.byteLength);
+    await this.putBytes(storagePath, combined);
+  }
+
+  async writeAt(
+    storagePath: string,
+    bytes: Uint8Array,
+    offset: number,
+  ): Promise<void> {
+    const existing = await this.read(storagePath);
+    if (offset < 0 || offset + bytes.byteLength > existing.byteLength) {
+      throw new Error(`writeAt outside blob bounds for ${storagePath}`);
+    }
+    const updated = new Uint8Array(existing);
+    updated.set(bytes, offset);
+    await this.putBytes(storagePath, updated);
+  }
+
+  async read(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
+    const meta = await head(storagePath);
+    const headers: HeadersInit = {};
+    if (range) {
+      const end = range.end === undefined ? "" : String(range.end - 1);
+      headers.Range = `bytes=${range.start}-${end}`;
+    }
+    const res = await fetch(meta.url, { headers, cache: "no-store" });
+    if (!res.ok && res.status !== 206) {
+      throw new Error(`Failed to read blob ${storagePath}: ${res.status}`);
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  async size(storagePath: string): Promise<number> {
+    const meta = await head(storagePath);
+    return meta.size;
+  }
+
+  async exists(storagePath: string): Promise<boolean> {
+    try {
+      await head(storagePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async delete(storagePath: string): Promise<void> {
+    const blobs = await list({ prefix: storagePath, limit: 1 });
+    if (blobs.blobs.length === 0) return;
+    await del(storagePath);
+  }
+
+  private async readIfExists(storagePath: string): Promise<Uint8Array> {
+    if (!(await this.exists(storagePath))) return new Uint8Array(0);
+    return this.read(storagePath);
+  }
+
+  private async putBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
+    await put(storagePath, Buffer.from(bytes), {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/octet-stream",
+    });
+  }
+}
+
+let instance: MocapStorage | null = null;
+
+export function getMocapStorage(): MocapStorage {
+  if (instance) return instance;
+
+  const backend = process.env.MOCAP_STORAGE_BACKEND ?? "local";
+  if (backend === "local") {
+    const root = process.env.MOCAP_STORAGE_ROOT
+      ? path.resolve(process.env.MOCAP_STORAGE_ROOT)
+      : path.resolve(process.cwd(), "storage");
+    instance = new LocalDiskStorage(root);
+    return instance;
+  }
+
+  if (backend === "vercel-blob") {
+    instance = new VercelBlobStorage();
+    return instance;
+  }
+
+  throw new Error(`Unknown MOCAP_STORAGE_BACKEND="${backend}"`);
+}

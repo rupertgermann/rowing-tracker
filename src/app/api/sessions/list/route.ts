@@ -51,6 +51,12 @@ export async function GET() {
           updatedAt: true,
           importedAt: true,
           sourceFile: true,
+          mocapSession: {
+            select: { id: true },
+          },
+          _count: {
+            select: { strokeData: true },
+          },
         },
         orderBy: {
           timestamp: 'desc',
@@ -62,10 +68,15 @@ export async function GET() {
       }),
     ]);
 
+    const sessionsWithCounts = sessions.map(({ _count, ...session }) => ({
+      ...session,
+      strokeDataCount: _count.strokeData,
+    }));
+
     return NextResponse.json({
-      sessions,
+      sessions: sessionsWithCounts,
       sessionsRevision: settings?.sessionsRevision ?? 0,
-      count: sessions.length,
+      count: sessionsWithCounts.length,
     });
   } catch (error) {
     console.error("Error fetching sessions list:", error);

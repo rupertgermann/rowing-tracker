@@ -29,6 +29,9 @@ export async function GET() {
             strokeIndex: 'asc',
           },
         },
+        mocapSession: {
+          select: { id: true },
+        },
       },
       orderBy: {
         timestamp: 'desc',

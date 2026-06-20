@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { settings, Settings, UserPreferences, DataManagement, TrainingSettings, NotificationSettings, PrivacySettings, AISettings, SmartRowSettings } from '@/lib/settings';
+import {
+  defaultPostureThresholdSettings,
+  postureThresholdsV1,
+  thresholdBandsEqual,
+  validatePostureThresholdBands,
+  type PostureThresholdBands,
+} from '@/lib/mocap/analysis/postureThresholds';
 import { cloudAI } from '@/lib/cloudAI';
 import { deleteAllInsightsFromDB } from '@/lib/dataSync';
 import { useAIInsights } from '@/hooks/useAIInsights';
@@ -85,6 +92,7 @@ type SettingsCategory =
   | 'notificationSettings'
   | 'privacySettings'
   | 'smartRowSettings'
+  | 'mocapSettings'
   | 'aiSettings';
 
 export default function SettingsPage() {
@@ -350,6 +358,9 @@ export default function SettingsPage() {
         case 'smartRowSettings':
           settings.updateSmartRowSettings(updates);
           break;
+        case 'mocapSettings':
+          settings.updateMocapSettings(updates);
+          break;
         case 'aiSettings':
           settings.updateAISettings(updates);
           break;
@@ -458,6 +469,7 @@ export default function SettingsPage() {
     { id: 'trainingSettings', name: 'Training Settings', icon: Target, description: 'Training zones, goals, and preferences' },
     { id: 'notificationSettings', name: 'Notifications', icon: Bell, description: 'Alerts and reminders' },
     { id: 'privacySettings', name: 'Privacy', icon: Shield, description: 'Data sharing and privacy controls' },
+    { id: 'mocapSettings', name: 'Mocap', icon: Target, description: 'Posture analysis thresholds' },
     { id: 'aiSettings', name: 'AI Settings', icon: Brain, description: 'Configure AI assistant, training plans, achievement generation, etc.' }
   ];
 
@@ -1077,6 +1089,294 @@ export default function SettingsPage() {
     </div>
   );
 
+  const savePostureThresholds = (thresholds: PostureThresholdBands) => {
+    const validation = validatePostureThresholdBands(thresholds);
+    if (!validation.valid) {
+      setErrorMessage(validation.errors[0] || 'Invalid posture threshold');
+      return;
+    }
+
+    saveSettings('mocapSettings', {
+      postureThresholds: {
+        version: postureThresholdsV1.version,
+        thresholds,
+        userOverridden: !thresholdBandsEqual(
+          thresholds,
+          postureThresholdsV1.thresholds
+        ),
+      },
+      postureThresholdWarning: null,
+    });
+  };
+
+  const updatePostureThreshold = (
+    faultKey: keyof PostureThresholdBands,
+    fieldKey: string,
+    value: number
+  ) => {
+    if (!settingsData?.mocapSettings) return;
+    const thresholds = settingsData.mocapSettings.postureThresholds.thresholds;
+    const next = {
+      ...thresholds,
+      [faultKey]: {
+        ...thresholds[faultKey],
+        [fieldKey]: value,
+      },
+    } as PostureThresholdBands;
+    savePostureThresholds(next);
+  };
+
+  const resetPostureFault = (faultKey: keyof PostureThresholdBands) => {
+    if (!settingsData?.mocapSettings) return;
+    const thresholds = settingsData.mocapSettings.postureThresholds.thresholds;
+    savePostureThresholds({
+      ...thresholds,
+      [faultKey]: { ...postureThresholdsV1.thresholds[faultKey] },
+    } as PostureThresholdBands);
+  };
+
+  const resetAllPostureThresholds = () => {
+    saveSettings('mocapSettings', {
+      postureThresholds: defaultPostureThresholdSettings(),
+      postureThresholdWarning: null,
+    });
+  };
+
+  const renderMocapSettings = () => {
+    const active = settingsData.mocapSettings.postureThresholds;
+    const thresholds = active.thresholds;
+    const validation = validatePostureThresholdBands(thresholds);
+
+    const field = (
+      faultKey: keyof PostureThresholdBands,
+      fieldKey: string,
+      label: string,
+      value: number,
+      step = 1
+    ) => (
+      <div>
+        <Label htmlFor={`${faultKey}-${fieldKey}`}>{label}</Label>
+        <Input
+          id={`${faultKey}-${fieldKey}`}
+          type="number"
+          min="0"
+          step={step}
+          value={value}
+          onChange={(e) =>
+            updatePostureThreshold(
+              faultKey,
+              fieldKey,
+              Number(e.target.value)
+            )
+          }
+          className="mt-1"
+        />
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        {settingsData.mocapSettings.postureThresholdWarning && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {settingsData.mocapSettings.postureThresholdWarning}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!validation.valid && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{validation.errors.join(' ')}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg">Posture Fault Thresholds</CardTitle>
+                <CardDescription>
+                  Tune the five v1 mocap fault rules used by analysis.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={active.userOverridden ? 'default' : 'secondary'}>
+                  {active.userOverridden ? 'Custom' : 'Defaults'}
+                </Badge>
+                <Button variant="outline" size="sm" onClick={resetAllPostureThresholds}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset all
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <ThresholdCard
+              title="Rounded Back at Catch"
+              description="Flags catch positions where the back angle is too closed."
+              onReset={() => resetPostureFault('rounded_back_at_catch')}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {field(
+                  'rounded_back_at_catch',
+                  'warningBelowDeg',
+                  'Warning below degrees',
+                  thresholds.rounded_back_at_catch.warningBelowDeg
+                )}
+                {field(
+                  'rounded_back_at_catch',
+                  'criticalBelowDeg',
+                  'Critical below degrees',
+                  thresholds.rounded_back_at_catch.criticalBelowDeg
+                )}
+              </div>
+            </ThresholdCard>
+
+            <ThresholdCard
+              title="Early Arm Bend"
+              description="Flags arm bend before the legs have completed the drive."
+              onReset={() => resetPostureFault('early_arm_bend')}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {field(
+                  'early_arm_bend',
+                  'infoBeforeLegsCompleteFrames',
+                  'Info at frames early',
+                  thresholds.early_arm_bend.infoBeforeLegsCompleteFrames
+                )}
+                {field(
+                  'early_arm_bend',
+                  'warningBeforeLegsCompleteFrames',
+                  'Warning at frames early',
+                  thresholds.early_arm_bend.warningBeforeLegsCompleteFrames
+                )}
+              </div>
+            </ThresholdCard>
+
+            <ThresholdCard
+              title="Back Opens Before Legs"
+              description="Flags torso opening before the leg drive signal."
+              onReset={() => resetPostureFault('back_opens_before_legs_drive')}
+            >
+              {field(
+                'back_opens_before_legs_drive',
+                'warningTorsoOpensBeforeLegsFrames',
+                'Warning at frames early',
+                thresholds.back_opens_before_legs_drive
+                  .warningTorsoOpensBeforeLegsFrames
+              )}
+            </ThresholdCard>
+
+            <ThresholdCard
+              title="Excessive Layback"
+              description="Flags finish positions where layback becomes too large."
+              onReset={() => resetPostureFault('excessive_layback')}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {field(
+                  'excessive_layback',
+                  'infoAboveDeg',
+                  'Info above degrees',
+                  thresholds.excessive_layback.infoAboveDeg
+                )}
+                {field(
+                  'excessive_layback',
+                  'warningAboveDeg',
+                  'Warning above degrees',
+                  thresholds.excessive_layback.warningAboveDeg
+                )}
+              </div>
+            </ThresholdCard>
+
+            <ThresholdCard
+              title="Slow Recovery Ratio"
+              description="Flags recovery phases that are long relative to the drive."
+              onReset={() => resetPostureFault('slow_recovery_ratio')}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {field(
+                  'slow_recovery_ratio',
+                  'warningAboveRatio',
+                  'Warning above ratio',
+                  thresholds.slow_recovery_ratio.warningAboveRatio,
+                  0.1
+                )}
+                {field(
+                  'slow_recovery_ratio',
+                  'criticalAboveRatio',
+                  'Critical above ratio',
+                  thresholds.slow_recovery_ratio.criticalAboveRatio,
+                  0.1
+                )}
+              </div>
+            </ThresholdCard>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Live Coaching Cues</CardTitle>
+            <CardDescription>
+              Controls visual and audio feedback during a mocap session.
+              Cues fire post-stroke (≤ 1s after each stroke completes).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Cue Verbosity</Label>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Quiet (default):</strong> only warning + critical faults.{' '}
+                  <strong>Verbose:</strong> also surfaces info-severity cues.
+                </p>
+              </div>
+              <select
+                className="rounded border px-2 py-1 text-sm bg-transparent"
+                value={settingsData.mocapSettings.mocapPreferences.verbosity}
+                onChange={(e) =>
+                  saveSettings('mocapSettings', {
+                    mocapPreferences: {
+                      ...settingsData.mocapSettings.mocapPreferences,
+                      verbosity: e.target.value as 'quiet' | 'verbose',
+                    },
+                  })
+                }
+                data-testid="mocap-cue-verbosity"
+              >
+                <option value="quiet">Quiet</option>
+                <option value="verbose">Verbose</option>
+              </select>
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Audio Cues</Label>
+                <p className="text-sm text-muted-foreground">
+                  Speak the short audio hint for each cue using the
+                  browser&apos;s speech synthesis. Visual cues remain on regardless.
+                </p>
+              </div>
+              <Switch
+                checked={settingsData.mocapSettings.mocapPreferences.audioEnabled}
+                onCheckedChange={(checked) =>
+                  saveSettings('mocapSettings', {
+                    mocapPreferences: {
+                      ...settingsData.mocapSettings.mocapPreferences,
+                      audioEnabled: checked,
+                    },
+                  })
+                }
+                data-testid="mocap-cue-audio"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderAISettings = () => {
     // ✅ No hooks here - moved to component level
     // Conditional logic is safe now
@@ -1205,6 +1505,23 @@ export default function SettingsPage() {
               <Switch
                 checked={settingsData.aiSettings.cloudAIEnabled}
                 onCheckedChange={(checked) => saveSettings('aiSettings', { cloudAIEnabled: checked })}
+              />
+            </div>
+
+            {/* Posture Data Sharing Tier Toggle */}
+            <div className={`flex items-start justify-between gap-4 ${!settingsData.aiSettings.cloudAIEnabled ? 'opacity-50' : ''}`}>
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Posture Analysis Data Sharing</Label>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Tier 3 (default):</strong> Sends fault counts and severity totals only — no body geometry.{' '}
+                  <strong>Tier 2 (opt-in):</strong> Also sends per-stroke back angle, layback, and recovery ratio.
+                  Raw pose keypoints are never sent to cloud AI.
+                </p>
+              </div>
+              <Switch
+                checked={settingsData.aiSettings.mocapDetailedAIShare ?? false}
+                onCheckedChange={(checked) => saveSettings('aiSettings', { mocapDetailedAIShare: checked })}
+                disabled={!settingsData.aiSettings.cloudAIEnabled}
               />
             </div>
 
@@ -2424,6 +2741,8 @@ export default function SettingsPage() {
         return renderNotificationSettings();
       case 'privacySettings':
         return renderPrivacySettings();
+      case 'mocapSettings':
+        return renderMocapSettings();
       case 'aiSettings':
         return renderAISettings();
       default:
@@ -2570,6 +2889,34 @@ export default function SettingsPage() {
         onConfirm={executeClearDataCategory}
         variant="destructive"
       />
+    </div>
+  );
+}
+
+function ThresholdCard({
+  title,
+  description,
+  children,
+  onReset,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  onReset: () => void;
+}) {
+  return (
+    <div className="rounded-md border p-4">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-medium">{title}</h3>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onReset}>
+          <RotateCcw className="h-4 w-4" />
+          <span className="sr-only">Reset {title}</span>
+        </Button>
+      </div>
+      {children}
     </div>
   );
 }

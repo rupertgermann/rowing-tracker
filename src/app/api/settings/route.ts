@@ -42,6 +42,7 @@ export async function GET() {
           insightsRevision: 0,
           userProfileContext: null,
           userProfileRawInput: null,
+          postureThresholds: null,
           aiConfig: null,
           customPromptsAi: null,
         }
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
     
     // AI settings
     if (settingsData.cloudAIEnabled !== undefined) updateData.cloudAIEnabled = settingsData.cloudAIEnabled;
+    if (settingsData.mocapDetailedAIShare !== undefined) updateData.mocapDetailedAIShare = settingsData.mocapDetailedAIShare;
     if (settingsData.maxTokens !== undefined) updateData.maxTokens = settingsData.maxTokens;
     if (settingsData.aiConfig !== undefined) updateData.aiConfig = settingsData.aiConfig;
     if (settingsData.customPromptsAi !== undefined) updateData.customPromptsAi = settingsData.customPromptsAi;
@@ -134,6 +136,8 @@ export async function POST(req: Request) {
     // User profile context
     if (settingsData.userProfileContext !== undefined) updateData.userProfileContext = settingsData.userProfileContext;
     if (settingsData.userProfileRawInput !== undefined) updateData.userProfileRawInput = settingsData.userProfileRawInput;
+    if (settingsData.postureThresholds !== undefined) updateData.postureThresholds = settingsData.postureThresholds;
+    if (settingsData.mocapPreferences !== undefined) updateData.mocapPreferences = settingsData.mocapPreferences;
     
     // Dashboard and view settings
     if (settingsData.dashboardSettings !== undefined) updateData.dashboardSettings = settingsData.dashboardSettings;

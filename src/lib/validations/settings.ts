@@ -75,6 +75,76 @@ const customPromptsAiSchema = z.record(z.string(), z.string());
 // View settings schemas (flexible JSON objects)
 const viewSettingsSchema = z.record(z.string(), z.unknown());
 
+const postureThresholdSettingsSchema = z.object({
+  version: z.string().min(1).max(20),
+  userOverridden: z.boolean(),
+  thresholds: z.object({
+    rounded_back_at_catch: z.object({
+      warningBelowDeg: z.number().min(0).max(180),
+      criticalBelowDeg: z.number().min(0).max(180),
+    }),
+    early_arm_bend: z.object({
+      infoBeforeLegsCompleteFrames: z.number().int().min(0).max(240),
+      warningBeforeLegsCompleteFrames: z.number().int().min(0).max(240),
+    }),
+    back_opens_before_legs_drive: z.object({
+      warningTorsoOpensBeforeLegsFrames: z.number().int().min(0).max(240),
+    }),
+    excessive_layback: z.object({
+      infoAboveDeg: z.number().min(0).max(180),
+      warningAboveDeg: z.number().min(0).max(180),
+    }),
+    slow_recovery_ratio: z.object({
+      warningAboveRatio: z.number().min(0).max(20),
+      criticalAboveRatio: z.number().min(0).max(20),
+    }),
+  }),
+}).superRefine((value, ctx) => {
+  const t = value.thresholds;
+  if (
+    t.rounded_back_at_catch.criticalBelowDeg >=
+    t.rounded_back_at_catch.warningBelowDeg
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Rounded-back critical angle must be below warning angle',
+      path: ['thresholds', 'rounded_back_at_catch', 'criticalBelowDeg'],
+    });
+  }
+  if (
+    t.early_arm_bend.infoBeforeLegsCompleteFrames >
+    t.early_arm_bend.warningBeforeLegsCompleteFrames
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Early-arm-bend info frame count must be at or below warning',
+      path: ['thresholds', 'early_arm_bend', 'infoBeforeLegsCompleteFrames'],
+    });
+  }
+  if (t.excessive_layback.infoAboveDeg > t.excessive_layback.warningAboveDeg) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Excessive-layback info angle must be at or below warning',
+      path: ['thresholds', 'excessive_layback', 'infoAboveDeg'],
+    });
+  }
+  if (
+    t.slow_recovery_ratio.warningAboveRatio >=
+    t.slow_recovery_ratio.criticalAboveRatio
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Slow-recovery warning ratio must be below critical ratio',
+      path: ['thresholds', 'slow_recovery_ratio', 'warningAboveRatio'],
+    });
+  }
+});
+
+const mocapPreferencesSchema = z.object({
+  verbosity: z.enum(['quiet', 'verbose']),
+  audioEnabled: z.boolean(),
+});
+
 /**
  * Main settings update schema
  * All fields are optional since the API accepts partial updates
@@ -112,6 +182,7 @@ export const settingsUpdateSchema = z.object({
 
   // AI settings
   cloudAIEnabled: z.boolean(),
+  mocapDetailedAIShare: z.boolean(),
   maxTokens: z.number().int().min(100).max(128000),
   aiConfig: aiConfigSchema,
   customPromptsAi: customPromptsAiSchema,
@@ -123,6 +194,8 @@ export const settingsUpdateSchema = z.object({
   // User profile context
   userProfileContext: z.string().max(50000).nullable(),
   userProfileRawInput: z.string().max(100000).nullable(),
+  postureThresholds: postureThresholdSettingsSchema.nullable(),
+  mocapPreferences: mocapPreferencesSchema.nullable(),
 
   // View settings (flexible JSON)
   dashboardSettings: viewSettingsSchema,

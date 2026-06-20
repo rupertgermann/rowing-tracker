@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { trainingPlans, TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
+import { POSTURE_FAULT_CATALOG_V1 } from '@/lib/mocap/analysis/postureThresholds';
+import type { PostureFaultType } from '@/lib/mocap/analysis/types';
+import type { PostureGoalProgress } from '@/lib/postureGoalProgress';
 import { cloudAI } from '@/lib/cloudAI';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
 import { useRowingStore } from '@/lib/store';
@@ -38,9 +41,60 @@ import {
   Upload,
   History,
   RotateCcw,
+  Activity,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PlanAnalysisArchiveModal } from '@/components/PlanAnalysisArchiveModal';
+
+function PostureGoalSetter({
+  planId,
+  onSave,
+}: {
+  planId: string;
+  onSave: (planId: string, faultType: PostureFaultType, targetRate: number) => void;
+}) {
+  const [faultType, setFaultType] = useState<PostureFaultType | ''>('');
+  const [targetRate, setTargetRate] = useState(0.1);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <select
+          value={faultType}
+          onChange={(e) => setFaultType(e.target.value as PostureFaultType | '')}
+          className="flex-1 p-1.5 border rounded-md text-sm"
+        >
+          <option value="">Select fault type...</option>
+          {POSTURE_FAULT_CATALOG_V1.map(ft => (
+            <option key={ft} value={ft}>{ft.replace(/_/g, ' ')}</option>
+          ))}
+        </select>
+        <Button
+          size="sm"
+          disabled={!faultType}
+          onClick={() => faultType && onSave(planId, faultType, targetRate)}
+        >
+          Set Goal
+        </Button>
+      </div>
+      {faultType && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>Target ≤</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={targetRate}
+            onChange={(e) => setTargetRate(parseFloat(e.target.value))}
+            className="flex-1"
+          />
+          <span className="w-12 text-right">{(targetRate * 100).toFixed(0)}%/stroke</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PlansPage() {
   const router = useRouter();
@@ -64,14 +118,31 @@ export default function PlansPage() {
     goals: '',
     level: 'intermediate' as 'beginner' | 'intermediate' | 'advanced',
     focus: 'general_fitness' as 'general_fitness' | 'endurance' | 'speed' | 'strength' | 'competition',
-    duration: 8
+    duration: 8,
+    postureFaultType: '' as PostureFaultType | '',
+    postureTargetRate: 0.1,
   });
+
+  const [postureGoalProgress, setPostureGoalProgress] = useState<{
+    goal: { faultType: string; targetRate: number } | null;
+    progress: PostureGoalProgress | null;
+  } | null>(null);
 
   useEffect(() => {
     loadPlans();
-    // Keep AI availability consistent across reloads/navigation.
     initializeCloudAIFromSettings();
   }, []);
+
+  useEffect(() => {
+    if (!activePlan) {
+      setPostureGoalProgress(null);
+      return;
+    }
+    fetch(`/api/training-plans/${activePlan.id}/posture-goal`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => data && setPostureGoalProgress(data))
+      .catch(() => {});
+  }, [activePlan?.id]);
 
   // Auto-select current week when active plan changes
   useEffect(() => {
@@ -191,6 +262,18 @@ export default function PlansPage() {
             actualVolume: 0
           })),
           status: 'draft'
+        });
+      }
+
+      // Attach posture goal if specified
+      if (planForm.postureFaultType) {
+        await fetch(`/api/training-plans/${newPlan.id}/posture-goal`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            faultType: planForm.postureFaultType,
+            targetRate: planForm.postureTargetRate,
+          }),
         });
       }
 
@@ -346,7 +429,9 @@ export default function PlansPage() {
       goals: plan.goals.join(', '),
       level: plan.level,
       focus: plan.focus,
-      duration: plan.duration
+      duration: plan.duration,
+      postureFaultType: '',
+      postureTargetRate: 0.1,
     });
   };
 
@@ -435,6 +520,36 @@ Please provide:
     router.push('/chat?fromPlanAnalysis=true');
   }, [activePlan, getSessions, setPendingPlanAnalysis, router]);
 
+  const handleSavePostureGoal = async (planId: string, faultType: PostureFaultType, targetRate: number) => {
+    try {
+      const res = await fetch(`/api/training-plans/${planId}/posture-goal`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faultType, targetRate }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPostureGoalProgress({ goal: data.goal, progress: null });
+        // Reload progress
+        fetch(`/api/training-plans/${planId}/posture-goal`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => d && setPostureGoalProgress(d))
+          .catch(() => {});
+      }
+    } catch {
+      setError('Failed to save posture goal');
+    }
+  };
+
+  const handleRemovePostureGoal = async (planId: string) => {
+    try {
+      await fetch(`/api/training-plans/${planId}/posture-goal`, { method: 'DELETE' });
+      setPostureGoalProgress({ goal: null, progress: null });
+    } catch {
+      setError('Failed to remove posture goal');
+    }
+  };
+
   const resetForm = () => {
     setPlanForm({
       title: '',
@@ -442,7 +557,9 @@ Please provide:
       goals: '',
       level: 'intermediate',
       focus: 'general_fitness',
-      duration: 8
+      duration: 8,
+      postureFaultType: '',
+      postureTargetRate: 0.1,
     });
   };
 
@@ -602,6 +719,50 @@ Please provide:
               </div>
             </div>
 
+            <div className="border-t pt-4">
+              <Label className="text-muted-foreground text-sm">Posture Goal (optional)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Track a technique target using linked mocap sessions.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="postureFaultType">Fault to Reduce</Label>
+                  <select
+                    id="postureFaultType"
+                    value={planForm.postureFaultType}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, postureFaultType: e.target.value as PostureFaultType | '' }))}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="">None</option>
+                    {POSTURE_FAULT_CATALOG_V1.map(ft => (
+                      <option key={ft} value={ft}>{ft.replace(/_/g, ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+                {planForm.postureFaultType && (
+                  <div>
+                    <Label htmlFor="postureTargetRate">
+                      Target Rate (faults/stroke): {planForm.postureTargetRate.toFixed(2)}
+                    </Label>
+                    <input
+                      id="postureTargetRate"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={planForm.postureTargetRate}
+                      onChange={(e) => setPlanForm(prev => ({ ...prev, postureTargetRate: parseFloat(e.target.value) }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0 (none)</span>
+                      <span>1 (every stroke)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => handleCreatePlan(false)}
@@ -684,6 +845,78 @@ Please provide:
                 <div className="text-sm text-muted-foreground">Goals</div>
               </div>
             </div>
+
+            {/* Posture Goal Progress */}
+            {postureGoalProgress !== null && (
+              <div className="border rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-purple-600" />
+                    <span className="font-medium text-sm">Posture Goal</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {postureGoalProgress.goal && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemovePostureGoal(activePlan.id)}
+                        className="text-xs text-muted-foreground h-6 px-2"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                    {!postureGoalProgress.goal && (
+                      <span className="text-xs text-muted-foreground">No goal set</span>
+                    )}
+                  </div>
+                </div>
+
+                {postureGoalProgress.goal ? (
+                  <>
+                    <div className="text-sm">
+                      Reduce <span className="font-mono font-medium">{postureGoalProgress.goal.faultType.replace(/_/g, ' ')}</span> to{' '}
+                      ≤ {(postureGoalProgress.goal.targetRate * 100).toFixed(0)}% fault rate
+                    </div>
+                    {postureGoalProgress.progress && postureGoalProgress.progress.linkedMocapSessionCount > 0 ? (
+                      <div className="grid grid-cols-3 gap-3 text-center mt-2">
+                        <div>
+                          <div className={`text-xl font-bold ${postureGoalProgress.progress.achieved ? 'text-green-600' : 'text-orange-500'}`}>
+                            {(postureGoalProgress.progress.currentRate * 100).toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">Current Rate</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-purple-600">
+                            {(postureGoalProgress.progress.targetRate * 100).toFixed(0)}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">Target Rate</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold">
+                            {postureGoalProgress.progress.linkedMocapSessionCount}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Mocap Sessions</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground bg-muted rounded p-2 mt-1">
+                        No linked mocap sessions yet. Link a mocap session to a training session to track posture progress.
+                      </div>
+                    )}
+                    {postureGoalProgress.progress?.achieved && (
+                      <Badge className="bg-green-100 text-green-800 mt-1">Goal Achieved</Badge>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Add a posture goal to track technique improvement across mocap sessions.
+                    </div>
+                    <PostureGoalSetter planId={activePlan.id} onSave={handleSavePostureGoal} />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Week Navigation */}
             <div className="space-y-4">
