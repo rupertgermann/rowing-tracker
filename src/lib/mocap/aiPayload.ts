@@ -30,6 +30,47 @@ export interface PostureAIPayload {
   strokeMetrics?: PostureMetricSummary[]; // only present on tier 2
 }
 
+export interface MocapCoachSessionInput {
+  id: string;
+  rowingSessionId: string | null;
+  createdAt: Date | string;
+  source: string;
+  capturePerspective: string;
+  qualityFlags: string[];
+  qualityScore: number | null;
+  faults: Array<{ faultType: string; severity: string }>;
+  metrics: Array<{
+    strokeIndex: number;
+    segmentationSource: string;
+    metricsJson: unknown;
+  }>;
+}
+
+export interface MocapCoachSessionSummary {
+  mocapSessionId: string;
+  rowingSessionId: string | null;
+  capturedAt: string;
+  source: string;
+  capturePerspective: string;
+  qualityFlags: string[];
+  qualityScore: number | null;
+  faultSummary: PostureFaultSummary;
+  strokeMetrics?: PostureMetricSummary[];
+}
+
+export interface MocapCoachContext {
+  tier: 2 | 3;
+  sessionCount: number;
+  sessions: MocapCoachSessionSummary[];
+  privacy: {
+    rawPoseIncluded: false;
+    videoIncluded: false;
+    detailedMetricsRequested: boolean;
+    detailedMetricsEnabled: boolean;
+    detailedMetricsIncluded: boolean;
+  };
+}
+
 /**
  * Build a cloud-safe posture AI payload respecting the 3-tier policy.
  *
@@ -91,6 +132,77 @@ export function buildPostureAIPayload(
   });
 
   return { tier: 2, faultSummary, strokeMetrics };
+}
+
+/**
+ * Build a cloud-safe, session-scoped mocap context for the AI Coach tool.
+ *
+ * This deliberately reuses the same tier policy as buildPostureAIPayload:
+ * no cloud AI means no mocap context; raw pose/video are never included; and
+ * per-stroke scalar metrics require both user opt-in and an explicit request.
+ */
+export function buildMocapCoachContext(
+  sessions: MocapCoachSessionInput[],
+  opts: {
+    cloudAIEnabled: boolean;
+    mocapDetailedAIShare: boolean;
+    includeStrokeMetrics: boolean;
+  },
+): MocapCoachContext | null {
+  if (!opts.cloudAIEnabled) return null;
+
+  const includeStrokeMetrics =
+    opts.mocapDetailedAIShare && opts.includeStrokeMetrics;
+
+  const summaries = sessions.map((session) => {
+    const payload = buildPostureAIPayload(
+      session.faults,
+      session.metrics,
+      session.qualityFlags,
+      session.qualityScore,
+      {
+        cloudAIEnabled: opts.cloudAIEnabled,
+        mocapDetailedAIShare: includeStrokeMetrics,
+      },
+    );
+
+    if (!payload) {
+      throw new Error("Expected mocap coach payload when cloud AI is enabled");
+    }
+
+    const capturedAt =
+      session.createdAt instanceof Date
+        ? session.createdAt.toISOString()
+        : new Date(session.createdAt).toISOString();
+
+    return {
+      mocapSessionId: session.id,
+      rowingSessionId: session.rowingSessionId,
+      capturedAt,
+      source: session.source,
+      capturePerspective: session.capturePerspective,
+      qualityFlags: session.qualityFlags,
+      qualityScore: session.qualityScore,
+      faultSummary: payload.faultSummary,
+      ...(payload.strokeMetrics ? { strokeMetrics: payload.strokeMetrics } : {}),
+    };
+  });
+
+  const context: MocapCoachContext = {
+    tier: includeStrokeMetrics ? 2 : 3,
+    sessionCount: summaries.length,
+    sessions: summaries,
+    privacy: {
+      rawPoseIncluded: false,
+      videoIncluded: false,
+      detailedMetricsRequested: opts.includeStrokeMetrics,
+      detailedMetricsEnabled: opts.mocapDetailedAIShare,
+      detailedMetricsIncluded: includeStrokeMetrics,
+    },
+  };
+
+  assertNoKeypointsInPayload(context);
+  return context;
 }
 
 /**

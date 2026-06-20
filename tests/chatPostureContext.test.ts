@@ -2,6 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPostureAIPayload,
+  buildMocapCoachContext,
   assertNoKeypointsInPayload,
 } from "../src/lib/mocap/aiPayload.js";
 
@@ -89,6 +90,98 @@ describe("chat posture context – payload construction", () => {
     assert.equal(result.faultSummary.totalFaults, 0);
     assert.deepEqual(result.faultSummary.qualityFlags, []);
     assert.equal(result.faultSummary.sessionQualityScore, null);
+  });
+});
+
+describe("chat posture context – AI Coach mocap tool context", () => {
+  test("cloud enabled, detailed share off → session summaries without stroke metrics", () => {
+    const result = buildMocapCoachContext(
+      [
+        {
+          id: "mocap-1",
+          rowingSessionId: "rowing-1",
+          createdAt: new Date("2026-05-08T10:00:00.000Z"),
+          source: "browser",
+          capturePerspective: "side-left",
+          qualityFlags: ["low_confidence"],
+          qualityScore: 0.82,
+          faults: LINKED_FAULTS,
+          metrics: LINKED_METRICS,
+        },
+      ],
+      {
+        cloudAIEnabled: true,
+        mocapDetailedAIShare: false,
+        includeStrokeMetrics: true,
+      },
+    );
+
+    assert.ok(result !== null);
+    assert.equal(result.tier, 3);
+    assert.equal(result.sessionCount, 1);
+    assert.equal(result.sessions[0].mocapSessionId, "mocap-1");
+    assert.equal(result.sessions[0].rowingSessionId, "rowing-1");
+    assert.equal(result.sessions[0].faultSummary.totalFaults, 3);
+    assert.equal(result.sessions[0].strokeMetrics, undefined);
+    assert.equal(result.privacy.rawPoseIncluded, false);
+    assert.equal(result.privacy.videoIncluded, false);
+    assert.equal(result.privacy.detailedMetricsIncluded, false);
+    assertNoKeypointsInPayload(result);
+  });
+
+  test("cloud enabled, detailed share on and requested → session summaries include scalar metrics", () => {
+    const result = buildMocapCoachContext(
+      [
+        {
+          id: "mocap-1",
+          rowingSessionId: null,
+          createdAt: "2026-05-08T10:00:00.000Z",
+          source: "sidecar",
+          capturePerspective: "sidecar-3d",
+          qualityFlags: [],
+          qualityScore: null,
+          faults: LINKED_FAULTS,
+          metrics: LINKED_METRICS,
+        },
+      ],
+      {
+        cloudAIEnabled: true,
+        mocapDetailedAIShare: true,
+        includeStrokeMetrics: true,
+      },
+    );
+
+    assert.ok(result !== null);
+    assert.equal(result.tier, 2);
+    assert.equal(result.sessions[0].strokeMetrics?.length, 2);
+    assert.equal(result.sessions[0].strokeMetrics?.[0].backAngleAtCatchDeg, 30);
+    assert.equal(result.privacy.detailedMetricsIncluded, true);
+    assertNoKeypointsInPayload(result);
+  });
+
+  test("cloud disabled → no mocap context leaves the app", () => {
+    const result = buildMocapCoachContext(
+      [
+        {
+          id: "mocap-1",
+          rowingSessionId: "rowing-1",
+          createdAt: "2026-05-08T10:00:00.000Z",
+          source: "browser",
+          capturePerspective: "side-left",
+          qualityFlags: [],
+          qualityScore: null,
+          faults: LINKED_FAULTS,
+          metrics: LINKED_METRICS,
+        },
+      ],
+      {
+        cloudAIEnabled: false,
+        mocapDetailedAIShare: true,
+        includeStrokeMetrics: true,
+      },
+    );
+
+    assert.equal(result, null);
   });
 });
 

@@ -213,6 +213,31 @@ export class CloudAIService {
         },
         {
           type: "function" as const,
+          name: "get_mocap_sessions",
+          description: "Get cloud-safe motion-capture posture analysis summaries for the user's ready mocap sessions. Returns fault summaries by default and per-stroke scalar metrics only when the user has enabled detailed mocap sharing.",
+          parameters: {
+            type: "object",
+            properties: {
+              limit: {
+                type: ["number", "null"],
+                description: "Number of mocap sessions to retrieve (default: 5, max: 10)"
+              },
+              sessionId: {
+                type: ["string", "null"],
+                description: "Optional MocapSession ID or linked RowingSession ID to retrieve"
+              },
+              includeStrokeMetrics: {
+                type: ["boolean", "null"],
+                description: "Request per-stroke scalar posture metrics. They are returned only if the user has enabled detailed mocap sharing."
+              }
+            },
+            required: ["limit", "sessionId", "includeStrokeMetrics"],
+            additionalProperties: false
+          },
+          strict: true
+        },
+        {
+          type: "function" as const,
           name: "get_memory_documents",
           description: "Retrieve documents from the user's coaching memory. Includes user uploads (PDFs, images) AND system-generated content like training plans and insights.",
           parameters: {
@@ -738,6 +763,37 @@ export class CloudAIService {
       return result;
     }
 
+    if (name === 'get_mocap_sessions') {
+      const params = new URLSearchParams();
+      const limit = typeof args.limit === 'number'
+        ? Math.min(Math.max(Math.floor(args.limit), 1), 10)
+        : 5;
+      params.set('limit', String(limit));
+
+      if (typeof args.sessionId === 'string' && args.sessionId.trim()) {
+        params.set('sessionId', args.sessionId.trim());
+      }
+
+      if (args.includeStrokeMetrics === true) {
+        params.set('includeStrokeMetrics', 'true');
+      }
+
+      const response = await fetch(`/api/chat/posture-context?${params.toString()}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        return {
+          error: data?.error || 'Unable to retrieve mocap posture context',
+        };
+      }
+
+      const data = await response.json();
+      return data.coachContext ?? {
+        sessionCount: 0,
+        sessions: [],
+        message: 'No cloud-safe mocap context is available. The user may have no ready mocap sessions, or cloud AI sharing may be disabled.',
+      };
+    }
+
     if (name === 'get_achievements') {
       const { useRowingStore } = await import('@/lib/store');
       const { AWARDS } = await import('@/lib/awards');
@@ -870,6 +926,13 @@ TOOLS AVAILABLE:
     * Consistency checks
     * Specific workout details or technique analysis
   - Do NOT assume you know the user's data unless you have called this tool.
+
+- get_mocap_sessions: Access cloud-safe motion-capture posture analysis for ready MocapSessions.
+  - ALWAYS use this tool when the user asks about motion capture, mocap, posture faults, rowing form seen on video, technique captured during a session, or why a posture issue happened.
+  - The tool returns derived posture analysis only: fault summaries by default, and per-stroke scalar metrics only when the user has enabled detailed mocap sharing.
+  - Raw PoseFrameStream data, landmarks, keypoints, pose-stream blobs, and video bytes are never available to you.
+  - If detailed metrics are not included, explain that privacy settings only allow fault summaries and quality information.
+  - Use get_sessions as well when the user asks to connect posture findings to pace, power, stroke rate, or other erg performance data.
 
 - get_memory_documents: Access the user's coaching memory containing uploaded documents and system-generated content.
   - MEMORY CONTENTS:
