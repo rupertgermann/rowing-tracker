@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
 import {
+  clearRowingSessionStrokeData,
+  deleteRowingSession,
   loadRowingSessionList,
   reviveRowingSessionTimestamps,
   saveRowingSessions,
+  saveRowingSessionStrokeData,
 } from "../src/lib/services/rowingSessionPersistence";
 import {
   cacheSessionsData,
@@ -51,6 +54,23 @@ function session(overrides: Partial<Session> & { id: string }): Session {
     maxStrokeRate: 26,
     ...overrides,
     id: overrides.id,
+  };
+}
+
+function stroke(overrides: Partial<NonNullable<Session["strokeData"]>[number]> = {}) {
+  return {
+    strokeIndex: 0,
+    time: 1,
+    timestamp: "00:01",
+    distance: 5,
+    work: 10,
+    power: 100,
+    avgPower: 100,
+    split: 200,
+    avgSplit: 200,
+    strokeRate: 24,
+    heartRate: null,
+    ...overrides,
   };
 }
 
@@ -233,4 +253,105 @@ test("saveRowingSessions preserves ZIP stroke data and linked mocap marker when 
   assert.equal(result.success, true);
   assert.deepEqual(result.sessions?.[0].strokeData, strokeData);
   assert.deepEqual(result.sessions?.[0].mocapSession, { id: "mocap-1" });
+});
+
+test("saveRowingSessionStrokeData persists stroke data through the RowingSession boundary and invalidates cache", async () => {
+  cacheSessionsData([session({ id: "cached-session" })], 7);
+  localStorage.setItem("rowing_analytics_cache", JSON.stringify({ cachedAt: Date.now() }));
+
+  const strokes = [stroke(), stroke({ strokeIndex: 1, distance: 10 })];
+  const captured: { requestBody?: { sessions: Session[] } } = {};
+
+  globalThis.fetch = async (input, init) => {
+    assert.equal(input, "/api/sessions");
+    assert.equal(init?.method, "POST");
+    captured.requestBody = JSON.parse(init?.body as string);
+
+    return jsonResponse({
+      sessions: [
+        {
+          ...session({ id: "session-with-strokes" }),
+          timestamp: "2026-05-08T14:30:00.000Z",
+          consistencyScore: 92,
+        },
+      ],
+      count: 1,
+    });
+  };
+
+  const saved = await saveRowingSessionStrokeData(
+    session({ id: "session-with-strokes" }),
+    strokes,
+  );
+
+  assert.ok(captured.requestBody);
+  assert.deepEqual(captured.requestBody.sessions[0].strokeData, strokes);
+  assert.equal(saved.id, "session-with-strokes");
+  assert.equal(saved.strokeData, strokes);
+  assert.equal(saved.strokeDataCount, 2);
+  assert.equal(saved.consistencyScore, 92);
+  assert.ok(saved.timestamp instanceof Date);
+  assert.equal(getCachedSessions(), null);
+  assert.equal(localStorage.getItem("rowing_analytics_cache"), null);
+});
+
+test("clearRowingSessionStrokeData persists an explicit empty strokeData array and keeps summary fields", async () => {
+  cacheSessionsData([session({ id: "cached-session" })], 7);
+
+  const original = session({
+    id: "session-to-clear",
+    distance: 2000,
+    duration: 480,
+    avgPower: 210,
+    strokeData: [stroke()],
+    strokeDataCount: 1,
+    consistencyScore: 88,
+  });
+  const captured: { requestBody?: { sessions: Session[] } } = {};
+
+  globalThis.fetch = async (_input, init) => {
+    captured.requestBody = JSON.parse(init?.body as string);
+
+    return jsonResponse({
+      sessions: [
+        {
+          ...original,
+          strokeData: undefined,
+          strokeDataCount: 0,
+          consistencyScore: null,
+          timestamp: original.timestamp.toISOString(),
+        },
+      ],
+      count: 1,
+    });
+  };
+
+  const cleared = await clearRowingSessionStrokeData(original);
+
+  assert.ok(captured.requestBody);
+  assert.deepEqual(captured.requestBody.sessions[0].strokeData, []);
+  assert.equal(cleared.distance, 2000);
+  assert.equal(cleared.duration, 480);
+  assert.equal(cleared.avgPower, 210);
+  assert.equal(cleared.strokeData, undefined);
+  assert.equal(cleared.strokeDataCount, 0);
+  assert.equal(cleared.consistencyScore, null);
+  assert.equal(getCachedSessions(), null);
+});
+
+test("deleteRowingSession persists deletion through the RowingSession boundary and invalidates cache", async () => {
+  cacheSessionsData([session({ id: "cached-session" })], 7);
+
+  let requestedUrl = "";
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    assert.equal(init?.method, "DELETE");
+    return jsonResponse({ success: true, sessionId: "session-to-delete" });
+  };
+
+  const deletedSessionId = await deleteRowingSession("session-to-delete");
+
+  assert.equal(requestedUrl, "/api/sessions?id=session-to-delete");
+  assert.equal(deletedSessionId, "session-to-delete");
+  assert.equal(getCachedSessions(), null);
 });

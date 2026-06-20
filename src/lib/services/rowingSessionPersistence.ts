@@ -45,6 +45,12 @@ interface SessionsListApiResponse {
   count?: number;
 }
 
+interface RowingSessionMutationApiResponse {
+  sessions?: Session[];
+  sessionId?: string;
+  error?: string;
+}
+
 function reviveSession(session: Session): Session {
   return {
     ...session,
@@ -245,4 +251,93 @@ export async function saveRowingSessions(
     success: true,
     sessions: savedSessions,
   };
+}
+
+export async function saveRowingSession(
+  session: Session,
+  init?: RequestInit,
+): Promise<Session> {
+  const headers = new Headers(init?.headers);
+  headers.set('Content-Type', 'application/json');
+
+  const response = await fetch('/api/sessions', {
+    ...init,
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ sessions: [session] }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[RowingSessionPersistence] Failed to save session:', errorText);
+    throw new Error('Failed to save rowing session');
+  }
+
+  const data: RowingSessionMutationApiResponse = await response.json();
+  const persisted = data.sessions?.[0]
+    ? reviveSession(data.sessions[0])
+    : reviveSession(session);
+
+  invalidateRowingSessionCaches();
+
+  return {
+    ...session,
+    ...persisted,
+    ...(Array.isArray(session.strokeData)
+      ? {
+          strokeData: session.strokeData,
+          strokeDataCount: session.strokeData.length,
+        }
+      : {}),
+  };
+}
+
+export async function saveRowingSessionStrokeData(
+  session: Session,
+  strokeData: NonNullable<Session['strokeData']>,
+): Promise<Session> {
+  return saveRowingSession({
+    ...session,
+    strokeData,
+    strokeDataCount: strokeData.length,
+  });
+}
+
+export async function clearRowingSessionStrokeData(
+  session: Session,
+): Promise<Session> {
+  const persisted = await saveRowingSession({
+    ...session,
+    strokeData: [],
+    strokeDataCount: 0,
+    consistencyScore: null,
+  });
+
+  return {
+    ...persisted,
+    strokeData: undefined,
+    strokeDataCount: 0,
+    consistencyScore: persisted.consistencyScore ?? null,
+  };
+}
+
+export async function deleteRowingSession(
+  sessionId: string,
+  init?: RequestInit,
+): Promise<string> {
+  const response = await fetch(`/api/sessions?id=${encodeURIComponent(sessionId)}`, {
+    ...init,
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[RowingSessionPersistence] Failed to delete session:', errorText);
+    throw new Error('Failed to delete rowing session');
+  }
+
+  const data: RowingSessionMutationApiResponse = await response.json();
+  invalidateRowingSessionCaches();
+
+  return data.sessionId ?? sessionId;
 }

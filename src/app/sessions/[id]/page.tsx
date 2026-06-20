@@ -12,6 +12,11 @@ import { parseStrokeCsv } from '@/lib/strokeParser';
 import type { Session, StrokeData } from '@/types/session';
 import { SessionAnalysis } from '@/components/SessionAnalysis';
 import {
+  clearRowingSessionStrokeData,
+  deleteRowingSession,
+  saveRowingSessionStrokeData,
+} from '@/lib/services/rowingSessionPersistence';
+import {
   ArrowLeft,
   ArrowRight,
   Calendar,
@@ -58,7 +63,7 @@ function formatPace(secondsPer500m: number): string {
 export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { getSessions, updateSession, deleteSession } = useRowingStore();
+  const { getSessions, updateSessionInStore, removeSessionFromStore } = useRowingStore();
   const sessions = getSessions();
 
   const [session, setSession] = useState<Session | null>(null);
@@ -105,11 +110,10 @@ export default function SessionDetailPage() {
     try {
       const result = await parseStrokeCsv(file);
       if (result.data.length > 0) {
+        const persistedSession = await saveRowingSessionStrokeData(session, result.data);
+        updateSessionInStore(persistedSession);
+        setSession(persistedSession);
         setStrokeData(result.data);
-        // Persist the stroke data to the session
-        const updatedSession = { ...session, strokeData: result.data };
-        updateSession(updatedSession);
-        setSession(updatedSession); // Update local state
       } else if (result.error) {
         // Simple alert for now, could be improved with a toast
         alert(result.error);
@@ -122,14 +126,22 @@ export default function SessionDetailPage() {
     }
   };
 
-  const confirmClearAnalysis = () => {
+  const confirmClearAnalysis = async () => {
     if (!session) return;
-    const updatedSession = { ...session };
-    delete updatedSession.strokeData;
-    updateSession(updatedSession);
-    setSession(updatedSession);
-    setStrokeData(null);
-    setShowClearAnalysisConfirm(false);
+
+    setAnalyzing(true);
+    try {
+      const clearedSession = await clearRowingSessionStrokeData(session);
+      updateSessionInStore(clearedSession);
+      setSession(clearedSession);
+      setStrokeData(null);
+      setShowClearAnalysisConfirm(false);
+    } catch (error) {
+      console.error(error);
+      alert('Failed to clear stroke analysis');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   useEffect(() => {
@@ -138,9 +150,14 @@ export default function SessionDetailPage() {
 
     if (foundSession) {
       setSession(foundSession);
-      if (foundSession.strokeData) {
+      if (foundSession.strokeData && foundSession.strokeData.length > 0) {
         setStrokeData(foundSession.strokeData);
+      } else {
+        setStrokeData(null);
       }
+    } else {
+      setSession(null);
+      setStrokeData(null);
     }
     setLoading(false);
   }, [params.id, sessions]);
@@ -447,10 +464,23 @@ export default function SessionDetailPage() {
 
         {/* Advanced Analysis Section */}
         <div>
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <Activity className="h-6 w-6" />
-            Stroke Analysis
-          </h2>
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Activity className="h-6 w-6" />
+              Stroke Analysis
+            </h2>
+            {strokeData ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowClearAnalysisConfirm(true)}
+                disabled={analyzing}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            ) : null}
+          </div>
 
           {!strokeData ? (
             <Card>
@@ -494,9 +524,16 @@ export default function SessionDetailPage() {
         description="Are you sure you want to delete this session? This will also remove any associated stroke data. This action cannot be undone."
         confirmLabel="Delete"
         cancelLabel="Cancel"
-        onConfirm={() => {
-          deleteSession(session.id);
-          router.push('/sessions');
+        onConfirm={async () => {
+          try {
+            await deleteRowingSession(session.id);
+            removeSessionFromStore(session.id);
+            const targetSession = nextSession ?? previousSession;
+            router.push(targetSession ? `/sessions/${targetSession.id}` : '/sessions');
+          } catch (error) {
+            console.error(error);
+            alert('Failed to delete session');
+          }
         }}
         variant="destructive"
       />
