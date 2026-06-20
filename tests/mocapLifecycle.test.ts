@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  finalizeMocapSessionLifecycle,
   linkMocapSessionLifecycle,
   reanalyzeMocapSessionLifecycle,
   unlinkMocapSessionLifecycle,
@@ -113,6 +114,197 @@ test("reanalyzeMocapSessionLifecycle rolls status back when analysis fails", asy
   });
   assert.deepEqual(calls, [
     "status:analyzing",
+    "status:ready",
+  ]);
+});
+
+test("finalizeMocapSessionLifecycle finalizes and analyzes before returning ready", async () => {
+  const calls: string[] = [];
+
+  const result = await finalizeMocapSessionLifecycle(
+    makeFinalizeDeps({
+      findSession: async () => makeSession({ status: "capturing" }),
+      setCaptureFinalizationState: async (_id, state) => {
+        calls.push(
+          `capture:${state.status}:${state.durationSec}:${state.qualityScore}:${state.qualityFlags.join(",")}`,
+        );
+        return { status: state.status, durationSec: state.durationSec };
+      },
+      finalizePoseStream: async (_storage, poseStreamPath) => {
+        calls.push(`finalize:${poseStreamPath}`);
+        return { frameCount: 12, poseStreamBytes: 4096 };
+      },
+      analyzePoseSegmented: async (_storage, analysisSession) => {
+        calls.push(`pose-segmented:${analysisSession.status}`);
+        return { strokeMetricCount: 5, faultCount: 2 };
+      },
+      analyzeCsvAligned: async () => {
+        calls.push("csv-aligned");
+        return { strokeMetricCount: 0, faultCount: 0 };
+      },
+      setStatus: async (_id, status) => {
+        calls.push(`status:${status}`);
+        return { status };
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      durationSec: 48,
+      qualityScore: 0.8,
+      qualityFlags: ["low-light"],
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    id: "mocap-1",
+    status: "ready",
+    durationSec: 48,
+    frameCount: 12,
+    poseStreamBytes: 4096,
+    strokeMetricCount: 5,
+    faultCount: 2,
+  });
+  assert.deepEqual(calls, [
+    "capture:analyzing:48:0.8:low-light",
+    "finalize:mocap/user-1/mocap-1/pose-stream.bin",
+    "pose-segmented:analyzing",
+    "status:ready",
+  ]);
+});
+
+test("finalizeMocapSessionLifecycle completes record-only captures without analysis", async () => {
+  const calls: string[] = [];
+
+  const result = await finalizeMocapSessionLifecycle(
+    makeFinalizeDeps({
+      storage: { exists: async () => false },
+      findSession: async () => makeSession({ status: "capturing" }),
+      setCaptureFinalizationState: async (_id, state) => {
+        calls.push(
+          `capture:${state.status}:${state.durationSec}:${state.qualityFlags.join(",")}`,
+        );
+        return { status: state.status, durationSec: state.durationSec };
+      },
+      finalizePoseStream: async () => {
+        calls.push("finalize");
+        throw new Error("record-only should not finalize a missing pose stream");
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        throw new Error("record-only should not run pose analysis");
+      },
+      analyzeCsvAligned: async () => {
+        calls.push("csv-aligned");
+        throw new Error("record-only should not run csv-aligned analysis");
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      durationSec: 30,
+      qualityFlags: ["record-only"],
+      skipAnalysis: true,
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    id: "mocap-1",
+    status: "ready",
+    durationSec: 30,
+    frameCount: 0,
+    poseStreamBytes: 0,
+    strokeMetricCount: 0,
+    faultCount: 0,
+  });
+  assert.deepEqual(calls, [
+    "capture:ready:30:record-only",
+  ]);
+});
+
+test("finalizeMocapSessionLifecycle restores capturing when pose-stream finalization fails", async () => {
+  const calls: string[] = [];
+
+  const result = await finalizeMocapSessionLifecycle(
+    makeFinalizeDeps({
+      findSession: async () => makeSession({ status: "capturing" }),
+      setCaptureFinalizationState: async (_id, state) => {
+        calls.push(`capture:${state.status}`);
+        return { status: state.status, durationSec: state.durationSec };
+      },
+      finalizePoseStream: async () => {
+        calls.push("finalize");
+        throw new Error("Pose stream has 17 trailing bytes (corrupt)");
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        throw new Error("analysis should not run after finalize failure");
+      },
+      setStatus: async (_id, status) => {
+        calls.push(`status:${status}`);
+        return { status };
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      durationSec: 42,
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 500,
+    error: "Pose stream has 17 trailing bytes (corrupt)",
+  });
+  assert.deepEqual(calls, [
+    "capture:analyzing",
+    "finalize",
+    "status:capturing",
+  ]);
+});
+
+test("finalizeMocapSessionLifecycle restores ready when analysis fails after finalization", async () => {
+  const calls: string[] = [];
+
+  const result = await finalizeMocapSessionLifecycle(
+    makeFinalizeDeps({
+      findSession: async () => makeSession({ status: "capturing" }),
+      setCaptureFinalizationState: async (_id, state) => {
+        calls.push(`capture:${state.status}`);
+        return { status: state.status, durationSec: state.durationSec };
+      },
+      finalizePoseStream: async () => {
+        calls.push("finalize");
+        return { frameCount: 8, poseStreamBytes: 2048 };
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        throw new Error("analysis failed");
+      },
+      setStatus: async (_id, status) => {
+        calls.push(`status:${status}`);
+        return { status };
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      durationSec: 42,
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 500,
+    error: "analysis failed",
+  });
+  assert.deepEqual(calls, [
+    "capture:analyzing",
+    "finalize",
+    "pose-segmented",
     "status:ready",
   ]);
 });
@@ -361,6 +553,21 @@ function makeDeps(
     bumpSessionsRevision: async () => {},
     analyzePoseSegmented: async () => ({ strokeMetricCount: 0, faultCount: 0 }),
     analyzeCsvAligned: async () => ({ strokeMetricCount: 0, faultCount: 0 }),
+    ...overrides,
+  };
+}
+
+function makeFinalizeDeps(
+  overrides: Partial<Parameters<typeof finalizeMocapSessionLifecycle>[0]> = {},
+): Parameters<typeof finalizeMocapSessionLifecycle>[0] {
+  return {
+    ...makeDeps(),
+    findSession: async () => makeSession({ status: "capturing" }),
+    finalizePoseStream: async () => ({ frameCount: 0, poseStreamBytes: 0 }),
+    setCaptureFinalizationState: async (_id, state) => ({
+      status: state.status,
+      durationSec: state.durationSec,
+    }),
     ...overrides,
   };
 }
