@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRowingStore, type SessionsDistanceFilter } from '@/lib/store';
@@ -20,6 +20,7 @@ import { formatSessionDate } from '@/lib/dateTimeUtils';
 import { loadRowingSessionList } from '@/lib/services/rowingSessionPersistence';
 import { TimeRangeSelector } from '@/components/ui/time-range-selector';
 import type { Session } from '@/types/session';
+import { calculatePersonalRecords, filterAndSortSessionsForView } from '@/lib/rowingSessionProjections';
 
 const distanceRangeOptions: Array<{ value: SessionsDistanceFilter; label: string }> = [
   { value: 'all', label: 'All Distances' },
@@ -60,9 +61,9 @@ function formatPace(secondsPer500m: number): string {
 type SortField = 'date' | 'distance' | 'pace' | 'power';
 
 export default function SessionsPage() {
-  const { getSessions, getPersonalRecords, replaceSessionsInStore, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
-  const sessions = getSessions();
-  const personalRecords = getPersonalRecords();
+  const sessions = useRowingStore((state) => state.sessions);
+  const { replaceSessionsInStore, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
+  const personalRecords = useMemo(() => calculatePersonalRecords(sessions), [sessions]);
   const router = useRouter();
 
   // Helper function to check if session is a personal record
@@ -106,63 +107,13 @@ export default function SessionsPage() {
     };
   }, [replaceSessionsInStore]);
 
-  // Apply filters to sessions
-  const filteredSessions = sessions.filter(session => {
-    // Date range filter
-    if (filters.dateRange !== 'all') {
-      const sessionDate = new Date(session.timestamp);
-      const now = new Date();
-      const daysToFilter = {
-        '7days': 7,
-        '30days': 30,
-        '90days': 90
-      }[filters.dateRange];
-
-      if (daysToFilter) {
-        const cutoffDate = new Date(now.getTime() - (daysToFilter * 24 * 60 * 60 * 1000));
-        if (sessionDate < cutoffDate) return false;
-      }
-    }
-
-    // Distance range filter
-    if (filters.distanceRange !== 'all') {
-      if (filters.distanceRange === '5000+') {
-        if (session.distance < 5000) return false;
-      } else {
-        const targetDistance = parseInt(filters.distanceRange);
-        if (session.distance !== targetDistance) return false;
-      }
-    }
-
-    return true;
-  });
-
-  // Sort sessions based on current sort configuration
-  const sortedSessions = [...filteredSessions].sort((a, b) => {
-    const { field, direction } = sortConfig;
-
-    let comparison = 0;
-
-    switch (field) {
-      case 'date':
-        comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-        break;
-      case 'distance':
-        comparison = a.distance - b.distance;
-        break;
-      case 'pace':
-        comparison = a.avgSplit - b.avgSplit;
-        break;
-      case 'power':
-        comparison = a.avgPower - b.avgPower;
-        break;
-    }
-
-    return direction === 'asc' ? comparison : -comparison;
-  });
+  const sortedSessions = useMemo(
+    () => filterAndSortSessionsForView(sessions, sessionsViewSettings),
+    [sessions, sessionsViewSettings],
+  );
 
   const hasData = sessions.length > 0;
-  const hasFilteredData = filteredSessions.length > 0;
+  const hasFilteredData = sortedSessions.length > 0;
   const hasActiveFilters = filters.dateRange !== 'all' || filters.distanceRange !== 'all';
 
   // Handle column sort

@@ -80,7 +80,7 @@ const emptySummary: AnalyticsSummary = {
 };
 
 export function useAnalyticsData(): UseAnalyticsDataResult {
-  const getSessions = useRowingStore((state) => state.getSessions);
+  const sessions = useRowingStore((state) => state.sessions);
   const [isLoading, setIsLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
   const [cachedData, setCachedData] = useState<CachedAnalyticsData | null>(null);
@@ -118,9 +118,6 @@ export function useAnalyticsData(): UseAnalyticsDataResult {
 
     loadData();
   }, [refreshCounter.current]);
-
-  // Get sessions from store
-  const sessions = getSessions();
 
   // Compute chart data from sessions (only when cache is invalid)
   const computedData = useMemo(() => {

@@ -18,6 +18,7 @@ import { formatChartDate, formatSessionDate, formatDateOnly, formatTime } from '
 import { chartTheme } from '@/lib/chartUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { MigrationPrompt } from '@/components/MigrationPrompt';
+import { calculateSessionStats } from '@/lib/rowingSessionProjections';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
@@ -185,9 +186,9 @@ const CustomTooltip = ({ active, payload, label, config }: any) => {
 
 const Dashboard = () => {
   const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
-  const sessions = getSessions();
-  const stats = getStats();
+  const sessions = useRowingStore((state) => state.sessions);
+  const { getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
+  const stats = useMemo(() => calculateSessionStats(sessions), [sessions]);
 
   const chartSettings = getChartSettings();
   const [mounted, setMounted] = useState(false);

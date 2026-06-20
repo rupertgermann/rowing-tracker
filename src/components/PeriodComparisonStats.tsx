@@ -14,8 +14,8 @@ interface MonthlyStats {
 }
 
 export function PeriodComparisonStats() {
-  const { getSessions, dashboardSettings, updateDashboardSettings } = useRowingStore();
-  const sessions = getSessions();
+  const sessions = useRowingStore((state) => state.sessions);
+  const { dashboardSettings, updateDashboardSettings } = useRowingStore();
 
   // Get unique months from sessions
   const availableMonths = useMemo(() => {

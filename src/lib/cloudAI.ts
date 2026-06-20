@@ -9,6 +9,7 @@ import {
 } from '@/lib/aiPromptDefaults';
 import { normalizeAITextModel } from '@/lib/settings';
 import type { AISettings, AITextModel } from '@/lib/settings';
+import { calculatePersonalRecords, calculateSessionStats } from '@/lib/rowingSessionProjections';
 
 // OpenAI API configuration
 interface OpenAIConfig {
@@ -803,7 +804,7 @@ export class CloudAIService {
 
       // Personal Records
       if (args.includePersonalRecords !== false) {
-        const prs = store.personalRecords;
+        const prs = calculatePersonalRecords(store.sessions);
         result.personalRecords = prs.map(pr => ({
           distance: pr.distance,
           bestTime: pr.bestTime,
@@ -837,7 +838,7 @@ export class CloudAIService {
       // Next Awards (upcoming achievements user is close to)
       if (args.includeNextAwards === true) {
         const sessions = store.sessions;
-        const stats = store.getStats();
+        const stats = calculateSessionStats(sessions);
         const earnedIds = new Set(store.earnedAwards.map(a => a.awardId));
 
         const unearnedAwards = AWARDS.filter(a => !earnedIds.has(a.id));

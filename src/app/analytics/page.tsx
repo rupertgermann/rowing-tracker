@@ -243,7 +243,8 @@ const CustomTooltip = ({ active, payload, label, config, smoothing }: CustomTool
 
 const Analytics = () => {
   const router = useRouter();
-  const { getSessions, getStats, getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, getChartExplanation, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
+  const storeSessions = useRowingStore((state) => state.sessions);
+  const { getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
 
   // ========== LAZY LOADING - Fetch directly from API ==========
   // This bypasses the store and loads data immediately from /api/analytics
@@ -294,14 +295,10 @@ const Analytics = () => {
 
   // Only load sessions from store if analytics data is not available
   // This avoids loading large strokeData payloads unnecessarily
-  const sessions = analyticsData ? [] : getSessions();
-  const stats = analyticsData ? {
-    totalDistance: analyticsData.summary.totalDistance,
-    totalTime: analyticsData.summary.totalDuration,
-    totalEnergy: analyticsData.summary.totalEnergy,
-    totalPower: analyticsData.summary.totalDistance > 0 ? analyticsData.summary.totalEnergy / (analyticsData.summary.totalDistance / 1000) : 0,
-    sessionCount: analyticsData.summary.sessionCount,
-  } : getStats();
+  const sessions = useMemo<Session[]>(
+    () => (analyticsData ? [] : storeSessions),
+    [analyticsData, storeSessions],
+  );
 
   // Create minimal sessions for ConsistencyScoreChart from analytics data
   const sessionsForConsistencyChart = useMemo(() => {

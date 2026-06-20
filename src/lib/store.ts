@@ -1,9 +1,25 @@
 import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
-import { AWARDS, EarnedAward } from '@/lib/awards';
+import type { EarnedAward } from '@/lib/awards';
 import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
 import { firstCleanCatchDate, CLEAN_CATCH_AWARD_ID } from '@/lib/postureAchievements';
 import type { SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
+import {
+  calculatePersonalRecords as projectPersonalRecords,
+  calculateSessionStats as projectSessionStats,
+  checkAIAwardSuggestions as projectAIAwardSuggestions,
+  computeEarnedAwards as projectEarnedAwards,
+  filterAndSortSessions as projectFilteredSessions,
+  selectNewlyEarnedAward as projectNewlyEarnedAward,
+  type AIAwardSuggestion,
+  type AIAwardSuggestionStatus,
+} from '@/lib/rowingSessionProjections';
+
+export type {
+  AIAwardCriteria,
+  AIAwardSuggestion,
+  AIAwardSuggestionStatus,
+} from '@/lib/rowingSessionProjections';
 
 // Chart configuration types
 export type ChartMetric = 'distance' | 'pace' | 'power' | 'strokeRate' | 'energy' | 'duration' | 'splitTime' | 'consistencyScore';
@@ -88,29 +104,6 @@ export interface PendingInsight {
   insightType: string;
   priority: string;
   prompt: string;
-}
-
-export type AIAwardSuggestionStatus = 'suggested' | 'approved' | 'earned';
-
-// Structured criteria for automatic evaluation
-export interface AIAwardCriteria {
-  type: 'total_distance' | 'total_duration' | 'total_sessions' | 'single_session_distance' | 'single_session_duration' | 'single_session_power' | 'single_session_pace' | 'weekly_sessions' | 'streak_days' | 'custom';
-  value: number; // The threshold value (meters, seconds, count, watts, pace in seconds/500m)
-  comparison: 'gte' | 'lte' | 'eq'; // greater-than-or-equal, less-than-or-equal, equal
-}
-
-export interface AIAwardSuggestion {
-  id: string; // Unique ID for this suggestion (AI-generated kebab-case)
-  title: string; // Award title
-  description: string; // How to earn this award
-  status: AIAwardSuggestionStatus;
-  rationale: string;
-  criteria?: AIAwardCriteria; // Machine-parseable criteria for automatic evaluation
-  targetDate?: Date;
-  suggestedAt: Date;
-  approvedAt?: Date;
-  earnedAt?: Date; // When the user marked this as earned or auto-earned
-  model?: string;
 }
 
 // Smoothing option type
@@ -270,345 +263,6 @@ const defaultSessionAnalysisSettings: SessionAnalysisSettings = {
   }
 };
 
-// Helpers to determine when an award was actually earned
-function sortSessionsByDate(sessions: Session[]): Session[] {
-  return [...sessions].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-}
-
-function computeAwardEarnedAt(sessions: Session[], awardId: string): Date | null {
-  const sorted = sortSessionsByDate(sessions);
-  for (let i = 0; i < sorted.length; i++) {
-    const prefix = sorted.slice(0, i + 1);
-    const stats = calculateStats(prefix);
-    const award = AWARDS.find(a => a.id === awardId);
-    if (!award) continue;
-    if (award.condition(prefix, stats)) {
-      return new Date(sorted[i].timestamp);
-    }
-  }
-  return null;
-}
-
-function computeAllEarnedAwards(sessions: Session[]): EarnedAward[] {
-  const earned: EarnedAward[] = [];
-  AWARDS.forEach(award => {
-    const earnedAt = computeAwardEarnedAt(sessions, award.id);
-    if (earnedAt) {
-      earned.push({ awardId: award.id, earnedAt });
-    }
-  });
-  return earned;
-}
-
-// Evaluate AI award criteria against session data
-function evaluateAIAwardCriteria(
-  criteria: AIAwardCriteria,
-  sessions: Session[],
-  stats: SessionStats
-): boolean {
-  const compare = (actual: number, target: number, comparison: string): boolean => {
-    switch (comparison) {
-      case 'gte': return actual >= target;
-      case 'lte': return actual <= target;
-      case 'eq': return actual === target;
-      default: return actual >= target;
-    }
-  };
-
-  switch (criteria.type) {
-    case 'total_distance':
-      return compare(stats.totalDistance, criteria.value, criteria.comparison);
-
-    case 'total_duration':
-      return compare(stats.totalTime, criteria.value, criteria.comparison);
-
-    case 'total_sessions':
-      return compare(sessions.length, criteria.value, criteria.comparison);
-
-    case 'single_session_distance':
-      return sessions.some(s => compare(s.distance, criteria.value, criteria.comparison));
-
-    case 'single_session_duration':
-      return sessions.some(s => compare(s.duration, criteria.value, criteria.comparison));
-
-    case 'single_session_power':
-      return sessions.some(s => s.avgPower && compare(s.avgPower, criteria.value, criteria.comparison));
-
-    case 'single_session_pace':
-      // Pace is in seconds per 500m, lower is better
-      return sessions.some(s => s.avgSplit && compare(s.avgSplit, criteria.value, criteria.comparison));
-
-    case 'weekly_sessions': {
-      // Check if any week has >= criteria.value sessions
-      const weekMap = new Map<string, number>();
-      sessions.forEach(s => {
-        const date = new Date(s.timestamp);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split('T')[0];
-        weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + 1);
-      });
-      return Array.from(weekMap.values()).some(count => compare(count, criteria.value, criteria.comparison));
-    }
-
-    case 'streak_days': {
-      // Check for consecutive days with sessions
-      const dates = [...new Set(sessions.map(s =>
-        new Date(s.timestamp).toISOString().split('T')[0]
-      ))].sort();
-
-      let maxStreak = 1;
-      let currentStreak = 1;
-
-      for (let i = 1; i < dates.length; i++) {
-        const prev = new Date(dates[i - 1]);
-        const curr = new Date(dates[i]);
-        const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-          currentStreak++;
-          maxStreak = Math.max(maxStreak, currentStreak);
-        } else {
-          currentStreak = 1;
-        }
-      }
-
-      return compare(maxStreak, criteria.value, criteria.comparison);
-    }
-
-    case 'custom':
-    default:
-      // Custom criteria can't be auto-evaluated
-      return false;
-  }
-}
-
-// Compute when an AI award's criteria was first satisfied
-function computeAIAwardEarnedAt(sessions: Session[], criteria: AIAwardCriteria): Date | null {
-  const sorted = sortSessionsByDate(sessions);
-
-  for (let i = 0; i < sorted.length; i++) {
-    const prefix = sorted.slice(0, i + 1);
-    const stats = calculateStats(prefix);
-
-    if (evaluateAIAwardCriteria(criteria, prefix, stats)) {
-      return new Date(sorted[i].timestamp);
-    }
-  }
-
-  return null;
-}
-
-// Check and update AI awards based on session data
-function checkAIAwards(
-  sessions: Session[],
-  aiAwardSuggestions: AIAwardSuggestion[]
-): AIAwardSuggestion[] {
-  return aiAwardSuggestions.map(suggestion => {
-    // Only check approved awards that have criteria and aren't already earned
-    if (suggestion.status !== 'approved' || !suggestion.criteria) {
-      return suggestion;
-    }
-
-    // Compute when the criteria was first satisfied
-    const earnedAt = computeAIAwardEarnedAt(sessions, suggestion.criteria);
-
-    if (earnedAt) {
-      return {
-        ...suggestion,
-        status: 'earned' as AIAwardSuggestionStatus,
-        earnedAt
-      };
-    }
-
-    return suggestion;
-  });
-}
-
-// Calculate personal records from sessions
-function calculatePersonalRecords(sessions: Session[]): PersonalRecord[] {
-  const records: PersonalRecord[] = [];
-
-  // Standard distances to track (including 100m)
-  const distances = [100, 500, 1000, 2000, 5000];
-
-  distances.forEach(distance => {
-    // Find sessions that exactly match this distance
-    const matchingSessions = sessions.filter(session => session.distance === distance);
-
-    if (matchingSessions.length > 0) {
-      // Find the fastest time (lowest duration)
-      const bestSession = matchingSessions.reduce((best, current) =>
-        current.duration < best.duration ? current : best
-      );
-
-      records.push({
-        distance,
-        bestTime: bestSession.duration,
-        bestPace: bestSession.avgSplit,
-        date: bestSession.timestamp,
-        avgPower: bestSession.avgPower,
-        sessionId: bestSession.id
-      });
-    }
-  });
-
-  return records;
-}
-
-// Calculate session statistics
-function calculateStats(sessions: Session[]): SessionStats {
-  if (sessions.length === 0) {
-    return {
-      totalDistance: 0,
-      totalTime: 0,
-      totalSessions: 0,
-      avgPace: 0,
-      avgPower: 0,
-      avgStrokeRate: 0,
-      currentStreak: 0,
-      bestStreak: 0
-    };
-  }
-
-  const totalDistance = sessions.reduce((sum, session) => sum + session.distance, 0);
-  const totalTime = sessions.reduce((sum, session) => sum + session.duration, 0);
-
-  // Calculate averages (excluding zero values)
-  const validPaceSessions = sessions.filter(s => s.avgSplit > 0);
-  const avgPace = validPaceSessions.length > 0
-    ? validPaceSessions.reduce((sum, s) => sum + s.avgSplit, 0) / validPaceSessions.length
-    : 0;
-
-  const validPowerSessions = sessions.filter(s => s.avgPower > 0);
-  const avgPower = validPowerSessions.length > 0
-    ? validPowerSessions.reduce((sum, s) => sum + s.avgPower, 0) / validPowerSessions.length
-    : 0;
-
-  const validStrokeRateSessions = sessions.filter(s => s.avgStrokeRate > 0);
-  const avgStrokeRate = validStrokeRateSessions.length > 0
-    ? validStrokeRateSessions.reduce((sum, s) => sum + s.avgStrokeRate, 0) / validStrokeRateSessions.length
-    : 0;
-
-  // Calculate streaks
-  const { currentStreak, bestStreak } = calculateStreaks(sessions);
-
-  return {
-    totalDistance,
-    totalTime,
-    totalSessions: sessions.length,
-    avgPace,
-    avgPower,
-    avgStrokeRate,
-    currentStreak,
-    bestStreak
-  };
-}
-
-// Calculate consecutive day streaks
-function calculateStreaks(sessions: Session[]): { currentStreak: number; bestStreak: number } {
-  if (sessions.length === 0) return { currentStreak: 0, bestStreak: 0 };
-
-  // Get unique dates (YYYY-MM-DD) and sort them - with defensive programming
-  const uniqueDates = Array.from(
-    new Set(sessions.map(s => {
-      const timestamp = s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp);
-      return timestamp.toISOString().split('T')[0];
-    }))
-  ).sort().reverse(); // Most recent first
-
-  let currentStreak = 0;
-  let bestStreak = 0;
-  let tempStreak = 0;
-
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-  // Check if there's a session today or yesterday to start current streak
-  const hasRecentSession = uniqueDates.includes(today) || uniqueDates.includes(yesterday);
-
-  if (hasRecentSession) {
-    for (let i = 0; i < uniqueDates.length; i++) {
-      const currentDate = new Date(uniqueDates[i]);
-      const expectedDate = new Date(today);
-      expectedDate.setDate(expectedDate.getDate() - i);
-
-      if (currentDate.toISOString().split('T')[0] === expectedDate.toISOString().split('T')[0]) {
-        currentStreak++;
-      } else {
-        break;
-      }
-    }
-  }
-
-  // Calculate best streak
-  tempStreak = 1;
-  for (let i = 1; i < uniqueDates.length; i++) {
-    const currentDate = new Date(uniqueDates[i]);
-    const previousDate = new Date(uniqueDates[i - 1]);
-    const diffDays = (previousDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24);
-
-    if (diffDays === 1) {
-      tempStreak++;
-    } else {
-      bestStreak = Math.max(bestStreak, tempStreak);
-      tempStreak = 1;
-    }
-  }
-  bestStreak = Math.max(bestStreak, tempStreak);
-
-  return { currentStreak, bestStreak };
-}
-
-// Filter and sort sessions
-function filterAndSortSessions(sessions: Session[], filters: SessionFilters): Session[] {
-  let filtered = [...sessions];
-
-  // Date range filter
-  if (filters.dateRange) {
-    filtered = filtered.filter(session =>
-      session.timestamp >= filters.dateRange!.start &&
-      session.timestamp <= filters.dateRange!.end
-    );
-  }
-
-  // Distance range filter
-  if (filters.distanceRange) {
-    filtered = filtered.filter(session =>
-      session.distance >= filters.distanceRange!.min &&
-      session.distance <= filters.distanceRange!.max
-    );
-  }
-
-  // Sorting
-  if (filters.sortBy) {
-    filtered.sort((a, b) => {
-      let comparison = 0;
-
-      switch (filters.sortBy) {
-        case 'date':
-          comparison = a.timestamp.getTime() - b.timestamp.getTime();
-          break;
-        case 'distance':
-          comparison = a.distance - b.distance;
-          break;
-        case 'pace':
-          comparison = a.avgSplit - b.avgSplit;
-          break;
-        case 'power':
-          comparison = a.avgPower - b.avgPower;
-          break;
-      }
-
-      return filters.sortOrder === 'desc' ? -comparison : comparison;
-    });
-  }
-
-  return filtered;
-}
-
 export const useRowingStore = create<RowingStore>()((set, get) => ({
   sessions: [],
   personalRecords: [],
@@ -663,7 +317,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
     set((state) => {
       const updatedSessions = [...state.sessions, ...uniqueNewSessions];
-      const updatedRecords = calculatePersonalRecords(updatedSessions);
+      const updatedRecords = projectPersonalRecords(updatedSessions);
 
       // Save PRs to database
       savePRsToDB(updatedRecords.map(pr => ({
@@ -678,7 +332,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       });
 
       // Recompute award dates based on when conditions first became true
-      const recomputedAwards = computeAllEarnedAwards(updatedSessions);
+      const recomputedAwards = projectEarnedAwards(updatedSessions);
 
       // Save awards to database
       saveAwardsToDB(recomputedAwards).catch(err => {
@@ -686,42 +340,16 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       });
 
       // Check AI awards for automatic completion
-      const updatedAIAwards = checkAIAwards(updatedSessions, state.aiAwardSuggestions);
-
-      // Determine newly earned static awards compared to previous state for notification
-      const previousAwardIds = new Set(state.earnedAwards.map(a => a.awardId));
-      const newlyEarnedStatic = recomputedAwards.filter(a => !previousAwardIds.has(a.awardId));
-
-      // Determine newly earned AI awards
-      const previousAIEarnedIds = new Set(
-        state.aiAwardSuggestions.filter(a => a.status === 'earned').map(a => a.id)
+      const updatedAIAwards = projectAIAwardSuggestions(updatedSessions, state.aiAwardSuggestions);
+      const newAward = projectNewlyEarnedAward(
+        state.earnedAwards,
+        recomputedAwards,
+        state.aiAwardSuggestions,
+        updatedAIAwards,
       );
-      const newlyEarnedAI = updatedAIAwards.filter(
-        a => a.status === 'earned' && !previousAIEarnedIds.has(a.id)
-      );
-
-      // Combine and find the most recent newly earned award
-      let newAward: EarnedAward | null = null;
-
-      if (newlyEarnedStatic.length > 0) {
-        newAward = newlyEarnedStatic.reduce((latest, current) =>
-          current.earnedAt > latest.earnedAt ? current : latest
-        );
-      }
-
-      // Check if an AI award was earned more recently
-      if (newlyEarnedAI.length > 0) {
-        const latestAI = newlyEarnedAI.reduce((latest, current) =>
-          (current.earnedAt || new Date()) > (latest.earnedAt || new Date()) ? current : latest
-        );
-        if (!newAward || (latestAI.earnedAt && latestAI.earnedAt > newAward.earnedAt)) {
-          newAward = { awardId: latestAI.id, earnedAt: latestAI.earnedAt || new Date() };
-        }
-      }
 
       return {
         sessions: updatedSessions,
-        personalRecords: updatedRecords,
         earnedAwards: recomputedAwards,
         aiAwardSuggestions: updatedAIAwards,
         newlyEarnedAward: state.newlyEarnedAward || newAward // Keep existing if not dismissed
@@ -753,11 +381,9 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
     set((state) => {
       const updatedSessions = state.sessions.filter(s => s.id !== sessionId);
-      const updatedRecords = calculatePersonalRecords(updatedSessions);
 
       return {
         sessions: updatedSessions,
-        personalRecords: updatedRecords,
         earnedAwards: state.earnedAwards,
       };
     });
@@ -781,12 +407,9 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       if (!hasExistingSession) {
         updatedSessions.push(revivedSession);
       }
-      // Recalculate records in case this update improved something (unlikely for just adding strokeData, but good practice)
-      const updatedRecords = calculatePersonalRecords(updatedSessions);
 
       return {
-        sessions: updatedSessions,
-        personalRecords: updatedRecords
+        sessions: updatedSessions
       };
     });
   },
@@ -815,11 +438,9 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       const updatedSessions = state.sessions.map(s =>
         sessionMap.has(s.id) ? sessionMap.get(s.id)! : s
       );
-      const updatedRecords = calculatePersonalRecords(updatedSessions);
 
       return {
-        sessions: updatedSessions,
-        personalRecords: updatedRecords
+        sessions: updatedSessions
       };
     });
   },
@@ -837,11 +458,9 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
           strokeData: s.strokeData ?? existing?.strokeData,
         };
       });
-      const personalRecords = calculatePersonalRecords(revivedSessions);
 
       return {
         sessions: revivedSessions,
-        personalRecords,
       };
     });
   },
@@ -1114,15 +733,15 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
   getFilteredSessions: () => {
     const { sessions, filters } = get();
-    return filterAndSortSessions(sessions, filters);
+    return projectFilteredSessions(sessions, filters);
   },
 
   getStats: () => {
-    return calculateStats(get().sessions);
+    return projectSessionStats(get().sessions);
   },
 
   getPersonalRecords: () => {
-    return get().personalRecords;
+    return projectPersonalRecords(get().sessions);
   },
 
   getSessionById: (id) => {
@@ -1143,9 +762,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
         ...s,
         timestamp: new Date(s.timestamp as string | Date)
       }));
-
-      // Calculate PRs from sessions
-      const personalRecords = calculatePersonalRecords(sessions as Session[]);
 
       // Convert database awards to app format
       const earnedAwards = data.earnedAwards.map((a) => ({
@@ -1182,7 +798,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
       set({
         sessions,
-        personalRecords,
         earnedAwards,
         chartSettings,
         sessionAnalysisSettings

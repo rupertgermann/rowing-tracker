@@ -7,6 +7,7 @@ import { useAchievementStore } from '@/lib/achievementStore';
 import { AWARDS, Award } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
 import { calculateAwardPredictions, formatPrediction, AwardPrediction } from '@/lib/awardPredictions';
+import { computeEarnedAwards } from '@/lib/rowingSessionProjections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -34,7 +35,23 @@ interface DisplayAward {
 export function AwardsList() {
   const { earnedAwards, aiAwardSuggestions, deleteAIAwardSuggestion, markAIAwardEarned, sessions } = useRowingStore();
   const { hasGeneratedContent, generatedAchievements } = useAchievementStore();
-  const earnedIds = new Set(earnedAwards.map(a => a.awardId));
+  const rowingSessionEarnedAwards = useMemo(
+    () => computeEarnedAwards(sessions),
+    [sessions],
+  );
+  const displayEarnedAwards = useMemo(() => {
+    const byId = new Map(rowingSessionEarnedAwards.map((award) => [award.awardId, award]));
+    earnedAwards.forEach((award) => {
+      if (!byId.has(award.awardId)) {
+        byId.set(award.awardId, award);
+      }
+    });
+    return Array.from(byId.values());
+  }, [earnedAwards, rowingSessionEarnedAwards]);
+  const earnedIds = useMemo(
+    () => new Set(displayEarnedAwards.map(a => a.awardId)),
+    [displayEarnedAwards],
+  );
 
   // Calculate predictions for un-earned awards
   const predictions = useMemo(() => {
@@ -95,7 +112,7 @@ export function AwardsList() {
     // Static awards from AWARDS array
     const staticItems: DisplayAward[] = AWARDS.map(award => {
       const isEarned = earnedIds.has(award.id);
-      const earnedInfo = earnedAwards.find(a => a.awardId === award.id);
+      const earnedInfo = displayEarnedAwards.find(a => a.awardId === award.id);
       return {
         id: award.id,
         title: award.title,
@@ -130,7 +147,7 @@ export function AwardsList() {
       }));
 
     return [...staticItems, ...aiItems];
-  }, [earnedIds, earnedAwards, aiAwardSuggestions, hasGeneratedContent, loadedImages]);
+  }, [earnedIds, displayEarnedAwards, aiAwardSuggestions, hasGeneratedContent, loadedImages]);
 
   const handleAwardClick = (item: DisplayAward) => {
     // Open gallery for any earned award (static or AI)

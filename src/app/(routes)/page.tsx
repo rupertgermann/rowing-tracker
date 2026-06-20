@@ -3,6 +3,7 @@
 import { Session } from '@/types/session';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
+import { calculateSessionStats } from '@/lib/rowingSessionProjections';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, TrendingUp, Clock, Zap, Target } from 'lucide-react';
@@ -54,9 +55,8 @@ function prepareChartData(sessions: Session[]) {
 }
 
 export default function DashboardPage() {
-  const { getSessions, getStats } = useRowingStore();
-  const sessions = getSessions();
-  const stats = getStats();
+  const sessions = useRowingStore((state) => state.sessions);
+  const stats = calculateSessionStats(sessions);
 
   // Check if user has data
   const hasData = sessions.length > 0;

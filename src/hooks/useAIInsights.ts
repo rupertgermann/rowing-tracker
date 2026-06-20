@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { Session } from '@/types/session';
 import { aiAnalysis, Insight, TrendData, TrainingLoadData, AnomalyData } from '@/lib/aiAnalysis';
@@ -180,8 +180,7 @@ const autoArchiveOldInsights = (insights: (Insight | CloudInsight)[]): {
 };
 
 export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
-  const { getSessions } = useRowingStore();
-  const sessions = getSessions();
+  const sessions = useRowingStore((state) => state.sessions);
   const [cloudAIError, setCloudAIError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);

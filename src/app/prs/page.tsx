@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { AwardsList } from '@/components/AwardsList';
 import { AwardSuggestionsModal } from '@/components/AwardSuggestionsModal';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { cardStyles, getCardClassName, getShadowStyle } from '@/lib/cardStyles';
+import { calculatePersonalRecords, calculateSessionStats } from '@/lib/rowingSessionProjections';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -40,7 +41,7 @@ function formatPace(secondsPer500m: number): string {
 }
 
 export default function PRsPage() {
-  const { getPersonalRecords, getSessions, getStats } = useRowingStore();
+  const sessions = useRowingStore((state) => state.sessions);
   const [mounted, setMounted] = useState(false);
   const [awardSuggestionsOpen, setAwardSuggestionsOpen] = useState(false);
 
@@ -48,9 +49,8 @@ export default function PRsPage() {
     setMounted(true);
   }, []);
 
-  const personalRecords = getPersonalRecords();
-  const sessions = getSessions();
-  const stats = getStats();
+  const personalRecords = useMemo(() => calculatePersonalRecords(sessions), [sessions]);
+  const stats = useMemo(() => calculateSessionStats(sessions), [sessions]);
 
   const hasData = sessions.length > 0;
   const hasPRs = personalRecords.length > 0;

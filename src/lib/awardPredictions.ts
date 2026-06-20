@@ -1,6 +1,6 @@
 import { Session } from '@/types/session';
-import { AWARDS, Award } from './awards';
-import { AIAwardCriteria } from './store';
+import { AWARDS } from './awards';
+import type { AIAwardCriteria } from './rowingSessionProjections';
 
 // Aligned with AIAwardSuggestion format for consistency
 export interface AwardPrediction {
