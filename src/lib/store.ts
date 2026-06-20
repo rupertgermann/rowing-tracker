@@ -162,6 +162,7 @@ interface RowingStore {
   deleteSession: (sessionId: string) => void;
   updateSession: (updatedSession: Session) => void;
   updateSessionsInStore: (sessions: Session[]) => void;  // Update local state only, no DB save
+  replaceSessionsInStore: (sessions: Session[]) => void;  // Replace local state only, no DB save
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   resetChartSettings: () => void;
   dismissNewAward: () => void;
@@ -852,6 +853,28 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       return {
         sessions: updatedSessions,
         personalRecords: updatedRecords
+      };
+    });
+  },
+
+  replaceSessionsInStore: (sessionsToReplace) => {
+    console.log('[STORE] replaceSessionsInStore called with', sessionsToReplace.length, 'sessions');
+
+    set((state) => {
+      const existingById = new Map(state.sessions.map(s => [s.id, s]));
+      const revivedSessions = sessionsToReplace.map(s => {
+        const existing = existingById.get(s.id);
+        return {
+          ...s,
+          timestamp: s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp),
+          strokeData: s.strokeData ?? existing?.strokeData,
+        };
+      });
+      const personalRecords = calculatePersonalRecords(revivedSessions);
+
+      return {
+        sessions: revivedSessions,
+        personalRecords,
       };
     });
   },
