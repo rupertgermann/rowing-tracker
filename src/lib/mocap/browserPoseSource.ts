@@ -12,6 +12,7 @@ import type {
   PoseCaptureSourceOptions,
   PoseCaptureSourceStatus,
 } from "./poseCaptureSource";
+import { PoseStreamUploadBuffer } from "./poseStreamUploadBuffer";
 
 export const POSE_MODEL_URL =
   process.env.NEXT_PUBLIC_MOCAP_POSE_MODEL_URL ??
@@ -26,10 +27,8 @@ export type PoseSourceOptions = PoseCaptureSourceOptions;
 
 export class BrowserPoseSource implements PoseCaptureSource {
   private worker: Worker | null = null;
-  private pendingChunks: Uint8Array[] = [];
-  private pendingBytes = 0;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
-  private uploadInflight: Promise<void> = Promise.resolve();
+  private uploadBuffer: PoseStreamUploadBuffer | null = null;
   private framesEncoded = 0;
   private capturing = false;
   private rvfcHandle: number | null = null;
@@ -44,6 +43,13 @@ export class BrowserPoseSource implements PoseCaptureSource {
     this.uploadPoseStream = opts.uploadPoseStream ?? true;
     if (this.uploadPoseStream && !opts.sessionId) {
       throw new Error("sessionId is required when pose stream upload is enabled");
+    }
+    if (this.uploadPoseStream && opts.sessionId) {
+      this.uploadBuffer = new PoseStreamUploadBuffer({
+        sessionId: opts.sessionId,
+        flushBytes: this.flushBytes,
+        onError: opts.onError,
+      });
     }
   }
 
@@ -95,7 +101,10 @@ export class BrowserPoseSource implements PoseCaptureSource {
     if (!this.worker) throw new Error("PoseSource not initialised");
     this.capturing = true;
     this.setStatus("capturing");
-    this.flushTimer = setInterval(() => this.flush(false), this.flushIntervalMs);
+    this.flushTimer = setInterval(
+      () => void this.uploadBuffer?.flush(false),
+      this.flushIntervalMs,
+    );
     this.scheduleFrame();
   }
 
@@ -156,10 +165,7 @@ export class BrowserPoseSource implements PoseCaptureSource {
     if (msg?.type === "frame") {
       this.framesEncoded = msg.framesEncoded;
       const bytes = new Uint8Array(msg.bytes);
-      if (this.uploadPoseStream) {
-        this.pendingChunks.push(bytes);
-        this.pendingBytes += bytes.byteLength;
-      }
+      this.uploadBuffer?.enqueue(bytes);
       this.opts.onFrame?.({
         framesEncoded: msg.framesEncoded,
         landmarkCount: msg.landmarkCount,
@@ -169,9 +175,6 @@ export class BrowserPoseSource implements PoseCaptureSource {
         poseFrameBytes: bytes,
         poseFrameBase64: bytesToBase64(bytes),
       });
-      if (this.uploadPoseStream && this.pendingBytes >= this.flushBytes) {
-        this.flush(false);
-      }
     } else if (msg?.type === "error") {
       const err = new Error(msg.message);
       this.opts.onError?.(err);
@@ -180,51 +183,7 @@ export class BrowserPoseSource implements PoseCaptureSource {
   };
 
   async drain(): Promise<void> {
-    await this.flush(true);
-  }
-
-  private async flush(final: boolean): Promise<void> {
-    if (this.pendingChunks.length === 0) {
-      if (final) await this.uploadInflight;
-      return;
-    }
-    const chunks = this.pendingChunks;
-    const total = this.pendingBytes;
-    this.pendingChunks = [];
-    this.pendingBytes = 0;
-    const buf = new Uint8Array(total);
-    let off = 0;
-    for (const c of chunks) {
-      buf.set(c, off);
-      off += c.byteLength;
-    }
-    this.uploadInflight = this.uploadInflight.then(() =>
-      this.upload(buf).catch((err) => {
-        this.opts.onError?.(
-          err instanceof Error ? err : new Error(String(err)),
-        );
-      }),
-    );
-    if (final) await this.uploadInflight;
-  }
-
-  private async upload(buf: Uint8Array): Promise<void> {
-    if (!this.opts.sessionId) {
-      throw new Error("Cannot upload pose stream without a session id");
-    }
-    const res = await fetch(
-      `/api/mocap/sessions/${this.opts.sessionId}/pose-stream`,
-      {
-        method: "POST",
-        body: new Blob([buf as BlobPart], {
-          type: "application/octet-stream",
-        }),
-        headers: { "Content-Type": "application/octet-stream" },
-      },
-    );
-    if (!res.ok) {
-      throw new Error(`Pose upload failed: ${res.status}`);
-    }
+    await this.uploadBuffer?.drain();
   }
 
   private setStatus(s: PoseCaptureSourceStatus, detail?: string): void {

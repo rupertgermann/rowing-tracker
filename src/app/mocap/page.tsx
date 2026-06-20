@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { BrowserPoseSource } from "@/lib/mocap/browserPoseSource";
+import { FreemocapSidecarSource } from "@/lib/mocap/freemocapSidecarSource";
 import type {
   PoseCaptureSource,
   PoseCaptureSourceStatus,
@@ -33,6 +34,8 @@ import {
 } from "@/lib/mocap/degradedMode";
 import {
   BYTES_PER_FRAME_V1,
+  BYTES_PER_FRAME_V2,
+  KEYPOINT_SCHEMA_V2,
   decodeFrame,
 } from "@/lib/mocap/poseFrameStream";
 import { VideoUploader } from "@/lib/mocap/videoUploader";
@@ -45,7 +48,10 @@ import {
   cancelSpokenCues,
   speakCue,
 } from "@/lib/mocap/coaching/cueAudio";
-import { keypointTripletsToPosePoints } from "@/lib/mocap/analysis/poseFrameStreamAdapter";
+import {
+  keypointQuadsToPosePoints,
+  keypointTripletsToPosePoints,
+} from "@/lib/mocap/analysis/poseFrameStreamAdapter";
 import type {
   Calibration,
   PoseAnalysisFrame,
@@ -55,7 +61,6 @@ import { settings } from "@/lib/settings";
 import {
   checkSidecarHealth,
   SIDECAR_DEFAULT_PORT,
-  stopSidecarSession,
   type SidecarHealth,
 } from "@/lib/mocap/sidecarClient";
 
@@ -471,6 +476,7 @@ export default function MocapCapturePage() {
     // Sidecar path: skip browser camera/calibration, use sidecar-3d perspective
     if (useSidecar) {
       setState({ kind: "starting" });
+      let sessionId: string | undefined;
       try {
         const health = await checkSidecarHealth(SIDECAR_DEFAULT_PORT);
         setSidecarHealth(health);
@@ -487,33 +493,37 @@ export default function MocapCapturePage() {
             captureModelVersion: `freemocap-sidecar@schemaV${health.schemaVersion}`,
             capturePerspective: "sidecar-3d",
             captureFps: health.fps,
-            recordOnly: true,
+            recordOnly: false,
             cameraCount: health.cameras,
           }),
         });
         if (!createRes.ok) throw new Error(`Create session failed: ${createRes.status}`);
         const created: { id: string } = await createRes.json();
-        const connectRes = await fetch(`/api/mocap/sessions/${created.id}/sidecar/connect`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        if (!connectRes.ok) {
-          throw new Error(`Sidecar connect failed: ${connectRes.status}`);
-        }
+        sessionId = created.id;
 
         const startedAt = Date.now();
         startedAtRef.current = startedAt;
-        recordOnlyRef.current = true;
+        recordOnlyRef.current = false;
         setElapsedSec(0);
         setFramesEncoded(0);
         setFramingDegraded(false);
-        setPoseStatus("stopped");
         setCameraReadiness(null);
-        setSessionQualityFlags(recordOnlySessionFlags([], null));
+        setSessionQualityFlags([]);
         qualityHistoryRef.current = [];
         effectiveFpsSamplesRef.current = [];
         latestCameraReadinessRef.current = null;
+        const source = new FreemocapSidecarSource({
+          sessionId: created.id,
+          port: SIDECAR_DEFAULT_PORT,
+          cameraCount: health.cameras,
+          onStatus: (s) => setPoseStatus(s),
+          onFrame: (info) => handlePoseFrame(info, false),
+          onError: (err) => handleError(err, created.id),
+        });
+        sourceRef.current = source;
+        await source.init();
+        await source.start();
+
         setState({
           kind: "capturing",
           sessionId: created.id,
@@ -523,7 +533,7 @@ export default function MocapCapturePage() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Sidecar error";
         setSidecarError(msg);
-        setState({ kind: "error", message: msg });
+        await handleError(err, sessionId);
       }
       return;
     }
@@ -697,11 +707,11 @@ export default function MocapCapturePage() {
     if (state.kind !== "capturing") return;
     const sessionId = state.sessionId;
     const captureSource = state.source;
-    const captureWasRecordOnly = captureSource === "sidecar" || recordOnlyRef.current;
+    const captureWasRecordOnly = recordOnlyRef.current;
     setState({ kind: "stopping", sessionId, source: captureSource });
     try {
       if (captureSource === "sidecar") {
-        await stopSidecarSession(SIDECAR_DEFAULT_PORT).catch(() => {});
+        await sourceRef.current?.stop();
       } else {
         const recorder = recorderRef.current;
         if (recorder && recorder.state !== "inactive") {
@@ -809,8 +819,7 @@ export default function MocapCapturePage() {
       try {
         const startedAt = startedAtRef.current || state.startedAt;
         const durationSec = Math.max(0, (Date.now() - startedAt) / 1000);
-        const captureWasRecordOnly =
-          state.source === "sidecar" || recordOnlyRef.current;
+        const captureWasRecordOnly = recordOnlyRef.current;
         navigator.sendBeacon?.(
           `/api/mocap/sessions/${sessionId}/finalize`,
           new Blob(
@@ -854,6 +863,7 @@ export default function MocapCapturePage() {
     captureSupport?.recordOnlyRecommended && !captureSupport.livePoseSupported,
   );
   const recordOnlyActive = recordOnly || recordOnlyForced;
+  const browserRecordOnlyActive = !useSidecar && recordOnlyActive;
   const sidecarReady =
     useSidecar && sidecarHealth?.status === "ready" && sidecarError === null;
   const captureBusy =
@@ -865,7 +875,7 @@ export default function MocapCapturePage() {
     (useSidecar
       ? sidecarReady
       : videoCaptureSupported &&
-        (recordOnlyActive ||
+        (browserRecordOnlyActive ||
           (livePoseSupported &&
             calibration.kind === "ready" &&
             Boolean(calibrationFrames) &&
@@ -981,7 +991,8 @@ export default function MocapCapturePage() {
             {calibration.kind === "idle" &&
             (state.kind === "idle" || state.kind === "done") &&
             livePoseSupported &&
-            !recordOnlyActive ? (
+            !browserRecordOnlyActive &&
+            !useSidecar ? (
               <Button
                 onClick={startCalibration}
                 data-testid="mocap-start-calibration"
@@ -994,7 +1005,7 @@ export default function MocapCapturePage() {
                 Calibrating…
               </Button>
             ) : null}
-            {calibration.kind === "ready" && nextCalibrationPose ? (
+            {calibration.kind === "ready" && nextCalibrationPose && !useSidecar ? (
               <Button
                 onClick={() => captureCalibrationFrame(nextCalibrationPose)}
                 disabled={!cameraReady}
@@ -1006,7 +1017,8 @@ export default function MocapCapturePage() {
             {calibration.kind === "ready" &&
             (state.kind === "idle" || state.kind === "done") &&
             livePoseSupported &&
-            !recordOnlyActive ? (
+            !browserRecordOnlyActive &&
+            !useSidecar ? (
               <Button
                 variant="outline"
                 onClick={startCalibration}
@@ -1021,7 +1033,11 @@ export default function MocapCapturePage() {
                 disabled={!canRecord}
                 data-testid="mocap-start"
               >
-                {recordOnlyActive ? "Start video recording" : "Start mocap session"}
+                {useSidecar
+                  ? "Start sidecar capture"
+                  : browserRecordOnlyActive
+                    ? "Start video recording"
+                    : "Start mocap session"}
               </Button>
             ) : null}
             {state.kind === "starting" ? (
@@ -1054,7 +1070,7 @@ export default function MocapCapturePage() {
             </div>
           ) : null}
 
-          {recordOnlyActive && videoCaptureSupported ? (
+          {browserRecordOnlyActive && videoCaptureSupported ? (
             <div
               className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
               data-testid="mocap-record-only-notice"
@@ -1069,24 +1085,26 @@ export default function MocapCapturePage() {
             <CalibrationStep
               label="Catch"
               done={
-                recordOnlyActive ||
+                browserRecordOnlyActive ||
+                useSidecar ||
                 ("catchFrame" in calibration && Boolean(calibration.catchFrame))
               }
             />
             <CalibrationStep
               label="Finish"
               done={
-                recordOnlyActive ||
+                browserRecordOnlyActive ||
+                useSidecar ||
                 ("finishFrame" in calibration && Boolean(calibration.finishFrame))
               }
             />
             <CalibrationStep
               label="Camera check"
-              done={recordOnlyActive || cameraReady}
+              done={browserRecordOnlyActive || useSidecar || cameraReady}
             />
           </div>
 
-          {cameraReadiness && !cameraReady && !recordOnlyActive ? (
+          {cameraReadiness && !cameraReady && !browserRecordOnlyActive && !useSidecar ? (
             <div
               className="rounded border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm"
               data-testid="mocap-camera-readiness-hint"
@@ -1346,10 +1364,13 @@ function decodeBase64PoseFrame(
     if (binary.length < BYTES_PER_FRAME_V1) return null;
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const decoded = decodeFrame(bytes, 0);
+    const isV2 = bytes.byteLength === BYTES_PER_FRAME_V2;
+    const decoded = decodeFrame(bytes, 0, isV2 ? KEYPOINT_SCHEMA_V2 : undefined);
     return {
       timestampMs: decoded.timestampMs,
-      keypoints: keypointTripletsToPosePoints(decoded.keypoints),
+      keypoints: isV2
+        ? keypointQuadsToPosePoints(decoded.keypoints)
+        : keypointTripletsToPosePoints(decoded.keypoints),
       qualityFlags: decoded.qualityFlags,
     };
   } catch {

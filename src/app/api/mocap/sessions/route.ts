@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { initializePoseStreamBlob } from "@/lib/mocap/capturePersistence";
 import { getMocapListAssignmentState } from "@/lib/mocap/assignment";
+import { KEYPOINT_SCHEMA_V2 } from "@/lib/mocap/poseFrameStream";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
   const storage = getMocapStorage();
-  const recordOnly = body.recordOnly === true || body.source === "sidecar";
+  const recordOnly = body.recordOnly === true && body.source !== "sidecar";
 
   const created = await prisma.$transaction(async (tx) => {
     const row = await tx.mocapSession.create({
@@ -148,7 +149,18 @@ export async function POST(req: Request) {
 
   if (!recordOnly) {
     try {
-      await initializePoseStreamBlob(storage, created.poseStreamPath, body.captureFps);
+      await initializePoseStreamBlob(
+        storage,
+        created.poseStreamPath,
+        body.captureFps,
+        body.source === "sidecar"
+          ? {
+              keypointSchemaVersion: KEYPOINT_SCHEMA_V2,
+              coordinateSpace: "world-mm-3d",
+              cameraCount: body.cameraCount,
+            }
+          : {},
+      );
     } catch (err) {
       await prisma.mocapSession.delete({ where: { id: created.id } }).catch(() => {});
       return NextResponse.json(

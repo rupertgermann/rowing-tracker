@@ -3,7 +3,11 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { checkSidecarHealth, SIDECAR_DEFAULT_PORT } from "@/lib/mocap/sidecarClient";
+import {
+  checkSidecarHealth,
+  SIDECAR_DEFAULT_PORT,
+  startSidecarSession,
+} from "@/lib/mocap/sidecarClient";
 
 const ConnectBody = z.object({
   port: z.number().int().positive().optional(),
@@ -47,14 +51,37 @@ export async function POST(
 
   try {
     const health = await checkSidecarHealth(port);
+    if (health.status !== "ready") {
+      return NextResponse.json(
+        { status: health.status, port },
+        { status: 409 },
+      );
+    }
+    const sidecarSession = await startSidecarSession(port);
+    await prisma.mocapSession.update({
+      where: { id: mocapSession.id },
+      data: {
+        calibrationId: sidecarSession.calibrationId ?? undefined,
+        cameraCount: health.cameras,
+      },
+    });
     return NextResponse.json({
       status: "connected",
       fps: health.fps,
       cameras: health.cameras,
       schemaVersion: health.schemaVersion,
       port,
+      sidecarSessionId: sidecarSession.sessionId ?? null,
+      calibrationId: sidecarSession.calibrationId ?? null,
     });
-  } catch {
-    return NextResponse.json({ status: "unreachable", port }, { status: 503 });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        status: "unreachable",
+        port,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      { status: 503 },
+    );
   }
 }
