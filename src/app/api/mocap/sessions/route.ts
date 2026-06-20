@@ -119,6 +119,7 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
   const storage = getMocapStorage();
+  const recordOnly = body.recordOnly === true || body.source === "sidecar";
 
   const created = await prisma.$transaction(async (tx) => {
     const row = await tx.mocapSession.create({
@@ -145,7 +146,7 @@ export async function POST(req: Request) {
     });
   });
 
-  if (!body.recordOnly) {
+  if (!recordOnly) {
     try {
       await initializePoseStreamBlob(storage, created.poseStreamPath, body.captureFps);
     } catch (err) {

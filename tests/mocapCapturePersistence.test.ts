@@ -4,11 +4,16 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
+  BYTES_PER_FRAME_V2,
   decodeFrame,
   decodeHeader,
   encodeFrame,
+  encodeFrameV2,
+  encodeHeader,
   frameByteOffset,
+  KEYPOINT_SCHEMA_V2,
   KEYPOINTS_PER_FRAME_V1,
+  KEYPOINTS_PER_FRAME_V2,
   type PoseFrame,
 } from "../src/lib/mocap/poseFrameStream";
 import {
@@ -45,6 +50,36 @@ test("capture persistence writes, finalizes, and byte-range reads identical pose
     for (let i = 0; i < frames[1].keypoints.length; i++) {
       assert.equal(secondFrame.keypoints[i], frames[1].keypoints[i]);
     }
+  } finally {
+    await cleanup();
+  }
+});
+
+test("finalize uses the pose-stream header frame size for v2 sidecar blobs", async () => {
+  const { storage, cleanup } = await makeStorage();
+  try {
+    const posePath = storage.poseStreamPath("user-1", "session-v2");
+    const frames = [makeFrameV2(0), makeFrameV2(1)];
+
+    await storage.appendBytes(
+      posePath,
+      encodeHeader({
+        fps: 60,
+        keypointSchemaVersion: KEYPOINT_SCHEMA_V2,
+        coordinateSpace: "world-mm-3d",
+        cameraCount: 3,
+      }),
+    );
+    await storage.appendBytes(posePath, concat(frames.map(encodeFrameV2)));
+
+    const finalized = await finalizePoseStreamBlob(storage, posePath);
+    assert.equal(finalized.frameCount, 2);
+
+    const header = decodeHeader(await storage.read(posePath, { start: 0, end: 32 }));
+    assert.equal(header.keypointSchemaVersion, KEYPOINT_SCHEMA_V2);
+    assert.equal(header.cameraCount, 3);
+    assert.equal(header.frameCount, 2);
+    assert.equal(header.bytesPerFrame, BYTES_PER_FRAME_V2);
   } finally {
     await cleanup();
   }
@@ -91,6 +126,18 @@ function makeFrame(seed: number): PoseFrame {
   }
   return {
     timestampMs: seed * 33.333,
+    keypoints,
+    qualityFlags: seed,
+  };
+}
+
+function makeFrameV2(seed: number): PoseFrame {
+  const keypoints = new Float32Array(KEYPOINTS_PER_FRAME_V2 * 4);
+  for (let i = 0; i < keypoints.length; i++) {
+    keypoints[i] = Math.fround(seed + i / 100);
+  }
+  return {
+    timestampMs: seed * 16.667,
     keypoints,
     qualityFlags: seed,
   };

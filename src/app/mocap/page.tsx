@@ -51,7 +51,12 @@ import type {
   PostureFault,
 } from "@/lib/mocap/analysis/types";
 import { settings } from "@/lib/settings";
-import { checkSidecarHealth, SIDECAR_DEFAULT_PORT, type SidecarHealth } from "@/lib/mocap/sidecarClient";
+import {
+  checkSidecarHealth,
+  SIDECAR_DEFAULT_PORT,
+  stopSidecarSession,
+  type SidecarHealth,
+} from "@/lib/mocap/sidecarClient";
 
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
@@ -64,6 +69,8 @@ const SEVERITY_WEIGHT: Record<string, number> = {
   info: 1,
 };
 
+type CaptureSource = "browser" | "sidecar";
+
 type CaptureState =
   | { kind: "idle" }
   | { kind: "starting" }
@@ -71,10 +78,12 @@ type CaptureState =
       kind: "capturing";
       sessionId: string;
       startedAt: number;
+      source: CaptureSource;
     }
   | {
       kind: "stopping";
       sessionId: string;
+      source: CaptureSource;
     }
   | {
       kind: "done";
@@ -82,6 +91,7 @@ type CaptureState =
       durationSec: number;
       frameCount: number;
       recordOnly: boolean;
+      source: CaptureSource;
   }
   | { kind: "error"; message: string };
 
@@ -476,18 +486,39 @@ export default function MocapCapturePage() {
             captureModelVersion: `freemocap-sidecar@schemaV${health.schemaVersion}`,
             capturePerspective: "sidecar-3d",
             captureFps: health.fps,
+            recordOnly: true,
             cameraCount: health.cameras,
           }),
         });
         if (!createRes.ok) throw new Error(`Create session failed: ${createRes.status}`);
         const created: { id: string } = await createRes.json();
-        // Arm the sidecar via the connect endpoint
-        await fetch(`/api/mocap/sessions/${created.id}/sidecar/connect`, {
+        const connectRes = await fetch(`/api/mocap/sessions/${created.id}/sidecar/connect`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
-        setState({ kind: "capturing", sessionId: created.id, startedAt: Date.now() });
+        if (!connectRes.ok) {
+          throw new Error(`Sidecar connect failed: ${connectRes.status}`);
+        }
+
+        const startedAt = Date.now();
+        startedAtRef.current = startedAt;
+        recordOnlyRef.current = true;
+        setElapsedSec(0);
+        setFramesEncoded(0);
+        setFramingDegraded(false);
+        setPoseStatus("stopped");
+        setCameraReadiness(null);
+        setSessionQualityFlags(recordOnlySessionFlags([], null));
+        qualityHistoryRef.current = [];
+        effectiveFpsSamplesRef.current = [];
+        latestCameraReadinessRef.current = null;
+        setState({
+          kind: "capturing",
+          sessionId: created.id,
+          startedAt,
+          source: "sidecar",
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Sidecar error";
         setSidecarError(msg);
@@ -505,6 +536,7 @@ export default function MocapCapturePage() {
       setState({ kind: "error", message: captureSupport.message });
       return;
     }
+    recordOnlyRef.current = captureRecordOnly;
 
     const calibrationFrames = getCalibrationFrames(calibration);
     if (
@@ -643,6 +675,7 @@ export default function MocapCapturePage() {
         kind: "capturing",
         sessionId,
         startedAt: startedAtRef.current,
+        source: "browser",
       });
     } catch (err) {
       await handleError(err, sessionId);
@@ -662,17 +695,23 @@ export default function MocapCapturePage() {
   const stop = useCallback(async () => {
     if (state.kind !== "capturing") return;
     const sessionId = state.sessionId;
-    const captureWasRecordOnly = recordOnlyRef.current;
-    setState({ kind: "stopping", sessionId });
+    const captureSource = state.source;
+    const captureWasRecordOnly = captureSource === "sidecar" || recordOnlyRef.current;
+    setState({ kind: "stopping", sessionId, source: captureSource });
     try {
-      const recorder = recorderRef.current;
-      if (recorder && recorder.state !== "inactive") {
-        await new Promise<void>((resolve) => {
-          recorder.onstop = () => resolve();
-          recorder.stop();
-        });
+      if (captureSource === "sidecar") {
+        await stopSidecarSession(SIDECAR_DEFAULT_PORT).catch(() => {});
+      } else {
+        const recorder = recorderRef.current;
+        if (recorder && recorder.state !== "inactive") {
+          await new Promise<void>((resolve) => {
+            recorder.onstop = () => resolve();
+            recorder.stop();
+          });
+        }
+        await sourceRef.current?.stop();
+        await uploaderRef.current?.drain();
       }
-      await sourceRef.current?.stop();
       // Drain any pending strokes from the live engine before tearing it down.
       try {
         engineRef.current?.flush();
@@ -682,9 +721,9 @@ export default function MocapCapturePage() {
       engineRef.current = null;
       clearCueDismissTimer();
       cancelSpokenCues();
-      await uploaderRef.current?.drain();
 
-      const durationSec = (Date.now() - startedAtRef.current) / 1000;
+      const startedAt = startedAtRef.current || state.startedAt;
+      const durationSec = Math.max(0, (Date.now() - startedAt) / 1000);
       const finalizeQualityFlags = captureWasRecordOnly
         ? recordOnlySessionFlags(sessionQualityFlags, recordOnlyReason)
         : sessionQualityFlags;
@@ -733,6 +772,7 @@ export default function MocapCapturePage() {
         durationSec: finalized.durationSec,
         frameCount: finalized.frameCount,
         recordOnly: captureWasRecordOnly,
+        source: captureSource,
       });
     } catch (err) {
       await handleError(err, sessionId);
@@ -766,8 +806,10 @@ export default function MocapCapturePage() {
         // ignore
       }
       try {
-        const durationSec = (Date.now() - startedAtRef.current) / 1000;
-        const captureWasRecordOnly = recordOnlyRef.current;
+        const startedAt = startedAtRef.current || state.startedAt;
+        const durationSec = Math.max(0, (Date.now() - startedAt) / 1000);
+        const captureWasRecordOnly =
+          state.source === "sidecar" || recordOnlyRef.current;
         navigator.sendBeacon?.(
           `/api/mocap/sessions/${sessionId}/finalize`,
           new Blob(
@@ -811,18 +853,22 @@ export default function MocapCapturePage() {
     captureSupport?.recordOnlyRecommended && !captureSupport.livePoseSupported,
   );
   const recordOnlyActive = recordOnly || recordOnlyForced;
+  const sidecarReady =
+    useSidecar && sidecarHealth?.status === "ready" && sidecarError === null;
   const captureBusy =
     state.kind === "capturing" ||
     state.kind === "starting" ||
     state.kind === "stopping";
   const canRecord =
     !captureBusy &&
-    videoCaptureSupported &&
-    (recordOnlyActive ||
-      (livePoseSupported &&
-        calibration.kind === "ready" &&
-        Boolean(calibrationFrames) &&
-        cameraReady));
+    (useSidecar
+      ? sidecarReady
+      : videoCaptureSupported &&
+        (recordOnlyActive ||
+          (livePoseSupported &&
+            calibration.kind === "ready" &&
+            Boolean(calibrationFrames) &&
+            cameraReady)));
 
   return (
     <div className="container mx-auto max-w-4xl py-8 space-y-6">

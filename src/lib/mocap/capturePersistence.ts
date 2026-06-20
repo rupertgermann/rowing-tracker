@@ -1,6 +1,7 @@
 import {
   BYTES_PER_FRAME_V1,
   HEADER_SIZE,
+  decodeHeader,
   framesFromBlobSize,
   encodeHeader,
 } from "./poseFrameStream";
@@ -52,12 +53,18 @@ export async function finalizePoseStreamBlob(
     throw new Error("Pose stream truncated below header");
   }
 
-  const trailing = (poseStreamBytes - HEADER_SIZE) % BYTES_PER_FRAME_V1;
+  const header = decodeHeader(
+    await storage.read(poseStreamPath, { start: 0, end: HEADER_SIZE }),
+  );
+  const trailing = (poseStreamBytes - HEADER_SIZE) % header.bytesPerFrame;
   if (trailing !== 0) {
     throw new Error(`Pose stream has ${trailing} trailing bytes (corrupt)`);
   }
 
-  const frameCount = framesFromBlobSize(poseStreamBytes);
+  const frameCount = framesFromBlobSize(
+    poseStreamBytes,
+    header.keypointSchemaVersion,
+  );
   const headerPatch = new Uint8Array(4);
   new DataView(headerPatch.buffer).setUint32(0, frameCount, true);
   await storage.writeAt(poseStreamPath, headerPatch, FRAME_COUNT_OFFSET);
