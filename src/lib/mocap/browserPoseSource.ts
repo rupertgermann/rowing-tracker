@@ -7,6 +7,11 @@
  */
 
 import { BYTES_PER_FRAME_V1 } from "./poseFrameStream";
+import type {
+  PoseCaptureSource,
+  PoseCaptureSourceOptions,
+  PoseCaptureSourceStatus,
+} from "./poseCaptureSource";
 
 export const POSE_MODEL_URL =
   process.env.NEXT_PUBLIC_MOCAP_POSE_MODEL_URL ??
@@ -16,34 +21,10 @@ export const MEDIAPIPE_WASM_BASE =
   process.env.NEXT_PUBLIC_MOCAP_MEDIAPIPE_WASM_BASE ??
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
 
-export type PoseSourceStatus =
-  | "idle"
-  | "loading"
-  | "ready"
-  | "capturing"
-  | "stopping"
-  | "stopped"
-  | "error";
+export type PoseSourceStatus = PoseCaptureSourceStatus;
+export type PoseSourceOptions = PoseCaptureSourceOptions;
 
-export interface PoseSourceOptions {
-  sessionId?: string;
-  videoEl: HTMLVideoElement;
-  uploadPoseStream?: boolean;
-  flushBytes?: number;
-  flushIntervalMs?: number;
-  onStatus?: (s: PoseSourceStatus, detail?: string) => void;
-  onFrame?: (info: {
-    framesEncoded: number;
-    landmarkCount: number;
-    trackedKeypointCount: number;
-    meanConfidence: number;
-    qualityFlags: number;
-    poseFrameBase64: string;
-  }) => void;
-  onError?: (err: Error) => void;
-}
-
-export class BrowserPoseSource {
+export class BrowserPoseSource implements PoseCaptureSource {
   private worker: Worker | null = null;
   private pendingChunks: Uint8Array[] = [];
   private pendingBytes = 0;
@@ -52,7 +33,7 @@ export class BrowserPoseSource {
   private framesEncoded = 0;
   private capturing = false;
   private rvfcHandle: number | null = null;
-  private status: PoseSourceStatus = "idle";
+  private sourceStatus: PoseCaptureSourceStatus = "idle";
   private readonly flushBytes: number;
   private readonly flushIntervalMs: number;
   private readonly uploadPoseStream: boolean;
@@ -68,6 +49,10 @@ export class BrowserPoseSource {
 
   get framesCaptured(): number {
     return this.framesEncoded;
+  }
+
+  get status(): PoseCaptureSourceStatus {
+    return this.sourceStatus;
   }
 
   async init(): Promise<void> {
@@ -127,8 +112,7 @@ export class BrowserPoseSource {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    await this.flush(true);
-    await this.uploadInflight;
+    await this.drain();
     this.worker?.postMessage({ type: "close" });
     this.worker?.terminate();
     this.worker = null;
@@ -182,6 +166,7 @@ export class BrowserPoseSource {
         trackedKeypointCount: msg.trackedKeypointCount,
         meanConfidence: msg.meanConfidence,
         qualityFlags: msg.qualityFlags,
+        poseFrameBytes: bytes,
         poseFrameBase64: bytesToBase64(bytes),
       });
       if (this.uploadPoseStream && this.pendingBytes >= this.flushBytes) {
@@ -193,6 +178,10 @@ export class BrowserPoseSource {
       this.setStatus("error", msg.message);
     }
   };
+
+  async drain(): Promise<void> {
+    await this.flush(true);
+  }
 
   private async flush(final: boolean): Promise<void> {
     if (this.pendingChunks.length === 0) {
@@ -238,8 +227,8 @@ export class BrowserPoseSource {
     }
   }
 
-  private setStatus(s: PoseSourceStatus, detail?: string): void {
-    this.status = s;
+  private setStatus(s: PoseCaptureSourceStatus, detail?: string): void {
+    this.sourceStatus = s;
     this.opts.onStatus?.(s, detail);
   }
 }
