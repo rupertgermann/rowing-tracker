@@ -28,6 +28,7 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
   private frameCount = 0;
   private currentHealth: SidecarHealth | null = null;
   private currentSession: SidecarSessionInfo | null = null;
+  private startAttempted = false;
   readonly port: number;
 
   constructor(private readonly opts: SidecarPoseSourceOptions = {}) {
@@ -92,6 +93,7 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     }
 
     try {
+      this.startAttempted = true;
       this.currentSession = await startSidecarSession(this.port);
       this.setStatus("capturing");
     } catch (err) {
@@ -107,7 +109,10 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     }
 
     this.setStatus("stopping");
-    if (!this.currentSession) {
+    const shouldStopSidecar = this.startAttempted || this.currentSession !== null;
+    this.currentSession = null;
+    this.startAttempted = false;
+    if (!shouldStopSidecar) {
       this.setStatus("stopped");
       return;
     }

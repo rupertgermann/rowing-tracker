@@ -540,6 +540,17 @@ export default function MocapCapturePage() {
         sessionId = created.id;
         await source.connect(created.id);
         await source.start();
+        const calibrationId = source.sidecarSession?.calibrationId;
+        if (calibrationId) {
+          const calibrationRes = await fetch(`/api/mocap/sessions/${created.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ calibrationId }),
+          });
+          if (!calibrationRes.ok) {
+            throw new Error(`Persist calibration failed: ${calibrationRes.status}`);
+          }
+        }
 
         const startedAt = Date.now();
         startedAtRef.current = startedAt;
@@ -843,6 +854,22 @@ export default function MocapCapturePage() {
     const sessionId = state.sessionId;
     const onPageHide = () => {
       try {
+        if (state.source === "sidecar") {
+          const stopBody = JSON.stringify({ port: getSidecarPort() });
+          const stopUrl = `/api/mocap/sessions/${sessionId}/sidecar/stop`;
+          const sent = navigator.sendBeacon?.(
+            stopUrl,
+            new Blob([stopBody], { type: "application/json" }),
+          );
+          if (!sent) {
+            fetch(stopUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: stopBody,
+              keepalive: true,
+            }).catch(() => {});
+          }
+        }
         recorderRef.current?.requestData?.();
         recorderRef.current?.stop();
       } catch {
@@ -879,7 +906,7 @@ export default function MocapCapturePage() {
     };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [state, sessionQualityFlags, recordOnlyReason]);
+  }, [state, sessionQualityFlags, recordOnlyReason, getSidecarPort]);
 
   const calibrationFrames = getCalibrationFrames(calibration);
   const nextCalibrationPose: CalibrationPose | null = !(

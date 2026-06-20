@@ -113,6 +113,35 @@ test("sidecar source reports non-ready health through status and error callbacks
   );
 });
 
+test("sidecar source stops sidecar after start response parse failures", async () => {
+  await withSidecarGlobals(
+    async ({ fetchCalls }) => {
+      const statuses: PoseCaptureSourceStatus[] = [];
+      const source = new FreemocapSidecarSource({
+        onStatus: (status) => statuses.push(status),
+      });
+
+      await source.init();
+      await assert.rejects(() => source.start(), SyntaxError);
+      await source.stop();
+
+      assert.deepEqual(fetchCalls.map((call) => String(call.input)), [
+        "http://localhost:8765/health",
+        "http://localhost:8765/session/start",
+        "http://localhost:8765/session/stop",
+      ]);
+      assert.deepEqual(statuses, [
+        "loading",
+        "ready",
+        "error",
+        "stopping",
+        "stopped",
+      ]);
+    },
+    { startResponse: "malformed" },
+  );
+});
+
 test("resolveSidecarPort falls back to the default when no user port is configured", () => {
   assert.equal(resolveSidecarPort(null), 8765);
   assert.equal(resolveSidecarPort(undefined), 8765);
@@ -122,7 +151,10 @@ async function withSidecarGlobals(
   run: (context: {
     fetchCalls: { input: RequestInfo | URL; init?: RequestInit }[];
   }) => Promise<void>,
-  options: { healthResponse?: "ready" | "initializing" | "unreachable" } = {},
+  options: {
+    healthResponse?: "ready" | "initializing" | "unreachable";
+    startResponse?: "ready" | "malformed";
+  } = {},
 ): Promise<void> {
   const originalFetch = globalThis.fetch;
   const fetchCalls: { input: RequestInfo | URL; init?: RequestInit }[] = [];
@@ -142,6 +174,12 @@ async function withSidecarGlobals(
       });
     }
     if (url.includes("/session/start")) {
+      if (options.startResponse === "malformed") {
+        return new Response("{", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       return Response.json({
         sessionId: "sidecar-session",
         calibrationId: "calibration-1",
