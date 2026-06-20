@@ -74,9 +74,13 @@ export async function POST(req: Request) {
 
     const created = [];
     let createdAnyNewSession = false;
+    let updatedAnyExistingSession = false;
 
     for (const sessionData of newSessions) {
       const normalizedTimestamp = new Date(sessionData.timestamp);
+      const hasStrokeDataInput =
+        Object.prototype.hasOwnProperty.call(sessionData, 'strokeData') &&
+        Array.isArray(sessionData.strokeData);
 
       // Check if session already exists (for updates)
       // 1) Prefer matching by id (stable across re-imports if client keeps it)
@@ -105,13 +109,14 @@ export async function POST(req: Request) {
       let sessionRecord;
 
       // Pre-compute consistency score from stroke data
-      const consistencyScore = sessionData.strokeData && Array.isArray(sessionData.strokeData)
+      const consistencyScore = hasStrokeDataInput
         ? calculateConsistencyScore(sessionData.strokeData)
-        : null;
+        : undefined;
 
       if (existing) {
         // Update existing session
         console.log(`[SESSIONS API] Updating existing session ${sessionData.id}`);
+        updatedAnyExistingSession = true;
 
         sessionRecord = await prisma.rowingSession.update({
           where: { id: existing.id },
@@ -130,13 +135,13 @@ export async function POST(req: Request) {
             avgStrokeLength: sessionData.avgStrokeLength || 0,
             avgStrokeRate: sessionData.avgStrokeRate || 0,
             maxStrokeRate: sessionData.maxStrokeRate || 0,
-            consistencyScore: consistencyScore,
+            ...(hasStrokeDataInput ? { consistencyScore } : {}),
             sourceFile: sessionData.sourceFile || null,
           },
         });
 
         // Delete existing stroke data before adding new
-        if (sessionData.strokeData && Array.isArray(sessionData.strokeData)) {
+        if (hasStrokeDataInput) {
           await prisma.strokeData.deleteMany({
             where: { sessionId: existing.id },
           });
@@ -163,7 +168,7 @@ export async function POST(req: Request) {
               avgStrokeLength: sessionData.avgStrokeLength || 0,
               avgStrokeRate: sessionData.avgStrokeRate || 0,
               maxStrokeRate: sessionData.maxStrokeRate || 0,
-              consistencyScore: consistencyScore,
+              consistencyScore: consistencyScore ?? null,
               sourceFile: sessionData.sourceFile || null,
             },
           });
@@ -184,6 +189,7 @@ export async function POST(req: Request) {
             }
 
             console.log(`[SESSIONS API] Duplicate detected, updating existing session ${dupe.id}`);
+            updatedAnyExistingSession = true;
             sessionRecord = await prisma.rowingSession.update({
               where: { id: dupe.id },
               data: {
@@ -199,12 +205,12 @@ export async function POST(req: Request) {
                 avgStrokeLength: sessionData.avgStrokeLength || 0,
                 avgStrokeRate: sessionData.avgStrokeRate || 0,
                 maxStrokeRate: sessionData.maxStrokeRate || 0,
-                consistencyScore: consistencyScore,
+                ...(hasStrokeDataInput ? { consistencyScore } : {}),
                 sourceFile: sessionData.sourceFile || null,
               },
             });
 
-            if (sessionData.strokeData && Array.isArray(sessionData.strokeData)) {
+            if (hasStrokeDataInput) {
               await prisma.strokeData.deleteMany({
                 where: { sessionId: dupe.id },
               });
@@ -216,7 +222,7 @@ export async function POST(req: Request) {
       }
 
       // Save stroke data if present - use bulk insert for performance
-      if (sessionData.strokeData && Array.isArray(sessionData.strokeData) && sessionData.strokeData.length > 0) {
+      if (hasStrokeDataInput && sessionData.strokeData.length > 0) {
         console.log(`[SESSIONS API] Bulk inserting ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
 
         const strokeDataRecords = sessionData.strokeData.map((stroke: Record<string, unknown>) => ({
@@ -244,7 +250,8 @@ export async function POST(req: Request) {
       created.push(sessionRecord);
     }
 
-    const shouldBumpSessionsRevision = createdAnyNewSession || newSessions.length > 1;
+    const shouldBumpSessionsRevision =
+      createdAnyNewSession || updatedAnyExistingSession || newSessions.length > 1;
     if (shouldBumpSessionsRevision) {
       await prisma.userSettings.upsert({
         where: { userId: session.user.id },
