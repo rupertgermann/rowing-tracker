@@ -6,11 +6,10 @@ import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { parseStrokeCsv } from '@/lib/strokeParser';
-import { StrokeData } from '@/types/session';
+import type { Session, StrokeData } from '@/types/session';
 import { SessionAnalysis } from '@/components/SessionAnalysis';
 import {
   ArrowLeft,
@@ -24,7 +23,8 @@ import {
   Flame,
   Gauge,
   Upload,
-  Trash2
+  Trash2,
+  Video
 } from 'lucide-react';
 import { formatSessionDetailDate } from '@/lib/dateTimeUtils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -61,7 +61,7 @@ export default function SessionDetailPage() {
   const { getSessions, updateSession, deleteSession } = useRowingStore();
   const sessions = getSessions();
 
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [strokeData, setStrokeData] = useState<StrokeData[] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -120,11 +120,6 @@ export default function SessionDetailPage() {
     } finally {
       setAnalyzing(false);
     }
-  };
-
-  const handleClearAnalysis = () => {
-    if (!session) return;
-    setShowClearAnalysisConfirm(true);
   };
 
   const confirmClearAnalysis = () => {
@@ -214,6 +209,17 @@ export default function SessionDetailPage() {
 
           {/* Previous/Next Navigation */}
           <div className="flex items-center gap-2">
+            {session.mocapSession ? (
+              <Button variant="outline" asChild>
+                <Link
+                  href={`/mocap/sessions/${session.mocapSession.id}`}
+                  data-testid="session-mocap-link"
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  View mocap
+                </Link>
+              </Button>
+            ) : null}
             {previousSession && (
               <Button variant="outline" asChild>
                 <Link href={`/sessions/${previousSession.id}`}>
