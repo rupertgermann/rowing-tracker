@@ -9,6 +9,15 @@ const session = {
   qualityScore: 0.92,
   qualityFlags: [],
   createdAt: "2026-05-09T10:00:00.000Z",
+  rowingSessionId: "linked-rowing-session",
+  rowingSession: {
+    id: "linked-rowing-session",
+    timestamp: "2026-05-08T14:30:00.000Z",
+    distance: 100,
+    duration: 40,
+    avgPower: 61,
+    strokeCount: 12,
+  },
   strokePostureMetrics: [
     metric(0, 0),
     metric(1, 90),
@@ -34,6 +43,14 @@ test("replay comparison controls render and select strokes", async ({ page }) =>
   );
 
   await page.goto("/mocap/sessions/mock-session");
+
+  const linkedSession = page.getByTestId("mocap-linked-session");
+  await expect(linkedSession).toBeVisible();
+  await expect(linkedSession).toContainText("100m · 0:40 · 61W");
+  await expect(page.getByTestId("mocap-linked-rowing-session-link")).toHaveAttribute(
+    "href",
+    "/sessions/linked-rowing-session",
+  );
 
   await expect(page.getByTestId("mocap-stroke-compare")).toBeVisible();
 

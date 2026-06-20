@@ -809,15 +809,25 @@ export default function MocapReplayPage() {
                 {fmtTime(session.rowingSession.duration)} ·{" "}
                 {Math.round(session.rowingSession.avgPower)}W
               </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={unlinkSession}
-                disabled={actionBusy}
-                data-testid="mocap-unlink"
-              >
-                {unlinking ? "Analyzing…" : "Unlink"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" asChild>
+                  <Link
+                    href={`/sessions/${session.rowingSession.id}`}
+                    data-testid="mocap-linked-rowing-session-link"
+                  >
+                    View rowing session
+                  </Link>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={unlinkSession}
+                  disabled={actionBusy}
+                  data-testid="mocap-unlink"
+                >
+                  {unlinking ? "Analyzing…" : "Unlink"}
+                </Button>
+              </div>
             </div>
             {unlinking ? (
               <Alert>
