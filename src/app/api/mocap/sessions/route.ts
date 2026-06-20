@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { initializePoseStreamBlob } from "@/lib/mocap/capturePersistence";
+import { getMocapListAssignmentState } from "@/lib/mocap/assignment";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -18,11 +19,21 @@ export async function GET() {
     select: {
       id: true,
       status: true,
+      rowingSessionId: true,
       durationSec: true,
       createdAt: true,
       capturePerspective: true,
       qualityScore: true,
       qualityFlags: true,
+      rowingSession: {
+        select: {
+          id: true,
+          timestamp: true,
+          distance: true,
+          duration: true,
+          avgPower: true,
+        },
+      },
       _count: {
         select: {
           strokePostureMetrics: true,
@@ -32,7 +43,12 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ sessions: rows });
+  return NextResponse.json({
+    sessions: rows.map((row) => ({
+      ...row,
+      assignmentState: getMocapListAssignmentState(row),
+    })),
+  });
 }
 
 const CalibrationFrame = z.object({

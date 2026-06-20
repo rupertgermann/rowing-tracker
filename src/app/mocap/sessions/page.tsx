@@ -11,15 +11,25 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { MocapListAssignmentState } from "@/lib/mocap/assignment";
 
 interface MocapSessionSummary {
   id: string;
   status: string;
+  rowingSessionId: string | null;
   durationSec: number;
   createdAt: string;
   capturePerspective: string;
   qualityScore: number | null;
   qualityFlags: string[];
+  assignmentState: MocapListAssignmentState;
+  rowingSession: {
+    id: string;
+    timestamp: string;
+    distance: number;
+    duration: number;
+    avgPower: number;
+  } | null;
   _count: {
     strokePostureMetrics: number;
     postureFaults: number;
@@ -48,6 +58,13 @@ function fmtDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function assignmentBadge(state: MocapListAssignmentState) {
+  if (state.kind === "linked") return <Badge variant="secondary">Linked</Badge>;
+  if (state.kind === "assignable") return <Badge variant="outline">Ready to assign</Badge>;
+  if (state.kind === "record-only") return <Badge variant="outline">No pose stream</Badge>;
+  return <Badge variant="outline">{state.status}</Badge>;
 }
 
 export default function MocapSessionsPage() {
@@ -152,7 +169,10 @@ export default function MocapSessionsPage() {
                   <CardTitle className="text-base font-medium">
                     {fmtDate(s.createdAt)}
                   </CardTitle>
-                  {statusBadge(s.status)}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {assignmentBadge(s.assignmentState)}
+                    {statusBadge(s.status)}
+                  </div>
                 </div>
                 <CardDescription>
                   {s.capturePerspective} · {fmtDuration(s.durationSec)}
@@ -163,7 +183,18 @@ export default function MocapSessionsPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                    {s.assignmentState.kind === "linked" && s.rowingSession ? (
+                      <span>
+                        Linked to {fmtDate(s.rowingSession.timestamp)} ·{" "}
+                        {s.rowingSession.distance}m · {fmtDuration(s.rowingSession.duration)}
+                      </span>
+                    ) : s.assignmentState.kind === "assignable" ? (
+                      <span>Unlinked pose-backed recording</span>
+                    ) : s.assignmentState.kind === "record-only" ? (
+                      <span>Record-only video; assignment unavailable.</span>
+                    ) : null}
+                    <span className="flex flex-wrap gap-4">
                     <span>{s._count.strokePostureMetrics} strokes</span>
                     <span>{s._count.postureFaults} faults</span>
                     {s.qualityFlags.length > 0 && (
@@ -171,19 +202,27 @@ export default function MocapSessionsPage() {
                         ⚠ {s.qualityFlags.join(", ")}
                       </span>
                     )}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {s.status === "ready" ? (
                       <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={reanalyzingId === s.id}
-                          onClick={() => handleReanalyze(s.id)}
-                          data-testid={`mocap-reanalyze-${s.id}`}
-                        >
-                          {reanalyzingId === s.id ? "Analyzing…" : "Reanalyze"}
-                        </Button>
+                        {s.assignmentState.kind !== "record-only" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reanalyzingId === s.id}
+                            onClick={() => handleReanalyze(s.id)}
+                            data-testid={`mocap-reanalyze-${s.id}`}
+                          >
+                            {reanalyzingId === s.id ? "Analyzing…" : "Reanalyze"}
+                          </Button>
+                        ) : null}
+                        {s.assignmentState.kind === "assignable" ? (
+                          <Button asChild size="sm">
+                            <Link href={`/mocap/sessions/${s.id}?assign=1`}>Assign</Link>
+                          </Button>
+                        ) : null}
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/mocap/sessions/${s.id}`}>Replay</Link>
                         </Button>

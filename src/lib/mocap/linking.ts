@@ -24,14 +24,30 @@ export type MocapLinkResult =
       message: string;
     };
 
+export type MocapUnlinkResult =
+  | {
+      ok: true;
+      mocapSessionId: string;
+      status: string;
+    }
+  | {
+      ok: false;
+      reason: MocapLinkFailureReason;
+      status: number;
+      message: string;
+    };
+
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-async function readErrorMessage(response: Response): Promise<string> {
+async function readErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
   try {
     const data = await response.json();
-    return typeof data?.error === "string" ? data.error : "Failed to link mocap session";
+    return typeof data?.error === "string" ? data.error : fallback;
   } catch {
-    return "Failed to link mocap session";
+    return fallback;
   }
 }
 
@@ -57,7 +73,7 @@ export async function confirmMocapSessionLink(
       ok: false,
       reason: failureReasonForStatus(response.status),
       status: response.status,
-      message: await readErrorMessage(response),
+      message: await readErrorMessage(response, "Failed to link mocap session"),
     };
   }
 
@@ -67,6 +83,32 @@ export async function confirmMocapSessionLink(
     mocapSessionId: typeof data?.id === "string" ? data.id : target.mocapSessionId,
     rowingSessionId:
       typeof data?.rowingSessionId === "string" ? data.rowingSessionId : target.rowingSessionId,
+    status: typeof data?.status === "string" ? data.status : "ready",
+  };
+}
+
+export async function confirmMocapSessionUnlink(
+  mocapSessionId: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<MocapUnlinkResult> {
+  const response = await fetchImpl(
+    `/api/mocap/sessions/${encodeURIComponent(mocapSessionId)}/unlink`,
+    { method: "POST" },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      reason: failureReasonForStatus(response.status),
+      status: response.status,
+      message: await readErrorMessage(response, "Failed to unlink mocap session"),
+    };
+  }
+
+  const data = await response.json();
+  return {
+    ok: true,
+    mocapSessionId: typeof data?.id === "string" ? data.id : mocapSessionId,
     status: typeof data?.status === "string" ? data.status : "ready",
   };
 }

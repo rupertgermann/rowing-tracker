@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { confirmMocapSessionLink } from "../src/lib/mocap/linking";
+import {
+  confirmMocapSessionLink,
+  confirmMocapSessionUnlink,
+} from "../src/lib/mocap/linking";
 
 test("confirmMocapSessionLink links an overlapping mocap session", async () => {
   const calls: Array<{ input: string; init?: RequestInit }> = [];
@@ -42,5 +45,40 @@ test("confirmMocapSessionLink reports already-linked conflicts", async () => {
     reason: "conflict",
     status: 409,
     message: "Rowing session is already linked to another mocap session.",
+  });
+});
+
+test("confirmMocapSessionUnlink unlinks a mocap session", async () => {
+  const calls: Array<{ input: string; init?: RequestInit }> = [];
+  const fetchImpl = async (input: string, init?: RequestInit) => {
+    calls.push({ input, init });
+    return Response.json({ id: "mocap-1", status: "ready" });
+  };
+
+  const result = await confirmMocapSessionUnlink("mocap-1", fetchImpl);
+
+  assert.deepEqual(result, {
+    ok: true,
+    mocapSessionId: "mocap-1",
+    status: "ready",
+  });
+  assert.equal(calls[0].input, "/api/mocap/sessions/mocap-1/unlink");
+  assert.equal(calls[0].init?.method, "POST");
+});
+
+test("confirmMocapSessionUnlink reports analysis failures", async () => {
+  const fetchImpl = async () =>
+    Response.json(
+      { error: "Failed to rebuild pose-segmented analysis." },
+      { status: 500 },
+    );
+
+  const result = await confirmMocapSessionUnlink("mocap-1", fetchImpl);
+
+  assert.deepEqual(result, {
+    ok: false,
+    reason: "analysis_failed",
+    status: 500,
+    message: "Failed to rebuild pose-segmented analysis.",
   });
 });

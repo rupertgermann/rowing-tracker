@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   HEADER_SIZE,
   BYTES_PER_FRAME_V1,
@@ -19,6 +20,18 @@ import {
   buildReplayComparisonOptions,
   countFaultsForStroke,
 } from "@/lib/mocap/replayComparison";
+import {
+  buildNonOverlapConfirmationMessage,
+  buildUnlinkConfirmationMessage,
+  formatGap,
+  isMocapAssignmentActionBusy,
+  MOCAP_RECORD_ONLY_FLAG,
+  type ManualAssignmentCandidate,
+} from "@/lib/mocap/assignment";
+import {
+  confirmMocapSessionLink,
+  confirmMocapSessionUnlink,
+} from "@/lib/mocap/linking";
 
 // MediaPipe 33-keypoint skeleton connections for side-view rowing
 const SKELETON_CONNECTIONS: [number, number][] = [
@@ -79,6 +92,15 @@ interface SessionFault {
 interface MocapSessionDetail {
   id: string;
   status: string;
+  rowingSessionId: string | null;
+  rowingSession: {
+    id: string;
+    timestamp: string;
+    distance: number;
+    duration: number;
+    avgPower: number;
+    strokeCount: number;
+  } | null;
   capturePerspective: string;
   captureFps: number;
   durationSec: number;
@@ -88,6 +110,18 @@ interface MocapSessionDetail {
   strokePostureMetrics: SessionStrokeMetric[];
   postureFaults: SessionFault[];
 }
+
+type AssignmentCandidatesResponse =
+  | {
+      linkable: true;
+      candidates: ManualAssignmentCandidate[];
+    }
+  | {
+      linkable: false;
+      reason: string;
+      message: string;
+      candidates: [];
+    };
 
 async function fetchPoseHeader(id: string): Promise<PoseStreamHeader | null> {
   try {
@@ -234,6 +268,18 @@ export default function MocapReplayPage() {
     Record<string, Float32Array | null>
   >({});
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [assignmentCandidates, setAssignmentCandidates] = useState<
+    ManualAssignmentCandidate[] | null
+  >(null);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [linkingRowingSessionId, setLinkingRowingSessionId] = useState<string | null>(
+    null,
+  );
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
 
   const comparisonOptions = useMemo(
     () =>
@@ -269,16 +315,36 @@ export default function MocapReplayPage() {
     return map;
   }, [session]);
 
+  const loadSession = useCallback(async () => {
+    setLoadError(null);
+    const response = await fetch(`/api/mocap/sessions/${id}`);
+    if (!response.ok) throw new Error(`${response.status}`);
+    const data = await response.json();
+    setSession(data.session);
+  }, [id]);
+
+  const loadAssignmentCandidates = useCallback(async () => {
+    setAssignmentError(null);
+    setAssignmentMessage(null);
+    const response = await fetch(`/api/mocap/sessions/${id}/assignment-candidates`);
+    const data: AssignmentCandidatesResponse = await response.json();
+    if (!response.ok) {
+      throw new Error("message" in data ? data.message : `${response.status}`);
+    }
+    if (data.linkable) {
+      setAssignmentCandidates(data.candidates);
+    } else {
+      setAssignmentCandidates([]);
+      setAssignmentMessage(data.message);
+    }
+  }, [id]);
+
   // Load session data
   useEffect(() => {
-    fetch(`/api/mocap/sessions/${id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`);
-        return r.json();
-      })
-      .then((data) => setSession(data.session))
-      .catch((e) => setLoadError(e.message));
-  }, [id]);
+    loadSession().catch((e) =>
+      setLoadError(e instanceof Error ? e.message : String(e)),
+    );
+  }, [loadSession]);
 
   // Load pose stream header
   useEffect(() => {
@@ -289,6 +355,38 @@ export default function MocapReplayPage() {
       setPoseHeaderChecked(true);
     });
   }, [id, session]);
+
+  useEffect(() => {
+    if (
+      !session ||
+      session.status !== "ready" ||
+      session.rowingSessionId !== null ||
+      session.qualityFlags.includes(MOCAP_RECORD_ONLY_FLAG)
+    ) {
+      setAssignmentCandidates(null);
+      setAssignmentMessage(null);
+      setAssignmentError(null);
+      setAssignmentLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setAssignmentLoading(true);
+    loadAssignmentCandidates()
+      .catch((e) => {
+        if (!cancelled) {
+          setAssignmentCandidates([]);
+          setAssignmentError(e instanceof Error ? e.message : String(e));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAssignmentLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadAssignmentCandidates, session]);
 
   useEffect(() => {
     if (!session || session.strokePostureMetrics.length === 0) return;
@@ -481,17 +579,85 @@ export default function MocapReplayPage() {
         method: "POST",
       });
       if (!res.ok) throw new Error(`${res.status}`);
-      // Refetch full session to get the new derived rows
-      const dataRes = await fetch(`/api/mocap/sessions/${id}`);
-      if (!dataRes.ok) throw new Error(`${dataRes.status}`);
-      const data = await dataRes.json();
-      setSession(data.session);
+      await loadSession();
     } catch (e) {
       setReanalyzeError(e instanceof Error ? e.message : String(e));
     } finally {
       setReanalyzing(false);
     }
-  }, [id]);
+  }, [id, loadSession]);
+
+  const assignCandidate = useCallback(
+    async (candidate: ManualAssignmentCandidate) => {
+      if (
+        isMocapAssignmentActionBusy({
+          linkingRowingSessionId,
+          unlinking,
+          reanalyzing,
+        })
+      ) {
+        return;
+      }
+
+      if (
+        !candidate.overlap.overlaps &&
+        !window.confirm(buildNonOverlapConfirmationMessage(candidate))
+      ) {
+        return;
+      }
+
+      setLinkingRowingSessionId(candidate.id);
+      setLinkError(null);
+      setUnlinkError(null);
+      try {
+        const result = await confirmMocapSessionLink({
+          mocapSessionId: id,
+          rowingSessionId: candidate.id,
+        });
+        if (!result.ok) {
+          setLinkError(result.message);
+          return;
+        }
+        setAssignmentCandidates(null);
+        await loadSession();
+      } catch (e) {
+        setLinkError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLinkingRowingSessionId(null);
+      }
+    },
+    [id, linkingRowingSessionId, loadSession, reanalyzing, unlinking],
+  );
+
+  const unlinkSession = useCallback(async () => {
+    if (
+      isMocapAssignmentActionBusy({
+        linkingRowingSessionId,
+        unlinking,
+        reanalyzing,
+      })
+    ) {
+      return;
+    }
+
+    if (!window.confirm(buildUnlinkConfirmationMessage())) return;
+
+    setUnlinking(true);
+    setUnlinkError(null);
+    setLinkError(null);
+    try {
+      const result = await confirmMocapSessionUnlink(id);
+      if (!result.ok) {
+        setUnlinkError(result.message);
+        return;
+      }
+      await loadSession();
+    } catch (e) {
+      setUnlinkError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUnlinking(false);
+    }
+  }, [id, linkingRowingSessionId, loadSession, reanalyzing, unlinking]);
 
   const freezeAtCatch = useCallback(() => {
     if (selectedStroke === null || !session || !poseHeader) return;
@@ -533,7 +699,14 @@ export default function MocapReplayPage() {
   const hasMetrics = session.strokePostureMetrics.length > 0;
   const hasPoseStream = Boolean(poseHeader);
   const segmentationSource = session.strokePostureMetrics[0]?.segmentationSource ?? null;
-  const isRecordOnly = session.qualityFlags.includes("record-only");
+  const isRecordOnly = session.qualityFlags.includes(MOCAP_RECORD_ONLY_FLAG);
+  const actionBusy = isMocapAssignmentActionBusy({
+    linkingRowingSessionId,
+    unlinking,
+    reanalyzing,
+  });
+  const showAssignmentWorkflow =
+    session.status === "ready" && session.rowingSessionId === null && !isRecordOnly;
   const compareFaultMetric =
     compareFaultStroke === null ? null : metricsByStroke.get(compareFaultStroke) ?? null;
   const compareMetric =
@@ -584,6 +757,124 @@ export default function MocapReplayPage() {
           />
         ) : null}
       </div>
+
+      {session.rowingSession ? (
+        <Card data-testid="mocap-linked-session">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between gap-3 text-sm font-medium">
+              <span>Linked rowing session</span>
+              <Badge variant="secondary">CSV-aligned</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {fmtDate(session.rowingSession.timestamp)} ·{" "}
+                {session.rowingSession.distance}m ·{" "}
+                {fmtTime(session.rowingSession.duration)} ·{" "}
+                {Math.round(session.rowingSession.avgPower)}W
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={unlinkSession}
+                disabled={actionBusy}
+                data-testid="mocap-unlink"
+              >
+                {unlinking ? "Analyzing…" : "Unlink"}
+              </Button>
+            </div>
+            {unlinking ? (
+              <Alert>
+                <AlertDescription>
+                  Unlinking and re-analyzing as pose-segmented data.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {unlinkError ? (
+              <Alert variant="destructive" data-testid="mocap-unlink-error">
+                <AlertDescription>{unlinkError}</AlertDescription>
+              </Alert>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {showAssignmentWorkflow ? (
+        <Card data-testid="mocap-assignment">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">
+              Assign rowing session
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {linkingRowingSessionId ? (
+              <Alert>
+                <AlertDescription>
+                  Linking and re-analyzing as CSV-aligned data.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {linkError ? (
+              <Alert variant="destructive" data-testid="mocap-link-error">
+                <AlertDescription>{linkError}</AlertDescription>
+              </Alert>
+            ) : null}
+            {assignmentError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{assignmentError}</AlertDescription>
+              </Alert>
+            ) : null}
+            {assignmentMessage ? (
+              <p className="text-sm text-muted-foreground">{assignmentMessage}</p>
+            ) : assignmentLoading || assignmentCandidates === null ? (
+              <p className="text-sm text-muted-foreground">Loading candidates…</p>
+            ) : assignmentCandidates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No unlinked rowing sessions are available.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {assignmentCandidates.map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    className="flex flex-col gap-3 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="space-y-1 text-sm">
+                      <div className="font-medium">{fmtDate(candidate.timestamp)}</div>
+                      <div className="text-muted-foreground">
+                        {candidate.distance}m · {fmtTime(candidate.duration)} ·{" "}
+                        {Math.round(candidate.avgPower)}W · {candidate.strokeCount} strokes
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {candidate.overlap.overlaps ? (
+                          <Badge variant="secondary">Overlaps capture</Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            Gap {formatGap(candidate.overlap.timeGapMs)}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => assignCandidate(candidate)}
+                      disabled={actionBusy}
+                      data-testid={`mocap-assign-${candidate.id}`}
+                    >
+                      {linkingRowingSessionId === candidate.id
+                        ? "Analyzing…"
+                        : candidate.overlap.overlaps
+                          ? "Assign"
+                          : "Review assign"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Freeze controls + stroke selector */}
       {hasMetrics ? (

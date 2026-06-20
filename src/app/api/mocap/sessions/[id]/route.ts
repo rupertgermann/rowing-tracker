@@ -17,6 +17,16 @@ export async function GET(
   const row = await prisma.mocapSession.findFirst({
     where: { id, userId: session.user.id },
     include: {
+      rowingSession: {
+        select: {
+          id: true,
+          timestamp: true,
+          distance: true,
+          duration: true,
+          avgPower: true,
+          strokeCount: true,
+        },
+      },
       strokePostureMetrics: {
         orderBy: { strokeIndex: "asc" },
       },

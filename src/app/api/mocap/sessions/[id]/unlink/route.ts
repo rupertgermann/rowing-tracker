@@ -46,6 +46,12 @@ export async function POST(
   }
 
   const previousRowingSessionId = mocapSession.rowingSessionId;
+  if (previousRowingSessionId === null) {
+    return NextResponse.json(
+      { error: "Mocap session is not linked to a rowing session." },
+      { status: 409 },
+    );
+  }
 
   // Clear the link and set status to "analyzing"
   await prisma.mocapSession.update({
@@ -78,6 +84,26 @@ export async function POST(
     where: { id },
     data: { status: "ready" },
     select: { id: true, status: true },
+  });
+
+  await prisma.userSettings.upsert({
+    where: { userId },
+    update: {
+      sessionsRevision: { increment: 1 },
+    },
+    create: {
+      userId,
+      theme: "system",
+      units: "metric",
+      dateFormat: "MM/DD/YYYY",
+      timeFormat: "24h",
+      language: "en",
+      defaultChartType: "line",
+      animationsEnabled: true,
+      cloudAIEnabled: false,
+      maxTokens: 4000,
+      sessionsRevision: 1,
+    },
   });
 
   return NextResponse.json({
