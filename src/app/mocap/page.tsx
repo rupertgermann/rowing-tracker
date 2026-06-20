@@ -828,11 +828,20 @@ export default function MocapCapturePage() {
     <div className="container mx-auto max-w-4xl py-8 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Motion capture session</CardTitle>
-          <CardDescription>
-            Single-webcam pose capture. Camera permission is requested only when
-            you click Start.
-          </CardDescription>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1.5">
+              <CardTitle>Motion capture session</CardTitle>
+              <CardDescription>
+                Single-webcam pose capture. Camera permission is requested only when
+                you click Start.
+              </CardDescription>
+            </div>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/mocap/sessions" data-testid="mocap-view-sessions">
+                View sessions
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-4">
