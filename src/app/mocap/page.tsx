@@ -10,10 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  BrowserPoseSource,
-  type PoseSourceStatus,
-} from "@/lib/mocap/browserPoseSource";
+import { BrowserPoseSource } from "@/lib/mocap/browserPoseSource";
+import type {
+  PoseCaptureSource,
+  PoseCaptureSourceStatus,
+} from "@/lib/mocap/poseCaptureSource";
 import {
   cameraQualityFlagLabel,
   evaluateCameraReadiness,
@@ -145,8 +146,8 @@ export default function MocapCapturePage() {
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const uploaderRef = useRef<VideoUploader | null>(null);
-  const sourceRef = useRef<BrowserPoseSource | null>(null);
-  const calibrationSourceRef = useRef<BrowserPoseSource | null>(null);
+  const sourceRef = useRef<PoseCaptureSource | null>(null);
+  const calibrationSourceRef = useRef<PoseCaptureSource | null>(null);
   const startedAtRef = useRef<number>(0);
   const latestPoseFrameRef = useRef<PoseQuality>(EMPTY_QUALITY);
   const qualityHistoryRef = useRef<CameraReadinessFrame[]>([]);
@@ -162,7 +163,7 @@ export default function MocapCapturePage() {
     kind: "idle",
   });
   const [framesEncoded, setFramesEncoded] = useState(0);
-  const [poseStatus, setPoseStatus] = useState<PoseSourceStatus>("idle");
+  const [poseStatus, setPoseStatus] = useState<PoseCaptureSourceStatus>("idle");
   const [perspective, setPerspective] = useState<"side-left" | "side-right">(
     "side-right",
   );
