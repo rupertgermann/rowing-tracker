@@ -29,7 +29,9 @@ A captured rowing session containing video + pose stream + derived metrics + fau
 
 Lifecycle states (proposed): `capturing` → `analyzing` → `ready` → optionally `linked` (when joined to a `RowingSession`).
 
-**Linking to a `RowingSession`** is bidirectional and exclusive — one `MocapSession` is linked to at most one `RowingSession` and vice versa. Either side may be unlinked; relinking is allowed. Linking triggers mandatory re-analysis (`pose-segmented` → `csv-aligned`) as a background job; the mocap row goes back to `analyzing` until it completes. Unlinking reverts to `pose-segmented` and re-runs metrics. CSV import auto-prompts to link when a capture window overlaps a new `RowingSession` by ±2 minutes — user confirms, never silent.
+**Linking to a `RowingSession`** is bidirectional and exclusive — one `MocapSession` is linked to at most one `RowingSession` and vice versa. Either side may be unlinked; relinking is allowed. Linking triggers mandatory re-analysis (`pose-segmented` → `csv-aligned`); the mocap row is `analyzing` until re-analysis completes. Unlinking reverts to `pose-segmented` and re-runs metrics. CSV import auto-prompts to link when a capture window overlaps a new `RowingSession` by ±2 minutes — user confirms, never silent. Manual assignment may link any ready, unlinked `MocapSession` to any unlinked `RowingSession` for the same user. Capture-window overlap is a recommendation signal, not an eligibility rule; warn before linking sessions that do not overlap.
+
+A **record-only `MocapSession`** has video but no `PoseFrameStream`. It cannot be linked to a `RowingSession`, because linking must produce `csv-aligned` posture analysis.
 
 ### CueLatencyBand
 
