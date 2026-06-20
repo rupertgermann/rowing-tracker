@@ -3,6 +3,11 @@ export interface MocapLinkTarget {
   mocapSessionId: string;
 }
 
+export interface MocapLinkableSession {
+  id: string;
+  mocapSession?: { id: string } | null;
+}
+
 export type MocapLinkFailureReason =
   | "analysis_failed"
   | "conflict"
@@ -38,6 +43,43 @@ export type MocapUnlinkResult =
     };
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+export function applyMocapLinkToSessions<T extends MocapLinkableSession>(
+  sessions: T[],
+  target: MocapLinkTarget,
+): T[] {
+  return sessions.map((session) => {
+    if (session.id === target.rowingSessionId) {
+      return {
+        ...session,
+        mocapSession: { id: target.mocapSessionId },
+      };
+    }
+
+    if (session.mocapSession?.id === target.mocapSessionId) {
+      return {
+        ...session,
+        mocapSession: null,
+      };
+    }
+
+    return session;
+  });
+}
+
+export function applyMocapUnlinkToSessions<T extends MocapLinkableSession>(
+  sessions: T[],
+  mocapSessionId: string,
+): T[] {
+  return sessions.map((session) =>
+    session.mocapSession?.id === mocapSessionId
+      ? {
+          ...session,
+          mocapSession: null,
+        }
+      : session,
+  );
+}
 
 async function readErrorMessage(
   response: Response,

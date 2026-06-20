@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useRowingStore } from "@/lib/store";
+import { clearSessionsCache } from "@/lib/services/sessionsCache";
 import {
   HEADER_SIZE,
   BYTES_PER_FRAME_V1,
@@ -29,6 +31,8 @@ import {
   type ManualAssignmentCandidate,
 } from "@/lib/mocap/assignment";
 import {
+  applyMocapLinkToSessions,
+  applyMocapUnlinkToSessions,
   confirmMocapSessionLink,
   confirmMocapSessionUnlink,
 } from "@/lib/mocap/linking";
@@ -252,6 +256,10 @@ export default function MocapReplayPage() {
   const animRef = useRef<number | null>(null);
   const fetchingRef = useRef(false);
   const lastFrameIndexRef = useRef(-1);
+  const getStoreSessions = useRowingStore((state) => state.getSessions);
+  const updateSessionsInStore = useRowingStore(
+    (state) => state.updateSessionsInStore,
+  );
 
   const [session, setSession] = useState<MocapSessionDetail | null>(null);
   const [poseHeader, setPoseHeader] = useState<PoseStreamHeader | null>(null);
@@ -618,6 +626,13 @@ export default function MocapReplayPage() {
           setLinkError(result.message);
           return;
         }
+        updateSessionsInStore(
+          applyMocapLinkToSessions(getStoreSessions(), {
+            rowingSessionId: result.rowingSessionId,
+            mocapSessionId: result.mocapSessionId,
+          }),
+        );
+        clearSessionsCache();
         setAssignmentCandidates(null);
         await loadSession();
       } catch (e) {
@@ -626,7 +641,15 @@ export default function MocapReplayPage() {
         setLinkingRowingSessionId(null);
       }
     },
-    [id, linkingRowingSessionId, loadSession, reanalyzing, unlinking],
+    [
+      getStoreSessions,
+      id,
+      linkingRowingSessionId,
+      loadSession,
+      reanalyzing,
+      unlinking,
+      updateSessionsInStore,
+    ],
   );
 
   const unlinkSession = useCallback(async () => {
@@ -651,13 +674,25 @@ export default function MocapReplayPage() {
         setUnlinkError(result.message);
         return;
       }
+      updateSessionsInStore(
+        applyMocapUnlinkToSessions(getStoreSessions(), result.mocapSessionId),
+      );
+      clearSessionsCache();
       await loadSession();
     } catch (e) {
       setUnlinkError(e instanceof Error ? e.message : String(e));
     } finally {
       setUnlinking(false);
     }
-  }, [id, linkingRowingSessionId, loadSession, reanalyzing, unlinking]);
+  }, [
+    getStoreSessions,
+    id,
+    linkingRowingSessionId,
+    loadSession,
+    reanalyzing,
+    unlinking,
+    updateSessionsInStore,
+  ]);
 
   const freezeAtCatch = useCallback(() => {
     if (selectedStroke === null || !session || !poseHeader) return;

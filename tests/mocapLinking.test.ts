@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  applyMocapLinkToSessions,
+  applyMocapUnlinkToSessions,
   confirmMocapSessionLink,
   confirmMocapSessionUnlink,
 } from "../src/lib/mocap/linking";
@@ -81,4 +83,47 @@ test("confirmMocapSessionUnlink reports analysis failures", async () => {
     status: 500,
     message: "Failed to rebuild pose-segmented analysis.",
   });
+});
+
+test("applyMocapLinkToSessions marks the linked rowing session for the sessions screen", () => {
+  const sessions = [
+    { id: "rowing-1", timestamp: new Date("2026-06-20T10:00:00Z"), distance: 1000 },
+    { id: "rowing-2", timestamp: new Date("2026-06-20T11:00:00Z"), distance: 2000 },
+  ];
+
+  const updated = applyMocapLinkToSessions(sessions, {
+    rowingSessionId: "rowing-2",
+    mocapSessionId: "mocap-1",
+  });
+
+  assert.equal(updated[0], sessions[0]);
+  assert.deepEqual(updated[1], {
+    ...sessions[1],
+    mocapSession: { id: "mocap-1" },
+  });
+});
+
+test("applyMocapUnlinkToSessions clears only the unlinked mocap session marker", () => {
+  const sessions = [
+    {
+      id: "rowing-1",
+      timestamp: new Date("2026-06-20T10:00:00Z"),
+      distance: 1000,
+      mocapSession: { id: "mocap-1" },
+    },
+    {
+      id: "rowing-2",
+      timestamp: new Date("2026-06-20T11:00:00Z"),
+      distance: 2000,
+      mocapSession: { id: "mocap-2" },
+    },
+  ];
+
+  const updated = applyMocapUnlinkToSessions(sessions, "mocap-1");
+
+  assert.deepEqual(updated[0], {
+    ...sessions[0],
+    mocapSession: null,
+  });
+  assert.equal(updated[1], sessions[1]);
 });
