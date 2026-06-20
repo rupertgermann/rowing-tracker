@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { KEYPOINT_SCHEMA_V2 } from "@/lib/mocap/poseFrameStream";
 import {
   checkSidecarHealth,
   SIDECAR_DEFAULT_PORT,
@@ -54,6 +55,17 @@ export async function POST(
     if (health.status !== "ready") {
       return NextResponse.json(
         { status: health.status, port },
+        { status: 409 },
+      );
+    }
+    if (health.schemaVersion !== KEYPOINT_SCHEMA_V2) {
+      return NextResponse.json(
+        {
+          status: "incompatible-schema",
+          port,
+          schemaVersion: health.schemaVersion,
+          expectedSchemaVersion: KEYPOINT_SCHEMA_V2,
+        },
         { status: 409 },
       );
     }

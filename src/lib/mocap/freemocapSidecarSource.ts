@@ -37,6 +37,8 @@ interface SidecarConnectResponse {
   calibrationId?: string | null;
 }
 
+const SIDECAR_RELEVANT_TRACKED_KEYPOINTS = 13;
+
 export class FreemocapSidecarSource implements PoseCaptureSource {
   private closeStream: (() => void) | null = null;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -45,6 +47,7 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
   private framesEncoded = 0;
   private capturing = false;
   private sidecarStarted = false;
+  private firstSidecarTimestampMs: number | null = null;
   private readonly port: number;
   private readonly uploadPoseStream: boolean;
   readonly cameraCount: number;
@@ -80,6 +83,7 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     if (this.capturing) return;
     this.setStatus("loading");
     try {
+      this.firstSidecarTimestampMs = null;
       const session = await this.startSidecarSession();
       this.sidecarStarted = true;
       this.sidecarSessionId = session.sidecarSessionId ?? session.sessionId ?? null;
@@ -105,7 +109,6 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
 
   async stop(): Promise<void> {
     const shouldStopSidecar = this.sidecarStarted;
-    this.capturing = false;
     this.sidecarStarted = false;
     this.setStatus("stopping");
 
@@ -113,25 +116,30 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
+
+    let stopError: Error | null = null;
+    if (shouldStopSidecar) {
+      try {
+        await stopSidecarSession(this.port);
+      } catch (err) {
+        stopError = toError(err);
+      }
+    }
+
+    this.capturing = false;
     this.closeStream?.();
     this.closeStream = null;
 
     await this.drain();
+    this.firstSidecarTimestampMs = null;
 
-    if (!shouldStopSidecar) {
-      this.setStatus("stopped");
-      return;
+    if (stopError) {
+      this.setStatus("error", stopError.message);
+      this.opts.onError?.(stopError);
+      throw stopError;
     }
 
-    try {
-      await stopSidecarSession(this.port);
-      this.setStatus("stopped");
-    } catch (err) {
-      const error = toError(err);
-      this.setStatus("error", error.message);
-      this.opts.onError?.(error);
-      throw error;
-    }
+    this.setStatus("stopped");
   }
 
   async drain(): Promise<void> {
@@ -163,13 +171,19 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     if (!this.capturing) return;
     try {
       const frame = validateSidecarKeypointFrame(message);
-      const poseFrameBytes = encodeSidecarPoseFrame(frame);
+      this.firstSidecarTimestampMs ??= frame.timestampMs;
+      const poseFrameBytes = encodeSidecarPoseFrame(
+        frame,
+        this.firstSidecarTimestampMs,
+      );
       this.framesEncoded += 1;
       this.uploadBuffer?.enqueue(poseFrameBytes);
       this.opts.onFrame?.({
         framesEncoded: this.framesEncoded,
         landmarkCount: KEYPOINTS_PER_FRAME_V2,
-        trackedKeypointCount: frame.quality.trackedCount,
+        trackedKeypointCount: sidecarTrackedCountForPoseQuality(
+          frame.quality.trackedCount,
+        ),
         meanConfidence: frame.quality.meanConfidence,
         qualityFlags: sidecarQualityFlags(frame),
         poseFrameBytes,
@@ -194,9 +208,12 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
   }
 }
 
-export function encodeSidecarPoseFrame(frame: SidecarKeypointFrame): Uint8Array {
+export function encodeSidecarPoseFrame(
+  frame: SidecarKeypointFrame,
+  timestampOriginMs = frame.timestampMs,
+): Uint8Array {
   const poseFrame: PoseFrame = {
-    timestampMs: frame.timestampMs,
+    timestampMs: Math.max(0, frame.timestampMs - timestampOriginMs),
     keypoints: sidecarKeypointsToQuads(frame),
     qualityFlags: sidecarQualityFlags(frame),
   };
@@ -318,6 +335,16 @@ function sidecarQualityFlags(frame: SidecarKeypointFrame): number {
     return QUALITY_FLAG.LOW_CONFIDENCE;
   }
   return 0;
+}
+
+function sidecarTrackedCountForPoseQuality(trackedCount: number): number {
+  return Math.min(
+    KEYPOINTS_PER_FRAME_V2,
+    Math.round(
+      (trackedCount / SIDECAR_RELEVANT_TRACKED_KEYPOINTS) *
+        KEYPOINTS_PER_FRAME_V2,
+    ),
+  );
 }
 
 function requiredNumber(

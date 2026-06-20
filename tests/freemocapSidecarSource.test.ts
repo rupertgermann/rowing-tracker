@@ -41,38 +41,46 @@ class FakeWebSocket {
 test("sidecar source starts capture, records calibration, and encodes v2 frames", async () => {
   await withSidecarGlobals(async ({ fetchCalls }) => {
     const captured: Uint8Array[] = [];
+    const trackedCounts: number[] = [];
     const source = new FreemocapSidecarSource({
       sessionId: "session-1",
       cameraCount: 3,
       flushBytes: BYTES_PER_FRAME_V2 * 4,
-      onFrame: (frame) => captured.push(frame.poseFrameBytes),
+      onFrame: (frame) => {
+        captured.push(frame.poseFrameBytes);
+        trackedCounts.push(frame.trackedKeypointCount);
+      },
     });
     const contract: PoseCaptureSource = source;
 
     await contract.init();
     await contract.start();
     FakeWebSocket.instances[0].emitMessage(makeSidecarFrame(0));
+    FakeWebSocket.instances[0].emitMessage(makeSidecarFrame(1));
 
     assert.equal(source.calibrationId, "calibration-1");
     assert.equal(source.sidecarSessionId, "sidecar-1");
-    assert.equal(contract.framesCaptured, 1);
-    assert.equal(captured.length, 1);
+    assert.equal(contract.framesCaptured, 2);
+    assert.equal(captured.length, 2);
+    assert.deepEqual(trackedCounts, [33, 33]);
     assert.equal(captured[0].byteLength, BYTES_PER_FRAME_V2);
 
     const decoded = decodeFrame(captured[0], 0, KEYPOINT_SCHEMA_V2);
-    assert.equal(decoded.timestampMs, Math.fround(1_700_000_000_000));
+    assert.equal(decoded.timestampMs, 0);
     assert.equal(decoded.keypoints[12 * 4], Math.fround(12));
     assert.equal(decoded.keypoints[12 * 4 + 1], Math.fround(112));
     assert.equal(decoded.keypoints[12 * 4 + 2], Math.fround(212));
     assert.equal(decoded.keypoints[12 * 4 + 3], Math.fround(0.9));
     assert.equal(decoded.qualityFlags, 0);
+    const decodedSecond = decodeFrame(captured[1], 0, KEYPOINT_SCHEMA_V2);
+    assert.equal(decodedSecond.timestampMs, 33);
 
     await contract.stop();
     assert.equal(FakeWebSocket.instances[0].closed, true);
     assert.deepEqual(fetchCalls.map((call) => String(call.input)), [
       "/api/mocap/sessions/session-1/sidecar/connect",
-      "/api/mocap/sessions/session-1/pose-stream",
       "http://localhost:8765/session/stop",
+      "/api/mocap/sessions/session-1/pose-stream",
     ]);
   });
 });
@@ -107,14 +115,17 @@ test("sidecar source flushes buffered v2 bytes by threshold and drains on stop",
     assert.equal(poseUploads.length, 2);
     assert.equal((poseUploads[1].init?.body as Blob).size, BYTES_PER_FRAME_V2);
 
-    const uploadIndex = fetchCalls.findIndex((call) =>
-      String(call.input).endsWith("/pose-stream"),
-    );
+    const uploadIndexes = fetchCalls
+      .map((call, index) =>
+        String(call.input).endsWith("/pose-stream") ? index : -1,
+      )
+      .filter((index) => index !== -1);
     const stopIndex = fetchCalls.findIndex(
       (call) => String(call.input) === "http://localhost:8765/session/stop",
     );
-    assert.ok(uploadIndex > -1);
-    assert.ok(stopIndex > uploadIndex);
+    assert.equal(uploadIndexes.length, 2);
+    assert.ok(stopIndex > uploadIndexes[0]);
+    assert.ok(stopIndex < uploadIndexes[1]);
   });
 });
 

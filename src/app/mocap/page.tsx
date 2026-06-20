@@ -262,7 +262,10 @@ export default function MocapCapturePage() {
         framesEncoded: number;
       },
       monitorDegradedFraming: boolean,
+      options: { allowRecordOnlyDowngrade?: boolean } = {},
     ) => {
+      const allowRecordOnlyDowngrade =
+        options.allowRecordOnlyDowngrade ?? true;
       const nextQuality: PoseQuality = {
         trackedKeypointCount: info.trackedKeypointCount,
         meanConfidence: info.meanConfidence,
@@ -304,6 +307,7 @@ export default function MocapCapturePage() {
         { timestampMs: nowMs, effectiveFps: readiness.effectiveFps },
       ];
       if (
+        allowRecordOnlyDowngrade &&
         !monitorDegradedFraming &&
         !recordOnlyRef.current &&
         hasSustainedLowEffectiveFps(effectiveFpsSamplesRef.current, { nowMs })
@@ -517,7 +521,10 @@ export default function MocapCapturePage() {
           port: SIDECAR_DEFAULT_PORT,
           cameraCount: health.cameras,
           onStatus: (s) => setPoseStatus(s),
-          onFrame: (info) => handlePoseFrame(info, false),
+          onFrame: (info) =>
+            handlePoseFrame(info, false, {
+              allowRecordOnlyDowngrade: false,
+            }),
           onError: (err) => handleError(err, created.id),
         });
         sourceRef.current = source;
