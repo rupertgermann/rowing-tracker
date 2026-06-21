@@ -436,6 +436,7 @@ export async function linkMocapSessionLifecycle(
 
   const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
   if (!updated) {
+    await restoreAssignment(deps, session.id, null);
     return transitionConflict("Session status changed during analysis");
   }
   await deps.bumpSessionsRevision?.(input.userId);
@@ -505,6 +506,7 @@ export async function unlinkMocapSessionLifecycle(
 
   const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
   if (!updated) {
+    await restoreAssignment(deps, session.id, previousRowingSessionId);
     return transitionConflict("Session status changed during analysis");
   }
   await deps.bumpSessionsRevision?.(input.userId);

@@ -341,6 +341,40 @@ test("saveRowingSessions persists derived awards and personal records after impo
   });
 });
 
+test("saveRowingSessions preserves committed sessions when derived persistence fails", async () => {
+  cacheSessionsData([session({ id: "cached-session" })], 7);
+  localStorage.setItem("rowing_analytics_cache", JSON.stringify({ stale: true }));
+
+  const submitted = session({ id: "client-session" });
+
+  globalThis.fetch = async (input) => {
+    switch (String(input)) {
+      case "/api/sessions":
+        return jsonResponse({
+          sessions: [
+            {
+              ...submitted,
+              id: "db-session",
+              timestamp: submitted.timestamp.toISOString(),
+            },
+          ],
+        });
+      case "/api/sessions/list":
+        return jsonResponse({ error: "derived refresh unavailable" }, 503);
+      default:
+        throw new Error(`Unexpected request: ${input}`);
+    }
+  };
+
+  const result = await saveRowingSessions([submitted]);
+
+  assert.equal(result.success, true);
+  assert.match(result.error ?? "", /derived refresh unavailable/);
+  assert.equal(result.sessions?.[0].id, "db-session");
+  assert.equal(getCachedSessions(), null);
+  assert.equal(localStorage.getItem("rowing_analytics_cache"), null);
+});
+
 test("saveRowingSessions preserves ZIP stroke data and linked mocap marker when API returns a lean row", async () => {
   const strokeData = [
     {

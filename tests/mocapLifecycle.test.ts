@@ -587,6 +587,52 @@ test("linkMocapSessionLifecycle rolls assignment back when analysis fails", asyn
   ]);
 });
 
+test("linkMocapSessionLifecycle rolls assignment back when final transition conflicts", async () => {
+  const calls: string[] = [];
+
+  const result = await linkMocapSessionLifecycle(
+    makeDeps({
+      findSession: async () => makeSession(),
+      findRowingSession: async () => ({ id: "rowing-1", mocapSession: null }),
+      assignMocapSession: async () => {
+        calls.push("assign");
+        return true;
+      },
+      analyzeCsvAligned: async () => {
+        calls.push("csv-aligned");
+        return { strokeMetricCount: 2, faultCount: 1 };
+      },
+      setStatus: async (_id, status) => {
+        calls.push(`status:${status}`);
+        return null;
+      },
+      restoreMocapSessionAssignment: async (_id, rowingSessionId, status) => {
+        calls.push(`restore:${rowingSessionId}:${status}`);
+      },
+      bumpSessionsRevision: async () => {
+        calls.push("revision");
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      rowingSessionId: "rowing-1",
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: "Session status changed during analysis",
+  });
+  assert.deepEqual(calls, [
+    "assign",
+    "csv-aligned",
+    "status:ready",
+    "restore:null:ready",
+  ]);
+});
+
 test("unlinkMocapSessionLifecycle clears assignment then analyzes pose-segmented", async () => {
   const calls: string[] = [];
 
@@ -679,6 +725,47 @@ test("unlinkMocapSessionLifecycle restores assignment when analysis fails", asyn
   assert.deepEqual(calls, [
     "unassign",
     "pose-segmented",
+    "restore:rowing-1:ready",
+  ]);
+});
+
+test("unlinkMocapSessionLifecycle restores assignment when final transition conflicts", async () => {
+  const calls: string[] = [];
+
+  const result = await unlinkMocapSessionLifecycle(
+    makeDeps({
+      findSession: async () => makeSession({ rowingSessionId: "rowing-1" }),
+      unassignMocapSession: async () => {
+        calls.push("unassign");
+        return true;
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        return { strokeMetricCount: 3, faultCount: 1 };
+      },
+      setStatus: async (_id, status) => {
+        calls.push(`status:${status}`);
+        return null;
+      },
+      restoreMocapSessionAssignment: async (_id, rowingSessionId, status) => {
+        calls.push(`restore:${rowingSessionId}:${status}`);
+      },
+      bumpSessionsRevision: async () => {
+        calls.push("revision");
+      },
+    }),
+    { userId: "user-1", mocapSessionId: "mocap-1" },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: "Session status changed during analysis",
+  });
+  assert.deepEqual(calls, [
+    "unassign",
+    "pose-segmented",
+    "status:ready",
     "restore:rowing-1:ready",
   ]);
 });

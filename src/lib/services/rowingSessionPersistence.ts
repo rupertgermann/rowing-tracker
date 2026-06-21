@@ -290,6 +290,7 @@ export async function saveRowingSessions(
   const totalChunks = Math.ceil(sessions.length / chunkSize);
   let sessionsProcessed = 0;
   const savedSessions: Session[] = [];
+  let derivedDataError: string | undefined;
 
   for (let i = 0; i < totalChunks; i++) {
     const start = i * chunkSize;
@@ -345,10 +346,9 @@ export async function saveRowingSessions(
       await persistDerivedDataAfterImport(fetchImpl);
     } catch (error) {
       console.error('[RowingSessionPersistence] Failed to persist derived data after import:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to persist derived import data',
-      };
+      derivedDataError = error instanceof Error
+        ? error.message
+        : 'Failed to persist derived import data';
     }
   }
 
@@ -364,6 +364,7 @@ export async function saveRowingSessions(
 
   return {
     success: true,
+    ...(derivedDataError ? { error: derivedDataError } : {}),
     sessions: savedSessions,
   };
 }
