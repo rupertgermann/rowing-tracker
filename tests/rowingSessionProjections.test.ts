@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   calculatePersonalRecords,
+  calculateConsistencyRecords,
   calculateSessionStats,
   checkAIAwardSuggestions,
   computeEarnedAwards,
@@ -61,6 +62,22 @@ test("calculatePersonalRecords finds fastest exact standard-distance sessions", 
   assert.deepEqual(records.map((record) => record.distance), [1000]);
   assert.equal(records[0].sessionId, "fast-1k");
   assert.equal(records[0].bestTime, 220);
+});
+
+test("calculateConsistencyRecords uses persisted consistencyScore without loaded stroke data", () => {
+  const records = calculateConsistencyRecords([
+    session({
+      id: "lean-consistency-session",
+      consistencyScore: 94,
+      strokeData: undefined,
+    }),
+  ]);
+
+  assert.equal(records.bestScore, 94);
+  assert.equal(records.bestScoreSession?.id, "lean-consistency-session");
+  assert.equal(records.avgScore, 94);
+  assert.equal(records.excellentCount, 1);
+  assert.equal(records.totalWithData, 1);
 });
 
 test("filterAndSortSessions applies domain filters without mutating input", () => {

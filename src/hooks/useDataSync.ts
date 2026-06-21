@@ -42,7 +42,10 @@ export function useDataSync() {
             // Initialize settings from DB first (populates localStorage cache)
             await settings.initializeFromDB();
 
-            const rowingSessions = await loadRowingSessionList({ cache: 'no-store' });
+            const rowingSessions = await loadRowingSessionList({
+              cache: 'no-store',
+              cacheOwnerKey: userId,
+            });
             replaceSessionsInStore(rowingSessions.sessions);
 
             // Then initialize non-RowingSession store data (awards, settings, etc.)
