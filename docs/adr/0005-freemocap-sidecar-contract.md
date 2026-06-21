@@ -1,4 +1,4 @@
-# ADR-0005: freemocap sidecar contract — Phase 2 shape
+# ADR-0005: freemocap sidecar contract
 
 **Status:** Accepted  
 **Date:** 2026-05-09  
@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-0002 deferred the freemocap sidecar contract until real output and real needs could inform its shape. Phase 1 (browser path) is now far enough along to draw those lessons. This ADR makes the sidecar contract explicit so Phase 2 implementation can proceed.
+ADR-0002 scoped v1 to browser-only pose streams until real output and real needs could inform the freemocap contract. This ADR defines the active sidecar contract.
 
 Empirical basis: freemocap v0.3.x output schema documented in `docs/freemocap-sample-schema.md`. Key facts:
 
@@ -16,9 +16,9 @@ Empirical basis: freemocap v0.3.x output schema documented in `docs/freemocap-sa
 - Confidence = MediaPipe visibility [0,1], not triangulation reprojection error (separate `reprojection_error_mm` available).
 - freemocap's batch `.npy` output is frame-indexed, not timestamped. The sidecar live-streaming layer adds wall-clock timestamps.
 
-v1 lessons that inform Phase 2:
+Browser-path lessons that inform the sidecar contract:
 - All five v1 faults (`rounded_back_at_catch`, `early_arm_bend`, `back_opens_before_legs_drive`, `excessive_layback`, `slow_recovery_ratio`) compute cleanly from 2D side view. They don't need depth.
-- The three deferred faults (`left_right_asymmetry`, `knee_track_deviation`, `shin_not_vertical_at_catch`) genuinely require frontal-plane or depth information. Sidecar-3D unlocks all three.
+- The three sidecar-only fault slots (`left_right_asymmetry`, `knee_track_deviation`, `shin_not_vertical_at_catch`) genuinely require frontal-plane or depth information.
 - Live coaching (post-stroke cues) is desirable for sidecar users too — the timing window is the same as the browser path.
 
 ## Decisions
@@ -74,7 +74,7 @@ The sidecar is a local Python process exposing:
 - `POST http://localhost:8765/session/start` — arms capture, returns `{ "sessionId": "<uuid>", "calibrationId": "<uuid>" }`
 - `POST http://localhost:8765/session/stop` — flushes, closes stream
 
-No Docker required. Users install the Python sidecar via `pip install rowing-tracker-sidecar` (separate PyPI package). The health endpoint is what the app polls during the camera readiness gate (already implemented in Phase 1 for browser; sidecar path uses the same gate, different URL).
+No Docker is required. Users install the Python sidecar via `pip install rowing-tracker-sidecar` (separate PyPI package). The app polls the health endpoint during the readiness gate.
 
 Port 8765 is the default; configurable in `UserSettings.sidecarPort`.
 
@@ -90,7 +90,7 @@ All v1 faults remain available (they use `{x, y}` only; z is ignored). Three fau
 
 These three remain marked `perspective: "sidecar-3d-only"` in the fault catalog. When perspective is `side-left` or `side-right`, they surface as "requires multi-camera capture" — never silently zeroed.
 
-Fault rules for the three new faults: to be specified in follow-up issues (see § Implementation notes). This ADR establishes that they exist and are unlocked by sidecar-3d, not their exact threshold definitions.
+Fault rules for the three sidecar-only fault slots emit `pending` severity until tuned thresholds exist. This ADR establishes that they exist and are unlocked by sidecar-3d, not their exact threshold definitions.
 
 ### 5. Metrics available with `sidecar-3d`
 
@@ -116,7 +116,7 @@ ADR-0004 tiers apply unchanged:
 - **Tier 3 (fault summary):** sent when `cloudAIEnabled` is true. Same format; the summary adds `"perspective": "sidecar-3d"` so the LLM knows depth metrics are available.
 - **Tier 2 (per-stroke metrics):** gated on `mocapDetailedAIShare`. For sidecar-3d, tier 2 includes `lateralShoulderSymmetryMm` and other 3D-derived values. The settings UI should make this explicit: "Share detailed 3D posture measurements for richer AI analysis."
 
-No new flag needed. The existing `mocapDetailedAIShare` flag already carries the right semantics ("I consent to sharing reconstructable body geometry"). The UI copy update noting "includes 3D measurements" is sufficient.
+The existing `mocapDetailedAIShare` flag carries the right semantics ("I consent to sharing reconstructable body geometry"). The settings copy notes that detailed sharing includes 3D measurements.
 
 ## Consequences
 
@@ -124,15 +124,15 @@ No new flag needed. The existing `mocapDetailedAIShare` flag already carries the
 
 - Contract is grounded in real freemocap output, not a speculative interface.
 - `keypointSchemaVersion` already existed (ADR-0001); the version bump is a one-line change in the blob reader.
-- All v1 fault logic is untouched; sidecar-3d is a pure addition.
-- The three long-deferred faults now have a clear unlock path.
+- All v1 fault logic keeps the same projected `{x, y}` rule path.
+- The three sidecar-3D-only faults have a clear metric path.
 - Live coaching and post-session replay both work the same way for sidecar users as for browser users.
 
 **Negative**
 
 - The sidecar is a separate Python install; adds setup burden for precision users (acceptable — they opted into the sidecar path).
 - `world-mm-3d` coordinates require the analysis pipeline to handle unit normalization before computing angles (v1 assumes image-relative units and uses pixel ratios). The metrics calculator needs a coordinate-space adapter.
-- `reprojection_error_mm` quality signal adds a new quality dimension that the UI needs to surface.
+- `reprojection_error_mm` is an additional quality dimension for the UI.
 
 **Neutral**
 
@@ -141,6 +141,6 @@ No new flag needed. The existing `mocapDetailedAIShare` flag already carries the
 
 ## Alternatives considered
 
-- **Normalize sidecar output to [0,1] to match v1 browser blobs.** Rejected: discards mm-scale information that makes the three new faults computable. Normalization can be done at query time.
+- **Normalize sidecar output to [0,1] to match v1 browser blobs.** Rejected: discards mm-scale information that makes the three sidecar-only fault slots computable. Normalization can be done at query time.
 - **Use gRPC instead of WebSocket.** Rejected: WebSocket is simpler for a local loopback connection with no firewall issues; the bandwidth is trivial.
 - **Support any pose model (OpenPose, ViTPose, etc.) not just BlazePose.** Rejected: the 33-landmark schema is the contract; other models would need an adapter. Defer until a concrete demand exists.

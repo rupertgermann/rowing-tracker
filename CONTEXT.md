@@ -10,7 +10,7 @@ Which physical viewpoint a mocap session was recorded from. Determines which pos
 
 - `side-left` — single webcam, rower's left side facing camera. Browser path.
 - `side-right` — single webcam, rower's right side facing camera. Browser path.
-- `sidecar-3d` — multi-camera 3D capture via freemocap sidecar. All metrics available.
+- `sidecar-3d` — multi-camera 3D capture via freemocap sidecar. 3D metrics are available where tracking quality is sufficient.
 
 Browser path emits `side-left` or `side-right` only. Metrics that require `sidecar-3d` (left-right asymmetry, knee track deviation) are marked **unavailable** on side captures — never silently zeroed or estimated. UI surfaces the unavailable state as "requires multi-camera capture."
 
@@ -27,11 +27,11 @@ A mocap session always begins life as `pose-segmented`. When linked to a `Rowing
 
 A captured rowing session containing video + pose stream + derived metrics + faults. Independent of `RowingSession` (which is CSV/erg-derived). May exist standalone (no CSV linked) or be linked to exactly one `RowingSession`.
 
-Lifecycle states (proposed): `capturing` → `analyzing` → `ready` → optionally `linked` (when joined to a `RowingSession`).
+Lifecycle states: `capturing` → `analyzing` → `ready`. Linking is represented by `rowingSessionId`, not by a separate status.
 
 **Linking to a `RowingSession`** is bidirectional and exclusive — one `MocapSession` is linked to at most one `RowingSession` and vice versa. Either side may be unlinked; relinking is allowed. Linking triggers mandatory re-analysis (`pose-segmented` → `csv-aligned`); the mocap row is `analyzing` until re-analysis completes. Unlinking reverts to `pose-segmented` and re-runs metrics. CSV import auto-prompts to link when a capture window overlaps a new `RowingSession` by ±2 minutes — user confirms, never silent. Manual assignment may link any ready, unlinked `MocapSession` to any unlinked `RowingSession` for the same user. Capture-window overlap is a recommendation signal, not an eligibility rule; warn before linking sessions that do not overlap.
 
-A **record-only `MocapSession`** has video but no `PoseFrameStream`. It cannot be linked to a `RowingSession`, because linking must produce `csv-aligned` posture analysis.
+A **record-only `MocapSession`** has video but no `PoseFrameStream`. It finalizes with `analysisMode: "record-only"` and cannot be linked to a `RowingSession`, because linking must produce `csv-aligned` posture analysis.
 
 ### CueLatencyBand
 
@@ -65,17 +65,17 @@ Stroke-granular faults the v1 detector emits. All computable from a 2D side-view
 | `excessive_layback` | finish | info > 30°, warning > 45° (torso past vertical) |
 | `slow_recovery_ratio` | recovery | warning > 2.5, critical > 3.5 (recovery / drive duration ratio) |
 
-**Excluded from v1**, surfaced as "metric available, detection deferred" or "requires multi-camera capture":
+**Sidecar-3D-only metrics**, surfaced as "metric available, detection pending" on `sidecar-3d` captures or "requires multi-camera capture" on browser captures:
 
 - `left_right_asymmetry` — needs front view or `sidecar-3d`
 - `knee_track_deviation` — needs front view or `sidecar-3d`
 - `shin_not_vertical_at_catch` — disambiguating near-side shin from far-side shin in 2D is unreliable
 
-**Unlocked by `sidecar-3d` (Phase 2):** all three deferred faults above become computable. Lateral displacement is unambiguous in 3D; near/far shin disambiguated by z-coordinate. Fault rules and thresholds to be defined in follow-up implementation issues.
+For `sidecar-3d`, lateral displacement is available in world-space coordinates and near/far shin disambiguation uses z-coordinate. The detector emits `pending` fault rows for these three keys until tuned thresholds are defined.
 
 `perspective` field on each fault: `"browser"` or `"sidecar-3d"`. When perspective is browser, the three sidecar-3d-only faults surface as "requires multi-camera capture" — never silently zeroed.
 
-This catalog is the canonical vocabulary. Test fixtures, threshold tuning, coaching cue copy, and AI prompt context all reference these exact keys. Anything outside this list is out of v1 scope.
+This catalog is the canonical vocabulary. Test fixtures, threshold tuning, coaching cue copy, and AI prompt context all reference these exact keys.
 
 ### FaultThresholds
 
