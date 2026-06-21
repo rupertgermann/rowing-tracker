@@ -132,6 +132,7 @@ v2 blobs are written when `source=sidecar`. Key differences from v1:
 
 ```bash
 npx tsx --test tests/sidecarTracer.test.ts
+npx tsx --test tests/sidecarMockContract.test.ts
 ```
 
-Expected: 13 tests pass.
+`tests/sidecarMockContract.test.ts` uses the in-process `tests/helpers/testSidecarMock.ts` fixture. It installs ADR-0005-compatible health, session/start, session/stop, and pose-stream behavior, persists uploaded v2 bytes to `LocalDiskStorage`, finalizes the blob, and runs post-session analysis without a real freemocap install or camera rig.

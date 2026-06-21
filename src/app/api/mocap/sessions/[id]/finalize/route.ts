@@ -7,6 +7,10 @@ import { getMocapStorage } from "@/lib/mocap/storage";
 import { finalizePoseStreamBlob } from "@/lib/mocap/capturePersistence";
 import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
 import { finalizeMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
+import {
+  setMocapCaptureFinalizationState,
+  setMocapSessionStatus,
+} from "@/lib/mocap/lifecyclePrisma";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -59,18 +63,8 @@ export async function POST(
             calibrationFinishFrame: true,
           },
         }),
-      setStatus: (mocapSessionId, status) =>
-        prisma.mocapSession.update({
-          where: { id: mocapSessionId },
-          data: { status },
-          select: { status: true },
-        }),
-      setCaptureFinalizationState: (mocapSessionId, state) =>
-        prisma.mocapSession.update({
-          where: { id: mocapSessionId },
-          data: state,
-          select: { status: true, durationSec: true },
-        }),
+      setStatus: setMocapSessionStatus,
+      setCaptureFinalizationState: setMocapCaptureFinalizationState,
       finalizePoseStream: finalizePoseStreamBlob,
       analyzePoseSegmented: analyzeAndPersistMocapSession,
       analyzeCsvAligned: async () => {
@@ -89,14 +83,16 @@ export async function POST(
 
   if (!result.ok) {
     return NextResponse.json(
-      { error: result.error },
+      { ok: false, error: result.error },
       { status: result.status },
     );
   }
 
   return NextResponse.json({
+    ok: true,
     id: result.id,
     status: result.status,
+    analysisMode: result.analysisMode,
     durationSec: result.durationSec,
     frameCount: result.frameCount,
     poseStreamBytes: result.poseStreamBytes,

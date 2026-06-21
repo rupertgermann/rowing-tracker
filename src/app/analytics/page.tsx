@@ -25,6 +25,7 @@ import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
 import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { StrokeData, Session } from '@/types/session';
+import { sortSessionsByDate } from '@/lib/rowingSessionProjections';
 
 // Chart type options
 type ChartType = 'line' | 'bar' | 'area' | 'scatter';
@@ -165,10 +166,7 @@ function formatPower(watts: number): string {
 
 // Prepare chart data for distance over time
 function prepareChartData(sessions: { timestamp: Date | string; distance: number }[]) {
-  return sessions
-    .slice()
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .map(session => ({
+  return sortSessionsByDate(sessions).map(session => ({
       date: formatChartDate(new Date(session.timestamp)),
       distance: session.distance,
       fullDate: session.timestamp

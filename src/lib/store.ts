@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Session, SessionStats, PersonalRecord, SessionFilters } from '@/types/session';
 import type { EarnedAward } from '@/lib/awards';
-import { initializeStoreFromDB, saveSessionsToDB, savePRsToDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
+import { initializeStoreFromDB, saveAwardsToDB, saveChartSettingsToDB, saveSessionAnalysisSettingsToDB } from '@/lib/dataSync';
 import { firstCleanCatchDate, CLEAN_CATCH_AWARD_ID } from '@/lib/postureAchievements';
 import type { SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
 import {
@@ -146,7 +146,7 @@ interface RowingStore {
   pendingInsight: PendingInsight | null; // temporary storage for insight discussion chat handoff
 
   // Actions
-  addSessions: (sessions: Session[], options?: { skipDbSave?: boolean }) => void;
+  addSessions: (sessions: Session[]) => void;
   clearSessions: () => void;
   updateFilters: (filters: Partial<SessionFilters>) => void;
   resetFilters: () => void;
@@ -280,7 +280,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
   pendingInsight: null,
 
   // Actions
-  addSessions: (newSessions, options) => {
+  addSessions: (newSessions) => {
     console.log('[STORE] addSessions called with', newSessions.length, 'sessions');
 
     // Ensure all new sessions have Date objects for timestamps (revive from JSON strings)
@@ -302,42 +302,11 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
     console.log('[STORE] Unique new sessions:', uniqueNewSessions.length);
 
-    if (uniqueNewSessions.length > 0 && !options?.skipDbSave) {
-      console.log('[STORE] Saving sessions to database...');
-      saveSessionsToDB(uniqueNewSessions)
-        .then(result => {
-          console.log('[STORE] Save result:', result);
-        })
-        .catch(err => {
-          console.error('[STORE] Failed to save sessions to database:', err);
-        });
-    } else if (options?.skipDbSave) {
-      console.log('[STORE] Skipping DB save (already saved)');
-    }
-
     set((state) => {
       const updatedSessions = [...state.sessions, ...uniqueNewSessions];
-      const updatedRecords = projectPersonalRecords(updatedSessions);
-
-      // Save PRs to database
-      savePRsToDB(updatedRecords.map(pr => ({
-        distance: pr.distance,
-        value: pr.bestTime,
-        bestPace: pr.bestPace,
-        avgPower: pr.avgPower,
-        achievedAt: pr.date,
-        sessionId: pr.sessionId
-      }))).catch(err => {
-        console.error('Failed to save PRs to database:', err);
-      });
 
       // Recompute award dates based on when conditions first became true
       const recomputedAwards = projectEarnedAwards(updatedSessions);
-
-      // Save awards to database
-      saveAwardsToDB(recomputedAwards).catch(err => {
-        console.error('Failed to save awards to database:', err);
-      });
 
       // Check AI awards for automatic completion
       const updatedAIAwards = projectAIAwardSuggestions(updatedSessions, state.aiAwardSuggestions);
@@ -757,12 +726,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
     try {
       const data = await initializeStoreFromDB();
 
-      // Convert timestamps to Date objects
-      const sessions = data.sessions.map((s) => ({
-        ...s,
-        timestamp: new Date(s.timestamp as string | Date)
-      }));
-
       // Convert database awards to app format
       const earnedAwards = data.earnedAwards.map((a) => ({
         awardId: a.awardId,
@@ -797,7 +760,6 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       const sessionAnalysisSettings = (data.sessionAnalysisSettings as unknown as SessionAnalysisSettings | undefined) || defaultSessionAnalysisSettings;
 
       set({
-        sessions,
         earnedAwards,
         chartSettings,
         sessionAnalysisSettings

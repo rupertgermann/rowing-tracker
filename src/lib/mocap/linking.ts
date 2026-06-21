@@ -1,3 +1,9 @@
+import {
+  readMocapLifecycleActionResponse,
+  type MocapLifecycleActionResult,
+  type MocapLifecycleFailureReason,
+} from "@/lib/mocap/lifecycleResponse";
+
 export interface MocapLinkTarget {
   rowingSessionId: string;
   mocapSessionId: string;
@@ -8,12 +14,7 @@ export interface MocapLinkableSession {
   mocapSession?: { id: string } | null;
 }
 
-export type MocapLinkFailureReason =
-  | "analysis_failed"
-  | "conflict"
-  | "not_found"
-  | "unauthorized"
-  | "error";
+export type MocapLinkFailureReason = MocapLifecycleFailureReason;
 
 export type MocapLinkResult =
   | {
@@ -21,6 +22,7 @@ export type MocapLinkResult =
       mocapSessionId: string;
       rowingSessionId: string;
       status: string;
+      lifecycle: Extract<MocapLifecycleActionResult, { ok: true }>;
     }
   | {
       ok: false;
@@ -34,6 +36,7 @@ export type MocapUnlinkResult =
       ok: true;
       mocapSessionId: string;
       status: string;
+      lifecycle: Extract<MocapLifecycleActionResult, { ok: true }>;
     }
   | {
       ok: false;
@@ -81,26 +84,6 @@ export function applyMocapUnlinkToSessions<T extends MocapLinkableSession>(
   );
 }
 
-async function readErrorMessage(
-  response: Response,
-  fallback: string,
-): Promise<string> {
-  try {
-    const data = await response.json();
-    return typeof data?.error === "string" ? data.error : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function failureReasonForStatus(status: number): MocapLinkFailureReason {
-  if (status === 401) return "unauthorized";
-  if (status === 404) return "not_found";
-  if (status === 409) return "conflict";
-  if (status >= 500) return "analysis_failed";
-  return "error";
-}
-
 export async function confirmMocapSessionLink(
   target: MocapLinkTarget,
   fetchImpl: FetchLike = fetch,
@@ -110,22 +93,31 @@ export async function confirmMocapSessionLink(
     { method: "POST" },
   );
 
-  if (!response.ok) {
+  const result = await readMocapLifecycleActionResponse(
+    response,
+    {
+      id: target.mocapSessionId,
+      rowingSessionId: target.rowingSessionId,
+      analysisMode: "csv-aligned",
+    },
+    "Failed to link mocap session",
+  );
+
+  if (!result.ok) {
     return {
       ok: false,
-      reason: failureReasonForStatus(response.status),
-      status: response.status,
-      message: await readErrorMessage(response, "Failed to link mocap session"),
+      reason: result.reason,
+      status: result.status,
+      message: result.message,
     };
   }
 
-  const data = await response.json();
   return {
     ok: true,
-    mocapSessionId: typeof data?.id === "string" ? data.id : target.mocapSessionId,
-    rowingSessionId:
-      typeof data?.rowingSessionId === "string" ? data.rowingSessionId : target.rowingSessionId,
-    status: typeof data?.status === "string" ? data.status : "ready",
+    mocapSessionId: result.id,
+    rowingSessionId: result.rowingSessionId ?? target.rowingSessionId,
+    status: result.status,
+    lifecycle: result,
   };
 }
 
@@ -138,19 +130,25 @@ export async function confirmMocapSessionUnlink(
     { method: "POST" },
   );
 
-  if (!response.ok) {
+  const result = await readMocapLifecycleActionResponse(
+    response,
+    { id: mocapSessionId, analysisMode: "pose-segmented" },
+    "Failed to unlink mocap session",
+  );
+
+  if (!result.ok) {
     return {
       ok: false,
-      reason: failureReasonForStatus(response.status),
-      status: response.status,
-      message: await readErrorMessage(response, "Failed to unlink mocap session"),
+      reason: result.reason,
+      status: result.status,
+      message: result.message,
     };
   }
 
-  const data = await response.json();
   return {
     ok: true,
-    mocapSessionId: typeof data?.id === "string" ? data.id : mocapSessionId,
-    status: typeof data?.status === "string" ? data.status : "ready",
+    mocapSessionId: result.id,
+    status: result.status,
+    lifecycle: result,
   };
 }

@@ -118,6 +118,64 @@ test("reanalyzeMocapSessionLifecycle rolls status back when analysis fails", asy
   ]);
 });
 
+test("reanalyzeMocapSessionLifecycle rejects stale ready-to-analyzing transitions", async () => {
+  const calls: string[] = [];
+
+  const result = await reanalyzeMocapSessionLifecycle(
+    {
+      ...makeDeps(),
+      findSession: async () => makeSession(),
+      setStatus: async (_id, status) => {
+        calls.push(`status:${status}`);
+        return null;
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        return { strokeMetricCount: 1, faultCount: 0 };
+      },
+    },
+    { userId: "user-1", mocapSessionId: "mocap-1" },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: "Session no longer ready",
+  });
+  assert.deepEqual(calls, ["status:analyzing"]);
+});
+
+test("reanalyzeMocapSessionLifecycle documents invalid and record-only states", async () => {
+  for (const status of ["capturing", "analyzing", "failed"]) {
+    const result = await reanalyzeMocapSessionLifecycle(
+      makeDeps({
+        findSession: async () => makeSession({ status }),
+      }),
+      { userId: "user-1", mocapSessionId: "mocap-1" },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      status: 409,
+      error: `Session not ready (status=${status})`,
+    });
+  }
+
+  const recordOnly = await reanalyzeMocapSessionLifecycle(
+    makeDeps({
+      storage: { exists: async () => false },
+      findSession: async () => makeSession({ status: "ready" }),
+    }),
+    { userId: "user-1", mocapSessionId: "mocap-1" },
+  );
+
+  assert.deepEqual(recordOnly, {
+    ok: false,
+    status: 409,
+    error: "Cannot re-analyze a record-only session without a pose stream",
+  });
+});
+
 test("finalizeMocapSessionLifecycle finalizes and analyzes before returning ready", async () => {
   const calls: string[] = [];
 
@@ -160,6 +218,7 @@ test("finalizeMocapSessionLifecycle finalizes and analyzes before returning read
     ok: true,
     id: "mocap-1",
     status: "ready",
+    analysisMode: "pose-segmented",
     durationSec: 48,
     frameCount: 12,
     poseStreamBytes: 4096,
@@ -172,6 +231,75 @@ test("finalizeMocapSessionLifecycle finalizes and analyzes before returning read
     "pose-segmented:analyzing",
     "status:ready",
   ]);
+});
+
+test("finalizeMocapSessionLifecycle rejects stale capturing-to-analyzing transitions", async () => {
+  const calls: string[] = [];
+
+  const result = await finalizeMocapSessionLifecycle(
+    makeFinalizeDeps({
+      findSession: async () => makeSession({ status: "capturing" }),
+      setCaptureFinalizationState: async (_id, state) => {
+        calls.push(`capture:${state.status}`);
+        return null;
+      },
+      finalizePoseStream: async () => {
+        calls.push("finalize");
+        return { frameCount: 1, poseStreamBytes: 128 };
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        return { strokeMetricCount: 1, faultCount: 0 };
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      durationSec: 20,
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: "Session no longer capturing",
+  });
+  assert.deepEqual(calls, ["capture:analyzing"]);
+});
+
+test("finalizeMocapSessionLifecycle refuses pose analysis for missing pose streams", async () => {
+  const calls: string[] = [];
+
+  const result = await finalizeMocapSessionLifecycle(
+    makeFinalizeDeps({
+      storage: { exists: async () => false },
+      findSession: async () => makeSession({ status: "capturing" }),
+      setCaptureFinalizationState: async (_id, state) => {
+        calls.push(`capture:${state.status}`);
+        return { status: state.status, durationSec: state.durationSec };
+      },
+      finalizePoseStream: async () => {
+        calls.push("finalize");
+        return { frameCount: 1, poseStreamBytes: 128 };
+      },
+      analyzePoseSegmented: async () => {
+        calls.push("pose-segmented");
+        return { strokeMetricCount: 1, faultCount: 0 };
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      durationSec: 20,
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: "Cannot analyze a record-only session without a pose stream",
+  });
+  assert.deepEqual(calls, []);
 });
 
 test("finalizeMocapSessionLifecycle completes record-only captures without analysis", async () => {
@@ -213,6 +341,7 @@ test("finalizeMocapSessionLifecycle completes record-only captures without analy
     ok: true,
     id: "mocap-1",
     status: "ready",
+    analysisMode: "record-only",
     durationSec: 30,
     frameCount: 0,
     poseStreamBytes: 0,
@@ -385,6 +514,37 @@ test("linkMocapSessionLifecycle rejects linked rowing session conflicts", async 
     ok: false,
     status: 409,
     error: "Rowing session is already linked to another mocap session.",
+  });
+  assert.deepEqual(calls, []);
+});
+
+test("linkMocapSessionLifecycle rejects record-only sessions before assignment", async () => {
+  const calls: string[] = [];
+
+  const result = await linkMocapSessionLifecycle(
+    makeDeps({
+      storage: { exists: async () => false },
+      findSession: async () => makeSession(),
+      assignMocapSession: async () => {
+        calls.push("assign");
+        return true;
+      },
+      analyzeCsvAligned: async () => {
+        calls.push("csv-aligned");
+        return { strokeMetricCount: 1, faultCount: 0 };
+      },
+    }),
+    {
+      userId: "user-1",
+      mocapSessionId: "mocap-1",
+      rowingSessionId: "rowing-1",
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: "Cannot re-analyze a record-only session without a pose stream",
   });
   assert.deepEqual(calls, []);
 });

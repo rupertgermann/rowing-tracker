@@ -4,7 +4,7 @@ import type { FinalizedPoseStream } from "@/lib/mocap/capturePersistence";
 import type { MocapStorage } from "@/lib/mocap/storage";
 import type { PersistedMocapAnalysisSummary } from "@/lib/mocap/sessionAnalysis";
 
-export type MocapAnalysisMode = "pose-segmented" | "csv-aligned";
+export type MocapAnalysisMode = "pose-segmented" | "csv-aligned" | "record-only";
 
 export interface MocapLifecycleSession {
   id: string;
@@ -57,6 +57,7 @@ export type FinalizeMocapSessionResult =
       ok: true;
       id: string;
       status: string;
+      analysisMode: MocapAnalysisMode;
       durationSec: number;
       frameCount: number;
       poseStreamBytes: number;
@@ -132,7 +133,8 @@ export interface MocapLifecycleDependencies {
   setStatus(
     mocapSessionId: string,
     status: "capturing" | "analyzing" | "ready",
-  ): Promise<{ status: string }>;
+    transition?: { from: string | string[] },
+  ): Promise<{ status: string } | null>;
   assignMocapSession?(
     mocapSessionId: string,
     userId: string,
@@ -169,7 +171,8 @@ export interface FinalizeMocapSessionDependencies
   setCaptureFinalizationState(
     mocapSessionId: string,
     state: MocapCaptureFinalizationState,
-  ): Promise<{ status: string; durationSec: number }>;
+    transition?: { from: string | string[] },
+  ): Promise<{ status: string; durationSec: number } | null>;
 }
 
 export async function finalizeMocapSessionLifecycle(
@@ -213,11 +216,15 @@ export async function finalizeMocapSessionLifecycle(
         ...captureState.qualityFlags,
         MOCAP_RECORD_ONLY_FLAG,
       ]),
-    });
+    }, { from: "capturing" });
+    if (!updated) {
+      return transitionConflict("Session no longer capturing");
+    }
     return {
       ok: true,
       id: session.id,
       status: updated.status,
+      analysisMode: "record-only",
       durationSec: updated.durationSec,
       frameCount: finalized.frameCount,
       poseStreamBytes: finalized.poseStreamBytes,
@@ -226,10 +233,21 @@ export async function finalizeMocapSessionLifecycle(
     };
   }
 
+  if (!(await deps.storage.exists(session.poseStreamPath))) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Cannot analyze a record-only session without a pose stream",
+    };
+  }
+
   const analyzing = await deps.setCaptureFinalizationState(session.id, {
     status: "analyzing",
     ...captureState,
-  });
+  }, { from: "capturing" });
+  if (!analyzing) {
+    return transitionConflict("Session no longer capturing");
+  }
 
   let finalized: FinalizedPoseStream;
   try {
@@ -238,7 +256,7 @@ export async function finalizeMocapSessionLifecycle(
       session.poseStreamPath,
     );
   } catch (err) {
-    await deps.setStatus(session.id, "capturing");
+    await deps.setStatus(session.id, "capturing", { from: "analyzing" });
     return finalizeFailure(err);
   }
 
@@ -249,15 +267,19 @@ export async function finalizeMocapSessionLifecycle(
       status: "analyzing",
     });
   } catch (err) {
-    await deps.setStatus(session.id, "ready");
+    await deps.setStatus(session.id, "ready", { from: "analyzing" });
     return analysisFailure(err);
   }
 
-  const updated = await deps.setStatus(session.id, "ready");
+  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  if (!updated) {
+    return transitionConflict("Session status changed during analysis");
+  }
   return {
     ok: true,
     id: session.id,
     status: updated.status,
+    analysisMode: "pose-segmented",
     durationSec: analyzing.durationSec,
     frameCount: finalized.frameCount,
     poseStreamBytes: finalized.poseStreamBytes,
@@ -289,7 +311,10 @@ export async function reanalyzeMocapSessionLifecycle(
     };
   }
 
-  await deps.setStatus(session.id, "analyzing");
+  const analyzing = await deps.setStatus(session.id, "analyzing", { from: "ready" });
+  if (!analyzing) {
+    return transitionConflict("Session no longer ready");
+  }
 
   const rowingSessionId = session.rowingSessionId;
   const analysisMode: MocapAnalysisMode = rowingSessionId
@@ -310,7 +335,7 @@ export async function reanalyzeMocapSessionLifecycle(
       );
     }
   } catch (err) {
-    await deps.setStatus(session.id, "ready");
+    await deps.setStatus(session.id, "ready", { from: "analyzing" });
     return {
       ok: false,
       status: 500,
@@ -318,7 +343,10 @@ export async function reanalyzeMocapSessionLifecycle(
     };
   }
 
-  const updated = await deps.setStatus(session.id, "ready");
+  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  if (!updated) {
+    return transitionConflict("Session status changed during analysis");
+  }
   return {
     ok: true,
     id: session.id,
@@ -406,7 +434,10 @@ export async function linkMocapSessionLifecycle(
     return analysisFailure(err);
   }
 
-  const updated = await deps.setStatus(session.id, "ready");
+  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  if (!updated) {
+    return transitionConflict("Session status changed during analysis");
+  }
   await deps.bumpSessionsRevision?.(input.userId);
   return {
     ok: true,
@@ -472,7 +503,10 @@ export async function unlinkMocapSessionLifecycle(
     return analysisFailure(err);
   }
 
-  const updated = await deps.setStatus(session.id, "ready");
+  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  if (!updated) {
+    return transitionConflict("Session status changed during analysis");
+  }
   await deps.bumpSessionsRevision?.(input.userId);
   return {
     ok: true,
@@ -521,6 +555,14 @@ function analysisFailure(err: unknown): { ok: false; status: 500; error: string 
     ok: false,
     status: 500,
     error: err instanceof Error ? err.message : String(err),
+  };
+}
+
+function transitionConflict(error: string): { ok: false; status: 409; error: string } {
+  return {
+    ok: false,
+    status: 409,
+    error,
   };
 }
 

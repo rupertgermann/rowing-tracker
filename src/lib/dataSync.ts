@@ -598,8 +598,6 @@ export async function saveMemoryDocumentsToDB(documents: any[]): Promise<SyncRes
  */
 export async function initializeStoreFromDB() {
   const [
-    sessions,
-    prs,
     awards,
     trainingPlans,
     insights,
@@ -608,8 +606,6 @@ export async function initializeStoreFromDB() {
     generatedAchievements,
     memoryDocuments,
   ] = await Promise.all([
-    fetchSessionsFromDB(),
-    fetchPRsFromDB(),
     fetchAwardsFromDB(),
     fetchTrainingPlansFromDB(),
     fetchInsightsFromDB(),
@@ -620,8 +616,6 @@ export async function initializeStoreFromDB() {
   ]);
 
   return {
-    sessions,
-    personalRecords: prs,
     earnedAwards: awards,
     trainingPlans,
     insights,

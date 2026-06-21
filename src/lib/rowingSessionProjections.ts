@@ -51,7 +51,9 @@ interface ProjectionOptions {
   now?: Date;
 }
 
-function timestampMs(session: Session): number {
+type SessionTimestampInput = { timestamp: Date | string };
+
+function timestampMs(session: SessionTimestampInput): number {
   return session.timestamp instanceof Date
     ? session.timestamp.getTime()
     : new Date(session.timestamp).getTime();
@@ -63,7 +65,9 @@ function timestampDate(session: Session): Date {
     : new Date(session.timestamp);
 }
 
-export function sortSessionsByDate(sessions: Session[]): Session[] {
+export function sortSessionsByDate<T extends SessionTimestampInput>(
+  sessions: T[],
+): T[] {
   return [...sessions].sort((a, b) => timestampMs(a) - timestampMs(b));
 }
 
