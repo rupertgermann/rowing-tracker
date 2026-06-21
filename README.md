@@ -6,7 +6,7 @@ An AI-powered web application for tracking rowing workouts with analytics, train
 
 ## Overview
 
-Rowing Tracker is a modern, AI-powered web app built specifically for rowers who use SmartRow equipment. Workouts are imported either via automated SmartRow.fit sync or manual CSV/ZIP upload, and the app turns them into deep analytics, personalized AI training plans, automated coaching insights, and webcam-based posture analysis. Each rower gets a private workspace with data stored in PostgreSQL (local or Supabase) and isolated by authenticated user.
+Rowing Tracker is a modern, AI-powered web app built specifically for rowers who use SmartRow equipment. Workouts are imported either via automated SmartRow.fit sync or manual CSV/ZIP upload, and the app turns them into deep analytics, personalized AI training plans, automated coaching insights, and motion-capture posture analysis. Each rower gets a private workspace with data stored in PostgreSQL (local or Supabase) and isolated by authenticated user.
 
 ## Features
 
@@ -46,12 +46,13 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **User Profiles**: Manage your account, change password, and update profile information
 - **Data Isolation**: Each user's data is completely isolated and private
 
-### � Data Import & Sync
+### Data Import & Sync
 
 - **Automated SmartRow Sync**: One-click sync from `smartrow.fit` directly inside `/sync`. A server-side Playwright session logs in with stored credentials, exports the workouts list (CSV) and the detailed-stroke archive (ZIP), and imports both in a single pass
 - **CSV Drag-and-Drop**: Manual upload of any SmartRow CSV (sessions list or detailed stroke export)
 - **ZIP Batch Import**: Upload the SmartRow archive ZIP to import many detailed-stroke sessions at once with progress reporting
 - **Duplicate-Safe Imports**: Sessions are deduplicated by `(userId, timestamp, distance)`; existing sessions are updated, not duplicated
+- **Lean Session Loading**: Session lists use `/api/sessions/list` without stroke rows and include `strokeDataCount`; detail pages fetch full stroke data on demand through `/api/sessions?id=<sessionId>`
 - **Last-Sync Timestamp**: SmartRow credentials and the most recent sync time are stored in `UserSettings.smartRowSettings`
 
 ### 💾 Data & Storage
@@ -61,6 +62,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Cloud Ready**: Supabase (pooler + direct URL) supported for production
 - **Memory System**: Upload and store PDFs and images for AI analysis; files are kept on disk (or Vercel Blob in deployed environments) and referenced by `MemoryDocument.filePath`
 - **Mocap Storage**: Recorded video and the `PoseFrameStream` binary blob are stored side-by-side on the same backend (local `storage/` directory or Vercel Blob), referenced by `MocapSession.videoStoragePath` and `MocapSession.poseStreamPath`
+- **Session Cache Invalidation**: Rowing-session mutations bump `UserSettings.sessionsRevision`; client caches use the revision plus row count to reuse lean lists safely and hydrate detail data only when needed
 - **Data Privacy**: Workout data, mocap video, and pose data are scoped by user ID; AI keys are encrypted at rest
 
 ### 🎨 User Experience
@@ -84,15 +86,18 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 ### 🎥 Motion-Capture & Posture Analysis (Mocap)
 
 - **Browser-Based Capture** (`/mocap`): Single-webcam recording with in-browser MediaPipe Pose Landmarker running in a Web Worker. Zero install, no cloud upload of video by default.
-- **Side-View Capture Perspectives**: `side-left` or `side-right`. Front-view-only metrics (left/right asymmetry, knee-track deviation) are explicitly marked as `requires-multi-cam` rather than silently estimated.
-- **Per-Session Calibration**: Two reference frames captured before recording (catch + finish) establish baselines for the current camera setup. Calibration is stored on the `MocapSession`, not on the user.
-- **Pose Frame Stream**: A versioned binary `PoseFrameStream` blob (2D `{x, y, confidence}` keypoints + per-frame quality flags) is appended in chunks via `POST /api/mocap/sessions/:id/pose-stream` and finalized with `POST /api/mocap/sessions/:id/finalize`.
-- **Stroke Segmentation**: `pose-segmented` boundaries during live capture; mandatory atomic re-segmentation to `csv-aligned` when a `MocapSession` is linked to a `RowingSession` via cross-correlation against `StrokeData`.
-- **v1 Posture Fault Catalog**: Five stroke-granular faults computable from a 2D side view—`rounded_back_at_catch`, `early_arm_bend`, `back_opens_before_legs_drive`, `excessive_layback`, `slow_recovery_ratio`—each with `info` / `warning` / `critical` severity bands.
+- **Multi-Camera Sidecar Capture**: Optional freemocap sidecar on localhost (default port `8765`) provides `sidecar-3d` capture with `world-mm-3d` keypoints, `cameraCount`, `calibrationId`, and `reprojectionErrorMm` quality data.
+- **Capture Perspectives**: Browser sessions use `side-left` or `side-right`; sidecar sessions use `sidecar-3d`. Metrics that need multi-camera geometry are marked as `requires-multi-cam` on side-view captures instead of being estimated.
+- **Record-Only Capture**: Browser sessions can persist video without a pose stream. Record-only sessions finalize with `analysisMode: "record-only"` and cannot be linked or reanalyzed until pose data exists.
+- **Per-Session Calibration**: Browser capture stores catch and finish reference frames on the `MocapSession`. Sidecar capture stores the sidecar's Charuco `calibrationId` for traceability.
+- **Pose Frame Stream**: A versioned binary `PoseFrameStream` blob is appended in chunks via `POST /api/mocap/sessions/:id/pose-stream`. v1 stores normalized 2D `{x, y, confidence}` frames; v2 stores sidecar `world-mm-3d` `{x, y, z, confidence}` frames.
+- **Guarded Lifecycle**: `MocapSession.status` moves through `capturing`, `analyzing`, and `ready`. Finalize, link, unlink, and reanalysis routes use guarded transitions and return normalized `{ ok, analysisMode, strokeMetricCount, faultCount }` responses on success.
+- **Stroke Segmentation**: `pose-segmented` boundaries are computed from the pose stream. Linking a `MocapSession` to a `RowingSession` re-segments atomically to `csv-aligned` using SmartRow `StrokeData`.
+- **Posture Fault Catalog**: Side-view rules emit `rounded_back_at_catch`, `early_arm_bend`, `back_opens_before_legs_drive`, `excessive_layback`, and `slow_recovery_ratio`. Sidecar 3D metrics surface lateral asymmetry, knee-track deviation, and shin-angle data where available.
 - **Configurable Thresholds**: Conservative hand-coded defaults (`postureThresholdsV1`) with auto-migration on version bumps; user customization stored in `UserSettings.postureThresholds` is preserved (`userOverridden: true`).
-- **Live Coaching Cues**: Post-stroke cues (≤ 1 s after the stroke completes) via the `LiveCoachingEngine`, with optional spoken audio (`speakCue`) and configurable verbosity in `UserSettings.mocapPreferences`.
-- **Auto-Link on CSV Import**: When a CSV import produces a `RowingSession` whose timestamp overlaps a `MocapSession` capture window by ±2 minutes, the user is prompted to link them (never silent). Linking is bidirectional, exclusive, and reversible (`/unlink` endpoint).
-- **Re-Analysis Endpoint**: `POST /api/mocap/sessions/:id/reanalyze` re-runs the segmenter, metrics calculator, and fault detector with current rules so old sessions benefit from updated thresholds.
+- **Live Coaching Cues**: Post-stroke cues (≤ 1 s after the stroke completes) via the `LiveCoachingEngine`, with optional spoken audio (`speakCue`) and configurable verbosity in `UserSettings.mocapPreferences`.
+- **Auto-Link on CSV Import**: When a CSV import produces a `RowingSession` whose timestamp overlaps a `MocapSession` capture window by ±2 minutes, the user is prompted to link them. Linking is bidirectional, exclusive, and reversible (`/unlink` endpoint).
+- **Re-Analysis Endpoint**: `POST /api/mocap/sessions/:id/reanalyze` re-runs the segmenter, metrics calculator, and fault detector with current rules so old sessions use current thresholds.
 - **Cloud-AI Payload Tiers**: AI gets a `PostureFault` summary by default; per-stroke metrics are opt-in via `UserSettings.mocapDetailedAIShare`; raw frames never cross to cloud (see ADR-0004).
 
 ## Tech Stack
@@ -111,7 +116,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 - **Storage**:
   - PostgreSQL for user data, sessions, plans, achievements, mocap rows
   - File system (or Vercel Blob via `@vercel/blob`) for award images, memory documents, mocap video, and pose stream blobs
-- **Pose Estimation**: `@mediapipe/tasks-vision` Pose Landmarker, Web Worker, WASM
+- **Pose Estimation**: `@mediapipe/tasks-vision` Pose Landmarker, Web Worker, WASM; optional freemocap sidecar via localhost HTTP/WebSocket contract
 - **CSV / ZIP Parsing**: `papaparse`, `jszip`
 - **PDF Extraction**: `unpdf`
 - **SmartRow Automation**: `playwright` (server-side login + export download for `/api/smartrow/sync`)
@@ -124,8 +129,8 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 ### Prerequisites
 
-- Node.js 18+ 
-- npm or yarn
+- Node.js 22.12+
+- npm 10.8+
 - Docker & Docker Compose (for local development)
 - OpenAI API Key (optional, for AI features)
 - PostgreSQL database (local via Docker or Supabase)
@@ -373,7 +378,8 @@ rowing-tracker/
 │   ├── design-system.md
 │   ├── prd.md
 │   ├── prd-mocap-posture.md      # Mocap PRD + locked decisions
-│   ├── adr/                      # Architecture Decision Records (0001–0004)
+│   ├── sidecar-local-setup.md    # Local freemocap sidecar setup and mock
+│   ├── adr/                      # Architecture Decision Records (0001–0005)
 │   ├── agents/                   # Agent docs (issue tracker, triage labels, domain)
 │   └── csvs/                     # Sample SmartRow CSVs
 ├── CONTEXT.md                    # Domain glossary
@@ -387,12 +393,12 @@ rowing-tracker/
 2. **Import**:
    - **Sync**: `/api/smartrow/sync` runs Playwright against smartrow.fit → returns CSV + base64 ZIP → client parses with papaparse / jszip → saved to PostgreSQL
    - **Manual**: User drops CSV/ZIP → client-side validation → saved to PostgreSQL
-3. **Mocap Capture**: Browser webcam → Pose Landmarker in Web Worker → chunked HTTP uploads of video and `PoseFrameStream` → finalize → stroke segmentation, metrics, and faults computed in browser; server only persists
+3. **Mocap Capture**: Browser webcam or freemocap sidecar → chunked HTTP uploads of video and `PoseFrameStream` → guarded finalize → pose-segmented metrics and faults for analyzable captures, or `record-only` for video-only captures
 4. **Storage**:
    - User data, sessions, plans, mocap rows → PostgreSQL via Prisma
    - Award images, memory documents, mocap video, pose stream blobs → file system or Vercel Blob
-   - Client state → Zustand store (persisted to DB on key actions)
-5. **Display**: Components fetch from database → calculate metrics → render charts; cache busts via `UserSettings.sessionsRevision` / `insightsRevision`
+   - Client rowing-session state → Zustand store for local UI state; RowingSession persistence runs through API/service helpers
+5. **Display**: Session lists use `/api/sessions/list` with `strokeDataCount`; detail views hydrate full `StrokeData` through `/api/sessions?id=<sessionId>`; cache busts via `UserSettings.sessionsRevision` / `insightsRevision`
 6. **Analysis**: Real-time PR calculations, trend analysis, consistency score, posture metrics, fault counts
 7. **AI Features**: Context (sessions, achievements, memory documents, posture summary) retrieved from database → personal context injected from `UserSettings.userProfileContext` → sent to OpenAI → response streamed
 8. **Linking**: When a `RowingSession` overlaps a `MocapSession` capture window by ±2 minutes, the user is prompted to link; linking triggers atomic re-segmentation to `csv-aligned`
@@ -420,8 +426,16 @@ rowing-tracker/
 - `npm run db:reset` — Reset database (destructive)
 
 **Tests:**
-- `npm test` — Run unit tests via `tsx --test` (covers `tests/*.test.ts`, including `mocapAnalysis`, `poseFrameStream`, `liveCoachingEngine`, `aiPayload`, etc.)
-- `npm run test:e2e` — Run Playwright end-to-end tests (`tests/e2e/`, e.g. `mocap-capture.spec.ts`)
+- `npx tsc --noEmit` — Run TypeScript validation
+- `npm run lint` — Run ESLint across the project
+- `npm test` — Run unit tests via `tsx --test tests/*.test.ts`
+- `npm run test:e2e` — Run Playwright end-to-end tests in `tests/e2e/`
+- `npx tsx --test tests/rowingSessionPersistence.test.ts` — Focused RowingSession list/detail hydration tests
+- `npx tsx --test tests/sidecarTracer.test.ts` — Sidecar v2 blob, projection, and sidecar-fault tests
+- `npx tsx --test tests/sidecarMockContract.test.ts` — In-process sidecar contract test without hardware
+- `npm run test:e2e -- tests/e2e/session-detail-mocap-link.spec.ts` — Session detail, stroke-data hydration, and mocap-link e2e coverage
+- `npm run test:e2e -- tests/e2e/mocap-capture.spec.ts` — Browser and sidecar mocap capture e2e coverage
+- `env PLAYWRIGHT_SKIP_SERVER=1 npm run test:e2e -- <spec>` — Reuse an already-running dev server for a focused Playwright spec
 
 **Operations:**
 - `npm run admin:promote -- <email>` — Promote a user to admin
@@ -463,7 +477,7 @@ PostgreSQL with Prisma ORM. Key models:
 - `PersonalRecord` — Best performance per distance
 
 **Mocap (Posture Analysis):**
-- `MocapSession` — One capture per session with video + pose stream paths, `capturePerspective`, calibration frames, `qualityScore`, status
+- `MocapSession` — One capture per session with video + pose stream paths, `source`, `capturePerspective`, calibration frames or `calibrationId`, `cameraCount`, `qualityScore`, and guarded `capturing` / `analyzing` / `ready` status
 - `StrokePostureMetric` — Per-stroke posture metrics with `segmentationSource` (`pose-segmented` or `csv-aligned`)
 - `PostureFault` — Detected faults with `faultType`, `severity`, `phase`, `evidenceJson`
 

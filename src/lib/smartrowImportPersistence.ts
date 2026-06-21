@@ -6,7 +6,7 @@ import {
 } from '@/lib/services/rowingSessionPersistence';
 
 export interface RowingImportStoreActions {
-  addSessions: (sessions: Session[], options?: { skipDbSave?: boolean }) => void;
+  addSessions: (sessions: Session[]) => void;
   updateSessionsInStore: (sessions: Session[]) => void;
 }
 
@@ -54,7 +54,7 @@ export async function persistCsvImportSessions(
 
   const savedSessions = savedSessionsFrom(result);
   if (savedSessions.length > 0) {
-    store.addSessions(savedSessions, { skipDbSave: true });
+    store.addSessions(savedSessions);
     await options.checkMocapOverlap?.(savedSessions);
   }
 

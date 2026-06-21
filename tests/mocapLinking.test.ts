@@ -12,7 +12,15 @@ test("confirmMocapSessionLink links an overlapping mocap session", async () => {
   const calls: Array<{ input: string; init?: RequestInit }> = [];
   const fetchImpl = async (input: string, init?: RequestInit) => {
     calls.push({ input, init });
-    return Response.json({ id: "mocap-1", rowingSessionId: "rowing-1", status: "ready" });
+    return Response.json({
+      ok: true,
+      id: "mocap-1",
+      rowingSessionId: "rowing-1",
+      status: "ready",
+      analysisMode: "csv-aligned",
+      strokeMetricCount: 4,
+      faultCount: 2,
+    });
   };
 
   const result = await confirmMocapSessionLink(
@@ -25,6 +33,18 @@ test("confirmMocapSessionLink links an overlapping mocap session", async () => {
     mocapSessionId: "mocap-1",
     rowingSessionId: "rowing-1",
     status: "ready",
+    lifecycle: {
+      ok: true,
+      id: "mocap-1",
+      rowingSessionId: "rowing-1",
+      status: "ready",
+      analysisMode: "csv-aligned",
+      strokeMetricCount: 4,
+      faultCount: 2,
+      durationSec: undefined,
+      frameCount: undefined,
+      poseStreamBytes: undefined,
+    },
   });
   assert.equal(calls[0].input, "/api/mocap/sessions/mocap-1/link/rowing-1");
   assert.equal(calls[0].init?.method, "POST");
@@ -54,7 +74,14 @@ test("confirmMocapSessionUnlink unlinks a mocap session", async () => {
   const calls: Array<{ input: string; init?: RequestInit }> = [];
   const fetchImpl = async (input: string, init?: RequestInit) => {
     calls.push({ input, init });
-    return Response.json({ id: "mocap-1", status: "ready" });
+    return Response.json({
+      ok: true,
+      id: "mocap-1",
+      status: "ready",
+      analysisMode: "pose-segmented",
+      strokeMetricCount: 3,
+      faultCount: 1,
+    });
   };
 
   const result = await confirmMocapSessionUnlink("mocap-1", fetchImpl);
@@ -63,6 +90,18 @@ test("confirmMocapSessionUnlink unlinks a mocap session", async () => {
     ok: true,
     mocapSessionId: "mocap-1",
     status: "ready",
+    lifecycle: {
+      ok: true,
+      id: "mocap-1",
+      rowingSessionId: undefined,
+      status: "ready",
+      analysisMode: "pose-segmented",
+      strokeMetricCount: 3,
+      faultCount: 1,
+      durationSec: undefined,
+      frameCount: undefined,
+      poseStreamBytes: undefined,
+    },
   });
   assert.equal(calls[0].input, "/api/mocap/sessions/mocap-1/unlink");
   assert.equal(calls[0].init?.method, "POST");

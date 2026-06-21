@@ -4,15 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Calendar, Target, Zap, TrendingUp, Medal, Crown, Flame, BarChart3, Sparkles } from 'lucide-react';
-import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { AwardsList } from '@/components/AwardsList';
 import { AwardSuggestionsModal } from '@/components/AwardSuggestionsModal';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { cardStyles, getCardClassName, getShadowStyle } from '@/lib/cardStyles';
-import { calculatePersonalRecords, calculateSessionStats } from '@/lib/rowingSessionProjections';
+import {
+  calculateConsistencyRecords,
+  calculatePersonalRecords,
+  calculateSessionStats,
+} from '@/lib/rowingSessionProjections';
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -46,7 +49,8 @@ export default function PRsPage() {
   const [awardSuggestionsOpen, setAwardSuggestionsOpen] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timeoutId = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   const personalRecords = useMemo(() => calculatePersonalRecords(sessions), [sessions]);
@@ -69,70 +73,10 @@ export default function PRsPage() {
   const bestPowerSessionId = (bestPower as { id?: string }).id;
   const bestStrokeRateSessionId = (bestStrokeRate as { id?: string }).id;
 
-  // Calculate consistency records from sessions with stroke data
-  const consistencyRecords = (() => {
-    const sessionsWithStrokeData = sessions.filter(s => s.strokeData && s.strokeData.length > 0);
-
-    if (sessionsWithStrokeData.length === 0) {
-      return {
-        bestScore: 0,
-        bestScoreSession: null as typeof sessions[0] | null,
-        avgScore: 0,
-        excellentCount: 0,
-        trend: 0,
-        totalWithData: 0
-      };
-    }
-
-    // Calculate consistency scores for all sessions
-    const sessionScores = sessionsWithStrokeData.map(session => ({
-      session,
-      score: calculateAdvancedStats(session.strokeData!).consistencyScore,
-      timestamp: new Date(session.timestamp).getTime()
-    })).sort((a, b) => a.timestamp - b.timestamp);
-
-    // Best consistency score
-    const best = sessionScores.reduce((max, curr) => curr.score > max.score ? curr : max, sessionScores[0]);
-
-    // Average consistency
-    const avgScore = sessionScores.reduce((sum, s) => sum + s.score, 0) / sessionScores.length;
-
-    // Sessions with excellent consistency (≥90)
-    const excellentCount = sessionScores.filter(s => s.score >= 90).length;
-
-    // Trend: compare last 2 weeks avg vs 2 weeks from 3 months ago
-    let trend = 0;
-    let hasTrendData = false;
-    const now = Date.now();
-    const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
-    const threeMonthsMs = 90 * 24 * 60 * 60 * 1000;
-
-    // Last 2 weeks
-    const recentStart = now - twoWeeksMs;
-    const recentSessions = sessionScores.filter(s => s.timestamp >= recentStart);
-
-    // 2 weeks from 3 months ago (between 3 months ago and 3 months - 2 weeks ago)
-    const oldEnd = now - threeMonthsMs;
-    const oldStart = oldEnd - twoWeeksMs;
-    const oldSessions = sessionScores.filter(s => s.timestamp >= oldStart && s.timestamp < oldEnd);
-
-    if (recentSessions.length > 0 && oldSessions.length > 0) {
-      const recentAvg = recentSessions.reduce((sum, s) => sum + s.score, 0) / recentSessions.length;
-      const oldAvg = oldSessions.reduce((sum, s) => sum + s.score, 0) / oldSessions.length;
-      trend = recentAvg - oldAvg;
-      hasTrendData = true;
-    }
-
-    return {
-      bestScore: best.score,
-      bestScoreSession: best.session,
-      avgScore,
-      excellentCount,
-      trend,
-      hasTrendData,
-      totalWithData: sessionsWithStrokeData.length
-    };
-  })();
+  const consistencyRecords = useMemo(
+    () => calculateConsistencyRecords(sessions),
+    [sessions],
+  );
 
   // Show loading placeholder during hydration
   if (!mounted) {

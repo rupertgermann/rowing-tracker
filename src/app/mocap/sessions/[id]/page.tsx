@@ -35,6 +35,7 @@ import {
   confirmMocapSessionLink,
   confirmMocapSessionUnlink,
 } from "@/lib/mocap/linking";
+import { readMocapLifecycleActionResponse } from "@/lib/mocap/lifecycleResponse";
 
 // MediaPipe 33-keypoint skeleton connections for side-view rowing
 const SKELETON_CONNECTIONS: [number, number][] = [
@@ -656,14 +657,22 @@ export default function MocapReplayPage() {
       const res = await fetch(`/api/mocap/sessions/${id}/reanalyze`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error(`${res.status}`);
+      const result = await readMocapLifecycleActionResponse(
+        res,
+        { id, analysisMode: session?.rowingSessionId ? "csv-aligned" : "pose-segmented" },
+        "Failed to re-analyze mocap session",
+      );
+      if (!result.ok) {
+        setReanalyzeError(result.message);
+        return;
+      }
       await loadSession();
     } catch (e) {
       setReanalyzeError(e instanceof Error ? e.message : String(e));
     } finally {
       setReanalyzing(false);
     }
-  }, [id, loadSession]);
+  }, [id, loadSession, session?.rowingSessionId]);
 
   const assignCandidate = useCallback(
     async (candidate: ManualAssignmentCandidate) => {

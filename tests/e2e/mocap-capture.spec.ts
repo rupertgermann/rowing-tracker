@@ -12,6 +12,13 @@
  */
 import { test, expect } from "@playwright/test";
 
+const sidecarCorsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Private-Network": "true",
+};
+
 test("capture page loads without prompting for camera", async ({ page }) => {
   let mediaRequested = false;
   await page.exposeFunction("__markMediaRequested", () => {
@@ -43,7 +50,7 @@ test("capture page loads without prompting for camera", async ({ page }) => {
   expect(mediaRequested).toBe(false);
 });
 
-test("sidecar capture can start and finalize as record-only", async ({ page }) => {
+test("sidecar capture can start and finalize as analyzable", async ({ page }) => {
   let finalizeBody:
     | {
         durationSec: number;
@@ -52,10 +59,11 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
       }
     | null = null;
 
-  await page.route("http://localhost:8765/health", async (route) => {
+  await page.route("**/health", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
+      headers: sidecarCorsHeaders,
       body: JSON.stringify({
         status: "ready",
         fps: 60,
@@ -64,18 +72,19 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
       }),
     });
   });
-  await page.route("http://localhost:8765/session/start", async (route) => {
+  await page.route("**/session/start", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
+      headers: sidecarCorsHeaders,
       body: JSON.stringify({
         sessionId: "sidecar-session",
         calibrationId: "calibration-1",
       }),
     });
   });
-  await page.route("http://localhost:8765/session/stop", async (route) => {
-    await route.fulfill({ status: 200, body: "" });
+  await page.route("**/session/stop", async (route) => {
+    await route.fulfill({ status: 200, headers: sidecarCorsHeaders, body: "" });
   });
   await page.route("**/api/mocap/sessions", async (route) => {
     if (route.request().method() !== "POST") {
@@ -115,11 +124,12 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
         body: JSON.stringify({
           id: "mock-sidecar",
           status: "ready",
+          analysisMode: "pose-segmented",
           durationSec: finalizeBody?.durationSec ?? 0,
-          frameCount: 0,
-          poseStreamBytes: 0,
-          strokeMetricCount: 0,
-          faultCount: 0,
+          frameCount: 12,
+          poseStreamBytes: 4096,
+          strokeMetricCount: 2,
+          faultCount: 1,
         }),
       });
     },
@@ -133,12 +143,48 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
   });
 
   await page.goto("/mocap");
-  await page.getByTestId("mocap-sidecar-toggle").check();
+  await page.waitForLoadState("networkidle");
+  const sidecarToggle = page.getByTestId("mocap-sidecar-toggle");
+  if (await sidecarToggle.isChecked()) {
+    await sidecarToggle.uncheck();
+  }
+  await sidecarToggle.check();
+  await expect(page.getByTestId("mocap-start")).toContainText(
+    "Start sidecar capture",
+  );
   await expect(page.getByTestId("mocap-sidecar-status")).toContainText(
     "Sidecar ready",
   );
 
   await expect(page.getByTestId("mocap-start")).toBeEnabled();
+  await page.evaluate(() => {
+    class MockWebSocket {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+      onopen: ((event: Event) => void) | null = null;
+      onclose: ((event: CloseEvent) => void) | null = null;
+      readyState = 1;
+      readonly url: string;
+
+      constructor(url: string) {
+        this.url = url;
+        setTimeout(() => this.onopen?.(new Event("open")), 0);
+      }
+
+      send() {}
+
+      close() {
+        this.readyState = 3;
+        this.onclose?.(new CloseEvent("close"));
+      }
+    }
+
+    Object.defineProperty(window, "WebSocket", {
+      configurable: true,
+      value: MockWebSocket,
+      writable: true,
+    });
+  });
   await page.getByTestId("mocap-start").click();
   await expect(page.getByTestId("mocap-recording-indicator")).toBeVisible();
 
@@ -146,11 +192,11 @@ test("sidecar capture can start and finalize as record-only", async ({ page }) =
   await page.getByTestId("mocap-stop").click();
 
   await expect(page.getByTestId("mocap-done")).toContainText(
-    "Video-only recording",
+    "12 pose frames",
   );
   expect(finalizeBody).not.toBeNull();
   expect(finalizeBody!.durationSec).toBeGreaterThan(0);
   expect(finalizeBody!.durationSec).toBeLessThan(60 * 60 * 8);
-  expect(finalizeBody!.skipAnalysis).toBe(true);
-  expect(finalizeBody!.qualityFlags).toContain("record-only");
+  expect(finalizeBody!.skipAnalysis).toBe(false);
+  expect(finalizeBody!.qualityFlags ?? []).not.toContain("record-only");
 });

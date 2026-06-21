@@ -1,6 +1,6 @@
-# Running the sidecar tracer locally
+# Running the freemocap sidecar locally
 
-This guide covers how to run the minimal freemocap sidecar integration for local development and testing.
+This guide covers the freemocap sidecar integration for local development and testing.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ This guide covers how to run the minimal freemocap sidecar integration for local
 
 ## Option A — real freemocap sidecar
 
-`rowing-tracker-sidecar` is not currently available on PyPI as of May 10, 2026, so the commands below will only work once that package is published or if you have access to an internal distribution.
+Install the sidecar from the distribution available to your environment:
 
 ```bash
 python3 -m venv .venv
@@ -19,7 +19,7 @@ python -m pip install rowing-tracker-sidecar
 rowing-tracker-sidecar --port 8765
 ```
 
-If `python -m pip install rowing-tracker-sidecar` fails with `No matching distribution found`, use Option B for local app development.
+If the sidecar package is not available in your environment, use Option B for local app development.
 
 The sidecar exposes:
 - `ws://localhost:8765/pose-stream` — streams `KeypointFrame` JSON
@@ -106,32 +106,38 @@ python scripts/sidecar-mock.py
 1. Start the sidecar (real or mock) on port 8765.
 2. Open the app at `http://localhost:3000/mocap`.
 3. Check **Multi-camera sidecar** — the UI polls health and shows "Sidecar ready — 3 cameras, 30 fps".
-4. Click **Start mocap session** — the app creates a session with `source=sidecar`, `capturePerspective=sidecar-3d`.
-5. The session detail page opens as normal. Posture faults from sidecar-3D will appear with `severity=pending` for the three new fault types until thresholds are defined.
+4. Click **Start sidecar capture** — the app creates a session with `source=sidecar`, `capturePerspective=sidecar-3d`, and a v2 `PoseFrameStream`.
+5. The session detail page opens as normal. Sidecar-3D-only posture faults appear with `severity=pending` until tuned thresholds are defined.
 
-## API endpoints added
+## API endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/api/mocap/sessions/:id/sidecar/connect` | Verify sidecar health and arm capture |
 | `GET`  | `/api/mocap/sessions/:id/sidecar/status` | Proxy to `localhost:8765/health` |
+| `POST` | `/api/mocap/sessions/:id/sidecar/stop` | Stop the sidecar session and flush the stream |
 
-Both require an authenticated session and a MocapSession in `capturing` status.
+All routes require an authenticated session and an owned `MocapSession`. `connect` also requires the session to be in `capturing` status and the sidecar schema to match `keypointSchemaVersion = 2`.
 
 ## PoseFrameStream v2 blob format
 
 v2 blobs are written when `source=sidecar`. Key differences from v1:
 
 - `keypointSchemaVersion = 2` in header
+- `coordinateSpace = "world-mm-3d"`
 - Each keypoint is `[x, y, z, confidence]` (4 × Float32 per keypoint, vs 3 × Float32 in v1)
 - Header byte 20: `coordinateSpace` (0 = normalized-2d, 1 = world-mm-3d)
 - Header byte 21: `cameraCount`
+- `calibrationId` is stored on `MocapSession` for traceability
 - v1 blobs are unchanged and remain readable
 
-## Running the new tests
+## Tests
 
 ```bash
 npx tsx --test tests/sidecarTracer.test.ts
+npx tsx --test tests/freemocapSidecarSource.test.ts
+npx tsx --test tests/sidecarMockContract.test.ts
+npm run test:e2e -- tests/e2e/mocap-capture.spec.ts
 ```
 
-Expected: 13 tests pass.
+`tests/sidecarMockContract.test.ts` uses the in-process `tests/helpers/testSidecarMock.ts` fixture. It installs ADR-0005-compatible health, session/start, session/stop, and pose-stream behavior, persists uploaded v2 bytes to `LocalDiskStorage`, finalizes the blob, and runs post-session analysis without a real freemocap install or camera rig.

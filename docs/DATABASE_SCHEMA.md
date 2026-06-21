@@ -208,10 +208,12 @@ model MocapSession {
   captureFps             Float
   calibrationCatchFrame  Json?    // Per-session catch baseline (encoded pose frame)
   calibrationFinishFrame Json?    // Per-session finish baseline (encoded pose frame)
+  calibrationId          String?  // Sidecar Charuco calibration id
+  cameraCount            Int?     // Sidecar camera count
   durationSec            Float    @default(0)
   qualityScore           Float?
   qualityFlags           String[] @default([])
-  status                 String   @default("capturing") // capturing | analyzing | ready | linked
+  status                 String   @default("capturing") // capturing | analyzing | ready
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -571,6 +573,7 @@ model UserSettings {
   // Mocap (posture analysis)
   postureThresholds       Json?    // Per-fault threshold overrides; respects userOverridden flag
   mocapPreferences        Json?    // Capture source default, live-cue verbosity, audio on/off
+  sidecarPort             Int?     // Optional local freemocap sidecar port; defaults to 8765
 
   // Dashboard / View Settings
   dashboardSettings       Json?
@@ -637,9 +640,10 @@ model ChartExplanation {
 - **Indexes**: defined via Prisma; primary filters are `userId`, timestamps, `status` / `archived`, and mocap session id.
 - **Security**: all queries are scoped by `userId`; API keys are AES-256-GCM encrypted (`UserApiKey`); NextAuth is enforced on protected routes; admin endpoints additionally checked through `src/lib/adminAuth.ts`.
 - **Mocap storage**: video and `PoseFrameStream` blobs live on the storage backend (`storage/` directory or Vercel Blob), never in Postgres; see ADR-0001 and ADR-0003.
+- **RowingSession loading**: `/api/sessions/list` returns lightweight session metadata without `StrokeData` plus `strokeDataCount`, `sessionsRevision`, and `count`; `/api/sessions?id=<sessionId>` returns the full session detail including ordered stroke rows.
 - **Cache invalidation**: mutations bump `UserSettings.sessionsRevision` / `insightsRevision` so client caches discard stale data without a full refetch protocol.
+- **Mocap lifecycle**: finalize, link, unlink, and reanalysis use guarded `capturing` / `analyzing` / `ready` transitions; linked state is represented by `MocapSession.rowingSessionId`.
 - **Backups**: enable managed backups / PITR on the Postgres host; user-initiated export is available via `/api/user/export`.
 - **One-off scripts**:
   - `npm run admin:promote -- <email>` — set `User.role = 'admin'`.
   - `npx tsx scripts/backfill-consistency.ts` — backfill `RowingSession.consistencyScore` from existing `StrokeData` and bump `sessionsRevision` for affected users.
-

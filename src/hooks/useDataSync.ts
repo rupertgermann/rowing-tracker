@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRowingStore } from '@/lib/store';
 import { settings } from '@/lib/settings';
+import { loadRowingSessionList } from '@/lib/services/rowingSessionPersistence';
 
 let activeInitialization: Promise<void> | null = null;
 let initializedUserId: string | null = null;
@@ -14,6 +15,7 @@ let initializedUserId: string | null = null;
 export function useDataSync() {
   const { data: session, status } = useSession();
   const initializeFromDB = useRowingStore((state) => state.initializeFromDB);
+  const replaceSessionsInStore = useRowingStore((state) => state.replaceSessionsInStore);
   const hasInitialized = useRef(false);
 
   useEffect(() => {
@@ -40,7 +42,13 @@ export function useDataSync() {
             // Initialize settings from DB first (populates localStorage cache)
             await settings.initializeFromDB();
 
-            // Then initialize store data (sessions, awards, etc.)
+            const rowingSessions = await loadRowingSessionList({
+              cache: 'no-store',
+              cacheOwnerKey: userId,
+            });
+            replaceSessionsInStore(rowingSessions.sessions);
+
+            // Then initialize non-RowingSession store data (awards, settings, etc.)
             await initializeFromDB();
             initializedUserId = userId;
           } catch (error) {
@@ -60,5 +68,5 @@ export function useDataSync() {
       initializedUserId = null;
       activeInitialization = null;
     }
-  }, [status, session, initializeFromDB]);
+  }, [status, session, initializeFromDB, replaceSessionsInStore]);
 }

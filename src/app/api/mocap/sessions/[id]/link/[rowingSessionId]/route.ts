@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
 import { analyzeAndPersistMocapSessionLinked } from "@/lib/mocap/sessionAnalysis";
 import { linkMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
+import { setMocapSessionStatus } from "@/lib/mocap/lifecyclePrisma";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,12 +48,7 @@ export async function POST(
             mocapSession: { select: { id: true } },
           },
         }),
-      setStatus: (mocapSessionId, status) =>
-        prisma.mocapSession.update({
-          where: { id: mocapSessionId },
-          data: { status },
-          select: { status: true },
-        }),
+      setStatus: setMocapSessionStatus,
       assignMocapSession: async (mocapSessionId, ownerId, targetRowingSessionId) => {
         try {
           const update = await prisma.mocapSession.updateMany({
@@ -93,15 +89,19 @@ export async function POST(
 
   if (!result.ok) {
     return NextResponse.json(
-      { error: result.error },
+      { ok: false, error: result.error },
       { status: result.status },
     );
   }
 
   return NextResponse.json({
+    ok: true,
     id: result.id,
     rowingSessionId: result.rowingSessionId,
     status: result.status,
+    analysisMode: result.analysisMode,
+    strokeMetricCount: result.strokeMetricCount,
+    faultCount: result.faultCount,
   });
 }
 

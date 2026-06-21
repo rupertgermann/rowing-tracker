@@ -8,6 +8,7 @@ const repoRoot = process.cwd();
 const projectionConsumers = [
   "src/app/(routes)/page.tsx",
   "src/app/dashboard/page.tsx",
+  "src/app/analytics/page.tsx",
   "src/app/prs/page.tsx",
   "src/app/sessions/page.tsx",
   "src/components/AwardsList.tsx",

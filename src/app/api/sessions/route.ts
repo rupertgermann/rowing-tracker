@@ -8,7 +8,7 @@ import { calculateConsistencyScore } from "@/lib/analysisUtils";
  * GET /api/sessions
  * Fetch all sessions for the authenticated user
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     
@@ -19,9 +19,13 @@ export async function GET() {
       );
     }
 
+    const { searchParams } = new URL(req.url);
+    const sessionId = searchParams.get('id');
+
     const sessions = await prisma.rowingSession.findMany({
       where: {
         userId: session.user.id,
+        ...(sessionId ? { id: sessionId } : {}),
       },
       include: {
         strokeData: {

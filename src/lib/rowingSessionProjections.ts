@@ -1,5 +1,6 @@
 import type { Session, SessionFilters, SessionStats, PersonalRecord } from '@/types/session';
 import { AWARDS, type EarnedAward } from '@/lib/awards';
+import { calculateAdvancedStats } from '@/lib/analysisUtils';
 
 export type ProjectionTimeRange = '7days' | '30days' | '90days' | 'all';
 export type ProjectionDistanceFilter = 'all' | '100' | '500' | '1000' | '2000' | '5000+';
@@ -51,7 +52,19 @@ interface ProjectionOptions {
   now?: Date;
 }
 
-function timestampMs(session: Session): number {
+export interface ConsistencyRecords {
+  bestScore: number;
+  bestScoreSession: Session | null;
+  avgScore: number;
+  excellentCount: number;
+  trend: number;
+  hasTrendData: boolean;
+  totalWithData: number;
+}
+
+type SessionTimestampInput = { timestamp: Date | string };
+
+function timestampMs(session: SessionTimestampInput): number {
   return session.timestamp instanceof Date
     ? session.timestamp.getTime()
     : new Date(session.timestamp).getTime();
@@ -63,7 +76,9 @@ function timestampDate(session: Session): Date {
     : new Date(session.timestamp);
 }
 
-export function sortSessionsByDate(sessions: Session[]): Session[] {
+export function sortSessionsByDate<T extends SessionTimestampInput>(
+  sessions: T[],
+): T[] {
   return [...sessions].sort((a, b) => timestampMs(a) - timestampMs(b));
 }
 
@@ -187,6 +202,88 @@ export function calculatePersonalRecords(sessions: Session[]): PersonalRecord[] 
   });
 
   return records;
+}
+
+function sessionConsistencyScore(session: Session): number | null {
+  if (session.strokeData && session.strokeData.length > 0) {
+    return calculateAdvancedStats(session.strokeData).consistencyScore;
+  }
+
+  return typeof session.consistencyScore === 'number'
+    ? session.consistencyScore
+    : null;
+}
+
+export function calculateConsistencyRecords(
+  sessions: Session[],
+  options: ProjectionOptions = {},
+): ConsistencyRecords {
+  const sessionScores = sessions
+    .map((session) => {
+      const score = sessionConsistencyScore(session);
+      return score === null
+        ? null
+        : {
+            session,
+            score,
+            timestamp: timestampMs(session),
+          };
+    })
+    .filter((entry): entry is { session: Session; score: number; timestamp: number } =>
+      entry !== null,
+    )
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  if (sessionScores.length === 0) {
+    return {
+      bestScore: 0,
+      bestScoreSession: null,
+      avgScore: 0,
+      excellentCount: 0,
+      trend: 0,
+      hasTrendData: false,
+      totalWithData: 0,
+    };
+  }
+
+  const best = sessionScores.reduce((max, curr) =>
+    curr.score > max.score ? curr : max,
+  );
+  const avgScore =
+    sessionScores.reduce((sum, row) => sum + row.score, 0) / sessionScores.length;
+
+  let trend = 0;
+  let hasTrendData = false;
+  const now = options.now?.getTime() ?? Date.now();
+  const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+  const threeMonthsMs = 90 * 24 * 60 * 60 * 1000;
+
+  const recentStart = now - twoWeeksMs;
+  const recentSessions = sessionScores.filter((row) => row.timestamp >= recentStart);
+  const oldEnd = now - threeMonthsMs;
+  const oldStart = oldEnd - twoWeeksMs;
+  const oldSessions = sessionScores.filter((row) =>
+    row.timestamp >= oldStart && row.timestamp < oldEnd,
+  );
+
+  if (recentSessions.length > 0 && oldSessions.length > 0) {
+    const recentAvg =
+      recentSessions.reduce((sum, row) => sum + row.score, 0) / recentSessions.length;
+    const oldAvg =
+      oldSessions.reduce((sum, row) => sum + row.score, 0) / oldSessions.length;
+    trend = recentAvg - oldAvg;
+    hasTrendData = true;
+  }
+
+  return {
+    bestScore: best.score,
+    bestScoreSession: best.session,
+    avgScore,
+    excellentCount: sessionScores.filter((row) => row.score >= 90).length,
+    trend,
+    hasTrendData,
+    totalWithData: sessionScores.length,
+  };
 }
 
 export function filterAndSortSessions(sessions: Session[], filters: SessionFilters): Session[] {

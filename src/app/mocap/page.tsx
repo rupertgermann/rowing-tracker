@@ -63,6 +63,7 @@ import {
   type SidecarHealth,
 } from "@/lib/mocap/sidecarClient";
 import { resolveSidecarPort } from "@/lib/mocap/sidecarPoseSource";
+import { readMocapLifecycleActionResponse } from "@/lib/mocap/lifecycleResponse";
 
 const CAPTURE_FPS = 30;
 const CAPTURE_MODEL_VERSION = "mediapipe-pose-landmarker-lite@0.10.35";
@@ -807,14 +808,17 @@ export default function MocapCapturePage() {
           }),
         },
       );
-      if (!finalizeRes.ok) {
-        throw new Error(`Finalize failed: ${finalizeRes.status}`);
+      const finalized = await readMocapLifecycleActionResponse(
+        finalizeRes,
+        {
+          id: sessionId,
+          analysisMode: captureWasRecordOnly ? "record-only" : "pose-segmented",
+        },
+        "Finalize failed",
+      );
+      if (!finalized.ok) {
+        throw new Error(`Finalize failed: ${finalized.message}`);
       }
-      const finalized: {
-        id: string;
-        durationSec: number;
-        frameCount: number;
-      } = await finalizeRes.json();
       await teardown();
       setCalibration({ kind: "idle" });
 
@@ -834,8 +838,8 @@ export default function MocapCapturePage() {
       setState({
         kind: "done",
         sessionId: finalized.id,
-        durationSec: finalized.durationSec,
-        frameCount: finalized.frameCount,
+        durationSec: finalized.durationSec ?? durationSec,
+        frameCount: finalized.frameCount ?? 0,
         recordOnly: captureWasRecordOnly,
         source: captureSource,
       });

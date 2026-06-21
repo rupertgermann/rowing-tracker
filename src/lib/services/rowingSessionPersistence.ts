@@ -1,6 +1,10 @@
 import type { Session } from '@/types/session';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 import {
+  calculatePersonalRecords,
+  computeEarnedAwards,
+} from '@/lib/rowingSessionProjections';
+import {
   cacheSessionsData,
   clearSessionsCache,
   getCachedSessions,
@@ -17,6 +21,10 @@ export interface RowingSessionListResponse {
   sessions: Session[];
   revision: number;
   count: number;
+}
+
+export interface LoadRowingSessionListOptions extends RequestInit {
+  cacheOwnerKey?: string;
 }
 
 export interface RowingSessionSaveResult {
@@ -37,6 +45,7 @@ export interface SaveRowingSessionsOptions {
   onProgress?: (progress: RowingSessionSaveProgress) => void;
   chunkSize?: number;
   fetchImpl?: typeof fetch;
+  persistDerivedData?: boolean;
 }
 
 interface SessionsListApiResponse {
@@ -48,6 +57,13 @@ interface SessionsListApiResponse {
 interface RowingSessionMutationApiResponse {
   sessions?: Session[];
   sessionId?: string;
+  error?: string;
+}
+
+interface PostImportSessionListApiResponse {
+  sessions?: Session[];
+  sessionsRevision?: number;
+  count?: number;
   error?: string;
 }
 
@@ -107,6 +123,64 @@ function mergeSavedSessionsWithSubmittedMetadata(
   });
 }
 
+async function fetchPostImportSessionList(
+  fetchImpl: typeof fetch,
+): Promise<Session[]> {
+  const response = await fetchImpl('/api/sessions/list', { cache: 'no-store' });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({})) as PostImportSessionListApiResponse;
+    throw new Error(error.error || 'Failed to refresh sessions after import');
+  }
+
+  const data: PostImportSessionListApiResponse = await response.json();
+  return reviveRowingSessionTimestamps(data.sessions ?? []);
+}
+
+async function persistJson(
+  fetchImpl: typeof fetch,
+  url: string,
+  body: unknown,
+  errorLabel: string,
+): Promise<void> {
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(error.error || errorLabel);
+  }
+}
+
+async function persistDerivedDataAfterImport(fetchImpl: typeof fetch): Promise<void> {
+  const sessions = await fetchPostImportSessionList(fetchImpl);
+  const awards = computeEarnedAwards(sessions);
+  const personalRecords = calculatePersonalRecords(sessions).map((record) => ({
+    distance: record.distance,
+    value: record.bestTime,
+    bestPace: record.bestPace,
+    avgPower: record.avgPower,
+    achievedAt: record.date,
+    sessionId: record.sessionId,
+  }));
+
+  if (awards.length > 0) {
+    await persistJson(fetchImpl, '/api/awards', { awards }, 'Failed to persist earned awards');
+  }
+
+  if (personalRecords.length > 0) {
+    await persistJson(
+      fetchImpl,
+      '/api/prs',
+      { prs: personalRecords },
+      'Failed to persist personal records',
+    );
+  }
+}
+
 export async function fetchRowingSessionList(
   init?: RequestInit,
 ): Promise<RowingSessionListResponse> {
@@ -129,15 +203,16 @@ export async function fetchRowingSessionList(
 }
 
 export async function loadRowingSessionList(
-  init?: RequestInit,
+  init?: LoadRowingSessionListOptions,
 ): Promise<RowingSessionListResult> {
-  const cached = getCachedSessions();
+  const { cacheOwnerKey, ...fetchInit } = init ?? {};
+  const cached = getCachedSessions(cacheOwnerKey);
   const cachedSessions = cached
     ? reviveRowingSessionTimestamps(cached.sessions)
     : null;
 
   try {
-    const fresh = await fetchRowingSessionList(init);
+    const fresh = await fetchRowingSessionList(fetchInit);
 
     if (
       cached &&
@@ -153,7 +228,7 @@ export async function loadRowingSessionList(
       };
     }
 
-    cacheSessionsData(fresh.sessions, fresh.revision);
+    cacheSessionsData(fresh.sessions, fresh.revision, cacheOwnerKey);
     return {
       sessions: fresh.sessions,
       revision: fresh.revision,
@@ -181,6 +256,26 @@ export async function loadRowingSessionList(
   }
 }
 
+export async function fetchRowingSessionDetail(
+  sessionId: string,
+  init?: RequestInit,
+): Promise<Session | null> {
+  const response = await fetch(
+    `/api/sessions?id=${encodeURIComponent(sessionId)}`,
+    init,
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[RowingSessionPersistence] Failed to fetch session detail:', errorText);
+    throw new Error('Failed to fetch rowing session detail');
+  }
+
+  const data: RowingSessionMutationApiResponse = await response.json();
+  const session = data.sessions?.[0];
+  return session ? reviveSession(session) : null;
+}
+
 export async function saveRowingSessions(
   sessions: Session[],
   options: SaveRowingSessionsOptions = {},
@@ -191,9 +286,11 @@ export async function saveRowingSessions(
 
   const fetchImpl = options.fetchImpl ?? fetch;
   const chunkSize = options.chunkSize ?? 25;
+  const persistDerivedData = options.persistDerivedData ?? true;
   const totalChunks = Math.ceil(sessions.length / chunkSize);
   let sessionsProcessed = 0;
   const savedSessions: Session[] = [];
+  let derivedDataError: string | undefined;
 
   for (let i = 0; i < totalChunks; i++) {
     const start = i * chunkSize;
@@ -237,6 +334,24 @@ export async function saveRowingSessions(
     }
   }
 
+  if (persistDerivedData) {
+    try {
+      options.onProgress?.({
+        current: totalChunks,
+        total: totalChunks,
+        sessionsProcessed: sessions.length,
+        totalSessions: sessions.length,
+        message: 'Updating awards and personal records...',
+      });
+      await persistDerivedDataAfterImport(fetchImpl);
+    } catch (error) {
+      console.error('[RowingSessionPersistence] Failed to persist derived data after import:', error);
+      derivedDataError = error instanceof Error
+        ? error.message
+        : 'Failed to persist derived import data';
+    }
+  }
+
   options.onProgress?.({
     current: totalChunks,
     total: totalChunks,
@@ -249,6 +364,7 @@ export async function saveRowingSessions(
 
   return {
     success: true,
+    ...(derivedDataError ? { error: derivedDataError } : {}),
     sessions: savedSessions,
   };
 }

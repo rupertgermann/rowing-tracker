@@ -8,6 +8,7 @@ import {
   analyzeAndPersistMocapSessionLinked,
 } from "@/lib/mocap/sessionAnalysis";
 import { reanalyzeMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
+import { setMocapSessionStatus } from "@/lib/mocap/lifecyclePrisma";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,12 +41,7 @@ export async function POST(
             calibrationFinishFrame: true,
           },
         }),
-      setStatus: (mocapSessionId, status) =>
-        prisma.mocapSession.update({
-          where: { id: mocapSessionId },
-          data: { status },
-          select: { status: true },
-        }),
+      setStatus: setMocapSessionStatus,
       analyzePoseSegmented: analyzeAndPersistMocapSession,
       analyzeCsvAligned: analyzeAndPersistMocapSessionLinked,
     },
@@ -57,12 +53,13 @@ export async function POST(
 
   if (!result.ok) {
     return NextResponse.json(
-      { error: result.error },
+      { ok: false, error: result.error },
       { status: result.status },
     );
   }
 
   return NextResponse.json({
+    ok: true,
     id: result.id,
     status: result.status,
     analysisMode: result.analysisMode,

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import {
   clearRowingSessionStrokeData,
   deleteRowingSession,
+  fetchRowingSessionDetail,
   loadRowingSessionList,
   reviveRowingSessionTimestamps,
   saveRowingSessions,
@@ -123,6 +124,23 @@ test("loadRowingSessionList returns cached sessions on revision and count cache 
   assert.ok(result.sessions[0].timestamp instanceof Date);
 });
 
+test("loadRowingSessionList scopes cache hits by authenticated user", async () => {
+  cacheSessionsData([session({ id: "user-a-session" })], 7, "user-a");
+
+  globalThis.fetch = async () => jsonResponse({
+    sessions: [session({ id: "user-b-session" })],
+    sessionsRevision: 7,
+    count: 1,
+  });
+
+  const result = await loadRowingSessionList({ cacheOwnerKey: "user-b" });
+
+  assert.equal(result.source, "network");
+  assert.equal(result.sessions[0].id, "user-b-session");
+  assert.equal(getCachedSessions("user-a")?.sessions[0].id, "user-a-session");
+  assert.equal(getCachedSessions("user-b")?.sessions[0].id, "user-b-session");
+});
+
 test("loadRowingSessionList fetches and caches sessions on cache miss", async () => {
   globalThis.fetch = async () => jsonResponse({
     sessions: [
@@ -177,6 +195,35 @@ test("reviveRowingSessionTimestamps revives list timestamps before UI state", ()
   assert.equal(revived.timestamp.toISOString(), "2026-05-10T14:30:00.000Z");
 });
 
+test("fetchRowingSessionDetail fetches a full session by id", async () => {
+  let requestedUrl: string | null = null;
+  let requestedCache: RequestCache | undefined;
+
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    requestedCache = init?.cache;
+    return jsonResponse({
+      sessions: [
+        {
+          ...session({ id: "detail-session" }),
+          timestamp: "2026-05-10T14:30:00.000Z",
+          strokeData: [stroke()],
+        },
+      ],
+    });
+  };
+
+  const result = await fetchRowingSessionDetail("detail/session?x", {
+    cache: "no-store",
+  });
+
+  assert.equal(requestedUrl, "/api/sessions?id=detail%2Fsession%3Fx");
+  assert.equal(requestedCache, "no-store");
+  assert.equal(result?.id, "detail-session");
+  assert.ok(result?.timestamp instanceof Date);
+  assert.equal(result?.strokeData?.length, 1);
+});
+
 test("saveRowingSessions posts CSV import rows, returns database ids, and clears caches once", async () => {
   cacheSessionsData([session({ id: "cached-session" })], 7);
   localStorage.setItem("rowing_analytics_cache", JSON.stringify({ stale: true }));
@@ -204,6 +251,7 @@ test("saveRowingSessions posts CSV import rows, returns database ids, and clears
 
   const result = await saveRowingSessions([submitted], {
     onProgress: (progress) => progressMessages.push(progress.message),
+    persistDerivedData: false,
   });
 
   assert.equal(result.success, true);
@@ -215,6 +263,116 @@ test("saveRowingSessions posts CSV import rows, returns database ids, and clears
   assert.equal(getCachedSessions(), null);
   assert.equal(localStorage.getItem("rowing_analytics_cache"), null);
   assert.equal(progressMessages.at(-1), "Upload complete!");
+});
+
+test("saveRowingSessions persists derived awards and personal records after import", async () => {
+  const submitted = session({
+    id: "client-session",
+    distance: 100,
+    duration: 38,
+    avgSplit: 190,
+    avgPower: 180,
+  });
+  const requests: Array<{
+    input: string;
+    init?: RequestInit;
+    body?: Record<string, unknown>;
+  }> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const body = init?.body
+      ? JSON.parse(String(init.body)) as Record<string, unknown>
+      : undefined;
+    requests.push({ input: String(input), init, body });
+
+    switch (String(input)) {
+      case "/api/sessions":
+        return jsonResponse({
+          sessions: [
+            {
+              ...submitted,
+              id: "db-session",
+              timestamp: submitted.timestamp.toISOString(),
+            },
+          ],
+        });
+      case "/api/sessions/list":
+        return jsonResponse({
+          sessions: [
+            {
+              ...submitted,
+              id: "db-session",
+              timestamp: submitted.timestamp.toISOString(),
+            },
+          ],
+          sessionsRevision: 8,
+          count: 1,
+        });
+      case "/api/awards":
+        return jsonResponse({ awards: body?.awards ?? [] });
+      case "/api/prs":
+        return jsonResponse({ prs: body?.prs ?? [] });
+      default:
+        throw new Error(`Unexpected request: ${input}`);
+    }
+  };
+
+  const result = await saveRowingSessions([submitted]);
+
+  assert.equal(result.success, true);
+  assert.deepEqual(
+    requests.map((request) => request.input),
+    ["/api/sessions", "/api/sessions/list", "/api/awards", "/api/prs"],
+  );
+  assert.deepEqual(requests[2].body, {
+    awards: [{ awardId: "sessions-1", earnedAt: submitted.timestamp.toISOString() }],
+  });
+  assert.deepEqual(requests[3].body, {
+    prs: [
+      {
+        distance: 100,
+        value: 38,
+        bestPace: 190,
+        avgPower: 180,
+        achievedAt: submitted.timestamp.toISOString(),
+        sessionId: "db-session",
+      },
+    ],
+  });
+});
+
+test("saveRowingSessions preserves committed sessions when derived persistence fails", async () => {
+  cacheSessionsData([session({ id: "cached-session" })], 7);
+  localStorage.setItem("rowing_analytics_cache", JSON.stringify({ stale: true }));
+
+  const submitted = session({ id: "client-session" });
+
+  globalThis.fetch = async (input) => {
+    switch (String(input)) {
+      case "/api/sessions":
+        return jsonResponse({
+          sessions: [
+            {
+              ...submitted,
+              id: "db-session",
+              timestamp: submitted.timestamp.toISOString(),
+            },
+          ],
+        });
+      case "/api/sessions/list":
+        return jsonResponse({ error: "derived refresh unavailable" }, 503);
+      default:
+        throw new Error(`Unexpected request: ${input}`);
+    }
+  };
+
+  const result = await saveRowingSessions([submitted]);
+
+  assert.equal(result.success, true);
+  assert.match(result.error ?? "", /derived refresh unavailable/);
+  assert.equal(result.sessions?.[0].id, "db-session");
+  assert.equal(getCachedSessions(), null);
+  assert.equal(localStorage.getItem("rowing_analytics_cache"), null);
 });
 
 test("saveRowingSessions preserves ZIP stroke data and linked mocap marker when API returns a lean row", async () => {

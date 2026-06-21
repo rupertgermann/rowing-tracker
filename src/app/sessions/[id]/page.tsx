@@ -14,6 +14,7 @@ import { SessionAnalysis } from '@/components/SessionAnalysis';
 import {
   clearRowingSessionStrokeData,
   deleteRowingSession,
+  fetchRowingSessionDetail,
   saveRowingSessionStrokeData,
 } from '@/lib/services/rowingSessionPersistence';
 import {
@@ -145,22 +146,63 @@ export default function SessionDetailPage() {
   };
 
   useEffect(() => {
-    const sessionId = params.id as string;
-    const foundSession = sessions.find(s => s.id === sessionId);
+    let cancelled = false;
 
-    if (foundSession) {
+    async function loadSessionDetail() {
+      const sessionId = params.id as string;
+      const foundSession = sessions.find(s => s.id === sessionId);
+
+      if (!foundSession) {
+        setSession(null);
+        setStrokeData(null);
+        setLoading(false);
+        return;
+      }
+
       setSession(foundSession);
       if (foundSession.strokeData && foundSession.strokeData.length > 0) {
         setStrokeData(foundSession.strokeData);
-      } else {
-        setStrokeData(null);
+        setLoading(false);
+        return;
       }
-    } else {
-      setSession(null);
-      setStrokeData(null);
+
+      if (!foundSession.strokeDataCount || foundSession.strokeDataCount <= 0) {
+        setStrokeData(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const detailedSession = await fetchRowingSessionDetail(sessionId, {
+          cache: 'no-store',
+        });
+        if (cancelled) return;
+
+        if (detailedSession) {
+          updateSessionInStore(detailedSession);
+          setSession(detailedSession);
+          if (detailedSession.strokeData && detailedSession.strokeData.length > 0) {
+            setStrokeData(detailedSession.strokeData);
+          } else {
+            setStrokeData(null);
+          }
+        } else {
+          setStrokeData(null);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error(error);
+        setStrokeData(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    setLoading(false);
-  }, [params.id, sessions]);
+
+    void loadSessionDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, sessions, updateSessionInStore]);
 
   if (loading) {
     return (
