@@ -89,7 +89,7 @@ Migration: when a new defaults version ships, users who haven't touched their th
 
 Two distinct calibration concepts — do not conflate:
 
-**Browser calibration** — a pair of reference pose frames captured before recording starts: one at **catch** position, one at **finish** position. Used as pixel-space baselines for downstream metric calculations. Stored per `MocapSession` (see ADR-0001). Recapture (~10 s) required at the start of each session.
+**Browser calibration** — a pair of reference pose frames captured before recording starts: one at **catch** position, one at **finish** position. Used as baseline-relative context for downstream metric calculations; it does not transform the raw `PoseFrameStream`, and `FaultThresholds` still own severity bands. If browser calibration is missing or unusable, calibrated comparisons are unavailable rather than estimated. Stored per `MocapSession` (see ADR-0001). Recapture (~10 s) required at the start of each session.
 
 **Sidecar Charuco calibration** — a multi-camera extrinsic calibration using a Charuco board. Establishes shared 3D world-space coordinate frame across cameras. Owned and executed by the freemocap sidecar, not by the app. The app stores `calibrationId` (UUID) in `MocapSession` for traceability, but does not own the calibration workflow. Charuco calibration is reusable across sessions as long as cameras don't move; users re-run it when the rig changes.
 
