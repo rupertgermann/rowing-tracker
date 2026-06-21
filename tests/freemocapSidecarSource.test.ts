@@ -169,7 +169,10 @@ test("sidecar source propagates start and websocket errors", async () => {
         /Sidecar session\/start failed: 503/,
       );
       assert.equal(source.status, "error");
-      assert.equal(errors[0].message, "Sidecar session/start failed: 503");
+      assert.equal(
+        errors[0].message,
+        "Sidecar session/start failed: 503 (unreachable)",
+      );
     },
     { connectStatus: 503 },
   );

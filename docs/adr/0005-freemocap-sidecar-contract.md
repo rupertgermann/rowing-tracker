@@ -74,7 +74,7 @@ The sidecar is a local Python process exposing:
 - `POST http://localhost:8765/session/start` — arms capture, returns `{ "sessionId": "<uuid>", "calibrationId": "<uuid>" }`
 - `POST http://localhost:8765/session/stop` — flushes, closes stream
 
-No Docker is required. Users install the Python sidecar via `pip install rowing-tracker-sidecar` (separate PyPI package). The app polls the health endpoint during the readiness gate.
+No Docker is required. The sidecar is a repo-owned Python package installed locally with `python -m pip install -e sidecar` unless a public package release is explicitly published. The app polls the health endpoint during the readiness gate.
 
 Port 8765 is the default; configurable in `UserSettings.sidecarPort`.
 

@@ -54,7 +54,12 @@ export async function POST(
     const health = await checkSidecarHealth(port);
     if (health.status !== "ready") {
       return NextResponse.json(
-        { status: health.status, port },
+        {
+          status: health.status,
+          port,
+          diagnostics: health.diagnostics ?? [],
+          source: health.source ?? null,
+        },
         { status: 409 },
       );
     }
