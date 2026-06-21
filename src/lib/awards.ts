@@ -1,10 +1,9 @@
-import { Session } from '@/types/session';
+import type { Session, SessionStats } from '@/types/session';
 import {
   Trophy,
   Timer,
   Flame,
   Medal,
-  Award as AwardIcon,
   Zap,
   Activity,
   TrendingUp,
@@ -12,16 +11,21 @@ import {
   Crown,
   ShieldCheck
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cleanCatchQualifies } from './postureAchievements';
 import type { SessionFaultInput } from './mocap/postureTrendAggregation';
+
+export interface AwardStats extends SessionStats {
+  postureSessions?: SessionFaultInput[];
+}
 
 export interface Award {
   id: string;
   title: string;
   description: string;
-  icon: any; // Lucide icon component
+  icon: LucideIcon;
   color: string; // Tailwind color class for icon
-  condition: (sessions: Session[], stats?: any) => boolean;
+  condition: (sessions: Session[], stats?: AwardStats) => boolean;
 }
 
 export interface EarnedAward {
@@ -147,7 +151,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 3 consecutive days',
     icon: Flame,
     color: 'text-orange-500',
-    condition: (_, stats) => stats && stats.bestStreak >= 3
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 3
   },
   {
     id: 'streak-5',
@@ -155,7 +159,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 5 consecutive days',
     icon: Flame,
     color: 'text-red-500',
-    condition: (_, stats) => stats && stats.bestStreak >= 5
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 5
   },
   {
     id: 'streak-7',
@@ -163,7 +167,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 7 consecutive days',
     icon: Flame,
     color: 'text-red-600',
-    condition: (_, stats) => stats && stats.bestStreak >= 7
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 7
   },
   {
     id: 'streak-10',
@@ -171,7 +175,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 10 consecutive days',
     icon: Flame,
     color: 'text-rose-600',
-    condition: (_, stats) => stats && stats.bestStreak >= 10
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 10
   },
   {
     id: 'streak-14',
@@ -179,7 +183,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 14 consecutive days',
     icon: Flame,
     color: 'text-rose-700',
-    condition: (_, stats) => stats && stats.bestStreak >= 14
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 14
   },
   {
     id: 'streak-21',
@@ -187,7 +191,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 21 consecutive days',
     icon: Flame,
     color: 'text-rose-800',
-    condition: (_, stats) => stats && stats.bestStreak >= 21
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 21
   },
   {
     id: 'streak-30',
@@ -195,7 +199,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 30 consecutive days',
     icon: Flame,
     color: 'text-rose-900',
-    condition: (_, stats) => stats && stats.bestStreak >= 30
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 30
   },
   {
     id: 'streak-45',
@@ -203,7 +207,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 45 consecutive days',
     icon: Flame,
     color: 'text-pink-600',
-    condition: (_, stats) => stats && stats.bestStreak >= 45
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 45
   },
   {
     id: 'streak-60',
@@ -211,7 +215,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 60 consecutive days',
     icon: Flame,
     color: 'text-pink-700',
-    condition: (_, stats) => stats && stats.bestStreak >= 60
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 60
   },
   {
     id: 'streak-100',
@@ -219,7 +223,7 @@ export const AWARDS: Award[] = [
     description: 'Row for 100 consecutive days',
     icon: Crown,
     color: 'text-fuchsia-600',
-    condition: (_, stats) => stats && stats.bestStreak >= 100
+    condition: (_, stats) => (stats?.bestStreak ?? 0) >= 100
   },
 
   // Distance Milestones
