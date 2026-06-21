@@ -15,13 +15,11 @@ import {
   BarChart,
   Bar,
   ScatterChart,
-  Scatter,
-  ZAxis
+  Scatter
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StrokeData } from '@/types/session';
 import { calculateAdvancedStats, calculateSegments, calculateRollingAverages, calculatePerformanceSummary } from '@/lib/analysisUtils';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Assuming these exist or standard tabs
 import { ComposedChart } from 'recharts';
@@ -48,34 +46,82 @@ const formatSplit = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+type TooltipValue = number | string | ReadonlyArray<number | string>;
+
+interface StrokeTooltipEntry {
+  color?: string;
+  name?: string | number;
+  value?: TooltipValue;
+  payload: {
+    strokeIndex: number;
+    time: number;
+  };
+}
+
+const CustomTooltip = ({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: StrokeTooltipEntry[];
+}) => {
   if (active && payload && payload.length) {
     return (
       <div style={chartTheme.tooltip.contentStyle}>
         <p style={chartTheme.tooltip.labelStyle}>
           Stroke {payload[0].payload.strokeIndex} ({formatDuration(payload[0].payload.time)})
         </p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2" style={{ ...chartTheme.tooltip.itemStyle, color: entry.color }}>
-            <span className="font-semibold">
-              {entry.name}:
-            </span>
-            <span>
-              {entry.name.includes('Split')
-                ? formatSplit(entry.value)
-                : entry.name === 'Distance'
-                  ? `${entry.value}m`
-                  : entry.name.includes('Length')
-                    ? `${entry.value}m`
-                    : Math.round(entry.value)}
-            </span>
-          </div>
-        ))}
+        {payload.map((entry, index) => {
+          const name = String(entry.name ?? '');
+          const value = entry.value;
+          const displayValue = name.includes('Split') && typeof value === 'number'
+            ? formatSplit(value)
+            : name === 'Distance'
+              ? `${value}m`
+              : name.includes('Length')
+                ? `${value}m`
+                : typeof value === 'number'
+                  ? Math.round(value)
+                  : value;
+
+          return (
+            <div key={index} className="flex items-center gap-2" style={{ ...chartTheme.tooltip.itemStyle, color: entry.color }}>
+              <span className="font-semibold">
+                {name}:
+              </span>
+              <span>
+                {displayValue}
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   }
   return null;
 };
+
+function AnalysisChartFrame({
+  height,
+  children,
+}: {
+  height: number;
+  children: React.ReactElement;
+}) {
+  return (
+    <div className="w-full min-w-0" style={{ height }}>
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={1}
+        minHeight={height}
+        initialDimension={{ width: 600, height }}
+      >
+        {children}
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
   const { sessionAnalysisSettings, updateSessionAnalysisSettings } = useRowingStore();
@@ -265,8 +311,6 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
   };
 
   const formatWatts = (watts: number) => `${watts.toFixed(0)} W`;
-  const formatSPM = (spm: number) => `${spm.toFixed(1)} spm`;
-  const formatBPM = (bpm: number) => `${Math.round(bpm)} bpm`;
   const formatMeters = (meters: number) => `${meters.toFixed(1)} m`;
   const formatKilojoules = (kj: number) => `${kj.toFixed(1)} kJ`;
 
@@ -482,8 +526,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <AnalysisChartFrame height={400}>
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis
@@ -519,8 +562,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       strokeWidth={2}
                     />
                   </LineChart>
-                </ResponsiveContainer>
-              </div>
+              </AnalysisChartFrame>
             </CardContent>
           </Card>
         </TabsContent>
@@ -557,8 +599,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <AnalysisChartFrame height={300}>
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis
@@ -593,8 +634,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       dot={false}
                     />
                   </LineChart>
-                </ResponsiveContainer>
-              </div>
+              </AnalysisChartFrame>
             </CardContent>
           </Card>
 
@@ -628,8 +668,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <AnalysisChartFrame height={300}>
                   <AreaChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="distance" tickFormatter={(val) => `${val}m`} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
@@ -646,8 +685,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       fillOpacity={0.2}
                     />
                   </AreaChart>
-                </ResponsiveContainer>
-              </div>
+              </AnalysisChartFrame>
             </CardContent>
           </Card>
 
@@ -681,8 +719,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <AnalysisChartFrame height={300}>
                   <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis dataKey="strokeIndex" label={{ value: 'Stroke #', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
@@ -699,8 +736,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       strokeWidth={2}
                     />
                   </LineChart>
-                </ResponsiveContainer>
-              </div>
+              </AnalysisChartFrame>
             </CardContent>
           </Card>
 
@@ -724,8 +760,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <LineChart data={enrichedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis dataKey="time" tickFormatter={formatDuration} label={{ value: 'Time', position: 'insideBottomRight', offset: -10, style: chartTheme.axis.labelStyle }} tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
@@ -742,8 +777,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         strokeWidth={2}
                       />
                     </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
           )}
@@ -798,8 +832,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <AnalysisChartFrame height={350}>
                   <ComposedChart data={segments} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                     <XAxis
@@ -841,8 +874,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       dot={{ fill: '#dc2626', r: 5 }}
                     />
                   </ComposedChart>
-                </ResponsiveContainer>
-              </div>
+              </AnalysisChartFrame>
             </CardContent>
           </Card>
 
@@ -877,8 +909,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis
@@ -922,8 +953,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         strokeWidth={2}
                       />
                     </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
 
@@ -956,8 +986,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <LineChart data={rollingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis
@@ -1008,8 +1037,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                         strokeWidth={2}
                       />
                     </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
           </div>
@@ -1077,8 +1105,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <BarChart data={distributions.power} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} vertical={false} opacity={chartTheme.grid.opacity} />
                       <XAxis dataKey="range" angle={-45} textAnchor="end" height={60} interval={0} fontSize={chartTheme.axis.fontSize} tick={{ fill: chartTheme.axis.tickColor }} stroke={chartTheme.axis.strokeColor} />
@@ -1086,8 +1113,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
                       <Bar dataKey="count" name="Strokes" fill="#2563eb" radius={[4, 4, 0, 0]} />
                     </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
 
@@ -1110,8 +1136,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <BarChart data={distributions.spm} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} vertical={false} opacity={chartTheme.grid.opacity} />
                       <XAxis dataKey="rate" tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }} stroke={chartTheme.axis.strokeColor} />
@@ -1119,8 +1144,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
                       <Bar dataKey="count" name="Strokes" fill="#dc2626" radius={[4, 4, 0, 0]} />
                     </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
 
@@ -1143,8 +1167,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
@@ -1152,8 +1175,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                       <Scatter name="Rate vs Power" data={enrichedData} fill="#8b5cf6" fillOpacity={0.6} />
                     </ScatterChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
 
@@ -1176,8 +1198,7 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <AnalysisChartFrame height={300}>
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
                       <XAxis type="number" dataKey="strokeRate" name="Rate" unit="spm" domain={['auto', 'auto']} />
@@ -1192,15 +1213,14 @@ export function SessionAnalysis({ data, sessionId }: SessionAnalysisProps) {
                       />
                       <Tooltip
                         cursor={{ strokeDasharray: '3 3' }}
-                        formatter={(value: any, name: any) => [
-                          name === 'Split' ? formatDuration(value) : value,
+                        formatter={(value: TooltipValue, name: string | number) => [
+                          name === 'Split' && typeof value === 'number' ? formatDuration(value) : value,
                           name
                         ]}
                       />
                       <Scatter name="Rate vs Split" data={enrichedData} fill="#10b981" fillOpacity={0.6} />
                     </ScatterChart>
-                  </ResponsiveContainer>
-                </div>
+                </AnalysisChartFrame>
               </CardContent>
             </Card>
           </div>

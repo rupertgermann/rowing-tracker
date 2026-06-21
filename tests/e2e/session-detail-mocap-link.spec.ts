@@ -151,6 +151,45 @@ async function installAuthenticatedSessionRoutes(
   };
 }
 
+function trackRechartsDimensionWarnings(page: Page) {
+  const warnings: string[] = [];
+  const warningPattern = /chart should be greater than 0|width\(-1\)|height\(-1\)/;
+
+  page.on("console", (message) => {
+    if (message.type() !== "warning") return;
+
+    const text = message.text();
+    if (warningPattern.test(text)) warnings.push(text);
+  });
+
+  return warnings;
+}
+
+async function expectVisibleChartsToHavePositiveDimensions(page: Page) {
+  await expect(page.locator(".recharts-responsive-container").first()).toBeVisible();
+
+  const chartDimensions = await page
+    .locator(".recharts-responsive-container")
+    .evaluateAll((containers) =>
+      containers
+        .map((container) => {
+          const rect = container.getBoundingClientRect();
+          return {
+            width: rect.width,
+            height: rect.height,
+            visible: rect.width > 0 && rect.height > 0,
+          };
+        })
+        .filter((dimension) => dimension.visible),
+    );
+
+  expect(chartDimensions.length).toBeGreaterThan(0);
+  for (const dimension of chartDimensions) {
+    expect(dimension.width).toBeGreaterThan(0);
+    expect(dimension.height).toBeGreaterThan(0);
+  }
+}
+
 test("session detail links to the connected mocap session", async ({ page }) => {
   await installAuthenticatedSessionRoutes(page, [rowingSession]);
 
@@ -174,4 +213,27 @@ test("session detail loads stroke data when the session list is lean", async ({ 
   await expect(page.getByText("Analysis Modules")).toBeVisible();
   await expect(page.getByText("Upload Stroke Data")).toHaveCount(0);
   expect(routes.getDetailFetchCount()).toBe(1);
+});
+
+test("session detail stroke-analysis charts render without Recharts dimension warnings", async ({
+  page,
+}) => {
+  const rechartsWarnings = trackRechartsDimensionWarnings(page);
+  await installAuthenticatedSessionRoutes(page, [rowingSessionWithStrokeData]);
+
+  await page.goto("/sessions/session-with-strokes");
+
+  await expect(page.getByText("Analysis Modules")).toBeVisible();
+  await expectVisibleChartsToHavePositiveDimensions(page);
+
+  for (const tabName of ["Performance Graphs", "Segments", "Deep Analysis"]) {
+    await page.getByRole("tab", { name: tabName }).click();
+    await expect(page.getByRole("tab", { name: tabName })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    await expectVisibleChartsToHavePositiveDimensions(page);
+  }
+
+  expect(rechartsWarnings).toEqual([]);
 });
