@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { encode } from "next-auth/jwt";
 import dotenv from "dotenv";
 
@@ -30,7 +30,36 @@ const rowingSession = {
   mocapSession: { id: "linked-mocap-session" },
 };
 
-test("session detail links to the connected mocap session", async ({ page }) => {
+function stroke(strokeIndex: number) {
+  const distance = (strokeIndex + 1) * 10;
+  return {
+    strokeIndex,
+    time: strokeIndex + 1,
+    timestamp: `00:${String(strokeIndex + 1).padStart(2, "0")}`,
+    distance,
+    work: 110 + strokeIndex,
+    power: 120 + strokeIndex,
+    avgPower: 120,
+    split: 150 - strokeIndex,
+    avgSplit: 150,
+    strokeRate: 24,
+    heartRate: null,
+    strokeLength: 10,
+  };
+}
+
+const rowingSessionWithStrokeData = {
+  ...rowingSession,
+  id: "session-with-strokes",
+  strokeData: Array.from({ length: 6 }, (_, index) => stroke(index)),
+  strokeDataCount: 6,
+  mocapSession: null,
+};
+
+async function installAuthenticatedSessionRoutes(
+  page: Page,
+  sessions: Array<typeof rowingSession | typeof rowingSessionWithStrokeData>,
+) {
   const secret = process.env.NEXTAUTH_SECRET;
   test.skip(!secret, "NEXTAUTH_SECRET is required to exercise protected routes");
 
@@ -55,8 +84,18 @@ test("session detail links to the connected mocap session", async ({ page }) => 
     },
   ]);
 
+  const leanSessions = sessions.map(({ strokeData: _strokeData, ...session }) => ({
+    ...session,
+    strokeDataCount: Array.isArray(_strokeData)
+      ? _strokeData.length
+      : (session as { strokeDataCount?: number }).strokeDataCount ?? 0,
+  }));
+
+  let detailFetchCount = 0;
+
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
+    const searchParams = new URL(route.request().url()).searchParams;
 
     if (path === "/api/auth/session") {
       return route.fulfill({
@@ -67,8 +106,23 @@ test("session detail links to the connected mocap session", async ({ page }) => 
       });
     }
 
+    if (path === "/api/sessions/list") {
+      return route.fulfill({
+        json: {
+          sessions: leanSessions,
+          sessionsRevision: 1,
+          count: leanSessions.length,
+        },
+      });
+    }
+
     if (path === "/api/sessions") {
-      return route.fulfill({ json: { sessions: [rowingSession] } });
+      const id = searchParams.get("id");
+      detailFetchCount += id ? 1 : 0;
+      const selected = id
+        ? sessions.filter((session) => session.id === id)
+        : sessions;
+      return route.fulfill({ json: { sessions: selected } });
     }
 
     if (path === "/api/settings") {
@@ -92,6 +146,14 @@ test("session detail links to the connected mocap session", async ({ page }) => 
     return route.continue();
   });
 
+  return {
+    getDetailFetchCount: () => detailFetchCount,
+  };
+}
+
+test("session detail links to the connected mocap session", async ({ page }) => {
+  await installAuthenticatedSessionRoutes(page, [rowingSession]);
+
   await page.goto("/sessions/linked-rowing-session");
 
   const mocapLink = page.getByTestId("session-mocap-link");
@@ -100,4 +162,16 @@ test("session detail links to the connected mocap session", async ({ page }) => 
     "href",
     "/mocap/sessions/linked-mocap-session",
   );
+});
+
+test("session detail loads stroke data when the session list is lean", async ({ page }) => {
+  const routes = await installAuthenticatedSessionRoutes(page, [
+    rowingSessionWithStrokeData,
+  ]);
+
+  await page.goto("/sessions/session-with-strokes");
+
+  await expect(page.getByText("Analysis Modules")).toBeVisible();
+  await expect(page.getByText("Upload Stroke Data")).toHaveCount(0);
+  expect(routes.getDetailFetchCount()).toBe(1);
 });

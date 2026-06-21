@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import {
   clearRowingSessionStrokeData,
   deleteRowingSession,
+  fetchRowingSessionDetail,
   loadRowingSessionList,
   reviveRowingSessionTimestamps,
   saveRowingSessions,
@@ -175,6 +176,35 @@ test("reviveRowingSessionTimestamps revives list timestamps before UI state", ()
 
   assert.ok(revived.timestamp instanceof Date);
   assert.equal(revived.timestamp.toISOString(), "2026-05-10T14:30:00.000Z");
+});
+
+test("fetchRowingSessionDetail fetches a full session by id", async () => {
+  let requestedUrl: string | null = null;
+  let requestedCache: RequestCache | undefined;
+
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    requestedCache = init?.cache;
+    return jsonResponse({
+      sessions: [
+        {
+          ...session({ id: "detail-session" }),
+          timestamp: "2026-05-10T14:30:00.000Z",
+          strokeData: [stroke()],
+        },
+      ],
+    });
+  };
+
+  const result = await fetchRowingSessionDetail("detail/session?x", {
+    cache: "no-store",
+  });
+
+  assert.equal(requestedUrl, "/api/sessions?id=detail%2Fsession%3Fx");
+  assert.equal(requestedCache, "no-store");
+  assert.equal(result?.id, "detail-session");
+  assert.ok(result?.timestamp instanceof Date);
+  assert.equal(result?.strokeData?.length, 1);
 });
 
 test("saveRowingSessions posts CSV import rows, returns database ids, and clears caches once", async () => {

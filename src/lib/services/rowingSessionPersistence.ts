@@ -181,6 +181,26 @@ export async function loadRowingSessionList(
   }
 }
 
+export async function fetchRowingSessionDetail(
+  sessionId: string,
+  init?: RequestInit,
+): Promise<Session | null> {
+  const response = await fetch(
+    `/api/sessions?id=${encodeURIComponent(sessionId)}`,
+    init,
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[RowingSessionPersistence] Failed to fetch session detail:', errorText);
+    throw new Error('Failed to fetch rowing session detail');
+  }
+
+  const data: RowingSessionMutationApiResponse = await response.json();
+  const session = data.sessions?.[0];
+  return session ? reviveSession(session) : null;
+}
+
 export async function saveRowingSessions(
   sessions: Session[],
   options: SaveRowingSessionsOptions = {},
