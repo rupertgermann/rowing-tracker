@@ -5,6 +5,7 @@ import {
   stopSidecarSession,
   type SidecarHealth,
   type SidecarSessionInfo,
+  sidecarReadinessMessage,
 } from "./sidecarClient";
 import type {
   PoseCaptureSource,
@@ -56,7 +57,7 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     try {
       const health = await checkSidecarHealth(this.port);
       if (health.status !== "ready") {
-        throw new Error(`Sidecar not ready: ${health.status}`);
+        throw new Error(sidecarReadinessMessage(health));
       }
       this.currentHealth = health;
       this.setStatus("ready");

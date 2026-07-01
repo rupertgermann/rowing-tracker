@@ -99,17 +99,20 @@ test("sidecar source reports non-ready health through status and error callbacks
 
       await assert.rejects(
         () => source.init(),
-        /Sidecar not ready: initializing/,
+        /Sidecar not ready: initializing \(camera rig warming up\)/,
       );
 
       assert.deepEqual(statuses, [
         ["loading", undefined],
-        ["error", "Sidecar not ready: initializing"],
+        ["error", "Sidecar not ready: initializing (camera rig warming up)"],
       ]);
       assert.equal(errors.length, 1);
-      assert.equal(errors[0].message, "Sidecar not ready: initializing");
+      assert.equal(
+        errors[0].message,
+        "Sidecar not ready: initializing (camera rig warming up)",
+      );
     },
-    { healthResponse: "initializing" },
+    { healthResponse: "initializing", healthDiagnostics: ["camera rig warming up"] },
   );
 });
 
@@ -153,6 +156,7 @@ async function withSidecarGlobals(
   }) => Promise<void>,
   options: {
     healthResponse?: "ready" | "initializing" | "unreachable";
+    healthDiagnostics?: string[];
     startResponse?: "ready" | "malformed";
   } = {},
 ): Promise<void> {
@@ -171,6 +175,7 @@ async function withSidecarGlobals(
         fps: 60,
         cameras: 3,
         schemaVersion: 2,
+        diagnostics: options.healthDiagnostics,
       });
     }
     if (url.includes("/session/start")) {

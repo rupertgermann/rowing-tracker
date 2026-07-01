@@ -20,6 +20,13 @@
 # production
 /build
 
+# Python sidecar
+__pycache__/
+*.py[cod]
+*.egg-info/
+/sidecar/build/
+/sidecar/dist/
+
 # misc
 .DS_Store
 *.pem

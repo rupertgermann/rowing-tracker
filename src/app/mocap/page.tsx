@@ -60,6 +60,7 @@ import type {
 import { settings } from "@/lib/settings";
 import {
   checkSidecarHealth,
+  sidecarReadinessMessage,
   type SidecarHealth,
 } from "@/lib/mocap/sidecarClient";
 import { resolveSidecarPort } from "@/lib/mocap/sidecarPoseSource";
@@ -263,7 +264,7 @@ export default function MocapCapturePage() {
     try {
       const health = await checkSidecarHealth(port);
       if (health.status !== "ready") {
-        throw new Error(`Sidecar not ready: ${health.status}`);
+        throw new Error(sidecarReadinessMessage(health));
       }
       setPoseStatus("ready");
       setSidecarHealth(health);

@@ -156,7 +156,8 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
       },
     );
     if (!res.ok) {
-      throw new Error(`Sidecar session/start failed: ${res.status}`);
+      const body = (await res.json().catch(() => null)) as unknown;
+      throw new Error(sidecarConnectFailureMessage(res.status, body));
     }
     const body = (await res.json().catch(() => ({}))) as unknown;
     if (!isRecord(body)) return {};
@@ -206,6 +207,18 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     this.sourceStatus = status;
     this.opts.onStatus?.(status, detail);
   }
+}
+
+function sidecarConnectFailureMessage(status: number, body: unknown): string {
+  if (!isRecord(body)) return `Sidecar session/start failed: ${status}`;
+  const statusText = optionalString(body.status) ?? optionalString(body.error);
+  const diagnostics = Array.isArray(body.diagnostics)
+    ? body.diagnostics.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+    : [];
+  const details = [statusText, ...diagnostics].filter(Boolean).join(": ");
+  return details
+    ? `Sidecar session/start failed: ${status} (${details})`
+    : `Sidecar session/start failed: ${status}`;
 }
 
 export function encodeSidecarPoseFrame(

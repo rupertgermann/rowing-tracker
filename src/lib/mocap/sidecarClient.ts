@@ -5,6 +5,9 @@ export interface SidecarHealth {
   fps: number;
   cameras: number;
   schemaVersion: number;
+  source?: string;
+  calibrationId?: string | null;
+  diagnostics?: string[];
 }
 
 export interface SidecarSessionInfo {
@@ -34,6 +37,15 @@ export async function checkSidecarHealth(port = SIDECAR_DEFAULT_PORT): Promise<S
   const res = await fetch(`http://localhost:${port}/health`);
   if (!res.ok) throw new Error(`Sidecar health check failed: ${res.status}`);
   return res.json() as Promise<SidecarHealth>;
+}
+
+export function sidecarReadinessMessage(health: SidecarHealth): string {
+  const diagnostic = Array.isArray(health.diagnostics)
+    ? health.diagnostics.find((entry) => typeof entry === "string" && entry.length > 0)
+    : undefined;
+  return diagnostic
+    ? `Sidecar not ready: ${health.status} (${diagnostic})`
+    : `Sidecar not ready: ${health.status}`;
 }
 
 export async function startSidecarSession(port = SIDECAR_DEFAULT_PORT): Promise<SidecarSessionInfo> {
