@@ -4,10 +4,11 @@ This is a manual, opt-in smoke test for a real FreeMoCap camera rig connected
 through the Rowing Tracker sidecar. It is hardware-gated and must not block
 normal CI when a camera rig, calibration, or live provider is unavailable.
 
-The repository does not yet bundle a built-in live FreeMoCap camera provider.
-The current live hardware path is an injected provider loaded with
-`--freemocap-provider`. Synthetic mode and recorded-data mode are useful for
-contract checks, but they do not count as the real camera-rig smoke test.
+The default `--source freemocap` path probes for the optional FreeMoCap Python
+package and fails closed when no supported live API is available. The current
+live hardware path is an injected provider loaded with `--freemocap-provider`.
+Synthetic mode and recorded-data mode are useful for contract checks, but they
+do not count as the real camera-rig smoke test.
 
 ## Pass criteria
 
@@ -30,7 +31,8 @@ contract checks, but they do not count as the real camera-rig smoke test.
 
 ## Preconditions
 
-- Python 3.10+.
+- Python 3.10 through 3.12 for `sidecar[freemocap]`, matching current FreeMoCap
+  release metadata.
 - Rowing Tracker dependencies installed and the app able to run locally.
 - A calibrated FreeMoCap-compatible camera rig.
 - An operator-provided provider factory for the sidecar, for example

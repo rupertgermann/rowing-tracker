@@ -4,7 +4,7 @@ import {
   spawn,
   type ChildProcessWithoutNullStreams,
 } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { once } from "node:events";
 import os from "node:os";
@@ -486,7 +486,10 @@ test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () =
     assert.deepEqual(health.cameras, 0);
     assert.match(
       String((health.diagnostics as unknown[])[0]),
-      /FreeMoCap live camera runtime is not configured/,
+      new RegExp(
+        "FreeMoCap package (is not installed|.+ is installed, " +
+          "but it does not expose a supported headless live camera API)",
+      ),
     );
 
     const startRes = await fetch(`http://localhost:${port}/session/start`, {
@@ -502,6 +505,49 @@ test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () =
     assert.equal(startBody.contractVersion, 1);
     assert.equal(startBody.sidecarVersion, "0.1.0");
     assert.deepEqual(startBody.diagnostics, health.diagnostics);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar diagnoses installed FreeMoCap package without a supported live API", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-pkg-"));
+  await mkdir(path.join(root, "freemocap"), { recursive: true });
+  await writeFile(path.join(root, "freemocap", "__init__.py"), "");
+  await mkdir(path.join(root, "freemocap-1.8.2.dist-info"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "freemocap-1.8.2.dist-info", "METADATA"),
+    "Metadata-Version: 2.1\nName: freemocap\nVersion: 1.8.2\n",
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(port, ["--source", "freemocap"], {
+    pythonPath: [root],
+  });
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "error");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.cameras, 0);
+    assert.match(
+      String((health.diagnostics as unknown[])[0]),
+      new RegExp(
+        "FreeMoCap package 1\\.8\\.2 is installed, " +
+          "but it does not expose a supported headless live camera API",
+      ),
+    );
+    assert.match(
+      String((health.diagnostics as unknown[])[1]),
+      /live calibrated camera frames require an injected --freemocap-provider adapter/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 409);
   } finally {
     await stopProcess(sidecar);
   }

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
+import importlib.util
 import itertools
 import json
 import math
@@ -386,6 +388,20 @@ class UnavailableFreeMocapRuntimeProvider:
         raise RuntimeError(self._diagnostics[0])
 
 
+class FreeMocapPackageRuntimeProvider(UnavailableFreeMocapRuntimeProvider):
+    def __init__(
+        self,
+        *,
+        fps: float,
+        calibration_id: str | None,
+    ) -> None:
+        super().__init__(
+            fps=fps,
+            calibration_id=calibration_id,
+            diagnostics=_detect_freemocap_package_runtime_diagnostics(),
+        )
+
+
 def _load_freemocap_runtime_provider(
     provider_spec: str | None,
     *,
@@ -393,7 +409,7 @@ def _load_freemocap_runtime_provider(
     calibration_id: str | None,
 ) -> FreeMocapRuntimeProvider:
     if provider_spec is None:
-        return UnavailableFreeMocapRuntimeProvider(
+        return FreeMocapPackageRuntimeProvider(
             fps=fps,
             calibration_id=calibration_id,
         )
@@ -419,12 +435,37 @@ def _load_freemocap_runtime_provider(
     return provider
 
 
+def _detect_freemocap_package_runtime_diagnostics() -> tuple[str, ...]:
+    package_spec = importlib.util.find_spec("freemocap")
+    if package_spec is None:
+        return (
+            "FreeMoCap package is not installed in this sidecar environment",
+            'install with python -m pip install -e "sidecar[freemocap]" on Python 3.10-3.12, '
+            "or pass --freemocap-provider module:factory for an operator-owned live runtime adapter",
+            "pass --freemocap-data to stream recorded FreeMoCap output through the ADR-0005 contract",
+        )
+
+    try:
+        version = importlib.metadata.version("freemocap")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown version"
+
+    return (
+        f"FreeMoCap package {version} is installed, but it does not expose a supported headless live camera API",
+        "upstream FreeMoCap exposes stable batch/headless processing and recorded outputs; "
+        "live calibrated camera frames require an injected --freemocap-provider adapter",
+        "pass --freemocap-data to stream recorded FreeMoCap output through the ADR-0005 contract",
+    )
+
+
 def _resolve_freemocap_path(path: pathlib.Path) -> pathlib.Path | None:
     if path.is_file():
         return path
     if not path.is_dir():
         return path
     candidates = [
+        "skeleton_3d.npy",
+        "3dData_numFrames_numTrackedPoints_spatialXYZ.npy",
         "mediapipe_body_3d_xyz.npy",
         "mediapipe_body_3d_xyz_confidence.npy",
         "body_3d_xyz.npy",

@@ -23,7 +23,7 @@ Run recorded FreeMoCap-style output through the same live contract:
 ```bash
 rowing-tracker-sidecar \
   --source freemocap \
-  --freemocap-data /path/to/mediapipe_body_3d_xyz.npy \
+  --freemocap-data /path/to/skeleton_3d.npy \
   --camera-count 3 \
   --fps 30 \
   --port 8765
@@ -47,7 +47,11 @@ calibration id, and version state that blocked capture.
 Synthetic mode is hardware-free and intended for development and CI. FreeMoCap
 recorded-data mode supports JSON, JSONL, and NPY `(frames, 33, 4)` sources.
 Selecting `--source freemocap` without `--freemocap-data` fails readiness with a
-clear diagnostic instead of pretending the camera rig is ready.
+clear diagnostic instead of pretending the camera rig is ready. The default
+FreeMoCap runtime path probes for the optional `freemocap` package, but current
+upstream FreeMoCap releases expose stable batch/headless processing and recorded
+outputs, not a supported one-call live calibrated camera API for this sidecar to
+invoke directly.
 
 Advanced live runtime adapters can be loaded with:
 
@@ -58,8 +62,9 @@ rowing-tracker-sidecar \
 ```
 
 The provider owns real camera health, session start/stop, calibration ids, and
-frame capture behind the stable ADR-0005 sidecar contract. This repository does
-not yet ship a built-in live FreeMoCap camera provider.
+frame capture behind the stable ADR-0005 sidecar contract. Treat SkellyCam,
+SkellyTracker, calibration, and live triangulation glue as provider-owned
+runtime code until upstream exposes a stable live API.
 
 Run the focused release gate before changing package or contract behavior:
 

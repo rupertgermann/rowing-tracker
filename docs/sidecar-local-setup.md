@@ -13,6 +13,10 @@ unless a release note says public publishing has happened.
 - Python 3.10+ with `venv`
 - The app running locally with `npm run dev`
 
+The optional `sidecar[freemocap]` extra follows current FreeMoCap releases and
+requires Python 3.10 through 3.12. Synthetic mode and recorded-data mode can run
+without that extra.
+
 ## Install from this repository
 
 ```bash
@@ -65,7 +69,7 @@ against real `world-mm-3d` coordinates before a live camera runtime is wired in.
 ```bash
 rowing-tracker-sidecar \
   --source freemocap \
-  --freemocap-data /path/to/freemocap/output/mediapipe_body_3d_xyz.npy \
+  --freemocap-data /path/to/freemocap/output/skeleton_3d.npy \
   --camera-count 3 \
   --fps 30 \
   --port 8765
@@ -78,13 +82,16 @@ Supported input formats:
 - `.npy` containing `(frames, 33, 4)` FreeMoCap body keypoints; this requires
   `numpy` in the sidecar environment
 - a directory containing a known FreeMoCap output file such as
+  `skeleton_3d.npy`, `3dData_numFrames_numTrackedPoints_spatialXYZ.npy`, or
   `mediapipe_body_3d_xyz.npy`
 
-If you select `--source freemocap` without `--freemocap-data`, health reports
-`status: "error"` with diagnostics. That failure is intentional: the current
-repo-owned sidecar has a stable adapter boundary for FreeMoCap data, while live
-camera capture depends on the FreeMoCap runtime available in the user's
-environment.
+If you select `--source freemocap` without `--freemocap-data` or
+`--freemocap-provider`, the sidecar probes for the optional FreeMoCap Python
+package and then fails closed with `status: "error"`. Missing-package
+diagnostics explain how to install `sidecar[freemocap]`; installed-package
+diagnostics explain that upstream FreeMoCap exposes batch/headless processing
+and recorded outputs, but not a supported one-call live calibrated camera API
+for this sidecar to invoke directly.
 
 ## FreeMoCap live-runtime provider hook
 
@@ -103,8 +110,9 @@ localhost HTTP/WebSocket contract stable while the provider owns camera/runtime
 details. If the provider cannot be loaded or the runtime cannot start/stop, the
 sidecar reports structured diagnostics instead of pretending capture is ready.
 
-The repository includes fake-provider contract coverage for this boundary. It
-does not yet ship a built-in live FreeMoCap camera provider.
+The repository includes fake-provider contract coverage for this boundary.
+Treat SkellyCam, SkellyTracker, calibration, and live triangulation glue as
+provider-owned runtime code until upstream exposes a stable live API.
 
 ## Using the sidecar in the app
 
@@ -170,8 +178,11 @@ before the Start button is enabled.
   and confirm `curl http://localhost:8765/health` works.
 - **Wrong port**: run the sidecar with `--port <port>` and configure
   `UserSettings.sidecarPort` to the same value.
-- **`status: "error"` with FreeMoCap diagnostics**: the FreeMoCap source is not
-  configured or the data path cannot be read. Pass `--freemocap-data`.
+- **`status: "error"` with FreeMoCap diagnostics**: read the first diagnostic
+  line. The optional package may be missing, the installed package may not
+  expose a supported live API, or the data path may be unreadable. Use
+  `--freemocap-data` for recorded output or `--freemocap-provider` for a live
+  camera adapter.
 - **Incompatible schema**: Rowing Tracker expects schema version `2`.
 - **Missing cameras or calibration**: health should remain `initializing` or
   `error`; do not start capture until it is `ready`.
