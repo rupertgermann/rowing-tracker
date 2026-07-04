@@ -7,6 +7,7 @@ import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMe
 import { memoryStorage } from '@/lib/memoryStorage';
 import { saveInsightsToDB, fetchInsightsFromDB } from '@/lib/dataSync';
 import { SettingsService } from '@/lib/settings';
+import { shouldPersistCurrentInsights } from '@/lib/insightsPersistence';
 import { buildPostureAIPayload, assertNoKeypointsInPayload, PostureAIPayload } from '@/lib/mocap/aiPayload';
 
 async function fetchPosturePayload(): Promise<PostureAIPayload | null> {
@@ -573,6 +574,39 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         return;
       }
 
+      const isCloudAIConfigured = initializeCloudAI();
+      if (!isCloudAIConfigured) {
+        const errorMessage = getAIConfigurationErrorMessage()
+          ?? 'AI connection not configured. Please configure AI settings to generate insights.';
+        setCloudAIError(errorMessage);
+        setData(prev => ({
+          ...prev,
+          usingCloudAI: false,
+          cloudAIError: errorMessage,
+          isCloudAIConfigured: false,
+          isGenerating: false
+        }));
+        return;
+      }
+
+      if (sessions.length < 3) {
+        setCloudAIError(null);
+        setData(prev => ({
+          ...prev,
+          insights: [],
+          trends: [],
+          trainingLoad: null,
+          anomalies: [],
+          isAnalyzable: false,
+          lastAnalyzed: null,
+          usingCloudAI: false,
+          cloudAIError: null,
+          isCloudAIConfigured: true,
+          isGenerating: false
+        }));
+        return;
+      }
+
       // Check if we have any active (non-archived) insights from DB
       // Use dbActiveInsightsCount (set during DB load) instead of data.insights to avoid stale state issues
       const hasActiveInsightsInDB = dbActiveInsightsCount > 0;
@@ -629,13 +663,17 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
             isArchivedView
           };
 
-          // Persist insights to DB (source of truth) - AWAIT to ensure save completes
-          try {
-            await saveInsightsToDB((updatedResult.insights || []) as Record<string, unknown>[], { markAsCurrent: true });
-            // Update the DB active insights count so we don't regenerate on next check
-            setDbActiveInsightsCount(updatedResult.insights?.length || 0);
-          } catch (err) {
-            console.warn('[useAIInsights] Failed to save insights to database:', err);
+          const shouldPersistResult = shouldPersistCurrentInsights(updatedResult);
+
+          if (shouldPersistResult) {
+            // Persist insights to DB (source of truth) - AWAIT to ensure save completes
+            try {
+              await saveInsightsToDB((updatedResult.insights || []) as Record<string, unknown>[], { markAsCurrent: true });
+              // Update the DB active insights count so we don't regenerate on next check
+              setDbActiveInsightsCount(updatedResult.insights?.length || 0);
+            } catch (err) {
+              console.warn('[useAIInsights] Failed to save insights to database:', err);
+            }
           }
 
           // Sync insights to memory for AI coach access (async, non-blocking)
@@ -649,19 +687,21 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
           setData(updatedResult);
 
-          // Refresh revision markers after a successful generation so future reloads don't retrigger.
-          try {
-            const res = await fetch('/api/settings');
-            if (res.ok) {
-              const newData = await res.json();
-              const s = newData?.settings;
-              setRevisions({
-                sessionsRevision: typeof s?.sessionsRevision === 'number' ? s.sessionsRevision : 0,
-                insightsRevision: typeof s?.insightsRevision === 'number' ? s.insightsRevision : 0,
-              });
+          if (shouldPersistResult) {
+            // Refresh revision markers after a successful generation so future reloads don't retrigger.
+            try {
+              const res = await fetch('/api/settings');
+              if (res.ok) {
+                const newData = await res.json();
+                const s = newData?.settings;
+                setRevisions({
+                  sessionsRevision: typeof s?.sessionsRevision === 'number' ? s.sessionsRevision : 0,
+                  insightsRevision: typeof s?.insightsRevision === 'number' ? s.insightsRevision : 0,
+                });
+              }
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
           }
         }
       } catch (error) {
@@ -669,12 +709,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
         if (isMounted) {
           const localResult = await getLocalAnalysis(sessions);
 
-          // IMPORTANT: Also save fallback results to DB with markAsCurrent to prevent re-regeneration
-          try {
-            await saveInsightsToDB((localResult.insights || []) as Record<string, unknown>[], { markAsCurrent: true });
-            setDbActiveInsightsCount(localResult.insights?.length || 0);
-          } catch (err) {
-            console.warn('[useAIInsights] Failed to save fallback insights to database:', err);
+          if (shouldPersistCurrentInsights(localResult)) {
+            // Save fallback results to DB with markAsCurrent to prevent re-regeneration
+            try {
+              await saveInsightsToDB((localResult.insights || []) as Record<string, unknown>[], { markAsCurrent: true });
+              setDbActiveInsightsCount(localResult.insights?.length || 0);
+            } catch (err) {
+              console.warn('[useAIInsights] Failed to save fallback insights to database:', err);
+            }
           }
 
           setData(localResult);
