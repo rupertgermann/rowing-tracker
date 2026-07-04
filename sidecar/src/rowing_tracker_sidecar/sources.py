@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import itertools
 import json
 import math
@@ -23,6 +24,14 @@ class SourceSession:
     calibration_id: str | None
 
 
+@dataclass(frozen=True)
+class RuntimeFrame:
+    keypoints: list[list[float]]
+    timestamp_ms: int | None
+    reprojection_error_mm: float | None = None
+    camera_count: int | None = None
+
+
 class FrameSource(Protocol):
     @property
     def fps(self) -> float: ...
@@ -42,6 +51,16 @@ class FrameSource(Protocol):
     def frame(self, frame_index: int, timestamp_ms: int) -> SidecarFrame: ...
 
 
+class FreeMocapRuntimeProvider(Protocol):
+    def health(self) -> SourceHealth: ...
+
+    def start_session(self, session_id: str) -> SourceSession: ...
+
+    def stop_session(self, session_id: str) -> None: ...
+
+    def frame(self) -> RuntimeFrame: ...
+
+
 def build_frame_source(
     *,
     source: str,
@@ -49,6 +68,7 @@ def build_frame_source(
     camera_count: int,
     calibration_id: str | None,
     freemocap_data: str | None,
+    freemocap_provider: str | None = None,
 ) -> FrameSource:
     if source == "synthetic":
         return SyntheticFrameSource(
@@ -57,11 +77,19 @@ def build_frame_source(
             calibration_id=calibration_id or "synthetic-calibration",
         )
     if source == "freemocap":
-        return FreeMocapRecordedSource(
-            data_path=freemocap_data,
-            fps=fps,
-            camera_count=camera_count,
-            calibration_id=calibration_id,
+        if freemocap_data:
+            return FreeMocapRecordedSource(
+                data_path=freemocap_data,
+                fps=fps,
+                camera_count=camera_count,
+                calibration_id=calibration_id,
+            )
+        return FreeMocapRuntimeSource(
+            provider=_load_freemocap_runtime_provider(
+                freemocap_provider,
+                fps=fps,
+                calibration_id=calibration_id,
+            ),
         )
     raise ValueError(f"Unsupported sidecar source: {source}")
 
@@ -236,35 +264,12 @@ class FreeMocapRecordedSource:
         if not self._frames:
             raise RuntimeError("FreeMoCap source is not ready")
         raw = self._frames[frame_index % len(self._frames)]
-        keypoints = []
-        confidences = []
-        for index, values in enumerate(raw.keypoints):
-            x, y, z, confidence = values
-            confidences.append(confidence)
-            keypoints.append(
-                {
-                    "index": index,
-                    "x": float(x),
-                    "y": float(y),
-                    "z": float(z),
-                    "confidence": float(confidence),
-                },
-            )
-        tracked = sum(1 for confidence in confidences if confidence >= 0.5)
-        mean_confidence = sum(confidences) / len(confidences)
-        return {
-            "schema_version": KEYPOINT_SCHEMA_VERSION,
-            "frame_index": frame_index,
-            "timestamp_ms": timestamp_ms,
-            "source": "sidecar-3d",
-            "keypoints": keypoints,
-            "quality": {
-                "tracked_count": tracked,
-                "mean_confidence": mean_confidence,
-                "reprojection_error_mm": raw.reprojection_error_mm or 0.0,
-                "camera_count": self.camera_count,
-            },
-        }
+        return _sidecar_frame_from_keypoints(
+            raw,
+            frame_index=frame_index,
+            timestamp_ms=timestamp_ms,
+            camera_count=self.camera_count,
+        )
 
     def _load(self) -> None:
         if self._data_path is None:
@@ -291,6 +296,127 @@ class FreeMocapRecordedSource:
         except Exception as exc:
             self._frames = []
             self._diagnostics = (f"Failed to load FreeMoCap data: {exc}",)
+
+
+class FreeMocapRuntimeSource:
+    source_name = "freemocap"
+
+    def __init__(self, *, provider: FreeMocapRuntimeProvider) -> None:
+        self._provider = provider
+
+    @property
+    def fps(self) -> float:
+        return self.health().fps
+
+    @property
+    def camera_count(self) -> int:
+        return self.health().camera_count
+
+    @property
+    def calibration_id(self) -> str | None:
+        return self.health().calibration_id
+
+    def health(self) -> SourceHealth:
+        health = self._provider.health()
+        return SourceHealth(
+            status=health.status,
+            fps=health.fps,
+            camera_count=health.camera_count,
+            schema_version=health.schema_version,
+            contract_version=health.contract_version,
+            sidecar_version=health.sidecar_version,
+            source=self.source_name,
+            calibration_id=health.calibration_id,
+            diagnostics=health.diagnostics,
+        )
+
+    def start_session(self, session_id: str) -> SourceSession:
+        return self._provider.start_session(session_id)
+
+    def stop_session(self, session_id: str) -> None:
+        self._provider.stop_session(session_id)
+
+    def frame(self, frame_index: int, timestamp_ms: int) -> SidecarFrame:
+        raw = self._provider.frame()
+        if not isinstance(raw.timestamp_ms, int):
+            raise ValueError("runtime frame timestamp_ms must be an integer")
+        return _sidecar_frame_from_keypoints(
+            RecordedFrame(
+                keypoints=raw.keypoints,
+                reprojection_error_mm=raw.reprojection_error_mm,
+            ),
+            frame_index=frame_index,
+            timestamp_ms=raw.timestamp_ms,
+            camera_count=raw.camera_count or self.camera_count,
+        )
+
+
+class UnavailableFreeMocapRuntimeProvider:
+    def __init__(
+        self,
+        *,
+        fps: float,
+        calibration_id: str | None,
+        diagnostics: tuple[str, ...] | None = None,
+    ) -> None:
+        self._fps = fps
+        self._calibration_id = calibration_id
+        self._diagnostics = diagnostics or (
+            "FreeMoCap live camera runtime is not configured in this build",
+            "pass --freemocap-provider module:factory for a live runtime adapter or --freemocap-data for recorded output",
+        )
+
+    def health(self) -> SourceHealth:
+        return SourceHealth(
+            status="error",
+            fps=self._fps,
+            camera_count=0,
+            source="freemocap",
+            calibration_id=self._calibration_id,
+            diagnostics=self._diagnostics,
+        )
+
+    def start_session(self, session_id: str) -> SourceSession:
+        raise RuntimeError(self._diagnostics[0])
+
+    def stop_session(self, session_id: str) -> None:
+        return None
+
+    def frame(self) -> RuntimeFrame:
+        raise RuntimeError(self._diagnostics[0])
+
+
+def _load_freemocap_runtime_provider(
+    provider_spec: str | None,
+    *,
+    fps: float,
+    calibration_id: str | None,
+) -> FreeMocapRuntimeProvider:
+    if provider_spec is None:
+        return UnavailableFreeMocapRuntimeProvider(
+            fps=fps,
+            calibration_id=calibration_id,
+        )
+    module_name, separator, factory_name = provider_spec.partition(":")
+    if not separator or not module_name or not factory_name:
+        return UnavailableFreeMocapRuntimeProvider(
+            fps=fps,
+            calibration_id=calibration_id,
+            diagnostics=(
+                "FreeMoCap runtime provider must be formatted as module:factory",
+            ),
+        )
+    try:
+        module = importlib.import_module(module_name)
+        factory = getattr(module, factory_name)
+        provider = factory()
+    except Exception as exc:
+        return UnavailableFreeMocapRuntimeProvider(
+            fps=fps,
+            calibration_id=calibration_id,
+            diagnostics=(f"Failed to load FreeMoCap runtime provider {provider_spec}: {exc}",),
+        )
+    return provider
 
 
 def _resolve_freemocap_path(path: pathlib.Path) -> pathlib.Path | None:
@@ -395,15 +521,69 @@ def _validate_recorded_frames(frames: list[RecordedFrame]) -> None:
     if not frames:
         raise ValueError("no frames found")
     for frame_index, recorded_frame in enumerate(frames):
-        frame = recorded_frame.keypoints
-        if len(frame) != KEYPOINT_COUNT:
+        _validate_recorded_frame(recorded_frame, frame_index)
+
+
+def _sidecar_frame_from_keypoints(
+    recorded_frame: RecordedFrame,
+    *,
+    frame_index: int,
+    timestamp_ms: int,
+    camera_count: int,
+) -> SidecarFrame:
+    _validate_recorded_frame(recorded_frame, frame_index)
+    keypoints = []
+    confidences = []
+    for index, values in enumerate(recorded_frame.keypoints):
+        x, y, z, confidence = values[:4]
+        x_value = float(x)
+        y_value = float(y)
+        z_value = float(z)
+        confidence_value = float(confidence)
+        confidences.append(confidence_value)
+        keypoints.append(
+            {
+                "index": index,
+                "x": x_value,
+                "y": y_value,
+                "z": z_value,
+                "confidence": confidence_value,
+            },
+        )
+    tracked = sum(1 for confidence in confidences if confidence >= 0.5)
+    mean_confidence = sum(confidences) / len(confidences)
+    return {
+        "schema_version": KEYPOINT_SCHEMA_VERSION,
+        "frame_index": frame_index,
+        "timestamp_ms": timestamp_ms,
+        "source": "sidecar-3d",
+        "keypoints": keypoints,
+        "quality": {
+            "tracked_count": tracked,
+            "mean_confidence": mean_confidence,
+            "reprojection_error_mm": recorded_frame.reprojection_error_mm
+            if recorded_frame.reprojection_error_mm is not None
+            else 0.0,
+            "camera_count": camera_count,
+        },
+    }
+
+
+def _validate_recorded_frame(recorded_frame: RecordedFrame, frame_index: int) -> None:
+    frame = recorded_frame.keypoints
+    if len(frame) != KEYPOINT_COUNT:
+        raise ValueError(
+            f"frame {frame_index} has {len(frame)} keypoints; expected 33",
+        )
+    for point_index, point in enumerate(frame):
+        if len(point) < 4:
             raise ValueError(
-                f"frame {frame_index} has {len(frame)} keypoints; expected 33",
+                f"frame {frame_index} keypoint {point_index} has {len(point)} values; expected 4",
             )
-        for point_index, point in enumerate(frame):
-            if len(point) < 4:
+        for value_index, value in enumerate(point[:4]):
+            if not math.isfinite(float(value)):
                 raise ValueError(
-                    f"frame {frame_index} keypoint {point_index} has {len(point)} values; expected 4",
+                    f"frame {frame_index} keypoint {point_index} value {value_index} must be finite",
                 )
 
 

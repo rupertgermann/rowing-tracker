@@ -28,6 +28,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="FreeMoCap-style JSON/JSONL/NPY data file or output directory.",
     )
     parser.add_argument(
+        "--freemocap-provider",
+        help="Advanced live FreeMoCap runtime provider as module:factory.",
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -47,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         camera_count=args.camera_count,
         calibration_id=args.calibration_id,
         freemocap_data=args.freemocap_data,
+        freemocap_provider=args.freemocap_provider,
     )
     server = SidecarServer(args.host, args.port, source)
     try:

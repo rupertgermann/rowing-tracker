@@ -86,6 +86,26 @@ repo-owned sidecar has a stable adapter boundary for FreeMoCap data, while live
 camera capture depends on the FreeMoCap runtime available in the user's
 environment.
 
+## FreeMoCap live-runtime provider hook
+
+The sidecar can load a live runtime adapter with `--freemocap-provider`:
+
+```bash
+rowing-tracker-sidecar \
+  --source freemocap \
+  --freemocap-provider my_runtime_module:create_provider \
+  --port 8765
+```
+
+The provider factory must return an object that owns real rig health,
+`start_session`, `stop_session`, and frame capture. The sidecar keeps the
+localhost HTTP/WebSocket contract stable while the provider owns camera/runtime
+details. If the provider cannot be loaded or the runtime cannot start/stop, the
+sidecar reports structured diagnostics instead of pretending capture is ready.
+
+The repository includes fake-provider contract coverage for this boundary. It
+does not yet ship a built-in live FreeMoCap camera provider.
+
 ## Using the sidecar in the app
 
 1. Start the sidecar on port `8765`.

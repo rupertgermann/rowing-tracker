@@ -165,6 +165,162 @@ test("rowing-tracker-sidecar rejects recorded FreeMoCap frames with incomplete k
   }
 });
 
+test("rowing-tracker-sidecar streams injected FreeMoCap runtime provider frames", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-runtime-"));
+  await writeFile(
+    path.join(root, "fake_runtime_provider.py"),
+    `
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.sources import RuntimeFrame, SourceSession
+
+class FakeRuntimeProvider:
+    def __init__(self):
+        self.active = False
+        self.session_id = None
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=24,
+            camera_count=5,
+            source="freemocap",
+            calibration_id="runtime-calibration",
+            diagnostics=("fake runtime ready",),
+        )
+
+    def start_session(self, session_id):
+        self.active = True
+        self.session_id = f"runtime-{session_id}"
+        return SourceSession(
+            session_id=self.session_id,
+            calibration_id="runtime-calibration",
+        )
+
+    def stop_session(self, session_id):
+        if session_id != self.session_id:
+            raise RuntimeError(f"unexpected session {session_id}")
+        self.active = False
+
+    def frame(self):
+        if not self.active:
+            raise RuntimeError("runtime provider is not active")
+        return RuntimeFrame(
+            keypoints=[
+                [index + 0.25, index + 100.25, index + 200.25, 0.92]
+                for index in range(33)
+            ],
+            timestamp_ms=1710000000123,
+            reprojection_error_mm=2.75,
+            camera_count=5,
+        )
+
+def create_provider():
+    return FakeRuntimeProvider()
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-provider",
+      "fake_runtime_provider:create_provider",
+    ],
+    { pythonPath: [root] },
+  );
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "ready");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.fps, 24);
+    assert.equal(health.cameras, 5);
+    assert.equal(health.calibrationId, "runtime-calibration");
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 200);
+    const started = (await startRes.json()) as Record<string, unknown>;
+    assert.match(String(started.sessionId), /^runtime-[0-9a-f-]+$/);
+    assert.equal(started.calibrationId, "runtime-calibration");
+
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.schema_version, 2);
+    assert.equal(frame.timestamp_ms, 1710000000123);
+    assert.equal(frame.source, "sidecar-3d");
+    assert.equal(frame.keypoints.length, 33);
+    assert.equal(frame.keypoints[12].x, 12.25);
+    assert.equal(frame.keypoints[12].y, 112.25);
+    assert.equal(frame.keypoints[12].z, 212.25);
+    assert.equal(frame.keypoints[12].confidence, 0.92);
+    assert.equal(frame.quality.tracked_count, 33);
+    assert.equal(frame.quality.camera_count, 5);
+    assert.equal(frame.quality.reprojection_error_mm, 2.75);
+
+    const stopRes = await fetch(`http://localhost:${port}/session/stop`, {
+      method: "POST",
+    });
+    assert.equal(stopRes.status, 200);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("freemocap runtime source rejects non-finite live provider frames", async () => {
+  const script = String.raw`
+import math
+
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.sources import FreeMocapRuntimeSource, RuntimeFrame, SourceSession
+
+class BadRuntimeProvider:
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=24,
+            camera_count=3,
+            source="freemocap",
+            calibration_id="runtime-calibration",
+        )
+
+    def start_session(self, session_id):
+        return SourceSession(
+            session_id=session_id,
+            calibration_id="runtime-calibration",
+        )
+
+    def stop_session(self, session_id):
+        return None
+
+    def frame(self):
+        return RuntimeFrame(
+            keypoints=[
+                [math.nan if index == 12 else index, index + 100, index + 200, 0.9]
+                for index in range(33)
+            ],
+            timestamp_ms=1710000000123,
+            reprojection_error_mm=1.5,
+            camera_count=3,
+        )
+
+source = FreeMocapRuntimeSource(provider=BadRuntimeProvider())
+
+try:
+    source.frame(0, 1710000000999)
+except ValueError as exc:
+    assert "must be finite" in str(exc)
+else:
+    raise AssertionError("expected non-finite runtime frame rejection")
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
 test("sidecar state delegates source session lifecycle", async () => {
   const script = String.raw`
 from rowing_tracker_sidecar.contract import SourceHealth
@@ -402,6 +558,7 @@ async function getFreePort(): Promise<number> {
 function startSidecar(
   port: number,
   extraArgs: string[],
+  options: { pythonPath?: string[] } = {},
 ): ChildProcessWithoutNullStreams {
   return spawn(
     "python3",
@@ -414,17 +571,20 @@ function startSidecar(
       String(port),
       ...extraArgs,
     ],
-    { env: sidecarPythonEnv() },
+    { env: sidecarPythonEnv(options.pythonPath) },
   );
 }
 
-function sidecarPythonEnv(): NodeJS.ProcessEnv {
+function sidecarPythonEnv(extraPythonPath: string[] = []): NodeJS.ProcessEnv {
   const sidecarSrc = path.join(process.cwd(), "sidecar", "src");
+  const pythonPath = [
+    sidecarSrc,
+    ...extraPythonPath,
+    process.env.PYTHONPATH,
+  ].filter((entry): entry is string => Boolean(entry));
   return {
     ...process.env,
-    PYTHONPATH: process.env.PYTHONPATH
-      ? `${sidecarSrc}${path.delimiter}${process.env.PYTHONPATH}`
-      : sidecarSrc,
+    PYTHONPATH: pythonPath.join(path.delimiter),
   };
 }
 
@@ -447,6 +607,7 @@ async function waitForHealth(
 
 async function readOneSidecarFrame(port: number): Promise<{
   schema_version: number;
+  timestamp_ms: number;
   source: string;
   keypoints: Array<{
     x: number;

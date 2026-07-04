@@ -49,6 +49,18 @@ recorded-data mode supports JSON, JSONL, and NPY `(frames, 33, 4)` sources.
 Selecting `--source freemocap` without `--freemocap-data` fails readiness with a
 clear diagnostic instead of pretending the camera rig is ready.
 
+Advanced live runtime adapters can be loaded with:
+
+```bash
+rowing-tracker-sidecar \
+  --source freemocap \
+  --freemocap-provider my_runtime_module:create_provider
+```
+
+The provider owns real camera health, session start/stop, calibration ids, and
+frame capture behind the stable ADR-0005 sidecar contract. This repository does
+not yet ship a built-in live FreeMoCap camera provider.
+
 Run the focused release gate before changing package or contract behavior:
 
 ```bash

@@ -24,7 +24,7 @@ test("sidecar package installs locally and exposes rowing-tracker-sidecar", asyn
 
   await execFileAsync(python, ["-m", "pip", "install", "-e", "sidecar"], {
     cwd: process.cwd(),
-    timeout: 60_000,
+    timeout: 180_000,
   });
   const { stdout } = await execFileAsync(command, ["--help"], {
     timeout: 30_000,
@@ -33,6 +33,7 @@ test("sidecar package installs locally and exposes rowing-tracker-sidecar", asyn
   assert.match(stdout, /Run the Rowing Tracker local mocap sidecar/);
   assert.match(stdout, /--source/);
   assert.match(stdout, /--freemocap-data/);
+  assert.match(stdout, /--freemocap-provider/);
 
   const port = await getFreePort();
   const sidecar = spawn(command, [
