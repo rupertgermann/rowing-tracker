@@ -52,11 +52,15 @@ export function initializeCloudAIFromSettings(): boolean {
       return success;
     }
 
-    // Fallback: try environment variable if user hasn't provided key
-    // This allows read-only/low-friction usage when env key is available
-    // but user hasn't explicitly configured their own key
-    const envKeyAvailable = cloudAI.initialize(); // initialize() with no args uses env var
-    return envKeyAvailable;
+    // Fallback: try environment variable if user hasn't provided key.
+    // Avoid calling cloudAI.initialize() with no key; this path is a normal
+    // configuration state, not a warning-worthy runtime failure.
+    const envApiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+    if (envApiKey && envApiKey.trim()) {
+      return cloudAI.initialize(envApiKey);
+    }
+
+    return false;
 
   } catch (error) {
     console.error('Failed to initialize Cloud AI from settings:', error);
