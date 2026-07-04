@@ -186,26 +186,11 @@ before the Start button is enabled.
 
 ## Hardware-gated smoke test
 
-Use this manual path when a real camera rig and FreeMoCap output are available.
-Today this is a recorded-output smoke path because the repo-owned sidecar does
-not yet own a live FreeMoCap camera runtime adapter:
-
-1. Capture or locate a FreeMoCap `(frames, 33, 4)` output file.
-2. Start the sidecar in recorded-data mode with that file.
-3. Confirm `/health` is `ready`, `schemaVersion` is `2`, and `cameras` matches
-   the rig.
-4. Record a Rowing Tracker sidecar session from `/mocap`.
-5. Stop capture and open the replay.
-6. Confirm the stored session uses `source=sidecar`,
-   `capturePerspective=sidecar-3d`, has pose frames, and runs post-session
-   analysis.
-
-This smoke test is hardware/data-gated and should not block normal CI.
-
-When a live runtime adapter lands, add a second opt-in smoke variant that starts
-`rowing-tracker-sidecar --source freemocap` against the actual camera rig,
-confirms nonzero fps and a sidecar-owned calibration id, records a short row,
-then verifies replay and analysis from the captured session.
+For the manual, opt-in real camera-rig procedure, see
+[FreeMoCap sidecar hardware smoke test](sidecar-hardware-smoke.md). It uses the
+current injected `--freemocap-provider` live path, records through Rowing
+Tracker, verifies replay and analysis output, and must not block normal CI when
+hardware is unavailable.
 
 ## Privacy and licensing
 
