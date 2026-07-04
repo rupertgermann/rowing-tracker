@@ -17,6 +17,12 @@ class RecordedFrame:
     reprojection_error_mm: float | None = None
 
 
+@dataclass(frozen=True)
+class SourceSession:
+    session_id: str
+    calibration_id: str | None
+
+
 class FrameSource(Protocol):
     @property
     def fps(self) -> float: ...
@@ -28,6 +34,10 @@ class FrameSource(Protocol):
     def calibration_id(self) -> str | None: ...
 
     def health(self) -> SourceHealth: ...
+
+    def start_session(self, session_id: str) -> SourceSession: ...
+
+    def stop_session(self, session_id: str) -> None: ...
 
     def frame(self, frame_index: int, timestamp_ms: int) -> SidecarFrame: ...
 
@@ -101,6 +111,15 @@ class SyntheticFrameSource:
             calibration_id=self.calibration_id,
             diagnostics=("synthetic source ready",),
         )
+
+    def start_session(self, session_id: str) -> SourceSession:
+        return SourceSession(
+            session_id=session_id,
+            calibration_id=self.calibration_id,
+        )
+
+    def stop_session(self, session_id: str) -> None:
+        return None
 
     def frame(self, frame_index: int, timestamp_ms: int) -> SidecarFrame:
         hip_knee_depth = _stroke_depth(frame_index)
@@ -203,6 +222,15 @@ class FreeMocapRecordedSource:
             calibration_id=self.calibration_id,
             diagnostics=self._diagnostics,
         )
+
+    def start_session(self, session_id: str) -> SourceSession:
+        return SourceSession(
+            session_id=session_id,
+            calibration_id=self.calibration_id,
+        )
+
+    def stop_session(self, session_id: str) -> None:
+        return None
 
     def frame(self, frame_index: int, timestamp_ms: int) -> SidecarFrame:
         if not self._frames:

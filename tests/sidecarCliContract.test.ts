@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  execFile,
+  spawn,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 test("rowing-tracker-sidecar serves the ADR-0005 contract with synthetic frames", async () => {
   const port = await getFreePort();
@@ -158,6 +165,160 @@ test("rowing-tracker-sidecar rejects recorded FreeMoCap frames with incomplete k
   }
 });
 
+test("sidecar state delegates source session lifecycle", async () => {
+  const script = String.raw`
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.server import SidecarState
+from rowing_tracker_sidecar.sources import SourceSession
+
+class FakeSource:
+    fps = 42
+    camera_count = 2
+    calibration_id = "health-calibration"
+
+    def __init__(self):
+        self.started_with = None
+        self.stopped_with = None
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=self.fps,
+            camera_count=self.camera_count,
+            source="freemocap",
+            calibration_id=self.calibration_id,
+        )
+
+    def start_session(self, session_id):
+        self.started_with = session_id
+        return SourceSession(
+            session_id=f"runtime-{session_id}",
+            calibration_id="runtime-calibration",
+        )
+
+    def stop_session(self, session_id):
+        self.stopped_with = session_id
+
+    def frame(self, frame_index, timestamp_ms):
+        raise AssertionError("frame should not be read by lifecycle test")
+
+source = FakeSource()
+state = SidecarState(source)
+status, body = state.start()
+
+assert status == 200
+assert source.started_with is not None
+assert body["sessionId"] == f"runtime-{source.started_with}"
+assert body["calibrationId"] == "runtime-calibration"
+assert state.session_id == body["sessionId"]
+assert state.is_active()
+
+stop_status, stop_body = state.stop()
+assert stop_status == 200
+assert source.stopped_with == body["sessionId"]
+assert stop_body == {"status": "stopped", "sessionId": body["sessionId"]}
+assert state.session_id is None
+assert not state.is_active()
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
+test("sidecar state refuses source session start failures without arming", async () => {
+  const script = String.raw`
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.server import SidecarState
+
+class FailingSource:
+    fps = 42
+    camera_count = 2
+    calibration_id = "health-calibration"
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=self.fps,
+            camera_count=self.camera_count,
+            source="freemocap",
+            calibration_id=self.calibration_id,
+        )
+
+    def start_session(self, session_id):
+        raise RuntimeError("camera runtime refused start")
+
+    def stop_session(self, session_id):
+        raise AssertionError("stop should not be called")
+
+    def frame(self, frame_index, timestamp_ms):
+        raise AssertionError("frame should not be read")
+
+state = SidecarState(FailingSource())
+status, body = state.start()
+
+assert status == 409
+assert body["status"] == "error"
+assert "camera runtime refused start" in body["diagnostics"][-1]
+assert state.session_id is None
+assert not state.is_active()
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
+test("sidecar state reports source session stop failures without clearing active session", async () => {
+  const script = String.raw`
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.server import SidecarState
+from rowing_tracker_sidecar.sources import SourceSession
+
+class FailingStopSource:
+    fps = 42
+    camera_count = 2
+    calibration_id = "runtime-calibration"
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=self.fps,
+            camera_count=self.camera_count,
+            source="freemocap",
+            calibration_id=self.calibration_id,
+        )
+
+    def start_session(self, session_id):
+        return SourceSession(
+            session_id=f"runtime-{session_id}",
+            calibration_id=self.calibration_id,
+        )
+
+    def stop_session(self, session_id):
+        raise RuntimeError(f"camera runtime refused stop for {session_id}")
+
+    def frame(self, frame_index, timestamp_ms):
+        raise AssertionError("frame should not be read")
+
+state = SidecarState(FailingStopSource())
+start_status, start_body = state.start()
+stop_status, stop_body = state.stop()
+
+assert start_status == 200
+assert stop_status == 409
+assert stop_body["status"] == "error"
+assert stop_body["sessionId"] == start_body["sessionId"]
+assert "camera runtime refused stop" in stop_body["diagnostics"][-1]
+assert state.session_id == start_body["sessionId"]
+assert state.is_active()
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
 test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () => {
   const port = await getFreePort();
   const sidecar = startSidecar(port, ["--source", "freemocap"]);
@@ -242,13 +403,6 @@ function startSidecar(
   port: number,
   extraArgs: string[],
 ): ChildProcessWithoutNullStreams {
-  const sidecarSrc = path.join(process.cwd(), "sidecar", "src");
-  const env = {
-    ...process.env,
-    PYTHONPATH: process.env.PYTHONPATH
-      ? `${sidecarSrc}${path.delimiter}${process.env.PYTHONPATH}`
-      : sidecarSrc,
-  };
   return spawn(
     "python3",
     [
@@ -260,8 +414,18 @@ function startSidecar(
       String(port),
       ...extraArgs,
     ],
-    { env },
+    { env: sidecarPythonEnv() },
   );
+}
+
+function sidecarPythonEnv(): NodeJS.ProcessEnv {
+  const sidecarSrc = path.join(process.cwd(), "sidecar", "src");
+  return {
+    ...process.env,
+    PYTHONPATH: process.env.PYTHONPATH
+      ? `${sidecarSrc}${path.delimiter}${process.env.PYTHONPATH}`
+      : sidecarSrc,
+  };
 }
 
 async function waitForHealth(

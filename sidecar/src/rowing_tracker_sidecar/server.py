@@ -45,24 +45,57 @@ class SidecarState:
                     HTTPStatus.CONFLICT,
                     body,
                 )
-            self.session_id = str(uuid.uuid4())
+            try:
+                source_session = self.source.start_session(str(uuid.uuid4()))
+            except Exception as exc:
+                LOGGER.exception("sidecar source failed to start")
+                body = health.to_json()
+                body["status"] = "error"
+                diagnostics = list(body.get("diagnostics", ()))
+                diagnostics.append(f"Failed to start source session: {exc}")
+                body["diagnostics"] = diagnostics
+                self.active = False
+                self.session_id = None
+                return (
+                    HTTPStatus.CONFLICT,
+                    body,
+                )
+            self.session_id = source_session.session_id
             self.active = True
             LOGGER.info("sidecar session started: %s", self.session_id)
             return (
                 HTTPStatus.OK,
                 {
                     "sessionId": self.session_id,
-                    "calibrationId": self.source.calibration_id,
+                    "calibrationId": source_session.calibration_id,
                 },
             )
 
-    def stop(self) -> dict[str, object]:
+    def stop(self) -> tuple[int, dict[str, object]]:
         with self.lock:
             stopped_id = self.session_id
+            if stopped_id is not None:
+                try:
+                    self.source.stop_session(stopped_id)
+                except Exception as exc:
+                    LOGGER.exception("sidecar source failed to stop")
+                    return (
+                        HTTPStatus.CONFLICT,
+                        {
+                            "status": "error",
+                            "sessionId": stopped_id,
+                            "diagnostics": [
+                                f"Failed to stop source session: {exc}",
+                            ],
+                        },
+                    )
             self.active = False
             self.session_id = None
             LOGGER.info("sidecar session stopped: %s", stopped_id)
-            return {"status": "stopped", "sessionId": stopped_id}
+            return (
+                HTTPStatus.OK,
+                {"status": "stopped", "sessionId": stopped_id},
+            )
 
     def is_active(self) -> bool:
         with self.lock:
@@ -128,8 +161,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             self._send_json(status, body)
             return
         if self.path == "/session/stop":
-            body = self.sidecar_state.stop()
-            self._send_json(HTTPStatus.OK, body)
+            status, body = self.sidecar_state.stop()
+            self._send_json(status, body)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": f"Unknown path: {self.path}"})
 
