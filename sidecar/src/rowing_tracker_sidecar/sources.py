@@ -5,9 +5,16 @@ import json
 import math
 import os
 import pathlib
+from dataclasses import dataclass
 from typing import Protocol
 
 from .contract import KEYPOINT_COUNT, KEYPOINT_SCHEMA_VERSION, SidecarFrame, SourceHealth
+
+
+@dataclass(frozen=True)
+class RecordedFrame:
+    keypoints: list[list[float]]
+    reprojection_error_mm: float | None = None
 
 
 class FrameSource(Protocol):
@@ -148,7 +155,7 @@ class FreeMocapRecordedSource:
         self._fps = fps
         self._camera_count = camera_count
         self._data_path = pathlib.Path(data_path).expanduser() if data_path else None
-        self._frames: list[list[list[float]]] = []
+        self._frames: list[RecordedFrame] = []
         self._diagnostics: tuple[str, ...] = ()
         self._calibration_id = calibration_id
         self._load()
@@ -203,7 +210,7 @@ class FreeMocapRecordedSource:
         raw = self._frames[frame_index % len(self._frames)]
         keypoints = []
         confidences = []
-        for index, values in enumerate(raw):
+        for index, values in enumerate(raw.keypoints):
             x, y, z, confidence = values
             confidences.append(confidence)
             keypoints.append(
@@ -226,7 +233,7 @@ class FreeMocapRecordedSource:
             "quality": {
                 "tracked_count": tracked,
                 "mean_confidence": mean_confidence,
-                "reprojection_error_mm": 0.0,
+                "reprojection_error_mm": raw.reprojection_error_mm or 0.0,
                 "camera_count": self.camera_count,
             },
         }
@@ -279,7 +286,7 @@ def _resolve_freemocap_path(path: pathlib.Path) -> pathlib.Path | None:
     return None
 
 
-def _load_json_frames(path: pathlib.Path) -> list[list[list[float]]]:
+def _load_json_frames(path: pathlib.Path) -> list[RecordedFrame]:
     if path.suffix.lower() == ".jsonl":
         frames = []
         for line in path.read_text().splitlines():
@@ -295,27 +302,34 @@ def _load_json_frames(path: pathlib.Path) -> list[list[list[float]]]:
     return [_extract_frame_values(frame) for frame in body]
 
 
-def _extract_frame_values(frame: object) -> list[list[float]]:
+def _extract_frame_values(frame: object) -> RecordedFrame:
     if isinstance(frame, dict) and "keypoints" in frame:
         keypoints = frame["keypoints"]
         if not isinstance(keypoints, list):
             raise ValueError("frame keypoints must be a list")
         ordered = sorted(keypoints, key=lambda item: int(item["index"]))
-        return [
-            [
-                float(item["x"]),
-                float(item["y"]),
-                float(item["z"]),
-                float(item.get("confidence", 1.0)),
-            ]
-            for item in ordered
-        ]
+        quality = frame.get("quality")
+        reprojection_error_mm = None
+        if isinstance(quality, dict) and quality.get("reprojection_error_mm") is not None:
+            reprojection_error_mm = float(quality["reprojection_error_mm"])
+        return RecordedFrame(
+            keypoints=[
+                [
+                    float(item["x"]),
+                    float(item["y"]),
+                    float(item["z"]),
+                    float(item.get("confidence", 1.0)),
+                ]
+                for item in ordered
+            ],
+            reprojection_error_mm=reprojection_error_mm,
+        )
     if isinstance(frame, list):
-        return [[float(value) for value in point] for point in frame]
+        return RecordedFrame(keypoints=[[float(value) for value in point] for point in frame])
     raise ValueError("frame must be a keypoint frame object or a 33x4 array")
 
 
-def _load_npy_frames(path: pathlib.Path) -> list[list[list[float]]]:
+def _load_npy_frames(path: pathlib.Path) -> list[RecordedFrame]:
     try:
         import numpy as np  # type: ignore
     except Exception as exc:
@@ -325,22 +339,25 @@ def _load_npy_frames(path: pathlib.Path) -> list[list[list[float]]]:
         raise ValueError(f"expected NPY array with shape (frames, 33, 4), got {array.shape}")
     if array.shape[1] != KEYPOINT_COUNT or array.shape[2] < 3:
         raise ValueError(f"expected NPY array with shape (frames, 33, 4), got {array.shape}")
-    frames: list[list[list[float]]] = []
+    frames: list[RecordedFrame] = []
     for frame in array:
         converted = []
         for point in frame:
             confidence = float(point[3]) if len(point) > 3 else 1.0
             converted.append([float(point[0]), float(point[1]), float(point[2]), confidence])
-        frames.append(converted)
+        frames.append(RecordedFrame(keypoints=converted))
     return frames
 
 
-def _validate_recorded_frames(frames: list[list[list[float]]]) -> None:
+def _validate_recorded_frames(frames: list[RecordedFrame]) -> None:
     if not frames:
         raise ValueError("no frames found")
-    for frame_index, frame in enumerate(frames):
+    for frame_index, recorded_frame in enumerate(frames):
+        frame = recorded_frame.keypoints
         if len(frame) != KEYPOINT_COUNT:
-            raise ValueError(f"frame {frame_index} has {len(frame)} keypoints; expected 33")
+            raise ValueError(
+                f"frame {frame_index} has {len(frame)} keypoints; expected 33",
+            )
         for point_index, point in enumerate(frame):
             if len(point) < 4:
                 raise ValueError(

@@ -1,5 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { once } from "node:events";
+import net from "node:net";
+import path from "node:path";
 import {
   FreemocapSidecarSource,
   encodeSidecarPoseFrame,
@@ -83,6 +87,73 @@ test("sidecar source starts capture, records calibration, and encodes v2 frames"
       "/api/mocap/sessions/session-1/pose-stream",
     ]);
   });
+});
+
+test("sidecar source captures from a real synthetic sidecar process", async () => {
+  const port = await getFreePort();
+  const sidecar = startPythonSidecar(port);
+  await waitForSidecarHealth(port);
+  const originalFetch = globalThis.fetch;
+  const poseUploads: Uint8Array[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/sidecar/connect")) {
+      assert.deepEqual(JSON.parse(init?.body as string), { port });
+      const startRes = await originalFetch(`http://localhost:${port}/session/start`, {
+        method: "POST",
+      });
+      assert.equal(startRes.status, 200);
+      const started = (await startRes.json()) as {
+        sessionId?: string;
+        calibrationId?: string;
+      };
+      return jsonResponse(
+        {
+          status: "connected",
+          fps: 30,
+          cameras: 3,
+          schemaVersion: 2,
+          port,
+          sidecarSessionId: started.sessionId,
+          calibrationId: started.calibrationId,
+        },
+        200,
+      );
+    }
+    if (url.endsWith("/pose-stream")) {
+      const body = init?.body;
+      assert.ok(body instanceof Blob);
+      poseUploads.push(new Uint8Array(await body.arrayBuffer()));
+      return new Response(null, { status: 200 });
+    }
+    return originalFetch(input, init);
+  }) as typeof fetch;
+
+  try {
+    const source = new FreemocapSidecarSource({
+      sessionId: "session-real-sidecar",
+      port,
+      flushBytes: BYTES_PER_FRAME_V2,
+    });
+
+    await source.init();
+    await source.start();
+    await waitFor(() => source.framesCaptured >= 2 && poseUploads.length >= 1);
+    await source.stop();
+
+    assert.match(source.sidecarSessionId ?? "", /^[0-9a-f-]{36}$/);
+    assert.equal(source.calibrationId, "synthetic-calibration");
+    assert.ok(source.framesCaptured >= 2);
+    assert.ok(poseUploads.length >= 1);
+    assert.equal(
+      poseUploads.reduce((total, chunk) => total + chunk.byteLength, 0) %
+        BYTES_PER_FRAME_V2,
+      0,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    await stopProcess(sidecar);
+  }
 });
 
 test("sidecar source flushes buffered v2 bytes by threshold and drains on stop", async () => {
@@ -377,4 +448,80 @@ function jsonResponse(body: unknown, status: number): Response {
 
 function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function getFreePort(): Promise<number> {
+  const server = net.createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const port = address.port;
+  server.close();
+  await once(server, "close");
+  return port;
+}
+
+function startPythonSidecar(port: number): ChildProcessWithoutNullStreams {
+  const sidecarSrc = path.join(process.cwd(), "sidecar", "src");
+  const env = {
+    ...process.env,
+    PYTHONPATH: process.env.PYTHONPATH
+      ? `${sidecarSrc}${path.delimiter}${process.env.PYTHONPATH}`
+      : sidecarSrc,
+  };
+  return spawn(
+    "python3",
+    [
+      "-m",
+      "rowing_tracker_sidecar",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--source",
+      "synthetic",
+    ],
+    { env },
+  );
+}
+
+async function waitForSidecarHealth(port: number): Promise<void> {
+  const deadline = Date.now() + 5000;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`http://localhost:${port}/health`);
+      if (res.ok) return;
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`sidecar did not become healthy: ${String(lastError)}`);
+}
+
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs = 5000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("timed out waiting for sidecar frames");
+}
+
+async function stopProcess(proc: ChildProcessWithoutNullStreams): Promise<void> {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  proc.kill("SIGTERM");
+  await Promise.race([
+    once(proc, "exit"),
+    new Promise((resolve) => setTimeout(resolve, 1000)),
+  ]);
+  if (proc.exitCode === null && proc.signalCode === null) {
+    proc.kill("SIGKILL");
+    await once(proc, "exit");
+  }
 }

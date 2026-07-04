@@ -55,12 +55,18 @@ test("rowing-tracker-sidecar streams recorded FreeMoCap-style frames", async () 
     dataPath,
     JSON.stringify({
       frames: [
-        Array.from({ length: 33 }, (_, index) => [
-          index + 0.5,
-          index + 100.5,
-          index + 200.5,
-          index < 13 ? 0.91 : 0.25,
-        ]),
+        {
+          keypoints: Array.from({ length: 33 }, (_, index) => ({
+            index,
+            x: index + 0.5,
+            y: index + 100.5,
+            z: index + 200.5,
+            confidence: index < 13 ? 0.91 : 0.25,
+          })),
+          quality: {
+            reprojection_error_mm: 4.5,
+          },
+        },
       ],
     }),
   );
@@ -98,6 +104,7 @@ test("rowing-tracker-sidecar streams recorded FreeMoCap-style frames", async () 
     assert.equal(frame.keypoints[12].confidence, 0.91);
     assert.equal(frame.quality.tracked_count, 13);
     assert.equal(frame.quality.camera_count, 4);
+    assert.equal(frame.quality.reprojection_error_mm, 4.5);
 
     await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
   } finally {
@@ -221,7 +228,11 @@ async function readOneSidecarFrame(port: number): Promise<{
     z: number;
     confidence: number;
   }>;
-  quality: { tracked_count: number; camera_count: number };
+  quality: {
+    tracked_count: number;
+    camera_count: number;
+    reprojection_error_mm: number;
+  };
 }> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}/pose-stream`);
