@@ -112,6 +112,52 @@ test("rowing-tracker-sidecar streams recorded FreeMoCap-style frames", async () 
   }
 });
 
+test("rowing-tracker-sidecar rejects recorded FreeMoCap frames with incomplete keypoint indexes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-"));
+  const dataPath = path.join(root, "frames.json");
+  await writeFile(
+    dataPath,
+    JSON.stringify({
+      frames: [
+        {
+          keypoints: Array.from({ length: 33 }, (_, index) => ({
+            index: Math.min(index, 31),
+            x: index + 0.5,
+            y: index + 100.5,
+            z: index + 200.5,
+            confidence: 0.91,
+          })),
+        },
+      ],
+    }),
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(port, [
+    "--source",
+    "freemocap",
+    "--freemocap-data",
+    dataPath,
+  ]);
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "error");
+    assert.equal(health.source, "freemocap");
+    assert.match(
+      String((health.diagnostics as unknown[])[0]),
+      /keypoint indexes must contain 0 through 32 exactly once/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 409);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
 test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () => {
   const port = await getFreePort();
   const sidecar = startSidecar(port, ["--source", "freemocap"]);

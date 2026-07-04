@@ -307,7 +307,21 @@ def _extract_frame_values(frame: object) -> RecordedFrame:
         keypoints = frame["keypoints"]
         if not isinstance(keypoints, list):
             raise ValueError("frame keypoints must be a list")
-        ordered = sorted(keypoints, key=lambda item: int(item["index"]))
+        indexed: list[tuple[int, dict[str, object]]] = []
+        for position, item in enumerate(keypoints):
+            if not isinstance(item, dict):
+                raise ValueError(f"frame keypoint {position} must be an object")
+            if "index" not in item:
+                raise ValueError(f"frame keypoint {position} is missing index")
+            indexed.append((int(item["index"]), item))
+        indexes = sorted(index for index, _item in indexed)
+        if indexes != list(range(KEYPOINT_COUNT)):
+            raise ValueError(
+                f"keypoint indexes must contain 0 through {KEYPOINT_COUNT - 1} exactly once",
+            )
+        ordered = [
+            item for _index, item in sorted(indexed, key=lambda entry: entry[0])
+        ]
         quality = frame.get("quality")
         reprojection_error_mm = None
         if isinstance(quality, dict) and quality.get("reprojection_error_mm") is not None:
