@@ -8,6 +8,7 @@ export class PoseStreamUploadBuffer {
   private pendingChunks: Uint8Array[] = [];
   private pendingBytes = 0;
   private uploadInflight: Promise<void> = Promise.resolve();
+  private uploadError: Error | null = null;
 
   constructor(private readonly opts: PoseStreamUploadBufferOptions) {}
 
@@ -15,7 +16,7 @@ export class PoseStreamUploadBuffer {
     this.pendingChunks.push(bytes);
     this.pendingBytes += bytes.byteLength;
     if (this.pendingBytes >= this.opts.flushBytes) {
-      void this.flush(false);
+      void this.flush(false).catch(() => undefined);
     }
   }
 
@@ -25,7 +26,10 @@ export class PoseStreamUploadBuffer {
 
   async flush(final: boolean): Promise<void> {
     if (this.pendingChunks.length === 0) {
-      if (final) await this.uploadInflight;
+      if (final) {
+        await this.uploadInflight;
+        if (this.uploadError) throw this.uploadError;
+      }
       return;
     }
     const chunks = this.pendingChunks;
@@ -40,14 +44,15 @@ export class PoseStreamUploadBuffer {
       off += chunk.byteLength;
     }
 
-    this.uploadInflight = this.uploadInflight.then(() =>
-      this.upload(buf).catch((err) => {
-        this.opts.onError?.(
-          err instanceof Error ? err : new Error(String(err)),
-        );
-      }),
-    );
-    if (final) await this.uploadInflight;
+    this.uploadInflight = this.uploadInflight.then(() => this.upload(buf)).catch((err) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.uploadError ??= error;
+      this.opts.onError?.(error);
+    });
+    if (final) {
+      await this.uploadInflight;
+      if (this.uploadError) throw this.uploadError;
+    }
   }
 
   private async upload(buf: Uint8Array): Promise<void> {

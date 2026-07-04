@@ -221,6 +221,31 @@ test("sidecar source reports stop errors after pending uploads are drained", asy
   );
 });
 
+test("sidecar source rejects final drain upload failures", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const errors: Error[] = [];
+      const statuses: string[] = [];
+      const source = new FreemocapSidecarSource({
+        sessionId: "session-7",
+        flushBytes: BYTES_PER_FRAME_V2 * 4,
+        onStatus: (status) => statuses.push(status),
+        onError: (err) => errors.push(err),
+      });
+
+      await source.init();
+      await source.start();
+      FakeWebSocket.instances[0].emitMessage(makeSidecarFrame(0));
+
+      await assert.rejects(() => source.stop(), /Pose upload failed: 500/);
+
+      assert.equal(errors.at(-1)?.message, "Pose upload failed: 500");
+      assert.equal(statuses.includes("stopped"), false);
+    },
+    { poseUploadStatus: 500 },
+  );
+});
+
 test("sidecar frame validator accepts ADR-0005 snake_case and rejects duplicates", () => {
   const frame = validateSidecarKeypointFrame(makeSidecarFrame(7));
   assert.equal(frame.frameIndex, 7);
@@ -239,11 +264,31 @@ test("sidecar frame validator accepts ADR-0005 snake_case and rejects duplicates
   );
 });
 
+test("sidecar frame validator requires schema and source fields", () => {
+  const missingSchema = makeSidecarFrame(0) as Partial<ReturnType<typeof makeSidecarFrame>>;
+  delete missingSchema.schema_version;
+  assert.throws(
+    () => validateSidecarKeypointFrame(missingSchema),
+    /schemaVersion must be a finite number/,
+  );
+
+  const missingSource = makeSidecarFrame(0) as Partial<ReturnType<typeof makeSidecarFrame>>;
+  delete missingSource.source;
+  assert.throws(
+    () => validateSidecarKeypointFrame(missingSource),
+    /source must be a string/,
+  );
+});
+
 async function withSidecarGlobals(
   run: (context: {
     fetchCalls: { input: RequestInfo | URL; init?: RequestInit }[];
   }) => Promise<void>,
-  options: { connectStatus?: number; stopStatus?: number } = {},
+  options: {
+    connectStatus?: number;
+    stopStatus?: number;
+    poseUploadStatus?: number;
+  } = {},
 ): Promise<void> {
   const originalFetch = globalThis.fetch;
   const originalWebSocket = globalThis.WebSocket;
@@ -266,7 +311,7 @@ async function withSidecarGlobals(
       );
     }
     if (url.endsWith("/pose-stream")) {
-      return new Response(null, { status: 200 });
+      return new Response(null, { status: options.poseUploadStatus ?? 200 });
     }
     if (url === "http://localhost:8765/session/stop") {
       return new Response(null, { status: options.stopStatus ?? 200 });

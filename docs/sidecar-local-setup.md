@@ -49,6 +49,8 @@ curl http://localhost:8765/health
   "fps": 30.0,
   "cameras": 3,
   "schemaVersion": 2,
+  "contractVersion": 1,
+  "sidecarVersion": "0.1.0",
   "source": "synthetic",
   "calibrationId": "synthetic-calibration"
 }
@@ -116,8 +118,23 @@ The app also proxies lifecycle calls through:
 | `POST` | `/api/mocap/sessions/:id/sidecar/stop` | Stop the sidecar session |
 
 All app routes require an authenticated session and an owned `MocapSession`.
-`connect` also requires the app-side session to be in `capturing` status and the
-sidecar schema to match `keypointSchemaVersion = 2`.
+`connect` also requires the app-side session to be in `capturing` status, the
+sidecar schema to match `keypointSchemaVersion = 2`, and the sidecar contract to
+match `contractVersion = 1`.
+
+## Version compatibility
+
+`/health` reports both the frame schema and sidecar package contract:
+
+- `schemaVersion`: pose-frame payload schema. Rowing Tracker currently accepts
+  only `2` for `sidecar-3d`.
+- `contractVersion`: HTTP/WebSocket contract version. Rowing Tracker currently
+  accepts only `1`.
+- `sidecarVersion`: installed Python package version, stored in new app-side
+  captures as part of `captureModelVersion`.
+
+If any of these fields are incompatible, the app refuses capture before the
+Start button is enabled.
 
 ## Troubleshooting
 
@@ -140,7 +157,9 @@ sidecar schema to match `keypointSchemaVersion = 2`.
 
 ## Hardware-gated smoke test
 
-Use this manual path when a real camera rig and FreeMoCap output are available:
+Use this manual path when a real camera rig and FreeMoCap output are available.
+Today this is a recorded-output smoke path because the repo-owned sidecar does
+not yet own a live FreeMoCap camera runtime adapter:
 
 1. Capture or locate a FreeMoCap `(frames, 33, 4)` output file.
 2. Start the sidecar in recorded-data mode with that file.
@@ -154,6 +173,11 @@ Use this manual path when a real camera rig and FreeMoCap output are available:
 
 This smoke test is hardware/data-gated and should not block normal CI.
 
+When a live runtime adapter lands, add a second opt-in smoke variant that starts
+`rowing-tracker-sidecar --source freemocap` against the actual camera rig,
+confirms nonzero fps and a sidecar-owned calibration id, records a short row,
+then verifies replay and analysis from the captured session.
+
 ## Privacy and licensing
 
 The sidecar binds to `127.0.0.1` by default and makes no cloud calls. Raw video,
@@ -166,6 +190,7 @@ dependency boundary before distributing bundled artifacts.
 ## Tests
 
 ```bash
+npm run test:sidecar
 npx tsx --test tests/sidecarCliContract.test.ts
 npx tsx --test tests/sidecarPackageInstall.test.ts
 npx tsx --test tests/sidecarTracer.test.ts
@@ -173,3 +198,7 @@ npx tsx --test tests/freemocapSidecarSource.test.ts
 npx tsx --test tests/sidecarMockContract.test.ts
 npm run test:e2e -- tests/e2e/mocap-capture.spec.ts
 ```
+
+The GitHub Actions `Sidecar release gate` workflow runs the install/startup
+check and `npm run test:sidecar` for PRs that touch the sidecar contract,
+package, app-side sidecar client, or focused sidecar tests.

@@ -103,7 +103,7 @@ test("browser pose source reports drain upload errors through the shared contrac
 
       await contract.init();
       FakeWorker.instances[0].emitMessage(makeFrameMessage(1, [9, 8, 7]));
-      await contract.drain();
+      await assert.rejects(() => contract.drain(), /Pose upload failed: 500/);
 
       assert.equal(errors.length, 1);
       assert.equal(errors[0].message, "Pose upload failed: 500");

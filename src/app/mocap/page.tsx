@@ -60,7 +60,7 @@ import type {
 import { settings } from "@/lib/settings";
 import {
   checkSidecarHealth,
-  sidecarReadinessMessage,
+  sidecarReadinessError,
   type SidecarHealth,
 } from "@/lib/mocap/sidecarClient";
 import { resolveSidecarPort } from "@/lib/mocap/sidecarPoseSource";
@@ -263,16 +263,20 @@ export default function MocapCapturePage() {
     setPoseStatus("loading");
     try {
       const health = await checkSidecarHealth(port);
-      if (health.status !== "ready") {
-        throw new Error(sidecarReadinessMessage(health));
+      const readinessError = sidecarReadinessError(health);
+      if (readinessError) {
+        throw new Error(readinessError);
       }
       setPoseStatus("ready");
       setSidecarHealth(health);
       setSidecarError(null);
       return health;
     } catch (err) {
+      const message = err instanceof Error ? err.message : "";
       const error =
-        err instanceof Error && err.message.startsWith("Sidecar not ready:")
+        err instanceof Error &&
+        (message.startsWith("Sidecar not ready:") ||
+          message.startsWith("Sidecar incompatible:"))
           ? err
           : new Error(`Sidecar not reachable on port ${port}`);
       setPoseStatus("error");
@@ -536,7 +540,7 @@ export default function MocapCapturePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             source: "sidecar",
-            captureModelVersion: `freemocap-sidecar@schemaV${health.schemaVersion}`,
+            captureModelVersion: `freemocap-sidecar@${health.sidecarVersion ?? "unknown"}+schemaV${health.schemaVersion}`,
             capturePerspective: "sidecar-3d",
             captureFps: health.fps,
             recordOnly: false,

@@ -3,8 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
+from . import __version__
+
 KEYPOINT_SCHEMA_VERSION = 2
 KEYPOINT_COUNT = 33
+SIDECAR_CONTRACT_VERSION = 1
 
 
 class Keypoint(TypedDict):
@@ -37,6 +40,8 @@ class SourceHealth:
     fps: float
     camera_count: int
     schema_version: int = KEYPOINT_SCHEMA_VERSION
+    contract_version: int = SIDECAR_CONTRACT_VERSION
+    sidecar_version: str = __version__
     source: str = "synthetic"
     calibration_id: str | None = None
     diagnostics: tuple[str, ...] = ()
@@ -47,6 +52,8 @@ class SourceHealth:
             "fps": self.fps,
             "cameras": self.camera_count,
             "schemaVersion": self.schema_version,
+            "contractVersion": self.contract_version,
+            "sidecarVersion": self.sidecar_version,
             "source": self.source,
             "calibrationId": self.calibration_id,
             "diagnostics": list(self.diagnostics),

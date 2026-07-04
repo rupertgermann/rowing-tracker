@@ -116,6 +116,45 @@ test("sidecar source reports non-ready health through status and error callbacks
   );
 });
 
+test("sidecar source rejects incompatible schema during readiness", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const statuses: Array<[PoseCaptureSourceStatus, string | undefined]> = [];
+      const errors: Error[] = [];
+      const source = new FreemocapSidecarSource({
+        onStatus: (status, detail) => statuses.push([status, detail]),
+        onError: (err) => errors.push(err),
+      });
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar incompatible: schema version 1 \(expected 2\)/,
+      );
+
+      assert.deepEqual(statuses, [
+        ["loading", undefined],
+        ["error", "Sidecar incompatible: schema version 1 (expected 2)"],
+      ]);
+      assert.equal(errors[0].message, "Sidecar incompatible: schema version 1 (expected 2)");
+    },
+    { schemaVersion: 1 },
+  );
+});
+
+test("sidecar source rejects incompatible contract during readiness", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar incompatible: contract version 99 \(expected 1\)/,
+      );
+    },
+    { contractVersion: 99 },
+  );
+});
+
 test("sidecar source stops sidecar after start response omits metadata", async () => {
   await withSidecarGlobals(
     async ({ fetchCalls }) => {
@@ -157,6 +196,8 @@ async function withSidecarGlobals(
   options: {
     healthResponse?: "ready" | "initializing" | "unreachable";
     healthDiagnostics?: string[];
+    schemaVersion?: number;
+    contractVersion?: number;
     startResponse?: "ready" | "malformed";
   } = {},
 ): Promise<void> {
@@ -174,7 +215,9 @@ async function withSidecarGlobals(
         status: options.healthResponse ?? "ready",
         fps: 60,
         cameras: 3,
-        schemaVersion: 2,
+        schemaVersion: options.schemaVersion ?? 2,
+        contractVersion: options.contractVersion ?? 1,
+        sidecarVersion: "0.1.0",
         diagnostics: options.healthDiagnostics,
       });
     }

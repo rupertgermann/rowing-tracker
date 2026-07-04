@@ -31,6 +31,7 @@
     "db:reset": "npx prisma migrate reset",
     "admin:promote": "npx tsx scripts/promote-admin.ts",
     "test": "npx tsx --test tests/*.test.ts",
+    "test:sidecar": "npx tsx --test tests/sidecarPackageInstall.test.ts tests/sidecarCliContract.test.ts tests/sidecarPoseSource.test.ts tests/freemocapSidecarSource.test.ts tests/sidecarMockContract.test.ts",
     "test:e2e": "npx playwright test",
     "preinstall": "node scripts/check-node-version.mjs",
     "postinstall": "prisma generate"

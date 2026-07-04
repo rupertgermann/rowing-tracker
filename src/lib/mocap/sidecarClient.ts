@@ -1,10 +1,15 @@
+import { KEYPOINT_SCHEMA_V2 } from "./poseFrameStream";
+
 export const SIDECAR_DEFAULT_PORT = 8765;
+export const SIDECAR_CONTRACT_VERSION = 1;
 
 export interface SidecarHealth {
   status: "ready" | "initializing" | "error";
   fps: number;
   cameras: number;
   schemaVersion: number;
+  contractVersion?: number;
+  sidecarVersion?: string;
   source?: string;
   calibrationId?: string | null;
   diagnostics?: string[];
@@ -40,6 +45,22 @@ export async function checkSidecarHealth(port = SIDECAR_DEFAULT_PORT): Promise<S
 }
 
 export function sidecarReadinessMessage(health: SidecarHealth): string {
+  return sidecarReadinessError(health) ?? "Sidecar ready";
+}
+
+export function sidecarReadinessError(health: SidecarHealth): string | null {
+  if (health.schemaVersion !== KEYPOINT_SCHEMA_V2) {
+    return `Sidecar incompatible: schema version ${health.schemaVersion} (expected ${KEYPOINT_SCHEMA_V2})`;
+  }
+  if (
+    health.contractVersion !== undefined &&
+    health.contractVersion !== SIDECAR_CONTRACT_VERSION
+  ) {
+    return `Sidecar incompatible: contract version ${health.contractVersion} (expected ${SIDECAR_CONTRACT_VERSION})`;
+  }
+  if (health.status === "ready") {
+    return null;
+  }
   const diagnostic = Array.isArray(health.diagnostics)
     ? health.diagnostics.find((entry) => typeof entry === "string" && entry.length > 0)
     : undefined;

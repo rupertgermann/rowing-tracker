@@ -7,6 +7,8 @@ import { KEYPOINT_SCHEMA_V2 } from "@/lib/mocap/poseFrameStream";
 import {
   checkSidecarHealth,
   SIDECAR_DEFAULT_PORT,
+  SIDECAR_CONTRACT_VERSION,
+  sidecarReadinessError,
   startSidecarSession,
 } from "@/lib/mocap/sidecarClient";
 
@@ -52,24 +54,19 @@ export async function POST(
 
   try {
     const health = await checkSidecarHealth(port);
-    if (health.status !== "ready") {
+    const readinessError = sidecarReadinessError(health);
+    if (readinessError) {
       return NextResponse.json(
         {
-          status: health.status,
+          status: health.status === "ready" ? "incompatible-sidecar" : health.status,
           port,
+          error: readinessError,
           diagnostics: health.diagnostics ?? [],
           source: health.source ?? null,
-        },
-        { status: 409 },
-      );
-    }
-    if (health.schemaVersion !== KEYPOINT_SCHEMA_V2) {
-      return NextResponse.json(
-        {
-          status: "incompatible-schema",
-          port,
           schemaVersion: health.schemaVersion,
           expectedSchemaVersion: KEYPOINT_SCHEMA_V2,
+          contractVersion: health.contractVersion ?? null,
+          expectedContractVersion: SIDECAR_CONTRACT_VERSION,
         },
         { status: 409 },
       );

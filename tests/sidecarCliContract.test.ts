@@ -15,6 +15,8 @@ test("rowing-tracker-sidecar serves the ADR-0005 contract with synthetic frames"
     const health = await waitForHealth(port);
     assert.equal(health.status, "ready");
     assert.equal(health.schemaVersion, 2);
+    assert.equal(health.contractVersion, 1);
+    assert.equal(health.sidecarVersion, "0.1.0");
     assert.equal(health.cameras, 3);
     assert.equal(health.fps, 30);
     assert.equal(health.source, "synthetic");

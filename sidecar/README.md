@@ -36,9 +36,20 @@ The service binds to `127.0.0.1` by default and exposes:
 - `POST /session/stop`
 - `ws://localhost:<port>/pose-stream`
 
+`GET /health` includes `schemaVersion`, `contractVersion`, and
+`sidecarVersion`. The app currently accepts schema version `2` and contract
+version `1`; incompatible versions are rejected before capture starts.
+
 Synthetic mode is hardware-free and intended for development and CI. FreeMoCap
 recorded-data mode supports JSON, JSONL, and NPY `(frames, 33, 4)` sources.
 Selecting `--source freemocap` without `--freemocap-data` fails readiness with a
 clear diagnostic instead of pretending the camera rig is ready.
 
-The sidecar makes no cloud calls and is local-only by default.
+Run the focused release gate before changing package or contract behavior:
+
+```bash
+npm run test:sidecar
+```
+
+The sidecar makes no cloud calls and is local-only by default. Keep FreeMoCap as
+a separate local process when adding live camera runtime support.
