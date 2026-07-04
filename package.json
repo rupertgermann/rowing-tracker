@@ -33,6 +33,7 @@
     "test": "npx tsx --test tests/*.test.ts",
     "test:sidecar": "npx tsx --test tests/sidecarPackageInstall.test.ts tests/sidecarCliContract.test.ts tests/sidecarPoseSource.test.ts tests/freemocapSidecarSource.test.ts tests/sidecarMockContract.test.ts tests/sidecarTracer.test.ts",
     "test:e2e": "npx playwright test",
+    "test:e2e:sidecar-smoke": "npx playwright test tests/e2e/sidecar-hardware-smoke.spec.ts",
     "preinstall": "node scripts/check-node-version.mjs",
     "postinstall": "prisma generate"
   },

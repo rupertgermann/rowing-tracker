@@ -153,3 +153,15 @@ This procedure is not an automated CI gate. CI should continue to use synthetic
 and deterministic contract tests for hardware-free coverage. Mark the hardware
 smoke test as skipped when no real rig and provider are available; do not fail a
 normal PR or release check solely because the hardware smoke test was skipped.
+
+An opt-in Playwright helper exercises the same Rowing Tracker UI path when a
+ready sidecar is already running on port `8765`:
+
+```bash
+ROWING_TRACKER_SIDECAR_HARDWARE_SMOKE=1 npm run test:e2e:sidecar-smoke
+```
+
+By default the helper is skipped. For local wiring checks without hardware, it
+can be run against the synthetic sidecar with
+`ROWING_TRACKER_SIDECAR_HARDWARE_ALLOW_SYNTHETIC=1`; that does not count as the
+real camera-rig smoke result.
