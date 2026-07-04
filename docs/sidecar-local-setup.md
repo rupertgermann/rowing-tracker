@@ -92,13 +92,46 @@ maps the per-frame finite mean into `quality.reprojection_error_mm`.
 Rowing Tracker preserves that signal in captured v2 frame quality flags as
 `high-reprojection-error` when it exceeds 50 mm.
 
+## FreeMoCap headless recording-processing mode
+
+If you have a FreeMoCap recording folder with synchronized videos, the sidecar
+can ask the optional FreeMoCap package to process that folder headlessly before
+streaming the generated `output_data` through the ADR-0005 contract. This uses
+FreeMoCap's batch/headless processor; it does not open the FreeMoCap GUI and it
+does not turn the sidecar into a live camera runtime.
+
+Install the optional FreeMoCap extra in the sidecar environment:
+
+```bash
+python -m pip install -e "sidecar[freemocap]"
+```
+
+Then run:
+
+```bash
+rowing-tracker-sidecar \
+  --source freemocap \
+  --freemocap-recording /path/to/freemocap/recording-folder \
+  --freemocap-calibration-toml /path/to/calibration.toml \
+  --camera-count 3 \
+  --fps 30 \
+  --port 8765
+```
+
+The sidecar disables Blender export, notebook generation, and tqdm progress for
+this path. On success, health diagnostics include `processed FreeMoCap
+recording ...`, then the generated `output_data/skeleton_3d.npy` or raw 3D
+output is loaded exactly like recorded-data mode. If processing fails, `/health`
+reports `status: "error"` with the FreeMoCap processing exception and the
+recording is not armed.
+
 If you select `--source freemocap` without `--freemocap-data` or
-`--freemocap-provider`, the sidecar probes for the optional FreeMoCap Python
-package and then fails closed with `status: "error"`. Missing-package
-diagnostics explain how to install `sidecar[freemocap]`; installed-package
-diagnostics explain that upstream FreeMoCap exposes batch/headless processing
-and recorded outputs, but not a supported one-call live calibrated camera API
-for this sidecar to invoke directly.
+`--freemocap-recording` or `--freemocap-provider`, the sidecar probes for the
+optional FreeMoCap Python package and then fails closed with `status: "error"`.
+Missing-package diagnostics explain how to install `sidecar[freemocap]`;
+installed-package diagnostics explain that upstream FreeMoCap exposes
+batch/headless processing and recorded outputs, but not a supported one-call
+live calibrated camera API for this sidecar to invoke directly.
 
 ## FreeMoCap live-runtime provider hook
 

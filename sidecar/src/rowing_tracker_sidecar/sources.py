@@ -70,6 +70,8 @@ def build_frame_source(
     camera_count: int,
     calibration_id: str | None,
     freemocap_data: str | None,
+    freemocap_recording: str | None = None,
+    freemocap_calibration_toml: str | None = None,
     freemocap_provider: str | None = None,
 ) -> FrameSource:
     if source == "synthetic":
@@ -82,6 +84,14 @@ def build_frame_source(
         if freemocap_data:
             return FreeMocapRecordedSource(
                 data_path=freemocap_data,
+                fps=fps,
+                camera_count=camera_count,
+                calibration_id=calibration_id,
+            )
+        if freemocap_recording:
+            return FreeMocapProcessedRecordingSource(
+                recording_path=freemocap_recording,
+                calibration_toml_path=freemocap_calibration_toml,
                 fps=fps,
                 camera_count=camera_count,
                 calibration_id=calibration_id,
@@ -311,6 +321,74 @@ class FreeMocapRecordedSource:
             self._diagnostics = (f"Failed to load FreeMoCap data: {exc}",)
 
 
+class FreeMocapProcessedRecordingSource(FreeMocapRecordedSource):
+    def __init__(
+        self,
+        *,
+        recording_path: str,
+        calibration_toml_path: str | None,
+        fps: float,
+        camera_count: int,
+        calibration_id: str | None,
+    ) -> None:
+        self._recording_path = pathlib.Path(recording_path).expanduser()
+        self._calibration_toml_path = (
+            pathlib.Path(calibration_toml_path).expanduser()
+            if calibration_toml_path
+            else None
+        )
+        super().__init__(
+            data_path=os.fspath(_freemocap_output_data_path(self._recording_path)),
+            fps=fps,
+            camera_count=camera_count,
+            calibration_id=calibration_id
+            or _processed_recording_calibration_id(
+                self._recording_path,
+                self._calibration_toml_path,
+            ),
+        )
+
+    def _load(self) -> None:
+        if not self._recording_path.exists():
+            self._frames = []
+            self._diagnostics = (
+                f"FreeMoCap recording path not found: {self._recording_path}",
+            )
+            return
+        if not self._recording_path.is_dir():
+            self._frames = []
+            self._diagnostics = (
+                f"FreeMoCap recording path must be a directory: {self._recording_path}",
+            )
+            return
+        if self._calibration_toml_path and not self._calibration_toml_path.exists():
+            self._frames = []
+            self._diagnostics = (
+                f"FreeMoCap calibration TOML not found: {self._calibration_toml_path}",
+            )
+            return
+        try:
+            _process_freemocap_recording(
+                recording_path=self._recording_path,
+                calibration_toml_path=self._calibration_toml_path,
+            )
+        except Exception as exc:
+            self._frames = []
+            self._diagnostics = (
+                f"Failed to process FreeMoCap recording {self._recording_path}: {exc}",
+                'install with python -m pip install -e "sidecar[freemocap]" on Python 3.10-3.12, '
+                "or pass --freemocap-data with an already processed FreeMoCap output directory",
+            )
+            return
+
+        super()._load()
+        if self._frames:
+            self._diagnostics = (
+                f"processed FreeMoCap recording {self._recording_path}",
+                *self._diagnostics,
+            )
+
+
 class FreeMocapRuntimeSource:
     source_name = "freemocap"
 
@@ -453,6 +531,7 @@ def _detect_freemocap_package_runtime_diagnostics() -> tuple[str, ...]:
             "FreeMoCap package is not installed in this sidecar environment",
             'install with python -m pip install -e "sidecar[freemocap]" on Python 3.10-3.12, '
             "or pass --freemocap-provider module:factory for an operator-owned live runtime adapter",
+            "pass --freemocap-recording to process a FreeMoCap recording folder headlessly",
             "pass --freemocap-data to stream recorded FreeMoCap output through the ADR-0005 contract",
         )
 
@@ -465,8 +544,47 @@ def _detect_freemocap_package_runtime_diagnostics() -> tuple[str, ...]:
         f"FreeMoCap package {version} is installed, but it does not expose a supported headless live camera API",
         "upstream FreeMoCap exposes stable batch/headless processing and recorded outputs; "
         "live calibrated camera frames require an injected --freemocap-provider adapter",
+        "pass --freemocap-recording to process a FreeMoCap recording folder headlessly",
         "pass --freemocap-data to stream recorded FreeMoCap output through the ADR-0005 contract",
     )
+
+
+def _process_freemocap_recording(
+    *,
+    recording_path: pathlib.Path,
+    calibration_toml_path: pathlib.Path | None,
+) -> None:
+    try:
+        from freemocap.core_processes.process_motion_capture_videos.process_recording_headless import (  # type: ignore
+            process_recording_headless,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "FreeMoCap headless recording processing requires the optional freemocap package",
+        ) from exc
+
+    process_recording_headless(
+        recording_path=os.fspath(recording_path),
+        path_to_camera_calibration_toml=(
+            os.fspath(calibration_toml_path) if calibration_toml_path else None
+        ),
+        run_blender=False,
+        make_jupyter_notebook=False,
+        use_tqdm=False,
+    )
+
+
+def _freemocap_output_data_path(recording_path: pathlib.Path) -> pathlib.Path:
+    return recording_path / "output_data"
+
+
+def _processed_recording_calibration_id(
+    recording_path: pathlib.Path,
+    calibration_toml_path: pathlib.Path | None,
+) -> str:
+    if calibration_toml_path is not None:
+        return f"freemocap-{calibration_toml_path.stem}"
+    return f"freemocap-{recording_path.name}"
 
 
 def _resolve_freemocap_path(path: pathlib.Path) -> pathlib.Path | None:

@@ -33,6 +33,8 @@ test("sidecar package installs locally and exposes rowing-tracker-sidecar", asyn
   assert.match(stdout, /Run the Rowing Tracker local mocap sidecar/);
   assert.match(stdout, /--source/);
   assert.match(stdout, /--freemocap-data/);
+  assert.match(stdout, /--freemocap-recording/);
+  assert.match(stdout, /--freemocap-calibration-toml/);
   assert.match(stdout, /--freemocap-provider/);
 
   const port = await getFreePort();

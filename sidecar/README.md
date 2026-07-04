@@ -29,6 +29,25 @@ rowing-tracker-sidecar \
   --port 8765
 ```
 
+Process an existing FreeMoCap recording folder headlessly, then stream the
+generated `output_data` through the same contract:
+
+```bash
+python -m pip install -e "sidecar[freemocap]"
+rowing-tracker-sidecar \
+  --source freemocap \
+  --freemocap-recording /path/to/freemocap/recording-folder \
+  --freemocap-calibration-toml /path/to/calibration.toml \
+  --camera-count 3 \
+  --fps 30 \
+  --port 8765
+```
+
+This uses FreeMoCap's batch/headless recording processor with Blender export,
+notebook generation, and tqdm progress disabled. It does not claim live
+camera-runtime support; use `--freemocap-provider` for operator-owned live
+camera adapters.
+
 The service binds to `127.0.0.1` by default and exposes:
 
 - `GET /health`
@@ -50,12 +69,13 @@ Directory mode also loads known FreeMoCap reprojection-error NPY files and maps
 finite per-frame means into `quality.reprojection_error_mm` when present.
 Rowing Tracker records values above 50 mm as `high-reprojection-error` quality
 flags on the captured v2 frames.
-Selecting `--source freemocap` without `--freemocap-data` fails readiness with a
-clear diagnostic instead of pretending the camera rig is ready. The default
-FreeMoCap runtime path probes for the optional `freemocap` package, but current
-upstream FreeMoCap releases expose stable batch/headless processing and recorded
-outputs, not a supported one-call live calibrated camera API for this sidecar to
-invoke directly.
+Selecting `--source freemocap` without `--freemocap-data`,
+`--freemocap-recording`, or `--freemocap-provider` fails readiness with a clear
+diagnostic instead of pretending the camera rig is ready. The default FreeMoCap
+runtime path probes for the optional `freemocap` package, but current upstream
+FreeMoCap releases expose stable batch/headless processing and recorded outputs,
+not a supported one-call live calibrated camera API for this sidecar to invoke
+directly.
 
 Advanced live runtime adapters can be loaded with:
 

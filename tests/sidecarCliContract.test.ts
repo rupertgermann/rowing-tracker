@@ -4,7 +4,7 @@ import {
   spawn,
   type ChildProcessWithoutNullStreams,
 } from "node:child_process";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { once } from "node:events";
 import os from "node:os";
@@ -205,6 +205,130 @@ def load(path):
     assert.equal(frame.keypoints[12].x, 12);
     assert.equal(frame.keypoints[12].confidence, 1);
     assert.equal(frame.quality.reprojection_error_mm, 2);
+
+    await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar processes a FreeMoCap recording folder before streaming", async () => {
+  const recordingRoot = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-recording-"));
+  const calibrationPath = path.join(recordingRoot, "rig-calibration.toml");
+  await writeFile(calibrationPath, "fake calibration");
+
+  const fakePackageRoot = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-headless-"));
+  const processorDir = path.join(
+    fakePackageRoot,
+    "freemocap",
+    "core_processes",
+    "process_motion_capture_videos",
+  );
+  await mkdir(processorDir, { recursive: true });
+  await writeFile(path.join(fakePackageRoot, "freemocap", "__init__.py"), "");
+  await writeFile(path.join(fakePackageRoot, "freemocap", "core_processes", "__init__.py"), "");
+  await writeFile(path.join(processorDir, "__init__.py"), "");
+  await writeFile(
+    path.join(processorDir, "process_recording_headless.py"),
+    `
+from pathlib import Path
+
+def process_recording_headless(
+    recording_path,
+    path_to_camera_calibration_toml=None,
+    path_to_blender_executable=None,
+    recording_processing_parameter_model=None,
+    recording_info_model=None,
+    run_blender=True,
+    make_jupyter_notebook=True,
+    use_tqdm=True,
+):
+    output = Path(recording_path) / "output_data"
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "skeleton_3d.npy").write_text("fake npy")
+    (output / "processor_args.txt").write_text(
+        f"{path_to_camera_calibration_toml}|{run_blender}|{make_jupyter_notebook}|{use_tqdm}"
+    )
+`,
+  );
+  await writeFile(
+    path.join(fakePackageRoot, "numpy.py"),
+    `
+import os
+
+class FakeArray:
+    def __init__(self, data):
+        self.data = data
+        self.shape = self._shape(data)
+        self.ndim = len(self.shape)
+
+    def _shape(self, data):
+        if isinstance(data, list):
+            if not data:
+                return (0,)
+            return (len(data),) + self._shape(data[0])
+        return ()
+
+    def __iter__(self):
+        return iter(self.data)
+
+def load(path):
+    if os.path.basename(path) != "skeleton_3d.npy":
+        raise FileNotFoundError(path)
+    return FakeArray([
+        [
+            [float(index), float(index + 100), float(index + 200), 0.91]
+            for index in range(33)
+        ]
+    ])
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-recording",
+      recordingRoot,
+      "--freemocap-calibration-toml",
+      calibrationPath,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakePackageRoot] },
+  );
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "ready");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.calibrationId, "freemocap-rig-calibration");
+    assert.match(
+      String((health.diagnostics as unknown[])[0]),
+      /processed FreeMoCap recording/,
+    );
+
+    const processorArgs = await readFile(
+      path.join(recordingRoot, "output_data", "processor_args.txt"),
+      "utf8",
+    );
+    assert.equal(processorArgs, `${calibrationPath}|False|False|False`);
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 200);
+
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.schema_version, 2);
+    assert.equal(frame.source, "sidecar-3d");
+    assert.equal(frame.keypoints[12].x, 12);
+    assert.equal(frame.keypoints[12].y, 112);
+    assert.equal(frame.keypoints[12].z, 212);
+    assert.equal(frame.keypoints[12].confidence, 0.91);
+    assert.equal(frame.quality.camera_count, 3);
 
     await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
   } finally {

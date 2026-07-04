@@ -23,9 +23,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fps", type=float, default=30.0)
     parser.add_argument("--camera-count", type=int, default=3)
     parser.add_argument("--calibration-id")
-    parser.add_argument(
+    freemocap_input = parser.add_mutually_exclusive_group()
+    freemocap_input.add_argument(
         "--freemocap-data",
         help="FreeMoCap-style JSON/JSONL/NPY data file or output directory.",
+    )
+    freemocap_input.add_argument(
+        "--freemocap-recording",
+        help="FreeMoCap recording folder to process headlessly before streaming output_data.",
+    )
+    parser.add_argument(
+        "--freemocap-calibration-toml",
+        help="Calibration TOML passed to FreeMoCap headless recording processing.",
     )
     parser.add_argument(
         "--freemocap-provider",
@@ -51,6 +60,8 @@ def main(argv: list[str] | None = None) -> int:
         camera_count=args.camera_count,
         calibration_id=args.calibration_id,
         freemocap_data=args.freemocap_data,
+        freemocap_recording=args.freemocap_recording,
+        freemocap_calibration_toml=args.freemocap_calibration_toml,
         freemocap_provider=args.freemocap_provider,
     )
     server = SidecarServer(args.host, args.port, source)
