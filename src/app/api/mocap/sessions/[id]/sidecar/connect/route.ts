@@ -8,6 +8,7 @@ import {
   checkSidecarHealth,
   SIDECAR_DEFAULT_PORT,
   SIDECAR_CONTRACT_VERSION,
+  SidecarSessionStartError,
   sidecarReadinessError,
   startSidecarSession,
 } from "@/lib/mocap/sidecarClient";
@@ -89,6 +90,21 @@ export async function POST(
       calibrationId: sidecarSession.calibrationId ?? null,
     });
   } catch (err) {
+    if (err instanceof SidecarSessionStartError) {
+      const body = isRecord(err.body) ? err.body : {};
+      return NextResponse.json(
+        {
+          ...body,
+          status: optionalString(body.status) ?? "start-failed",
+          port,
+          error: err.message,
+          diagnostics: Array.isArray(body.diagnostics) ? body.diagnostics : [],
+          expectedSchemaVersion: KEYPOINT_SCHEMA_V2,
+          expectedContractVersion: SIDECAR_CONTRACT_VERSION,
+        },
+        { status: err.status },
+      );
+    }
     return NextResponse.json(
       {
         status: "unreachable",
@@ -98,4 +114,12 @@ export async function POST(
       { status: 503 },
     );
   }
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

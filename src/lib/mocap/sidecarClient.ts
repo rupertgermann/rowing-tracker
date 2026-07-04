@@ -20,6 +20,17 @@ export interface SidecarSessionInfo {
   calibrationId?: string;
 }
 
+export class SidecarSessionStartError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: unknown,
+  ) {
+    super(message);
+    this.name = "SidecarSessionStartError";
+  }
+}
+
 export interface SidecarKeypointFrame {
   frameIndex: number;
   timestampMs: number;
@@ -53,10 +64,13 @@ export function sidecarReadinessError(health: SidecarHealth): string | null {
     return `Sidecar incompatible: schema version ${health.schemaVersion} (expected ${KEYPOINT_SCHEMA_V2})`;
   }
   if (
-    health.contractVersion !== undefined &&
     health.contractVersion !== SIDECAR_CONTRACT_VERSION
   ) {
-    return `Sidecar incompatible: contract version ${health.contractVersion} (expected ${SIDECAR_CONTRACT_VERSION})`;
+    const actual =
+      health.contractVersion === undefined
+        ? "missing"
+        : String(health.contractVersion);
+    return `Sidecar incompatible: contract version ${actual} (expected ${SIDECAR_CONTRACT_VERSION})`;
   }
   if (health.status === "ready") {
     return null;
@@ -71,8 +85,14 @@ export function sidecarReadinessError(health: SidecarHealth): string | null {
 
 export async function startSidecarSession(port = SIDECAR_DEFAULT_PORT): Promise<SidecarSessionInfo> {
   const res = await fetch(`http://localhost:${port}/session/start`, { method: "POST" });
-  if (!res.ok) throw new Error(`Sidecar session/start failed: ${res.status}`);
   const body = (await res.json().catch(() => ({}))) as unknown;
+  if (!res.ok) {
+    throw new SidecarSessionStartError(
+      sidecarSessionFailureMessage("start", res.status, body),
+      res.status,
+      body,
+    );
+  }
   if (!isRecord(body)) return {};
   return {
     sessionId: optionalString(body.sessionId),
@@ -104,6 +124,24 @@ export function connectSidecarStream(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function sidecarSessionFailureMessage(
+  action: "start" | "stop",
+  status: number,
+  body: unknown,
+): string {
+  if (!isRecord(body)) return `Sidecar session/${action} failed: ${status}`;
+  const statusText = optionalString(body.status) ?? optionalString(body.error);
+  const diagnostics = Array.isArray(body.diagnostics)
+    ? body.diagnostics.filter(
+        (entry): entry is string => typeof entry === "string" && entry.length > 0,
+      )
+    : [];
+  const details = [statusText, ...diagnostics].filter(Boolean).join(": ");
+  return details
+    ? `Sidecar session/${action} failed: ${status} (${details})`
+    : `Sidecar session/${action} failed: ${status}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

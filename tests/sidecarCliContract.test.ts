@@ -130,8 +130,15 @@ test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () =
       method: "POST",
     });
     assert.equal(startRes.status, 409);
-    const startBody = (await startRes.json()) as { status: string };
+    const startBody = (await startRes.json()) as Record<string, unknown>;
     assert.equal(startBody.status, "error");
+    assert.equal(startBody.source, "freemocap");
+    assert.equal(startBody.fps, 30);
+    assert.equal(startBody.cameras, 0);
+    assert.equal(startBody.schemaVersion, 2);
+    assert.equal(startBody.contractVersion, 1);
+    assert.equal(startBody.sidecarVersion, "0.1.0");
+    assert.deepEqual(startBody.diagnostics, health.diagnostics);
   } finally {
     await stopProcess(sidecar);
   }
@@ -159,6 +166,15 @@ test("rowing-tracker-sidecar refuses capture when no cameras are available", asy
       method: "POST",
     });
     assert.equal(startRes.status, 409);
+    const startBody = (await startRes.json()) as Record<string, unknown>;
+    assert.equal(startBody.status, "error");
+    assert.equal(startBody.source, "synthetic");
+    assert.equal(startBody.fps, 30);
+    assert.equal(startBody.cameras, 0);
+    assert.equal(startBody.schemaVersion, 2);
+    assert.equal(startBody.contractVersion, 1);
+    assert.equal(startBody.sidecarVersion, "0.1.0");
+    assert.deepEqual(startBody.diagnostics, health.diagnostics);
   } finally {
     await stopProcess(sidecar);
   }

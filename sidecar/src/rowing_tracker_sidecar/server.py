@@ -35,20 +35,15 @@ class SidecarState:
             if health.status != "ready":
                 return (
                     HTTPStatus.CONFLICT,
-                    {
-                        "status": health.status,
-                        "schemaVersion": health.schema_version,
-                        "diagnostics": list(health.diagnostics),
-                    },
+                    health.to_json(),
                 )
             if health.schema_version != KEYPOINT_SCHEMA_VERSION:
+                body = health.to_json()
+                body["status"] = "incompatible-schema"
+                body["expectedSchemaVersion"] = KEYPOINT_SCHEMA_VERSION
                 return (
                     HTTPStatus.CONFLICT,
-                    {
-                        "status": "incompatible-schema",
-                        "schemaVersion": health.schema_version,
-                        "expectedSchemaVersion": KEYPOINT_SCHEMA_VERSION,
-                    },
+                    body,
                 )
             self.session_id = str(uuid.uuid4())
             self.active = True

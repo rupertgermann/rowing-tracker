@@ -38,7 +38,11 @@ The service binds to `127.0.0.1` by default and exposes:
 
 `GET /health` includes `schemaVersion`, `contractVersion`, and
 `sidecarVersion`. The app currently accepts schema version `2` and contract
-version `1`; incompatible versions are rejected before capture starts.
+version `1`; missing or incompatible versions are rejected before capture
+starts.
+When `POST /session/start` returns `409`, its JSON body repeats the same health
+fields plus diagnostics so operators can see the camera count, fps, source,
+calibration id, and version state that blocked capture.
 
 Synthetic mode is hardware-free and intended for development and CI. FreeMoCap
 recorded-data mode supports JSON, JSONL, and NPY `(frames, 33, 4)` sources.

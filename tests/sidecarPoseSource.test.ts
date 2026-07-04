@@ -155,6 +155,42 @@ test("sidecar source rejects incompatible contract during readiness", async () =
   );
 });
 
+test("sidecar source rejects missing contract during readiness", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar incompatible: contract version missing \(expected 1\)/,
+      );
+    },
+    { contractVersion: null },
+  );
+});
+
+test("sidecar source reports direct start refusal diagnostics", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const errors: Error[] = [];
+      const source = new FreemocapSidecarSource({
+        onError: (err) => errors.push(err),
+      });
+
+      await source.init();
+      await assert.rejects(
+        () => source.start(),
+        /Sidecar session\/start failed: 409 \(error: No cameras available\)/,
+      );
+      assert.equal(
+        errors[0].message,
+        "Sidecar session/start failed: 409 (error: No cameras available)",
+      );
+    },
+    { startResponse: "notReady" },
+  );
+});
+
 test("sidecar source stops sidecar after start response omits metadata", async () => {
   await withSidecarGlobals(
     async ({ fetchCalls }) => {
@@ -197,8 +233,8 @@ async function withSidecarGlobals(
     healthResponse?: "ready" | "initializing" | "unreachable";
     healthDiagnostics?: string[];
     schemaVersion?: number;
-    contractVersion?: number;
-    startResponse?: "ready" | "malformed";
+    contractVersion?: number | null;
+    startResponse?: "ready" | "malformed" | "notReady";
   } = {},
 ): Promise<void> {
   const originalFetch = globalThis.fetch;
@@ -211,15 +247,18 @@ async function withSidecarGlobals(
       if (options.healthResponse === "unreachable") {
         throw new TypeError("fetch failed");
       }
-      return Response.json({
+      const healthBody: Record<string, unknown> = {
         status: options.healthResponse ?? "ready",
         fps: 60,
         cameras: 3,
         schemaVersion: options.schemaVersion ?? 2,
-        contractVersion: options.contractVersion ?? 1,
         sidecarVersion: "0.1.0",
         diagnostics: options.healthDiagnostics,
-      });
+      };
+      if (options.contractVersion !== null) {
+        healthBody.contractVersion = options.contractVersion ?? 1;
+      }
+      return Response.json(healthBody);
     }
     if (url.includes("/session/start")) {
       if (options.startResponse === "malformed") {
@@ -227,6 +266,21 @@ async function withSidecarGlobals(
           status: 200,
           headers: { "content-type": "application/json" },
         });
+      }
+      if (options.startResponse === "notReady") {
+        return Response.json(
+          {
+            status: "error",
+            fps: 30,
+            cameras: 0,
+            schemaVersion: 2,
+            contractVersion: 1,
+            sidecarVersion: "0.1.0",
+            source: "synthetic",
+            diagnostics: ["No cameras available"],
+          },
+          { status: 409 },
+        );
       }
       return Response.json({
         sessionId: "sidecar-session",

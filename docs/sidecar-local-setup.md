@@ -109,6 +109,12 @@ comes from the sidecar's `calibrationId`.
 | `POST` | `/session/stop` | Stop capture and flush/close the stream |
 | `WS` | `/pose-stream` | Stream one schema-v2 `sidecar-3d` keypoint frame per message |
 
+If `/session/start` refuses capture with `409`, the response repeats the
+readiness fields from `/health`: `status`, `fps`, `cameras`, `schemaVersion`,
+`contractVersion`, `sidecarVersion`, `source`, `calibrationId`, and
+`diagnostics`. Use that body in logs and bug reports; it is the source of truth
+for why the sidecar would not arm capture.
+
 The app also proxies lifecycle calls through:
 
 | Method | Path | Purpose |
@@ -133,8 +139,8 @@ match `contractVersion = 1`.
 - `sidecarVersion`: installed Python package version, stored in new app-side
   captures as part of `captureModelVersion`.
 
-If any of these fields are incompatible, the app refuses capture before the
-Start button is enabled.
+If any of these fields are missing or incompatible, the app refuses capture
+before the Start button is enabled.
 
 ## Troubleshooting
 
@@ -149,6 +155,9 @@ Start button is enabled.
 - **Incompatible schema**: Rowing Tracker expects schema version `2`.
 - **Missing cameras or calibration**: health should remain `initializing` or
   `error`; do not start capture until it is `ready`.
+- **`/session/start` returns `409`**: inspect the response body. It mirrors the
+  health payload so camera count, fps, source, version, calibration, and
+  diagnostic details are still visible even when capture cannot arm.
 - **Low or zero fps**: reduce camera load, check USB bandwidth, and verify the
   source reports a stable fps before recording.
 - **Stream errors during capture**: stop the app capture, stop the sidecar, and
