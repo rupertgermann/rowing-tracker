@@ -1,0 +1,37 @@
+name: Sidecar release gate
+
+on:
+  pull_request:
+    paths:
+      - "sidecar/**"
+      - "src/lib/mocap/**"
+      - "src/app/api/mocap/**/sidecar/**"
+      - "src/app/mocap/page.tsx"
+      - "tests/sidecar*.test.ts"
+      - "tests/freemocapSidecarSource.test.ts"
+      - "tests/e2e/mocap-capture.spec.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/sidecar-release.yml"
+  workflow_dispatch:
+
+jobs:
+  sidecar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12.0"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e sidecar
+      - run: rowing-tracker-sidecar --help
+      - run: npm run test:sidecar

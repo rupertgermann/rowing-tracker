@@ -116,6 +116,123 @@ test("sidecar source reports non-ready health through status and error callbacks
   );
 });
 
+test("sidecar source rejects ready health with no cameras", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar not ready: ready \(No cameras available\)/,
+      );
+    },
+    { cameras: 0 },
+  );
+});
+
+test("sidecar source rejects ready health with zero fps", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar not ready: ready \(FPS must be greater than zero\)/,
+      );
+    },
+    { fps: 0 },
+  );
+});
+
+test("sidecar source rejects freemocap readiness without calibration traceability", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar not ready: ready \(Missing sidecar calibration id\)/,
+      );
+    },
+    { source: "freemocap", calibrationId: null },
+  );
+});
+
+test("sidecar source rejects incompatible schema during readiness", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const statuses: Array<[PoseCaptureSourceStatus, string | undefined]> = [];
+      const errors: Error[] = [];
+      const source = new FreemocapSidecarSource({
+        onStatus: (status, detail) => statuses.push([status, detail]),
+        onError: (err) => errors.push(err),
+      });
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar incompatible: schema version 1 \(expected 2\)/,
+      );
+
+      assert.deepEqual(statuses, [
+        ["loading", undefined],
+        ["error", "Sidecar incompatible: schema version 1 (expected 2)"],
+      ]);
+      assert.equal(errors[0].message, "Sidecar incompatible: schema version 1 (expected 2)");
+    },
+    { schemaVersion: 1 },
+  );
+});
+
+test("sidecar source rejects incompatible contract during readiness", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar incompatible: contract version 99 \(expected 1\)/,
+      );
+    },
+    { contractVersion: 99 },
+  );
+});
+
+test("sidecar source rejects missing contract during readiness", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar incompatible: contract version missing \(expected 1\)/,
+      );
+    },
+    { contractVersion: null },
+  );
+});
+
+test("sidecar source reports direct start refusal diagnostics", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const errors: Error[] = [];
+      const source = new FreemocapSidecarSource({
+        onError: (err) => errors.push(err),
+      });
+
+      await source.init();
+      await assert.rejects(
+        () => source.start(),
+        /Sidecar session\/start failed: 409 \(error: No cameras available\)/,
+      );
+      assert.equal(
+        errors[0].message,
+        "Sidecar session/start failed: 409 (error: No cameras available)",
+      );
+    },
+    { startResponse: "notReady" },
+  );
+});
+
 test("sidecar source stops sidecar after start response omits metadata", async () => {
   await withSidecarGlobals(
     async ({ fetchCalls }) => {
@@ -157,7 +274,13 @@ async function withSidecarGlobals(
   options: {
     healthResponse?: "ready" | "initializing" | "unreachable";
     healthDiagnostics?: string[];
-    startResponse?: "ready" | "malformed";
+    fps?: number;
+    cameras?: number;
+    schemaVersion?: number;
+    contractVersion?: number | null;
+    source?: string;
+    calibrationId?: string | null;
+    startResponse?: "ready" | "malformed" | "notReady";
   } = {},
 ): Promise<void> {
   const originalFetch = globalThis.fetch;
@@ -170,13 +293,23 @@ async function withSidecarGlobals(
       if (options.healthResponse === "unreachable") {
         throw new TypeError("fetch failed");
       }
-      return Response.json({
+      const healthBody: Record<string, unknown> = {
         status: options.healthResponse ?? "ready",
-        fps: 60,
-        cameras: 3,
-        schemaVersion: 2,
+        fps: options.fps ?? 60,
+        cameras: options.cameras ?? 3,
+        schemaVersion: options.schemaVersion ?? 2,
+        sidecarVersion: "0.1.0",
+        source: options.source ?? "synthetic",
+        calibrationId:
+          options.calibrationId === undefined
+            ? "synthetic-calibration"
+            : options.calibrationId,
         diagnostics: options.healthDiagnostics,
-      });
+      };
+      if (options.contractVersion !== null) {
+        healthBody.contractVersion = options.contractVersion ?? 1;
+      }
+      return Response.json(healthBody);
     }
     if (url.includes("/session/start")) {
       if (options.startResponse === "malformed") {
@@ -184,6 +317,21 @@ async function withSidecarGlobals(
           status: 200,
           headers: { "content-type": "application/json" },
         });
+      }
+      if (options.startResponse === "notReady") {
+        return Response.json(
+          {
+            status: "error",
+            fps: 30,
+            cameras: 0,
+            schemaVersion: 2,
+            contractVersion: 1,
+            sidecarVersion: "0.1.0",
+            source: "synthetic",
+            diagnostics: ["No cameras available"],
+          },
+          { status: 409 },
+        );
       }
       return Response.json({
         sessionId: "sidecar-session",

@@ -38,6 +38,7 @@ interface SidecarConnectResponse {
 }
 
 const SIDECAR_RELEVANT_TRACKED_KEYPOINTS = 13;
+export const SIDECAR_REPROJECTION_ERROR_WARNING_MM = 50;
 
 export class FreemocapSidecarSource implements PoseCaptureSource {
   private closeStream: (() => void) | null = null;
@@ -240,14 +241,15 @@ export function validateSidecarKeypointFrame(
     throw new Error("Sidecar frame must be an object");
   }
 
-  const schemaVersion = optionalNumber(
+  const schemaVersion = requiredInteger(
     pickField(message, "schemaVersion", "schema_version"),
+    "schemaVersion",
   );
-  if (schemaVersion !== undefined && schemaVersion !== KEYPOINT_SCHEMA_V2) {
+  if (schemaVersion !== KEYPOINT_SCHEMA_V2) {
     throw new Error("Sidecar frame schemaVersion must be 2");
   }
-  const source = optionalString(message.source);
-  if (source !== undefined && source !== "sidecar-3d") {
+  const source = requiredString(message.source, "source");
+  if (source !== "sidecar-3d") {
     throw new Error("Sidecar frame source must be sidecar-3d");
   }
 
@@ -341,13 +343,20 @@ function sidecarKeypointsToQuads(frame: SidecarKeypointFrame): Float32Array {
 }
 
 function sidecarQualityFlags(frame: SidecarKeypointFrame): number {
+  let flags = 0;
   if (
     frame.quality.meanConfidence < 0.6 ||
     frame.quality.trackedCount < 13
   ) {
-    return QUALITY_FLAG.LOW_CONFIDENCE;
+    flags |= QUALITY_FLAG.LOW_CONFIDENCE;
   }
-  return 0;
+  if (
+    frame.quality.reprojectionErrorMm !== undefined &&
+    frame.quality.reprojectionErrorMm > SIDECAR_REPROJECTION_ERROR_WARNING_MM
+  ) {
+    flags |= QUALITY_FLAG.HIGH_REPROJECTION_ERROR;
+  }
+  return flags;
 }
 
 function sidecarTrackedCountForPoseQuality(trackedCount: number): number {
@@ -407,6 +416,13 @@ function optionalInteger(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Sidecar ${field} must be a string`);
+  }
+  return value;
 }
 
 function pickField(

@@ -13,6 +13,10 @@ unless a release note says public publishing has happened.
 - Python 3.10+ with `venv`
 - The app running locally with `npm run dev`
 
+The optional `sidecar[freemocap]` extra follows current FreeMoCap releases and
+requires Python 3.10 through 3.12. Synthetic mode and recorded-data mode can run
+without that extra.
+
 ## Install from this repository
 
 ```bash
@@ -49,6 +53,8 @@ curl http://localhost:8765/health
   "fps": 30.0,
   "cameras": 3,
   "schemaVersion": 2,
+  "contractVersion": 1,
+  "sidecarVersion": "0.1.0",
   "source": "synthetic",
   "calibrationId": "synthetic-calibration"
 }
@@ -63,7 +69,7 @@ against real `world-mm-3d` coordinates before a live camera runtime is wired in.
 ```bash
 rowing-tracker-sidecar \
   --source freemocap \
-  --freemocap-data /path/to/freemocap/output/mediapipe_body_3d_xyz.npy \
+  --freemocap-data /path/to/freemocap/output/skeleton_3d.npy \
   --camera-count 3 \
   --fps 30 \
   --port 8765
@@ -76,13 +82,79 @@ Supported input formats:
 - `.npy` containing `(frames, 33, 4)` FreeMoCap body keypoints; this requires
   `numpy` in the sidecar environment
 - a directory containing a known FreeMoCap output file such as
+  `skeleton_3d.npy`, `3dData_numFrames_numTrackedPoints_spatialXYZ.npy`, or
   `mediapipe_body_3d_xyz.npy`
 
-If you select `--source freemocap` without `--freemocap-data`, health reports
-`status: "error"` with diagnostics. That failure is intentional: the current
-repo-owned sidecar has a stable adapter boundary for FreeMoCap data, while live
-camera capture depends on the FreeMoCap runtime available in the user's
-environment.
+When a directory also contains
+`3dData_numFrames_numTrackedPoints_reprojectionError.npy` or
+`3dData_numCams_numFrames_numTrackedPoints_reprojectionError.npy`, the sidecar
+maps the per-frame finite mean into `quality.reprojection_error_mm`.
+Rowing Tracker preserves that signal in captured v2 frame quality flags as
+`high-reprojection-error` when it exceeds 50 mm.
+
+## FreeMoCap headless recording-processing mode
+
+If you have a FreeMoCap recording folder with synchronized videos, the sidecar
+can ask the optional FreeMoCap package to process that folder headlessly before
+streaming the generated `output_data` through the ADR-0005 contract. This uses
+FreeMoCap's batch/headless processor; it does not open the FreeMoCap GUI and it
+does not turn the sidecar into a live camera runtime.
+
+Install the optional FreeMoCap extra in the sidecar environment:
+
+```bash
+python -m pip install -e "sidecar[freemocap]"
+```
+
+Then run:
+
+```bash
+rowing-tracker-sidecar \
+  --source freemocap \
+  --freemocap-recording /path/to/freemocap/recording-folder \
+  --freemocap-calibration-toml /path/to/calibration.toml \
+  --camera-count 3 \
+  --fps 30 \
+  --port 8765
+```
+
+The sidecar disables Blender export, notebook generation, and tqdm progress for
+this path. While processing runs, `/health` reports `status: "initializing"`
+with a `processing FreeMoCap recording ...` diagnostic and `/session/start`
+returns `409`. On success, health diagnostics include `processed FreeMoCap
+recording ...`, then the generated `output_data/skeleton_3d.npy` or raw 3D
+output is loaded exactly like recorded-data mode. If processing fails, `/health`
+reports `status: "error"` with the FreeMoCap processing exception and the
+recording is not armed.
+
+If you select `--source freemocap` without `--freemocap-data` or
+`--freemocap-recording` or `--freemocap-provider`, the sidecar probes for the
+optional FreeMoCap Python package and then fails closed with `status: "error"`.
+Missing-package diagnostics explain how to install `sidecar[freemocap]`;
+installed-package diagnostics explain that upstream FreeMoCap exposes
+batch/headless processing and recorded outputs, but not a supported one-call
+live calibrated camera API for this sidecar to invoke directly.
+
+## FreeMoCap live-runtime provider hook
+
+The sidecar can load a live runtime adapter with `--freemocap-provider`:
+
+```bash
+rowing-tracker-sidecar \
+  --source freemocap \
+  --freemocap-provider my_runtime_module:create_provider \
+  --port 8765
+```
+
+The provider factory must return an object that owns real rig health,
+`start_session`, `stop_session`, and frame capture. The sidecar keeps the
+localhost HTTP/WebSocket contract stable while the provider owns camera/runtime
+details. If the provider cannot be loaded or the runtime cannot start/stop, the
+sidecar reports structured diagnostics instead of pretending capture is ready.
+
+The repository includes fake-provider contract coverage for this boundary.
+Treat SkellyCam, SkellyTracker, calibration, and live triangulation glue as
+provider-owned runtime code until upstream exposes a stable live API.
 
 ## Using the sidecar in the app
 
@@ -107,6 +179,12 @@ comes from the sidecar's `calibrationId`.
 | `POST` | `/session/stop` | Stop capture and flush/close the stream |
 | `WS` | `/pose-stream` | Stream one schema-v2 `sidecar-3d` keypoint frame per message |
 
+If `/session/start` refuses capture with `409`, the response repeats the
+readiness fields from `/health`: `status`, `fps`, `cameras`, `schemaVersion`,
+`contractVersion`, `sidecarVersion`, `source`, `calibrationId`, and
+`diagnostics`. Use that body in logs and bug reports; it is the source of truth
+for why the sidecar would not arm capture.
+
 The app also proxies lifecycle calls through:
 
 | Method | Path | Purpose |
@@ -116,8 +194,23 @@ The app also proxies lifecycle calls through:
 | `POST` | `/api/mocap/sessions/:id/sidecar/stop` | Stop the sidecar session |
 
 All app routes require an authenticated session and an owned `MocapSession`.
-`connect` also requires the app-side session to be in `capturing` status and the
-sidecar schema to match `keypointSchemaVersion = 2`.
+`connect` also requires the app-side session to be in `capturing` status, the
+sidecar schema to match `keypointSchemaVersion = 2`, and the sidecar contract to
+match `contractVersion = 1`.
+
+## Version compatibility
+
+`/health` reports both the frame schema and sidecar package contract:
+
+- `schemaVersion`: pose-frame payload schema. Rowing Tracker currently accepts
+  only `2` for `sidecar-3d`.
+- `contractVersion`: HTTP/WebSocket contract version. Rowing Tracker currently
+  accepts only `1`.
+- `sidecarVersion`: installed Python package version, stored in new app-side
+  captures as part of `captureModelVersion`.
+
+If any of these fields are missing or incompatible, the app refuses capture
+before the Start button is enabled.
 
 ## Troubleshooting
 
@@ -127,11 +220,17 @@ sidecar schema to match `keypointSchemaVersion = 2`.
   and confirm `curl http://localhost:8765/health` works.
 - **Wrong port**: run the sidecar with `--port <port>` and configure
   `UserSettings.sidecarPort` to the same value.
-- **`status: "error"` with FreeMoCap diagnostics**: the FreeMoCap source is not
-  configured or the data path cannot be read. Pass `--freemocap-data`.
+- **`status: "error"` with FreeMoCap diagnostics**: read the first diagnostic
+  line. The optional package may be missing, the installed package may not
+  expose a supported live API, or the data path may be unreadable. Use
+  `--freemocap-data` for recorded output or `--freemocap-provider` for a live
+  camera adapter.
 - **Incompatible schema**: Rowing Tracker expects schema version `2`.
 - **Missing cameras or calibration**: health should remain `initializing` or
   `error`; do not start capture until it is `ready`.
+- **`/session/start` returns `409`**: inspect the response body. It mirrors the
+  health payload so camera count, fps, source, version, calibration, and
+  diagnostic details are still visible even when capture cannot arm.
 - **Low or zero fps**: reduce camera load, check USB bandwidth, and verify the
   source reports a stable fps before recording.
 - **Stream errors during capture**: stop the app capture, stop the sidecar, and
@@ -140,19 +239,11 @@ sidecar schema to match `keypointSchemaVersion = 2`.
 
 ## Hardware-gated smoke test
 
-Use this manual path when a real camera rig and FreeMoCap output are available:
-
-1. Capture or locate a FreeMoCap `(frames, 33, 4)` output file.
-2. Start the sidecar in recorded-data mode with that file.
-3. Confirm `/health` is `ready`, `schemaVersion` is `2`, and `cameras` matches
-   the rig.
-4. Record a Rowing Tracker sidecar session from `/mocap`.
-5. Stop capture and open the replay.
-6. Confirm the stored session uses `source=sidecar`,
-   `capturePerspective=sidecar-3d`, has pose frames, and runs post-session
-   analysis.
-
-This smoke test is hardware/data-gated and should not block normal CI.
+For the manual, opt-in real camera-rig procedure, see
+[FreeMoCap sidecar hardware smoke test](sidecar-hardware-smoke.md). It uses the
+current injected `--freemocap-provider` live path, records through Rowing
+Tracker, verifies replay and analysis output, and must not block normal CI when
+hardware is unavailable.
 
 ## Privacy and licensing
 
@@ -166,6 +257,7 @@ dependency boundary before distributing bundled artifacts.
 ## Tests
 
 ```bash
+npm run test:sidecar
 npx tsx --test tests/sidecarCliContract.test.ts
 npx tsx --test tests/sidecarPackageInstall.test.ts
 npx tsx --test tests/sidecarTracer.test.ts
@@ -173,3 +265,7 @@ npx tsx --test tests/freemocapSidecarSource.test.ts
 npx tsx --test tests/sidecarMockContract.test.ts
 npm run test:e2e -- tests/e2e/mocap-capture.spec.ts
 ```
+
+The GitHub Actions `Sidecar release gate` workflow runs the install/startup
+check and `npm run test:sidecar` for PRs that touch the sidecar contract,
+package, app-side sidecar client, or focused sidecar tests.

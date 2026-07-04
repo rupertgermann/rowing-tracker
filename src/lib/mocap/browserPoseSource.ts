@@ -121,11 +121,14 @@ export class BrowserPoseSource implements PoseCaptureSource {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    await this.drain();
-    this.worker?.postMessage({ type: "close" });
-    this.worker?.terminate();
-    this.worker = null;
-    this.setStatus("stopped");
+    try {
+      await this.drain();
+    } finally {
+      this.worker?.postMessage({ type: "close" });
+      this.worker?.terminate();
+      this.worker = null;
+      this.setStatus("stopped");
+    }
   }
 
   private scheduleFrame(): void {

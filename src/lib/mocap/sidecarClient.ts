@@ -1,10 +1,15 @@
+import { KEYPOINT_SCHEMA_V2 } from "./poseFrameStream";
+
 export const SIDECAR_DEFAULT_PORT = 8765;
+export const SIDECAR_CONTRACT_VERSION = 1;
 
 export interface SidecarHealth {
   status: "ready" | "initializing" | "error";
   fps: number;
   cameras: number;
   schemaVersion: number;
+  contractVersion?: number;
+  sidecarVersion?: string;
   source?: string;
   calibrationId?: string | null;
   diagnostics?: string[];
@@ -13,6 +18,17 @@ export interface SidecarHealth {
 export interface SidecarSessionInfo {
   sessionId?: string;
   calibrationId?: string;
+}
+
+export class SidecarSessionStartError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: unknown,
+  ) {
+    super(message);
+    this.name = "SidecarSessionStartError";
+  }
 }
 
 export interface SidecarKeypointFrame {
@@ -40,6 +56,38 @@ export async function checkSidecarHealth(port = SIDECAR_DEFAULT_PORT): Promise<S
 }
 
 export function sidecarReadinessMessage(health: SidecarHealth): string {
+  return sidecarReadinessError(health) ?? "Sidecar ready";
+}
+
+export function sidecarReadinessError(health: SidecarHealth): string | null {
+  if (health.schemaVersion !== KEYPOINT_SCHEMA_V2) {
+    return `Sidecar incompatible: schema version ${health.schemaVersion} (expected ${KEYPOINT_SCHEMA_V2})`;
+  }
+  if (
+    health.contractVersion !== SIDECAR_CONTRACT_VERSION
+  ) {
+    const actual =
+      health.contractVersion === undefined
+        ? "missing"
+        : String(health.contractVersion);
+    return `Sidecar incompatible: contract version ${actual} (expected ${SIDECAR_CONTRACT_VERSION})`;
+  }
+  if (!Number.isFinite(health.cameras) || health.cameras <= 0) {
+    return `Sidecar not ready: ${health.status} (No cameras available)`;
+  }
+  if (!Number.isFinite(health.fps) || health.fps <= 0) {
+    return `Sidecar not ready: ${health.status} (FPS must be greater than zero)`;
+  }
+  if (
+    health.source !== undefined &&
+    health.source !== "synthetic" &&
+    !health.calibrationId
+  ) {
+    return `Sidecar not ready: ${health.status} (Missing sidecar calibration id)`;
+  }
+  if (health.status === "ready") {
+    return null;
+  }
   const diagnostic = Array.isArray(health.diagnostics)
     ? health.diagnostics.find((entry) => typeof entry === "string" && entry.length > 0)
     : undefined;
@@ -50,8 +98,14 @@ export function sidecarReadinessMessage(health: SidecarHealth): string {
 
 export async function startSidecarSession(port = SIDECAR_DEFAULT_PORT): Promise<SidecarSessionInfo> {
   const res = await fetch(`http://localhost:${port}/session/start`, { method: "POST" });
-  if (!res.ok) throw new Error(`Sidecar session/start failed: ${res.status}`);
   const body = (await res.json().catch(() => ({}))) as unknown;
+  if (!res.ok) {
+    throw new SidecarSessionStartError(
+      sidecarSessionFailureMessage("start", res.status, body),
+      res.status,
+      body,
+    );
+  }
   if (!isRecord(body)) return {};
   return {
     sessionId: optionalString(body.sessionId),
@@ -83,6 +137,24 @@ export function connectSidecarStream(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function sidecarSessionFailureMessage(
+  action: "start" | "stop",
+  status: number,
+  body: unknown,
+): string {
+  if (!isRecord(body)) return `Sidecar session/${action} failed: ${status}`;
+  const statusText = optionalString(body.status) ?? optionalString(body.error);
+  const diagnostics = Array.isArray(body.diagnostics)
+    ? body.diagnostics.filter(
+        (entry): entry is string => typeof entry === "string" && entry.length > 0,
+      )
+    : [];
+  const details = [statusText, ...diagnostics].filter(Boolean).join(": ");
+  return details
+    ? `Sidecar session/${action} failed: ${status} (${details})`
+    : `Sidecar session/${action} failed: ${status}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

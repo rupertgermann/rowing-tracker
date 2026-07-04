@@ -36,6 +36,7 @@ import {
   BYTES_PER_FRAME_V1,
   BYTES_PER_FRAME_V2,
   KEYPOINT_SCHEMA_V2,
+  QUALITY_FLAG,
   decodeFrame,
 } from "@/lib/mocap/poseFrameStream";
 import { VideoUploader } from "@/lib/mocap/videoUploader";
@@ -60,7 +61,7 @@ import type {
 import { settings } from "@/lib/settings";
 import {
   checkSidecarHealth,
-  sidecarReadinessMessage,
+  sidecarReadinessError,
   type SidecarHealth,
 } from "@/lib/mocap/sidecarClient";
 import { resolveSidecarPort } from "@/lib/mocap/sidecarPoseSource";
@@ -156,6 +157,7 @@ export default function MocapCapturePage() {
   const sourceRef = useRef<PoseCaptureSource | null>(null);
   const calibrationSourceRef = useRef<PoseCaptureSource | null>(null);
   const startedAtRef = useRef<number>(0);
+  const activeCaptureSessionIdRef = useRef<string | null>(null);
   const latestPoseFrameRef = useRef<PoseQuality>(EMPTY_QUALITY);
   const qualityHistoryRef = useRef<CameraReadinessFrame[]>([]);
   const effectiveFpsSamplesRef = useRef<EffectiveFpsSample[]>([]);
@@ -263,16 +265,20 @@ export default function MocapCapturePage() {
     setPoseStatus("loading");
     try {
       const health = await checkSidecarHealth(port);
-      if (health.status !== "ready") {
-        throw new Error(sidecarReadinessMessage(health));
+      const readinessError = sidecarReadinessError(health);
+      if (readinessError) {
+        throw new Error(readinessError);
       }
       setPoseStatus("ready");
       setSidecarHealth(health);
       setSidecarError(null);
       return health;
     } catch (err) {
+      const message = err instanceof Error ? err.message : "";
       const error =
-        err instanceof Error && err.message.startsWith("Sidecar not ready:")
+        err instanceof Error &&
+        (message.startsWith("Sidecar not ready:") ||
+          message.startsWith("Sidecar incompatible:"))
           ? err
           : new Error(`Sidecar not reachable on port ${port}`);
       setPoseStatus("error");
@@ -370,6 +376,12 @@ export default function MocapCapturePage() {
         if (decodedFrame) engineRef.current.pushFrame(decodedFrame);
       }
 
+      if ((info.qualityFlags & QUALITY_FLAG.HIGH_REPROJECTION_ERROR) !== 0) {
+        setSessionQualityFlags((flags) =>
+          appendUniqueFlags(flags, ["high-reprojection-error"]),
+        );
+      }
+
       if (!monitorDegradedFraming) return;
 
       if (!readiness.sustainedDegraded) {
@@ -408,6 +420,9 @@ export default function MocapCapturePage() {
   const handleError = useCallback(
     async (err: unknown, sessionId?: string) => {
       const message = err instanceof Error ? err.message : String(err);
+      const deleteAbandonedSession = Boolean(
+        sessionId && activeCaptureSessionIdRef.current !== sessionId,
+      );
       setState({ kind: "error", message });
       try {
         await sourceRef.current?.stop();
@@ -426,7 +441,7 @@ export default function MocapCapturePage() {
       }
       await uploaderRef.current?.drain();
       await teardown();
-      if (sessionId) {
+      if (deleteAbandonedSession && sessionId) {
         // Best-effort delete of the abandoned row
         fetch(`/api/mocap/sessions/${sessionId}`, { method: "DELETE" }).catch(
           () => {},
@@ -526,6 +541,7 @@ export default function MocapCapturePage() {
   const start = useCallback(async () => {
     // Sidecar path: skip browser camera/calibration, use sidecar-3d perspective
     if (useSidecar) {
+      activeCaptureSessionIdRef.current = null;
       setState({ kind: "starting" });
       let sessionId: string | undefined;
       try {
@@ -536,7 +552,7 @@ export default function MocapCapturePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             source: "sidecar",
-            captureModelVersion: `freemocap-sidecar@schemaV${health.schemaVersion}`,
+            captureModelVersion: `freemocap-sidecar@${health.sidecarVersion ?? "unknown"}+schemaV${health.schemaVersion}`,
             capturePerspective: "sidecar-3d",
             captureFps: health.fps,
             recordOnly: false,
@@ -575,6 +591,7 @@ export default function MocapCapturePage() {
         sourceRef.current = source;
         await source.init();
         await source.start();
+        activeCaptureSessionIdRef.current = created.id;
 
         setState({
           kind: "capturing",
@@ -615,6 +632,7 @@ export default function MocapCapturePage() {
     }
 
     setState({ kind: "starting" });
+    activeCaptureSessionIdRef.current = null;
     let sessionId: string | undefined;
     try {
       const stream =
@@ -720,6 +738,7 @@ export default function MocapCapturePage() {
       }
 
       recorder.start(VIDEO_TIMESLICE_MS);
+      activeCaptureSessionIdRef.current = sessionId;
       sourceRef.current?.start();
       startedAtRef.current = Date.now();
       setElapsedSec(0);
@@ -821,6 +840,7 @@ export default function MocapCapturePage() {
         throw new Error(`Finalize failed: ${finalized.message}`);
       }
       await teardown();
+      activeCaptureSessionIdRef.current = null;
       setCalibration({ kind: "idle" });
 
       // Fetch faults for end-of-session summary
@@ -1313,7 +1333,10 @@ export default function MocapCapturePage() {
           ) : null}
 
           {state.kind === "error" ? (
-            <div className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm">
+            <div
+              className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm"
+              data-testid="mocap-error"
+            >
               Error: {state.message}
             </div>
           ) : null}

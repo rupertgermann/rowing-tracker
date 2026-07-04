@@ -70,7 +70,7 @@ interface FrameQuality {
 The sidecar is a local Python process exposing:
 
 - `ws://localhost:8765/pose-stream` — streams `KeypointFrame` JSON, one message per frame
-- `GET http://localhost:8765/health` — returns `{ "status": "ready", "fps": 30, "cameras": 3, "schemaVersion": 2 }`
+- `GET http://localhost:8765/health` — returns `{ "status": "ready", "fps": 30, "cameras": 3, "schemaVersion": 2, "contractVersion": 1, "sidecarVersion": "0.1.0" }`
 - `POST http://localhost:8765/session/start` — arms capture, returns `{ "sessionId": "<uuid>", "calibrationId": "<uuid>" }`
 - `POST http://localhost:8765/session/stop` — flushes, closes stream
 

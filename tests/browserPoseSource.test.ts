@@ -103,10 +103,31 @@ test("browser pose source reports drain upload errors through the shared contrac
 
       await contract.init();
       FakeWorker.instances[0].emitMessage(makeFrameMessage(1, [9, 8, 7]));
-      await contract.drain();
+      await assert.rejects(() => contract.drain(), /Pose upload failed: 500/);
 
       assert.equal(errors.length, 1);
       assert.equal(errors[0].message, "Pose upload failed: 500");
+    },
+    { fetchOk: false },
+  );
+});
+
+test("browser pose source cleans up worker when stop drain fails", async () => {
+  await withBrowserPoseSourceGlobals(
+    async () => {
+      const source = new BrowserPoseSource({
+        sessionId: "session-3",
+        videoEl: fakeVideoElement(),
+        flushBytes: 100,
+      });
+
+      await source.init();
+      FakeWorker.instances[0].emitMessage(makeFrameMessage(1, [3, 2, 1]));
+
+      await assert.rejects(() => source.stop(), /Pose upload failed: 500/);
+
+      assert.equal(FakeWorker.instances[0].terminated, true);
+      assert.equal(source.status, "stopped");
     },
     { fetchOk: false },
   );

@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import {
+  execFile,
+  spawn,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 test("rowing-tracker-sidecar serves the ADR-0005 contract with synthetic frames", async () => {
   const port = await getFreePort();
@@ -15,6 +22,8 @@ test("rowing-tracker-sidecar serves the ADR-0005 contract with synthetic frames"
     const health = await waitForHealth(port);
     assert.equal(health.status, "ready");
     assert.equal(health.schemaVersion, 2);
+    assert.equal(health.contractVersion, 1);
+    assert.equal(health.sidecarVersion, "0.1.0");
     assert.equal(health.cameras, 3);
     assert.equal(health.fps, 30);
     assert.equal(health.source, "synthetic");
@@ -53,12 +62,18 @@ test("rowing-tracker-sidecar streams recorded FreeMoCap-style frames", async () 
     dataPath,
     JSON.stringify({
       frames: [
-        Array.from({ length: 33 }, (_, index) => [
-          index + 0.5,
-          index + 100.5,
-          index + 200.5,
-          index < 13 ? 0.91 : 0.25,
-        ]),
+        {
+          keypoints: Array.from({ length: 33 }, (_, index) => ({
+            index,
+            x: index + 0.5,
+            y: index + 100.5,
+            z: index + 200.5,
+            confidence: index < 13 ? 0.91 : 0.25,
+          })),
+          quality: {
+            reprojection_error_mm: 4.5,
+          },
+        },
       ],
     }),
   );
@@ -96,11 +111,803 @@ test("rowing-tracker-sidecar streams recorded FreeMoCap-style frames", async () 
     assert.equal(frame.keypoints[12].confidence, 0.91);
     assert.equal(frame.quality.tracked_count, 13);
     assert.equal(frame.quality.camera_count, 4);
+    assert.equal(frame.quality.reprojection_error_mm, 4.5);
 
     await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
   } finally {
     await stopProcess(sidecar);
   }
+});
+
+test("rowing-tracker-sidecar maps FreeMoCap directory reprojection quality", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-dir-"));
+  await writeFile(
+    path.join(root, "3dData_numFrames_numTrackedPoints_spatialXYZ.npy"),
+    "",
+  );
+  await writeFile(
+    path.join(root, "3dData_numFrames_numTrackedPoints_reprojectionError.npy"),
+    "",
+  );
+
+  const fakeNumpyRoot = await mkdtemp(path.join(os.tmpdir(), "sidecar-numpy-"));
+  await writeFile(
+    path.join(fakeNumpyRoot, "numpy.py"),
+    `
+import math
+import os
+
+class FakeArray:
+    def __init__(self, data):
+        self.data = data
+        self.shape = self._shape(data)
+        self.ndim = len(self.shape)
+
+    def _shape(self, data):
+        if isinstance(data, list):
+            if not data:
+                return (0,)
+            return (len(data),) + self._shape(data[0])
+        return ()
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+def _frame(offset):
+    return [
+        [float(index + offset), float(index + 100 + offset), float(index + 200 + offset)]
+        for index in range(33)
+    ]
+
+def load(path):
+    basename = os.path.basename(path)
+    if basename == "3dData_numFrames_numTrackedPoints_spatialXYZ.npy":
+        return FakeArray([_frame(0), _frame(1000)])
+    if basename == "3dData_numFrames_numTrackedPoints_reprojectionError.npy":
+        return FakeArray([[1.0, 2.0, 3.0], [4.0, math.nan, 6.0]])
+    raise FileNotFoundError(path)
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-data",
+      root,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakeNumpyRoot] },
+  );
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "ready");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.calibrationId, "freemocap-3dData_numFrames_numTrackedPoints_spatialXYZ");
+    assert.match(
+      String((health.diagnostics as unknown[])[1]),
+      /loaded FreeMoCap reprojection quality/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 200);
+
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.keypoints[12].x, 12);
+    assert.equal(frame.keypoints[12].confidence, 1);
+    assert.equal(frame.quality.reprojection_error_mm, 2);
+
+    await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar processes a FreeMoCap recording folder before streaming", async () => {
+  const recordingRoot = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-recording-"));
+  const calibrationPath = path.join(recordingRoot, "rig-calibration.toml");
+  await writeFile(calibrationPath, "fake calibration");
+
+  const fakePackageRoot = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-headless-"));
+  const processorDir = path.join(
+    fakePackageRoot,
+    "freemocap",
+    "core_processes",
+    "process_motion_capture_videos",
+  );
+  await mkdir(processorDir, { recursive: true });
+  await writeFile(path.join(fakePackageRoot, "freemocap", "__init__.py"), "");
+  await writeFile(path.join(fakePackageRoot, "freemocap", "core_processes", "__init__.py"), "");
+  await writeFile(path.join(processorDir, "__init__.py"), "");
+  await writeFile(
+    path.join(processorDir, "process_recording_headless.py"),
+    `
+from pathlib import Path
+
+def process_recording_headless(
+    recording_path,
+    path_to_camera_calibration_toml=None,
+    path_to_blender_executable=None,
+    recording_processing_parameter_model=None,
+    recording_info_model=None,
+    run_blender=True,
+    make_jupyter_notebook=True,
+    use_tqdm=True,
+):
+    output = Path(recording_path) / "output_data"
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "skeleton_3d.npy").write_text("fake npy")
+    (output / "processor_args.txt").write_text(
+        f"{path_to_camera_calibration_toml}|{run_blender}|{make_jupyter_notebook}|{use_tqdm}"
+    )
+`,
+  );
+  await writeFile(
+    path.join(fakePackageRoot, "numpy.py"),
+    `
+import os
+
+class FakeArray:
+    def __init__(self, data):
+        self.data = data
+        self.shape = self._shape(data)
+        self.ndim = len(self.shape)
+
+    def _shape(self, data):
+        if isinstance(data, list):
+            if not data:
+                return (0,)
+            return (len(data),) + self._shape(data[0])
+        return ()
+
+    def __iter__(self):
+        return iter(self.data)
+
+def load(path):
+    if os.path.basename(path) != "skeleton_3d.npy":
+        raise FileNotFoundError(path)
+    return FakeArray([
+        [
+            [float(index), float(index + 100), float(index + 200), 0.91]
+            for index in range(33)
+        ]
+    ])
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-recording",
+      recordingRoot,
+      "--freemocap-calibration-toml",
+      calibrationPath,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakePackageRoot] },
+  );
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "ready");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.calibrationId, "freemocap-rig-calibration");
+    assert.match(
+      String((health.diagnostics as unknown[])[0]),
+      /processed FreeMoCap recording/,
+    );
+
+    const processorArgs = await readFile(
+      path.join(recordingRoot, "output_data", "processor_args.txt"),
+      "utf8",
+    );
+    assert.equal(processorArgs, `${calibrationPath}|False|False|False`);
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 200);
+
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.schema_version, 2);
+    assert.equal(frame.source, "sidecar-3d");
+    assert.equal(frame.keypoints[12].x, 12);
+    assert.equal(frame.keypoints[12].y, 112);
+    assert.equal(frame.keypoints[12].z, 212);
+    assert.equal(frame.keypoints[12].confidence, 0.91);
+    assert.equal(frame.quality.camera_count, 3);
+
+    await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar reports initializing while FreeMoCap recording processing runs", async () => {
+  const recordingRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-"),
+  );
+  const fakePackageRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-pkg-"),
+  );
+  const processorDir = path.join(
+    fakePackageRoot,
+    "freemocap",
+    "core_processes",
+    "process_motion_capture_videos",
+  );
+  await mkdir(processorDir, { recursive: true });
+  await writeFile(path.join(fakePackageRoot, "freemocap", "__init__.py"), "");
+  await writeFile(
+    path.join(fakePackageRoot, "freemocap", "core_processes", "__init__.py"),
+    "",
+  );
+  await writeFile(path.join(processorDir, "__init__.py"), "");
+  await writeFile(
+    path.join(processorDir, "process_recording_headless.py"),
+    `
+import time
+from pathlib import Path
+
+def process_recording_headless(
+    recording_path,
+    path_to_camera_calibration_toml=None,
+    path_to_blender_executable=None,
+    recording_processing_parameter_model=None,
+    recording_info_model=None,
+    run_blender=True,
+    make_jupyter_notebook=True,
+    use_tqdm=True,
+):
+    root = Path(recording_path)
+    (root / "processor-started.txt").write_text("started")
+    release = root / "processor-release.txt"
+    while not release.exists():
+        time.sleep(0.02)
+    output = root / "output_data"
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "skeleton_3d.npy").write_text("fake npy")
+`,
+  );
+  await writeFile(
+    path.join(fakePackageRoot, "numpy.py"),
+    `
+import os
+
+class FakeArray:
+    def __init__(self, data):
+        self.data = data
+        self.shape = (len(data), len(data[0]), len(data[0][0]))
+        self.ndim = 3
+
+    def __iter__(self):
+        return iter(self.data)
+
+def load(path):
+    if os.path.basename(path) != "skeleton_3d.npy":
+        raise FileNotFoundError(path)
+    return FakeArray([
+        [
+            [float(index), float(index + 100), float(index + 200), 0.91]
+            for index in range(33)
+        ]
+    ])
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-recording",
+      recordingRoot,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakePackageRoot] },
+  );
+
+  try {
+    await waitForFile(path.join(recordingRoot, "processor-started.txt"), 1_000);
+    const initializing = await waitForHealthStatus(port, "initializing", 1_000);
+    assert.equal(initializing.source, "freemocap");
+    assert.equal(initializing.fps, 30);
+    assert.equal(initializing.cameras, 3);
+    assert.equal(initializing.schemaVersion, 2);
+    assert.equal(initializing.contractVersion, 1);
+    assert.equal(initializing.calibrationId, `freemocap-${path.basename(recordingRoot)}`);
+    assert.match(
+      String((initializing.diagnostics as unknown[])[0]),
+      /processing FreeMoCap recording/,
+    );
+
+    const initializingStartRes = await fetch(
+      `http://localhost:${port}/session/start`,
+      { method: "POST" },
+    );
+    assert.equal(initializingStartRes.status, 409);
+    const initializingStartBody =
+      (await initializingStartRes.json()) as Record<string, unknown>;
+    assert.equal(initializingStartBody.status, "initializing");
+    assert.equal(initializingStartBody.calibrationId, initializing.calibrationId);
+    assert.deepEqual(
+      initializingStartBody.diagnostics,
+      initializing.diagnostics,
+    );
+
+    await writeFile(path.join(recordingRoot, "processor-release.txt"), "go");
+    const ready = await waitForHealthStatus(port, "ready", 5_000);
+    assert.equal(ready.calibrationId, `freemocap-${path.basename(recordingRoot)}`);
+    const readyStartRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(readyStartRes.status, 200);
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.source, "sidecar-3d");
+    assert.equal(frame.keypoints.length, 33);
+    await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar reports FreeMoCap recording processing failures after initializing", async () => {
+  const recordingRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-fails-"),
+  );
+  const fakePackageRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-fails-pkg-"),
+  );
+  const processorDir = path.join(
+    fakePackageRoot,
+    "freemocap",
+    "core_processes",
+    "process_motion_capture_videos",
+  );
+  await mkdir(processorDir, { recursive: true });
+  await writeFile(path.join(fakePackageRoot, "freemocap", "__init__.py"), "");
+  await writeFile(
+    path.join(fakePackageRoot, "freemocap", "core_processes", "__init__.py"),
+    "",
+  );
+  await writeFile(path.join(processorDir, "__init__.py"), "");
+  await writeFile(
+    path.join(processorDir, "process_recording_headless.py"),
+    `
+import time
+from pathlib import Path
+
+def process_recording_headless(
+    recording_path,
+    path_to_camera_calibration_toml=None,
+    path_to_blender_executable=None,
+    recording_processing_parameter_model=None,
+    recording_info_model=None,
+    run_blender=True,
+    make_jupyter_notebook=True,
+    use_tqdm=True,
+):
+    root = Path(recording_path)
+    (root / "processor-started.txt").write_text("started")
+    release = root / "processor-release.txt"
+    while not release.exists():
+        time.sleep(0.02)
+    raise RuntimeError("calibration solve failed")
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-recording",
+      recordingRoot,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakePackageRoot] },
+  );
+
+  try {
+    await waitForFile(path.join(recordingRoot, "processor-started.txt"), 1_000);
+    const initializing = await waitForHealthStatus(port, "initializing", 1_000);
+    assert.equal(initializing.source, "freemocap");
+
+    await writeFile(path.join(recordingRoot, "processor-release.txt"), "go");
+    const failed = await waitForHealthStatus(port, "error", 5_000);
+    assert.equal(failed.source, "freemocap");
+    assert.match(
+      String((failed.diagnostics as unknown[])[0]),
+      /Failed to process FreeMoCap recording/,
+    );
+    assert.match(
+      String((failed.diagnostics as unknown[])[0]),
+      /calibration solve failed/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 409);
+    const startBody = (await startRes.json()) as Record<string, unknown>;
+    assert.equal(startBody.status, "error");
+    assert.deepEqual(startBody.diagnostics, failed.diagnostics);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar rejects recorded FreeMoCap frames with incomplete keypoint indexes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-"));
+  const dataPath = path.join(root, "frames.json");
+  await writeFile(
+    dataPath,
+    JSON.stringify({
+      frames: [
+        {
+          keypoints: Array.from({ length: 33 }, (_, index) => ({
+            index: Math.min(index, 31),
+            x: index + 0.5,
+            y: index + 100.5,
+            z: index + 200.5,
+            confidence: 0.91,
+          })),
+        },
+      ],
+    }),
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(port, [
+    "--source",
+    "freemocap",
+    "--freemocap-data",
+    dataPath,
+  ]);
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "error");
+    assert.equal(health.source, "freemocap");
+    assert.match(
+      String((health.diagnostics as unknown[])[0]),
+      /keypoint indexes must contain 0 through 32 exactly once/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 409);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar streams injected FreeMoCap runtime provider frames", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-runtime-"));
+  await writeFile(
+    path.join(root, "fake_runtime_provider.py"),
+    `
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.sources import RuntimeFrame, SourceSession
+
+class FakeRuntimeProvider:
+    def __init__(self):
+        self.active = False
+        self.session_id = None
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=24,
+            camera_count=5,
+            source="freemocap",
+            calibration_id="runtime-calibration",
+            diagnostics=("fake runtime ready",),
+        )
+
+    def start_session(self, session_id):
+        self.active = True
+        self.session_id = f"runtime-{session_id}"
+        return SourceSession(
+            session_id=self.session_id,
+            calibration_id="runtime-calibration",
+        )
+
+    def stop_session(self, session_id):
+        if session_id != self.session_id:
+            raise RuntimeError(f"unexpected session {session_id}")
+        self.active = False
+
+    def frame(self):
+        if not self.active:
+            raise RuntimeError("runtime provider is not active")
+        return RuntimeFrame(
+            keypoints=[
+                [index + 0.25, index + 100.25, index + 200.25, 0.92]
+                for index in range(33)
+            ],
+            timestamp_ms=1710000000123,
+            reprojection_error_mm=2.75,
+            camera_count=5,
+        )
+
+def create_provider():
+    return FakeRuntimeProvider()
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-provider",
+      "fake_runtime_provider:create_provider",
+    ],
+    { pythonPath: [root] },
+  );
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "ready");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.fps, 24);
+    assert.equal(health.cameras, 5);
+    assert.equal(health.calibrationId, "runtime-calibration");
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 200);
+    const started = (await startRes.json()) as Record<string, unknown>;
+    assert.match(String(started.sessionId), /^runtime-[0-9a-f-]+$/);
+    assert.equal(started.calibrationId, "runtime-calibration");
+
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.schema_version, 2);
+    assert.equal(frame.timestamp_ms, 1710000000123);
+    assert.equal(frame.source, "sidecar-3d");
+    assert.equal(frame.keypoints.length, 33);
+    assert.equal(frame.keypoints[12].x, 12.25);
+    assert.equal(frame.keypoints[12].y, 112.25);
+    assert.equal(frame.keypoints[12].z, 212.25);
+    assert.equal(frame.keypoints[12].confidence, 0.92);
+    assert.equal(frame.quality.tracked_count, 33);
+    assert.equal(frame.quality.camera_count, 5);
+    assert.equal(frame.quality.reprojection_error_mm, 2.75);
+
+    const stopRes = await fetch(`http://localhost:${port}/session/stop`, {
+      method: "POST",
+    });
+    assert.equal(stopRes.status, 200);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("freemocap runtime source rejects non-finite live provider frames", async () => {
+  const script = String.raw`
+import math
+
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.sources import FreeMocapRuntimeSource, RuntimeFrame, SourceSession
+
+class BadRuntimeProvider:
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=24,
+            camera_count=3,
+            source="freemocap",
+            calibration_id="runtime-calibration",
+        )
+
+    def start_session(self, session_id):
+        return SourceSession(
+            session_id=session_id,
+            calibration_id="runtime-calibration",
+        )
+
+    def stop_session(self, session_id):
+        return None
+
+    def frame(self):
+        return RuntimeFrame(
+            keypoints=[
+                [math.nan if index == 12 else index, index + 100, index + 200, 0.9]
+                for index in range(33)
+            ],
+            timestamp_ms=1710000000123,
+            reprojection_error_mm=1.5,
+            camera_count=3,
+        )
+
+source = FreeMocapRuntimeSource(provider=BadRuntimeProvider())
+
+try:
+    source.frame(0, 1710000000999)
+except ValueError as exc:
+    assert "must be finite" in str(exc)
+else:
+    raise AssertionError("expected non-finite runtime frame rejection")
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
+test("sidecar state delegates source session lifecycle", async () => {
+  const script = String.raw`
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.server import SidecarState
+from rowing_tracker_sidecar.sources import SourceSession
+
+class FakeSource:
+    fps = 42
+    camera_count = 2
+    calibration_id = "health-calibration"
+
+    def __init__(self):
+        self.started_with = None
+        self.stopped_with = None
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=self.fps,
+            camera_count=self.camera_count,
+            source="freemocap",
+            calibration_id=self.calibration_id,
+        )
+
+    def start_session(self, session_id):
+        self.started_with = session_id
+        return SourceSession(
+            session_id=f"runtime-{session_id}",
+            calibration_id="runtime-calibration",
+        )
+
+    def stop_session(self, session_id):
+        self.stopped_with = session_id
+
+    def frame(self, frame_index, timestamp_ms):
+        raise AssertionError("frame should not be read by lifecycle test")
+
+source = FakeSource()
+state = SidecarState(source)
+status, body = state.start()
+
+assert status == 200
+assert source.started_with is not None
+assert body["sessionId"] == f"runtime-{source.started_with}"
+assert body["calibrationId"] == "runtime-calibration"
+assert state.session_id == body["sessionId"]
+assert state.is_active()
+
+stop_status, stop_body = state.stop()
+assert stop_status == 200
+assert source.stopped_with == body["sessionId"]
+assert stop_body == {"status": "stopped", "sessionId": body["sessionId"]}
+assert state.session_id is None
+assert not state.is_active()
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
+test("sidecar state refuses source session start failures without arming", async () => {
+  const script = String.raw`
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.server import SidecarState
+
+class FailingSource:
+    fps = 42
+    camera_count = 2
+    calibration_id = "health-calibration"
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=self.fps,
+            camera_count=self.camera_count,
+            source="freemocap",
+            calibration_id=self.calibration_id,
+        )
+
+    def start_session(self, session_id):
+        raise RuntimeError("camera runtime refused start")
+
+    def stop_session(self, session_id):
+        raise AssertionError("stop should not be called")
+
+    def frame(self, frame_index, timestamp_ms):
+        raise AssertionError("frame should not be read")
+
+state = SidecarState(FailingSource())
+status, body = state.start()
+
+assert status == 409
+assert body["status"] == "error"
+assert "camera runtime refused start" in body["diagnostics"][-1]
+assert state.session_id is None
+assert not state.is_active()
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
+});
+
+test("sidecar state reports source session stop failures without clearing active session", async () => {
+  const script = String.raw`
+from rowing_tracker_sidecar.contract import SourceHealth
+from rowing_tracker_sidecar.server import SidecarState
+from rowing_tracker_sidecar.sources import SourceSession
+
+class FailingStopSource:
+    fps = 42
+    camera_count = 2
+    calibration_id = "runtime-calibration"
+
+    def health(self):
+        return SourceHealth(
+            status="ready",
+            fps=self.fps,
+            camera_count=self.camera_count,
+            source="freemocap",
+            calibration_id=self.calibration_id,
+        )
+
+    def start_session(self, session_id):
+        return SourceSession(
+            session_id=f"runtime-{session_id}",
+            calibration_id=self.calibration_id,
+        )
+
+    def stop_session(self, session_id):
+        raise RuntimeError(f"camera runtime refused stop for {session_id}")
+
+    def frame(self, frame_index, timestamp_ms):
+        raise AssertionError("frame should not be read")
+
+state = SidecarState(FailingStopSource())
+start_status, start_body = state.start()
+stop_status, stop_body = state.stop()
+
+assert start_status == 200
+assert stop_status == 409
+assert stop_body["status"] == "error"
+assert stop_body["sessionId"] == start_body["sessionId"]
+assert "camera runtime refused stop" in stop_body["diagnostics"][-1]
+assert state.session_id == start_body["sessionId"]
+assert state.is_active()
+`;
+  await execFileAsync("python3", ["-c", script], {
+    env: sidecarPythonEnv(),
+    timeout: 30_000,
+  });
 });
 
 test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () => {
@@ -114,15 +921,68 @@ test("rowing-tracker-sidecar refuses unconfigured FreeMoCap capture", async () =
     assert.deepEqual(health.cameras, 0);
     assert.match(
       String((health.diagnostics as unknown[])[0]),
-      /FreeMoCap live camera runtime is not configured/,
+      new RegExp(
+        "FreeMoCap package (is not installed|.+ is installed, " +
+          "but it does not expose a supported headless live camera API)",
+      ),
     );
 
     const startRes = await fetch(`http://localhost:${port}/session/start`, {
       method: "POST",
     });
     assert.equal(startRes.status, 409);
-    const startBody = (await startRes.json()) as { status: string };
+    const startBody = (await startRes.json()) as Record<string, unknown>;
     assert.equal(startBody.status, "error");
+    assert.equal(startBody.source, "freemocap");
+    assert.equal(startBody.fps, 30);
+    assert.equal(startBody.cameras, 0);
+    assert.equal(startBody.schemaVersion, 2);
+    assert.equal(startBody.contractVersion, 1);
+    assert.equal(startBody.sidecarVersion, "0.1.0");
+    assert.deepEqual(startBody.diagnostics, health.diagnostics);
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar diagnoses installed FreeMoCap package without a supported live API", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-pkg-"));
+  await mkdir(path.join(root, "freemocap"), { recursive: true });
+  await writeFile(path.join(root, "freemocap", "__init__.py"), "");
+  await mkdir(path.join(root, "freemocap-1.8.2.dist-info"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "freemocap-1.8.2.dist-info", "METADATA"),
+    "Metadata-Version: 2.1\nName: freemocap\nVersion: 1.8.2\n",
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(port, ["--source", "freemocap"], {
+    pythonPath: [root],
+  });
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "error");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.cameras, 0);
+    assert.match(
+      String((health.diagnostics as unknown[])[0]),
+      new RegExp(
+        "FreeMoCap package 1\\.8\\.2 is installed, " +
+          "but it does not expose a supported headless live camera API",
+      ),
+    );
+    assert.match(
+      String((health.diagnostics as unknown[])[1]),
+      /live calibrated camera frames require an injected --freemocap-provider adapter/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 409);
   } finally {
     await stopProcess(sidecar);
   }
@@ -150,6 +1010,15 @@ test("rowing-tracker-sidecar refuses capture when no cameras are available", asy
       method: "POST",
     });
     assert.equal(startRes.status, 409);
+    const startBody = (await startRes.json()) as Record<string, unknown>;
+    assert.equal(startBody.status, "error");
+    assert.equal(startBody.source, "synthetic");
+    assert.equal(startBody.fps, 30);
+    assert.equal(startBody.cameras, 0);
+    assert.equal(startBody.schemaVersion, 2);
+    assert.equal(startBody.contractVersion, 1);
+    assert.equal(startBody.sidecarVersion, "0.1.0");
+    assert.deepEqual(startBody.diagnostics, health.diagnostics);
   } finally {
     await stopProcess(sidecar);
   }
@@ -170,14 +1039,8 @@ async function getFreePort(): Promise<number> {
 function startSidecar(
   port: number,
   extraArgs: string[],
+  options: { pythonPath?: string[] } = {},
 ): ChildProcessWithoutNullStreams {
-  const sidecarSrc = path.join(process.cwd(), "sidecar", "src");
-  const env = {
-    ...process.env,
-    PYTHONPATH: process.env.PYTHONPATH
-      ? `${sidecarSrc}${path.delimiter}${process.env.PYTHONPATH}`
-      : sidecarSrc,
-  };
   return spawn(
     "python3",
     [
@@ -189,8 +1052,21 @@ function startSidecar(
       String(port),
       ...extraArgs,
     ],
-    { env },
+    { env: sidecarPythonEnv(options.pythonPath) },
   );
+}
+
+function sidecarPythonEnv(extraPythonPath: string[] = []): NodeJS.ProcessEnv {
+  const sidecarSrc = path.join(process.cwd(), "sidecar", "src");
+  const pythonPath = [
+    sidecarSrc,
+    ...extraPythonPath,
+    process.env.PYTHONPATH,
+  ].filter((entry): entry is string => Boolean(entry));
+  return {
+    ...process.env,
+    PYTHONPATH: pythonPath.join(path.delimiter),
+  };
 }
 
 async function waitForHealth(
@@ -210,8 +1086,51 @@ async function waitForHealth(
   throw new Error(`sidecar did not become healthy: ${String(lastError)}`);
 }
 
+async function waitForFile(filePath: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      await stat(filePath);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Timed out waiting for ${filePath}: ${String(lastError)}`);
+}
+
+async function waitForHealthStatus(
+  port: number,
+  status: string,
+  timeoutMs: number,
+): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + timeoutMs;
+  let lastHealth: Record<string, unknown> | null = null;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`http://localhost:${port}/health`);
+      if (res.ok) {
+        lastHealth = (await res.json()) as Record<string, unknown>;
+        if (lastHealth.status === status) return lastHealth;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(
+    `sidecar did not report health status ${status}: ${JSON.stringify(
+      lastHealth,
+    )}; ${String(lastError)}`,
+  );
+}
+
 async function readOneSidecarFrame(port: number): Promise<{
   schema_version: number;
+  timestamp_ms: number;
   source: string;
   keypoints: Array<{
     x: number;
@@ -219,7 +1138,11 @@ async function readOneSidecarFrame(port: number): Promise<{
     z: number;
     confidence: number;
   }>;
-  quality: { tracked_count: number; camera_count: number };
+  quality: {
+    tracked_count: number;
+    camera_count: number;
+    reprojection_error_mm: number;
+  };
 }> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}/pose-stream`);

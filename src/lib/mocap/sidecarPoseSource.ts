@@ -5,7 +5,7 @@ import {
   stopSidecarSession,
   type SidecarHealth,
   type SidecarSessionInfo,
-  sidecarReadinessMessage,
+  sidecarReadinessError,
 } from "./sidecarClient";
 import type {
   PoseCaptureSource,
@@ -56,14 +56,18 @@ export class FreemocapSidecarSource implements PoseCaptureSource {
     this.setStatus("loading");
     try {
       const health = await checkSidecarHealth(this.port);
-      if (health.status !== "ready") {
-        throw new Error(sidecarReadinessMessage(health));
+      const readinessError = sidecarReadinessError(health);
+      if (readinessError) {
+        throw new Error(readinessError);
       }
       this.currentHealth = health;
       this.setStatus("ready");
     } catch (err) {
+      const message = err instanceof Error ? err.message : "";
       const error =
-        err instanceof Error && err.message.startsWith("Sidecar not ready:")
+        err instanceof Error &&
+        (message.startsWith("Sidecar not ready:") ||
+          message.startsWith("Sidecar incompatible:"))
           ? err
           : new Error(`Sidecar not reachable on port ${this.port}`);
       this.reportError(error);
