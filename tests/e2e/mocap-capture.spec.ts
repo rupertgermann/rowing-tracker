@@ -11,6 +11,11 @@
  * keeps the contract regression-proof on the UI surface.
  */
 import { test, expect, type Page } from "@playwright/test";
+import { SIDECAR_REPROJECTION_ERROR_WARNING_MM } from "../../src/lib/mocap/freemocapSidecarSource";
+import {
+  makeTestSidecarFrame,
+  type TestSidecarFrame,
+} from "../helpers/testSidecarMock";
 
 const sidecarCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +63,9 @@ test("capture page loads without prompting for camera", async ({ page }) => {
 
 test("sidecar capture can start and finalize as analyzable", async ({ page }) => {
   let finalizeBody: FinalizeBody | null = null;
+  const highReprojectionFrame = makeTestSidecarFrame(0, 20);
+  highReprojectionFrame.quality.reprojection_error_mm =
+    SIDECAR_REPROJECTION_ERROR_WARNING_MM + 1;
 
   await mockSidecarCapture(page, {
     appSessionId: "mock-sidecar",
@@ -66,7 +74,7 @@ test("sidecar capture can start and finalize as analyzable", async ({ page }) =>
     },
   });
 
-  await openReadySidecarCapture(page);
+  await openReadySidecarCapture(page, { frames: [highReprojectionFrame] });
   await page.getByTestId("mocap-start").click();
   await expect(page.getByTestId("mocap-recording-indicator")).toBeVisible();
 
@@ -80,6 +88,9 @@ test("sidecar capture can start and finalize as analyzable", async ({ page }) =>
   expect(finalizeBody!.durationSec).toBeGreaterThan(0);
   expect(finalizeBody!.durationSec).toBeLessThan(60 * 60 * 8);
   expect(finalizeBody!.skipAnalysis).toBe(false);
+  expect(finalizeBody!.qualityFlags ?? []).toContain(
+    "high-reprojection-error",
+  );
   expect(finalizeBody!.qualityFlags ?? []).not.toContain("record-only");
 });
 
@@ -132,7 +143,10 @@ test("sidecar capture preserves active sessions when sidecar stop fails", async 
   expect(deleteRequested).toBe(false);
 });
 
-async function openReadySidecarCapture(page: Page) {
+async function openReadySidecarCapture(
+  page: Page,
+  opts: { frames?: TestSidecarFrame[] } = {},
+) {
   await page.goto("/mocap");
   await page.waitForLoadState("networkidle");
   const sidecarToggle = page.getByTestId("mocap-sidecar-toggle");
@@ -147,11 +161,14 @@ async function openReadySidecarCapture(page: Page) {
     "Sidecar ready",
   );
   await expect(page.getByTestId("mocap-start")).toBeEnabled();
-  await installMockSidecarWebSocket(page);
+  await installMockSidecarWebSocket(page, opts.frames);
 }
 
-async function installMockSidecarWebSocket(page: Page) {
-  await page.evaluate(() => {
+async function installMockSidecarWebSocket(
+  page: Page,
+  frames: TestSidecarFrame[] = [],
+) {
+  await page.evaluate((mockFrames) => {
     class MockWebSocket {
       onmessage: ((event: MessageEvent) => void) | null = null;
       onerror: ((event: Event) => void) | null = null;
@@ -162,7 +179,14 @@ async function installMockSidecarWebSocket(page: Page) {
 
       constructor(url: string) {
         this.url = url;
-        setTimeout(() => this.onopen?.(new Event("open")), 0);
+        setTimeout(() => {
+          this.onopen?.(new Event("open"));
+          for (const frame of mockFrames) {
+            this.onmessage?.(
+              new MessageEvent("message", { data: JSON.stringify(frame) }),
+            );
+          }
+        }, 0);
       }
 
       send() {}
@@ -178,7 +202,7 @@ async function installMockSidecarWebSocket(page: Page) {
       value: MockWebSocket,
       writable: true,
     });
-  });
+  }, frames);
 }
 
 async function mockSidecarCapture(
@@ -255,6 +279,12 @@ async function mockSidecarCapture(
           port: 8765,
         }),
       });
+    },
+  );
+  await page.route(
+    `**/api/mocap/sessions/${opts.appSessionId}/pose-stream`,
+    async (route) => {
+      await route.fulfill({ status: 204, body: "" });
     },
   );
   await page.route(
