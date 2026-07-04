@@ -116,6 +116,48 @@ test("sidecar source reports non-ready health through status and error callbacks
   );
 });
 
+test("sidecar source rejects ready health with no cameras", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar not ready: ready \(No cameras available\)/,
+      );
+    },
+    { cameras: 0 },
+  );
+});
+
+test("sidecar source rejects ready health with zero fps", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar not ready: ready \(FPS must be greater than zero\)/,
+      );
+    },
+    { fps: 0 },
+  );
+});
+
+test("sidecar source rejects freemocap readiness without calibration traceability", async () => {
+  await withSidecarGlobals(
+    async () => {
+      const source = new FreemocapSidecarSource();
+
+      await assert.rejects(
+        () => source.init(),
+        /Sidecar not ready: ready \(Missing sidecar calibration id\)/,
+      );
+    },
+    { source: "freemocap", calibrationId: null },
+  );
+});
+
 test("sidecar source rejects incompatible schema during readiness", async () => {
   await withSidecarGlobals(
     async () => {
@@ -232,8 +274,12 @@ async function withSidecarGlobals(
   options: {
     healthResponse?: "ready" | "initializing" | "unreachable";
     healthDiagnostics?: string[];
+    fps?: number;
+    cameras?: number;
     schemaVersion?: number;
     contractVersion?: number | null;
+    source?: string;
+    calibrationId?: string | null;
     startResponse?: "ready" | "malformed" | "notReady";
   } = {},
 ): Promise<void> {
@@ -249,10 +295,15 @@ async function withSidecarGlobals(
       }
       const healthBody: Record<string, unknown> = {
         status: options.healthResponse ?? "ready",
-        fps: 60,
-        cameras: 3,
+        fps: options.fps ?? 60,
+        cameras: options.cameras ?? 3,
         schemaVersion: options.schemaVersion ?? 2,
         sidecarVersion: "0.1.0",
+        source: options.source ?? "synthetic",
+        calibrationId:
+          options.calibrationId === undefined
+            ? "synthetic-calibration"
+            : options.calibrationId,
         diagnostics: options.healthDiagnostics,
       };
       if (options.contractVersion !== null) {

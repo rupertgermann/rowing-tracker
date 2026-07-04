@@ -72,6 +72,19 @@ export function sidecarReadinessError(health: SidecarHealth): string | null {
         : String(health.contractVersion);
     return `Sidecar incompatible: contract version ${actual} (expected ${SIDECAR_CONTRACT_VERSION})`;
   }
+  if (!Number.isFinite(health.cameras) || health.cameras <= 0) {
+    return `Sidecar not ready: ${health.status} (No cameras available)`;
+  }
+  if (!Number.isFinite(health.fps) || health.fps <= 0) {
+    return `Sidecar not ready: ${health.status} (FPS must be greater than zero)`;
+  }
+  if (
+    health.source !== undefined &&
+    health.source !== "synthetic" &&
+    !health.calibrationId
+  ) {
+    return `Sidecar not ready: ${health.status} (Missing sidecar calibration id)`;
+  }
   if (health.status === "ready") {
     return null;
   }
