@@ -46,6 +46,8 @@ calibration id, and version state that blocked capture.
 
 Synthetic mode is hardware-free and intended for development and CI. FreeMoCap
 recorded-data mode supports JSON, JSONL, and NPY `(frames, 33, 4)` sources.
+Directory mode also loads known FreeMoCap reprojection-error NPY files and maps
+finite per-frame means into `quality.reprojection_error_mm` when present.
 Selecting `--source freemocap` without `--freemocap-data` fails readiness with a
 clear diagnostic instead of pretending the camera rig is ready. The default
 FreeMoCap runtime path probes for the optional `freemocap` package, but current

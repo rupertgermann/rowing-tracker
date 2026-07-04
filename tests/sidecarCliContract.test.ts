@@ -119,6 +119,99 @@ test("rowing-tracker-sidecar streams recorded FreeMoCap-style frames", async () 
   }
 });
 
+test("rowing-tracker-sidecar maps FreeMoCap directory reprojection quality", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-dir-"));
+  await writeFile(
+    path.join(root, "3dData_numFrames_numTrackedPoints_spatialXYZ.npy"),
+    "",
+  );
+  await writeFile(
+    path.join(root, "3dData_numFrames_numTrackedPoints_reprojectionError.npy"),
+    "",
+  );
+
+  const fakeNumpyRoot = await mkdtemp(path.join(os.tmpdir(), "sidecar-numpy-"));
+  await writeFile(
+    path.join(fakeNumpyRoot, "numpy.py"),
+    `
+import math
+import os
+
+class FakeArray:
+    def __init__(self, data):
+        self.data = data
+        self.shape = self._shape(data)
+        self.ndim = len(self.shape)
+
+    def _shape(self, data):
+        if isinstance(data, list):
+            if not data:
+                return (0,)
+            return (len(data),) + self._shape(data[0])
+        return ()
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+def _frame(offset):
+    return [
+        [float(index + offset), float(index + 100 + offset), float(index + 200 + offset)]
+        for index in range(33)
+    ]
+
+def load(path):
+    basename = os.path.basename(path)
+    if basename == "3dData_numFrames_numTrackedPoints_spatialXYZ.npy":
+        return FakeArray([_frame(0), _frame(1000)])
+    if basename == "3dData_numFrames_numTrackedPoints_reprojectionError.npy":
+        return FakeArray([[1.0, 2.0, 3.0], [4.0, math.nan, 6.0]])
+    raise FileNotFoundError(path)
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-data",
+      root,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakeNumpyRoot] },
+  );
+
+  try {
+    const health = await waitForHealth(port);
+    assert.equal(health.status, "ready");
+    assert.equal(health.source, "freemocap");
+    assert.equal(health.calibrationId, "freemocap-3dData_numFrames_numTrackedPoints_spatialXYZ");
+    assert.match(
+      String((health.diagnostics as unknown[])[1]),
+      /loaded FreeMoCap reprojection quality/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 200);
+
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.keypoints[12].x, 12);
+    assert.equal(frame.keypoints[12].confidence, 1);
+    assert.equal(frame.quality.reprojection_error_mm, 2);
+
+    await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
 test("rowing-tracker-sidecar rejects recorded FreeMoCap frames with incomplete keypoint indexes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "sidecar-freemocap-"));
   const dataPath = path.join(root, "frames.json");

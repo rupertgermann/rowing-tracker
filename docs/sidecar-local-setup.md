@@ -85,6 +85,11 @@ Supported input formats:
   `skeleton_3d.npy`, `3dData_numFrames_numTrackedPoints_spatialXYZ.npy`, or
   `mediapipe_body_3d_xyz.npy`
 
+When a directory also contains
+`3dData_numFrames_numTrackedPoints_reprojectionError.npy` or
+`3dData_numCams_numFrames_numTrackedPoints_reprojectionError.npy`, the sidecar
+maps the per-frame finite mean into `quality.reprojection_error_mm`.
+
 If you select `--source freemocap` without `--freemocap-data` or
 `--freemocap-provider`, the sidecar probes for the optional FreeMoCap Python
 package and then fails closed with `status: "error"`. Missing-package

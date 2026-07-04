@@ -284,6 +284,10 @@ class FreeMocapRecordedSource:
         if path is None or not path.exists():
             self._diagnostics = (f"FreeMoCap data path not found: {self._data_path}",)
             return
+        reprojection_error_path = _resolve_freemocap_reprojection_path(
+            requested_path=self._data_path,
+            resolved_data_path=path,
+        )
         try:
             if path.suffix.lower() in {".json", ".jsonl"}:
                 frames = _load_json_frames(path)
@@ -291,10 +295,17 @@ class FreeMocapRecordedSource:
                 frames = _load_npy_frames(path)
             else:
                 raise ValueError(f"Unsupported FreeMoCap data file: {path}")
+            if reprojection_error_path is not None:
+                frames = _attach_reprojection_errors(frames, reprojection_error_path)
             _validate_recorded_frames(frames)
             self._frames = frames
             self._calibration_id = self._calibration_id or f"freemocap-{path.stem}"
-            self._diagnostics = (f"loaded FreeMoCap data from {path}",)
+            diagnostics = [f"loaded FreeMoCap data from {path}"]
+            if reprojection_error_path is not None:
+                diagnostics.append(
+                    f"loaded FreeMoCap reprojection quality from {reprojection_error_path}",
+                )
+            self._diagnostics = tuple(diagnostics)
         except Exception as exc:
             self._frames = []
             self._diagnostics = (f"Failed to load FreeMoCap data: {exc}",)
@@ -481,6 +492,23 @@ def _resolve_freemocap_path(path: pathlib.Path) -> pathlib.Path | None:
     return None
 
 
+def _resolve_freemocap_reprojection_path(
+    *,
+    requested_path: pathlib.Path,
+    resolved_data_path: pathlib.Path,
+) -> pathlib.Path | None:
+    search_dir = requested_path if requested_path.is_dir() else resolved_data_path.parent
+    candidates = [
+        "3dData_numFrames_numTrackedPoints_reprojectionError.npy",
+        "3dData_numCams_numFrames_numTrackedPoints_reprojectionError.npy",
+    ]
+    for relative in candidates:
+        candidate = search_dir / relative
+        if candidate.exists() and candidate != resolved_data_path:
+            return candidate
+    return None
+
+
 def _load_json_frames(path: pathlib.Path) -> list[RecordedFrame]:
     if path.suffix.lower() == ".jsonl":
         frames = []
@@ -556,6 +584,76 @@ def _load_npy_frames(path: pathlib.Path) -> list[RecordedFrame]:
             converted.append([float(point[0]), float(point[1]), float(point[2]), confidence])
         frames.append(RecordedFrame(keypoints=converted))
     return frames
+
+
+def _attach_reprojection_errors(
+    frames: list[RecordedFrame],
+    path: pathlib.Path,
+) -> list[RecordedFrame]:
+    errors = _load_reprojection_errors(path, frame_count=len(frames))
+    return [
+        RecordedFrame(
+            keypoints=frame.keypoints,
+            reprojection_error_mm=frame.reprojection_error_mm
+            if frame.reprojection_error_mm is not None
+            else errors[index],
+        )
+        for index, frame in enumerate(frames)
+    ]
+
+
+def _load_reprojection_errors(
+    path: pathlib.Path,
+    *,
+    frame_count: int,
+) -> list[float | None]:
+    try:
+        import numpy as np  # type: ignore
+    except Exception as exc:
+        raise ValueError("reading FreeMoCap reprojection data requires numpy") from exc
+    array = np.load(os.fspath(path))
+    shape = tuple(getattr(array, "shape", ()))
+    if not shape:
+        raise ValueError(f"expected reprojection NPY array with frames, got {shape}")
+    if shape[0] == frame_count:
+        frame_values = [array[index] for index in range(frame_count)]
+    elif len(shape) >= 2 and shape[1] == frame_count:
+        frame_values = [
+            [camera_values[index] for camera_values in array]
+            for index in range(frame_count)
+        ]
+    else:
+        raise ValueError(
+            f"expected reprojection NPY to include {frame_count} frames, got {shape}",
+        )
+    return [_mean_finite_values(values) for values in frame_values]
+
+
+def _mean_finite_values(value: object) -> float | None:
+    values = list(_iter_finite_numbers(value))
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _iter_finite_numbers(value: object):
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if math.isfinite(number):
+            yield number
+        return
+    if isinstance(value, (str, bytes)):
+        return
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        yield from _iter_finite_numbers(tolist())
+        return
+    try:
+        iterator = iter(value)  # type: ignore[arg-type]
+    except TypeError:
+        return
+    for item in iterator:
+        yield from _iter_finite_numbers(item)
 
 
 def _validate_recorded_frames(frames: list[RecordedFrame]) -> None:
