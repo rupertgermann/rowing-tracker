@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { calculateConsistencyScore } from "@/lib/analysisUtils";
+import { bumpUserSessionsRevision } from "@/lib/server/userSettings";
 
 /**
  * POST /api/sessions/backfill-consistency
@@ -57,25 +58,7 @@ export async function POST() {
 
     // Bump the sessions revision to invalidate caches
     if (updated > 0) {
-      await prisma.userSettings.upsert({
-        where: { userId: session.user.id },
-        update: {
-          sessionsRevision: { increment: 1 },
-        },
-        create: {
-          userId: session.user.id,
-          theme: 'system',
-          units: 'metric',
-          dateFormat: 'MM/DD/YYYY',
-          timeFormat: '24h',
-          language: 'en',
-          defaultChartType: 'line',
-          animationsEnabled: true,
-          cloudAIEnabled: false,
-          maxTokens: 4000,
-          sessionsRevision: 1,
-        },
-      });
+      await bumpUserSessionsRevision(session.user.id);
     }
 
     return NextResponse.json({

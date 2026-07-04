@@ -1,8 +1,68 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import type { MocapCaptureFinalizationState } from "@/lib/mocap/lifecycle";
+import {
+  reanalyzeMocapSessionLifecycle,
+  type MocapCaptureFinalizationState,
+  type ReanalyzeMocapSessionDependencies,
+  type ReanalyzeMocapSessionResult,
+} from "@/lib/mocap/lifecycle";
+import { getMocapStorage } from "@/lib/mocap/storage";
+import {
+  analyzeAndPersistMocapSession,
+  analyzeAndPersistMocapSessionLinked,
+} from "@/lib/mocap/sessionAnalysis";
 
 type MocapStatus = "capturing" | "analyzing" | "ready";
 type StatusTransition = { from: string | string[] };
+
+export const mocapLifecycleSessionSelect = {
+  id: true,
+  userId: true,
+  status: true,
+  rowingSessionId: true,
+  poseStreamPath: true,
+  capturePerspective: true,
+  calibrationCatchFrame: true,
+  calibrationFinishFrame: true,
+} satisfies Prisma.MocapSessionSelect;
+
+export interface MocapSessionLifecycle {
+  reanalyze(
+    userId: string,
+    mocapSessionId: string,
+  ): Promise<ReanalyzeMocapSessionResult>;
+}
+
+export function createPrismaMocapSessionLifecycle(): MocapSessionLifecycle {
+  const storage = getMocapStorage();
+  const reanalyzeDeps: ReanalyzeMocapSessionDependencies = {
+    storage,
+    findSession: (userId, mocapSessionId) =>
+      prisma.mocapSession.findFirst({
+        where: { id: mocapSessionId, userId },
+        select: mocapLifecycleSessionSelect,
+      }),
+    setStatus: setMocapSessionStatus,
+    analyzePoseSegmented: analyzeAndPersistMocapSession,
+    analyzeCsvAligned: analyzeAndPersistMocapSessionLinked,
+  };
+
+  return {
+    reanalyze(userId, mocapSessionId) {
+      return reanalyzeMocapSessionLifecycle(reanalyzeDeps, {
+        userId,
+        mocapSessionId,
+      });
+    },
+  };
+}
+
+let prismaMocapSessionLifecycle: MocapSessionLifecycle | null = null;
+
+export function getPrismaMocapSessionLifecycle(): MocapSessionLifecycle {
+  prismaMocapSessionLifecycle ??= createPrismaMocapSessionLifecycle();
+  return prismaMocapSessionLifecycle;
+}
 
 function transitionStatusWhere(
   mocapSessionId: string,

@@ -120,21 +120,34 @@ export interface MocapCaptureFinalizationState {
   qualityFlags: string[];
 }
 
-export interface MocapLifecycleDependencies {
+export interface ReanalyzeMocapSessionDependencies {
   storage: Pick<MocapStorage, "exists">;
   findSession(
     userId: string,
     mocapSessionId: string,
   ): Promise<MocapLifecycleSession | null>;
-  findRowingSession?(
-    userId: string,
-    rowingSessionId: string,
-  ): Promise<MocapLifecycleRowingSession | null>;
   setStatus(
     mocapSessionId: string,
     status: "capturing" | "analyzing" | "ready",
     transition?: { from: string | string[] },
   ): Promise<{ status: string } | null>;
+  analyzePoseSegmented(
+    storage: MocapStorage,
+    session: MocapLifecycleSession,
+  ): Promise<PersistedMocapAnalysisSummary>;
+  analyzeCsvAligned(
+    storage: MocapStorage,
+    session: MocapLifecycleSession,
+    rowingSessionId: string,
+  ): Promise<PersistedMocapAnalysisSummary>;
+}
+
+export interface MocapLifecycleDependencies
+  extends ReanalyzeMocapSessionDependencies {
+  findRowingSession?(
+    userId: string,
+    rowingSessionId: string,
+  ): Promise<MocapLifecycleRowingSession | null>;
   assignMocapSession?(
     mocapSessionId: string,
     userId: string,
@@ -151,15 +164,6 @@ export interface MocapLifecycleDependencies {
     status: "ready",
   ): Promise<void>;
   bumpSessionsRevision?(userId: string): Promise<void>;
-  analyzePoseSegmented(
-    storage: MocapStorage,
-    session: MocapLifecycleSession,
-  ): Promise<PersistedMocapAnalysisSummary>;
-  analyzeCsvAligned(
-    storage: MocapStorage,
-    session: MocapLifecycleSession,
-    rowingSessionId: string,
-  ): Promise<PersistedMocapAnalysisSummary>;
 }
 
 export interface FinalizeMocapSessionDependencies

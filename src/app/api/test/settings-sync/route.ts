@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { USER_SETTINGS_DEFAULT_VALUES } from "@/lib/server/userSettings";
 
 /**
  * GET /api/test/settings-sync
@@ -84,15 +85,15 @@ export async function POST(req: Request) {
         userId: session.user.id,
       },
       update: {
-        theme: testData.theme || "system",
-        units: testData.units || "metric",
-        language: testData.language || "en",
+        theme: testData.theme || USER_SETTINGS_DEFAULT_VALUES.theme,
+        units: testData.units || USER_SETTINGS_DEFAULT_VALUES.units,
+        language: testData.language || USER_SETTINGS_DEFAULT_VALUES.language,
       },
       create: {
         userId: session.user.id,
-        theme: testData.theme || "system",
-        units: testData.units || "metric",
-        language: testData.language || "en",
+        theme: testData.theme || USER_SETTINGS_DEFAULT_VALUES.theme,
+        units: testData.units || USER_SETTINGS_DEFAULT_VALUES.units,
+        language: testData.language || USER_SETTINGS_DEFAULT_VALUES.language,
       },
     });
 

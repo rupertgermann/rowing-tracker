@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import {
+  buildUserSettingsCreateData,
+  USER_SETTINGS_DEFAULT_VALUES,
+} from "@/lib/server/userSettings";
 
 /**
  * GET /api/ai-config
@@ -32,8 +36,8 @@ export async function GET() {
     return NextResponse.json({ 
       config: settings || {
         aiConfig: null,
-        cloudAIEnabled: false,
-        maxTokens: 4000,
+        cloudAIEnabled: USER_SETTINGS_DEFAULT_VALUES.cloudAIEnabled,
+        maxTokens: USER_SETTINGS_DEFAULT_VALUES.maxTokens,
       }
     });
   } catch (error) {
@@ -71,12 +75,12 @@ export async function POST(req: Request) {
         cloudAIEnabled: configData.cloudAIEnabled,
         maxTokens: configData.maxTokens,
       },
-      create: {
-        userId: session.user.id,
+      create: buildUserSettingsCreateData(session.user.id, {
         aiConfig: configData.aiConfig,
-        cloudAIEnabled: configData.cloudAIEnabled || false,
-        maxTokens: configData.maxTokens || 4000,
-      },
+        cloudAIEnabled:
+          configData.cloudAIEnabled || USER_SETTINGS_DEFAULT_VALUES.cloudAIEnabled,
+        maxTokens: configData.maxTokens || USER_SETTINGS_DEFAULT_VALUES.maxTokens,
+      }),
       select: {
         aiConfig: true,
         cloudAIEnabled: true,

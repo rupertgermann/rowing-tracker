@@ -6,6 +6,7 @@ import { getMocapStorage } from "@/lib/mocap/storage";
 import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
 import { unlinkMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
 import { setMocapSessionStatus } from "@/lib/mocap/lifecyclePrisma";
+import { bumpUserSessionsRevision } from "@/lib/server/userSettings";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -60,7 +61,7 @@ export async function POST(
             data: { rowingSessionId: restoredRowingSessionId, status },
           })
           .then(() => undefined),
-      bumpSessionsRevision: (ownerId) => bumpSessionsRevision(ownerId),
+      bumpSessionsRevision: bumpUserSessionsRevision,
       analyzePoseSegmented: analyzeAndPersistMocapSession,
       analyzeCsvAligned: async () => {
         throw new Error("Unlink lifecycle must use pose-segmented analysis");
@@ -83,27 +84,5 @@ export async function POST(
     analysisMode: result.analysisMode,
     strokeMetricCount: result.strokeMetricCount,
     faultCount: result.faultCount,
-  });
-}
-
-async function bumpSessionsRevision(userId: string): Promise<void> {
-  await prisma.userSettings.upsert({
-    where: { userId },
-    update: {
-      sessionsRevision: { increment: 1 },
-    },
-    create: {
-      userId,
-      theme: "system",
-      units: "metric",
-      dateFormat: "MM/DD/YYYY",
-      timeFormat: "24h",
-      language: "en",
-      defaultChartType: "line",
-      animationsEnabled: true,
-      cloudAIEnabled: false,
-      maxTokens: 4000,
-      sessionsRevision: 1,
-    },
   });
 }

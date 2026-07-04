@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import {
+  buildUserSettingsCreateData,
+  USER_SETTINGS_DEFAULT_VALUES,
+} from "@/lib/server/userSettings";
 import { settingsUpdateSchema } from "@/lib/validations/settings";
 
 /**
@@ -29,15 +33,7 @@ export async function GET() {
     if (!settings) {
       return NextResponse.json({ 
         settings: {
-          theme: 'system',
-          units: 'metric',
-          dateFormat: 'MM/DD/YYYY',
-          timeFormat: '24h',
-          language: 'en',
-          defaultChartType: 'line',
-          animationsEnabled: true,
-          cloudAIEnabled: false,
-          maxTokens: 4000,
+          ...USER_SETTINGS_DEFAULT_VALUES,
           sessionsRevision: 0,
           insightsRevision: 0,
           userProfileContext: null,
@@ -154,21 +150,22 @@ export async function POST(req: Request) {
         userId: session.user.id,
       },
       update: updateData,
-      create: {
-        userId: session.user.id,
-        theme: settingsData.theme || 'system',
-        units: settingsData.units || 'metric',
-        dateFormat: settingsData.dateFormat || 'MM/DD/YYYY',
-        timeFormat: settingsData.timeFormat || '24h',
-        language: settingsData.language || 'en',
-        defaultChartType: settingsData.defaultChartType || 'line',
+      create: buildUserSettingsCreateData(session.user.id, {
+        theme: settingsData.theme || USER_SETTINGS_DEFAULT_VALUES.theme,
+        units: settingsData.units || USER_SETTINGS_DEFAULT_VALUES.units,
+        dateFormat: settingsData.dateFormat || USER_SETTINGS_DEFAULT_VALUES.dateFormat,
+        timeFormat: settingsData.timeFormat || USER_SETTINGS_DEFAULT_VALUES.timeFormat,
+        language: settingsData.language || USER_SETTINGS_DEFAULT_VALUES.language,
+        defaultChartType:
+          settingsData.defaultChartType || USER_SETTINGS_DEFAULT_VALUES.defaultChartType,
         animationsEnabled: settingsData.animationsEnabled !== false,
-        cloudAIEnabled: settingsData.cloudAIEnabled || false,
-        maxTokens: settingsData.maxTokens || 4000,
+        cloudAIEnabled:
+          settingsData.cloudAIEnabled || USER_SETTINGS_DEFAULT_VALUES.cloudAIEnabled,
+        maxTokens: settingsData.maxTokens || USER_SETTINGS_DEFAULT_VALUES.maxTokens,
         userProfileContext: settingsData.userProfileContext,
         userProfileRawInput: settingsData.userProfileRawInput,
         sidecarPort: settingsData.sidecarPort,
-      },
+      }),
     });
 
     return NextResponse.json({ settings });
