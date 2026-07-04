@@ -6,6 +6,7 @@ import net from "node:net";
 import path from "node:path";
 import {
   FreemocapSidecarSource,
+  SIDECAR_REPROJECTION_ERROR_WARNING_MM,
   encodeSidecarPoseFrame,
   validateSidecarKeypointFrame,
 } from "../src/lib/mocap/freemocapSidecarSource";
@@ -13,6 +14,7 @@ import type { PoseCaptureSource } from "../src/lib/mocap/poseCaptureSource";
 import {
   BYTES_PER_FRAME_V2,
   KEYPOINT_SCHEMA_V2,
+  QUALITY_FLAG,
   decodeFrame,
 } from "../src/lib/mocap/poseFrameStream";
 
@@ -197,6 +199,39 @@ test("sidecar source flushes buffered v2 bytes by threshold and drains on stop",
     assert.equal(uploadIndexes.length, 2);
     assert.ok(stopIndex > uploadIndexes[0]);
     assert.ok(stopIndex < uploadIndexes[1]);
+  });
+});
+
+test("sidecar source preserves high reprojection quality as frame flags", async () => {
+  await withSidecarGlobals(async () => {
+    const capturedFlags: number[] = [];
+    const capturedBytes: Uint8Array[] = [];
+    const source = new FreemocapSidecarSource({
+      sessionId: "session-reprojection",
+      flushBytes: BYTES_PER_FRAME_V2 * 4,
+      onFrame: (frame) => {
+        capturedFlags.push(frame.qualityFlags);
+        capturedBytes.push(frame.poseFrameBytes);
+      },
+    });
+
+    await source.init();
+    await source.start();
+    const highReprojectionFrame = makeSidecarFrame(0);
+    highReprojectionFrame.quality.reprojection_error_mm =
+      SIDECAR_REPROJECTION_ERROR_WARNING_MM + 1;
+    FakeWebSocket.instances[0].emitMessage(highReprojectionFrame);
+    await source.stop();
+
+    assert.equal(
+      (capturedFlags[0] & QUALITY_FLAG.HIGH_REPROJECTION_ERROR) !== 0,
+      true,
+    );
+    const decoded = decodeFrame(capturedBytes[0], 0, KEYPOINT_SCHEMA_V2);
+    assert.equal(
+      (decoded.qualityFlags & QUALITY_FLAG.HIGH_REPROJECTION_ERROR) !== 0,
+      true,
+    );
   });
 });
 

@@ -36,6 +36,7 @@ import {
   BYTES_PER_FRAME_V1,
   BYTES_PER_FRAME_V2,
   KEYPOINT_SCHEMA_V2,
+  QUALITY_FLAG,
   decodeFrame,
 } from "@/lib/mocap/poseFrameStream";
 import { VideoUploader } from "@/lib/mocap/videoUploader";
@@ -373,6 +374,12 @@ export default function MocapCapturePage() {
       // Feed the live coaching engine when active.
       if (engineRef.current) {
         if (decodedFrame) engineRef.current.pushFrame(decodedFrame);
+      }
+
+      if ((info.qualityFlags & QUALITY_FLAG.HIGH_REPROJECTION_ERROR) !== 0) {
+        setSessionQualityFlags((flags) =>
+          appendUniqueFlags(flags, ["high-reprojection-error"]),
+        );
       }
 
       if (!monitorDegradedFraming) return;

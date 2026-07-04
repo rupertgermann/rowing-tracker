@@ -89,6 +89,8 @@ When a directory also contains
 `3dData_numFrames_numTrackedPoints_reprojectionError.npy` or
 `3dData_numCams_numFrames_numTrackedPoints_reprojectionError.npy`, the sidecar
 maps the per-frame finite mean into `quality.reprojection_error_mm`.
+Rowing Tracker preserves that signal in captured v2 frame quality flags as
+`high-reprojection-error` when it exceeds 50 mm.
 
 If you select `--source freemocap` without `--freemocap-data` or
 `--freemocap-provider`, the sidecar probes for the optional FreeMoCap Python

@@ -38,6 +38,7 @@ interface SidecarConnectResponse {
 }
 
 const SIDECAR_RELEVANT_TRACKED_KEYPOINTS = 13;
+export const SIDECAR_REPROJECTION_ERROR_WARNING_MM = 50;
 
 export class FreemocapSidecarSource implements PoseCaptureSource {
   private closeStream: (() => void) | null = null;
@@ -342,13 +343,20 @@ function sidecarKeypointsToQuads(frame: SidecarKeypointFrame): Float32Array {
 }
 
 function sidecarQualityFlags(frame: SidecarKeypointFrame): number {
+  let flags = 0;
   if (
     frame.quality.meanConfidence < 0.6 ||
     frame.quality.trackedCount < 13
   ) {
-    return QUALITY_FLAG.LOW_CONFIDENCE;
+    flags |= QUALITY_FLAG.LOW_CONFIDENCE;
   }
-  return 0;
+  if (
+    frame.quality.reprojectionErrorMm !== undefined &&
+    frame.quality.reprojectionErrorMm > SIDECAR_REPROJECTION_ERROR_WARNING_MM
+  ) {
+    flags |= QUALITY_FLAG.HIGH_REPROJECTION_ERROR;
+  }
+  return flags;
 }
 
 function sidecarTrackedCountForPoseQuality(trackedCount: number): number {

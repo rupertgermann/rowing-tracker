@@ -48,6 +48,7 @@ export const QUALITY_FLAG = {
   OUT_OF_FRAME: 1 << 2,
   LOW_CONFIDENCE: 1 << 3,
   CAMERA_MOTION: 1 << 4,
+  HIGH_REPROJECTION_ERROR: 1 << 5,
 } as const;
 
 export interface PoseStreamHeader {
