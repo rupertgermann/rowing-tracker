@@ -8,6 +8,7 @@ import json
 import math
 import os
 import pathlib
+import threading
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -337,33 +338,85 @@ class FreeMocapProcessedRecordingSource(FreeMocapRecordedSource):
             if calibration_toml_path
             else None
         )
-        super().__init__(
-            data_path=os.fspath(_freemocap_output_data_path(self._recording_path)),
-            fps=fps,
-            camera_count=camera_count,
-            calibration_id=calibration_id
-            or _processed_recording_calibration_id(
-                self._recording_path,
-                self._calibration_toml_path,
-            ),
+        self._fps = fps
+        self._camera_count = camera_count
+        self._data_path = _freemocap_output_data_path(self._recording_path)
+        self._frames: list[RecordedFrame] = []
+        self._diagnostics: tuple[str, ...] = (
+            f"processing FreeMoCap recording {self._recording_path}",
+        )
+        self._calibration_id = calibration_id or _processed_recording_calibration_id(
+            self._recording_path,
+            self._calibration_toml_path,
+        )
+        self._status = "initializing"
+        self._lock = threading.RLock()
+        self._worker = threading.Thread(
+            target=self._process_and_load,
+            name="freemocap-recording-processor",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def health(self) -> SourceHealth:
+        invalid = _invalid_runtime_diagnostics(self.fps, self.camera_count)
+        if invalid:
+            return SourceHealth(
+                status="error",
+                fps=self.fps,
+                camera_count=max(0, self.camera_count),
+                source=self.source_name,
+                calibration_id=self.calibration_id,
+                diagnostics=invalid,
+            )
+        with self._lock:
+            status = self._status
+            diagnostics = self._diagnostics
+            frame_count = len(self._frames)
+            calibration_id = self._calibration_id
+        if status == "ready" and frame_count > 0:
+            return SourceHealth(
+                status="ready",
+                fps=self.fps,
+                camera_count=self.camera_count,
+                source=self.source_name,
+                calibration_id=calibration_id,
+                diagnostics=diagnostics,
+            )
+        if status == "initializing":
+            return SourceHealth(
+                status="initializing",
+                fps=self.fps,
+                camera_count=max(0, self.camera_count),
+                source=self.source_name,
+                calibration_id=calibration_id,
+                diagnostics=diagnostics,
+            )
+        return SourceHealth(
+            status="error",
+            fps=self.fps,
+            camera_count=max(0, self.camera_count if frame_count else 0),
+            source=self.source_name,
+            calibration_id=calibration_id,
+            diagnostics=diagnostics,
         )
 
-    def _load(self) -> None:
+    def _process_and_load(self) -> None:
         if not self._recording_path.exists():
-            self._frames = []
-            self._diagnostics = (
+            self._set_processing_result(
+                "error",
                 f"FreeMoCap recording path not found: {self._recording_path}",
             )
             return
         if not self._recording_path.is_dir():
-            self._frames = []
-            self._diagnostics = (
+            self._set_processing_result(
+                "error",
                 f"FreeMoCap recording path must be a directory: {self._recording_path}",
             )
             return
         if self._calibration_toml_path and not self._calibration_toml_path.exists():
-            self._frames = []
-            self._diagnostics = (
+            self._set_processing_result(
+                "error",
                 f"FreeMoCap calibration TOML not found: {self._calibration_toml_path}",
             )
             return
@@ -373,20 +426,42 @@ class FreeMocapProcessedRecordingSource(FreeMocapRecordedSource):
                 calibration_toml_path=self._calibration_toml_path,
             )
         except Exception as exc:
-            self._frames = []
-            self._diagnostics = (
+            self._set_processing_result(
+                "error",
                 f"Failed to process FreeMoCap recording {self._recording_path}: {exc}",
                 'install with python -m pip install -e "sidecar[freemocap]" on Python 3.10-3.12, '
                 "or pass --freemocap-data with an already processed FreeMoCap output directory",
             )
             return
 
-        super()._load()
-        if self._frames:
-            self._diagnostics = (
-                f"processed FreeMoCap recording {self._recording_path}",
-                *self._diagnostics,
-            )
+        loaded = FreeMocapRecordedSource(
+            data_path=os.fspath(self._data_path),
+            fps=self._fps,
+            camera_count=self._camera_count,
+            calibration_id=self._calibration_id,
+        )
+        with self._lock:
+            self._frames = loaded._frames
+            self._calibration_id = loaded.calibration_id
+            if self._frames:
+                self._status = "ready"
+                self._diagnostics = (
+                    f"processed FreeMoCap recording {self._recording_path}",
+                    *loaded._diagnostics,
+                )
+            else:
+                self._status = "error"
+                self._diagnostics = loaded._diagnostics
+
+    def _set_processing_result(
+        self,
+        status: str,
+        *diagnostics: str,
+    ) -> None:
+        with self._lock:
+            self._frames = []
+            self._status = status
+            self._diagnostics = tuple(diagnostics)
 
 
 class FreeMocapRuntimeSource:

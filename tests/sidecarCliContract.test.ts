@@ -4,7 +4,7 @@ import {
   spawn,
   type ChildProcessWithoutNullStreams,
 } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { once } from "node:events";
 import os from "node:os";
@@ -331,6 +331,224 @@ def load(path):
     assert.equal(frame.quality.camera_count, 3);
 
     await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar reports initializing while FreeMoCap recording processing runs", async () => {
+  const recordingRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-"),
+  );
+  const fakePackageRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-pkg-"),
+  );
+  const processorDir = path.join(
+    fakePackageRoot,
+    "freemocap",
+    "core_processes",
+    "process_motion_capture_videos",
+  );
+  await mkdir(processorDir, { recursive: true });
+  await writeFile(path.join(fakePackageRoot, "freemocap", "__init__.py"), "");
+  await writeFile(
+    path.join(fakePackageRoot, "freemocap", "core_processes", "__init__.py"),
+    "",
+  );
+  await writeFile(path.join(processorDir, "__init__.py"), "");
+  await writeFile(
+    path.join(processorDir, "process_recording_headless.py"),
+    `
+import time
+from pathlib import Path
+
+def process_recording_headless(
+    recording_path,
+    path_to_camera_calibration_toml=None,
+    path_to_blender_executable=None,
+    recording_processing_parameter_model=None,
+    recording_info_model=None,
+    run_blender=True,
+    make_jupyter_notebook=True,
+    use_tqdm=True,
+):
+    root = Path(recording_path)
+    (root / "processor-started.txt").write_text("started")
+    release = root / "processor-release.txt"
+    while not release.exists():
+        time.sleep(0.02)
+    output = root / "output_data"
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "skeleton_3d.npy").write_text("fake npy")
+`,
+  );
+  await writeFile(
+    path.join(fakePackageRoot, "numpy.py"),
+    `
+import os
+
+class FakeArray:
+    def __init__(self, data):
+        self.data = data
+        self.shape = (len(data), len(data[0]), len(data[0][0]))
+        self.ndim = 3
+
+    def __iter__(self):
+        return iter(self.data)
+
+def load(path):
+    if os.path.basename(path) != "skeleton_3d.npy":
+        raise FileNotFoundError(path)
+    return FakeArray([
+        [
+            [float(index), float(index + 100), float(index + 200), 0.91]
+            for index in range(33)
+        ]
+    ])
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-recording",
+      recordingRoot,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakePackageRoot] },
+  );
+
+  try {
+    await waitForFile(path.join(recordingRoot, "processor-started.txt"), 1_000);
+    const initializing = await waitForHealthStatus(port, "initializing", 1_000);
+    assert.equal(initializing.source, "freemocap");
+    assert.equal(initializing.fps, 30);
+    assert.equal(initializing.cameras, 3);
+    assert.equal(initializing.schemaVersion, 2);
+    assert.equal(initializing.contractVersion, 1);
+    assert.equal(initializing.calibrationId, `freemocap-${path.basename(recordingRoot)}`);
+    assert.match(
+      String((initializing.diagnostics as unknown[])[0]),
+      /processing FreeMoCap recording/,
+    );
+
+    const initializingStartRes = await fetch(
+      `http://localhost:${port}/session/start`,
+      { method: "POST" },
+    );
+    assert.equal(initializingStartRes.status, 409);
+    const initializingStartBody =
+      (await initializingStartRes.json()) as Record<string, unknown>;
+    assert.equal(initializingStartBody.status, "initializing");
+    assert.equal(initializingStartBody.calibrationId, initializing.calibrationId);
+    assert.deepEqual(
+      initializingStartBody.diagnostics,
+      initializing.diagnostics,
+    );
+
+    await writeFile(path.join(recordingRoot, "processor-release.txt"), "go");
+    const ready = await waitForHealthStatus(port, "ready", 5_000);
+    assert.equal(ready.calibrationId, `freemocap-${path.basename(recordingRoot)}`);
+    const readyStartRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(readyStartRes.status, 200);
+    const frame = await readOneSidecarFrame(port);
+    assert.equal(frame.source, "sidecar-3d");
+    assert.equal(frame.keypoints.length, 33);
+    await fetch(`http://localhost:${port}/session/stop`, { method: "POST" });
+  } finally {
+    await stopProcess(sidecar);
+  }
+});
+
+test("rowing-tracker-sidecar reports FreeMoCap recording processing failures after initializing", async () => {
+  const recordingRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-fails-"),
+  );
+  const fakePackageRoot = await mkdtemp(
+    path.join(os.tmpdir(), "sidecar-freemocap-processing-fails-pkg-"),
+  );
+  const processorDir = path.join(
+    fakePackageRoot,
+    "freemocap",
+    "core_processes",
+    "process_motion_capture_videos",
+  );
+  await mkdir(processorDir, { recursive: true });
+  await writeFile(path.join(fakePackageRoot, "freemocap", "__init__.py"), "");
+  await writeFile(
+    path.join(fakePackageRoot, "freemocap", "core_processes", "__init__.py"),
+    "",
+  );
+  await writeFile(path.join(processorDir, "__init__.py"), "");
+  await writeFile(
+    path.join(processorDir, "process_recording_headless.py"),
+    `
+import time
+from pathlib import Path
+
+def process_recording_headless(
+    recording_path,
+    path_to_camera_calibration_toml=None,
+    path_to_blender_executable=None,
+    recording_processing_parameter_model=None,
+    recording_info_model=None,
+    run_blender=True,
+    make_jupyter_notebook=True,
+    use_tqdm=True,
+):
+    root = Path(recording_path)
+    (root / "processor-started.txt").write_text("started")
+    release = root / "processor-release.txt"
+    while not release.exists():
+        time.sleep(0.02)
+    raise RuntimeError("calibration solve failed")
+`,
+  );
+
+  const port = await getFreePort();
+  const sidecar = startSidecar(
+    port,
+    [
+      "--source",
+      "freemocap",
+      "--freemocap-recording",
+      recordingRoot,
+      "--camera-count",
+      "3",
+    ],
+    { pythonPath: [fakePackageRoot] },
+  );
+
+  try {
+    await waitForFile(path.join(recordingRoot, "processor-started.txt"), 1_000);
+    const initializing = await waitForHealthStatus(port, "initializing", 1_000);
+    assert.equal(initializing.source, "freemocap");
+
+    await writeFile(path.join(recordingRoot, "processor-release.txt"), "go");
+    const failed = await waitForHealthStatus(port, "error", 5_000);
+    assert.equal(failed.source, "freemocap");
+    assert.match(
+      String((failed.diagnostics as unknown[])[0]),
+      /Failed to process FreeMoCap recording/,
+    );
+    assert.match(
+      String((failed.diagnostics as unknown[])[0]),
+      /calibration solve failed/,
+    );
+
+    const startRes = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(startRes.status, 409);
+    const startBody = (await startRes.json()) as Record<string, unknown>;
+    assert.equal(startBody.status, "error");
+    assert.deepEqual(startBody.diagnostics, failed.diagnostics);
   } finally {
     await stopProcess(sidecar);
   }
@@ -866,6 +1084,48 @@ async function waitForHealth(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`sidecar did not become healthy: ${String(lastError)}`);
+}
+
+async function waitForFile(filePath: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      await stat(filePath);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Timed out waiting for ${filePath}: ${String(lastError)}`);
+}
+
+async function waitForHealthStatus(
+  port: number,
+  status: string,
+  timeoutMs: number,
+): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + timeoutMs;
+  let lastHealth: Record<string, unknown> | null = null;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`http://localhost:${port}/health`);
+      if (res.ok) {
+        lastHealth = (await res.json()) as Record<string, unknown>;
+        if (lastHealth.status === status) return lastHealth;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(
+    `sidecar did not report health status ${status}: ${JSON.stringify(
+      lastHealth,
+    )}; ${String(lastError)}`,
+  );
 }
 
 async function readOneSidecarFrame(port: number): Promise<{

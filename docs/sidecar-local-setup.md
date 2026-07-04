@@ -119,7 +119,9 @@ rowing-tracker-sidecar \
 ```
 
 The sidecar disables Blender export, notebook generation, and tqdm progress for
-this path. On success, health diagnostics include `processed FreeMoCap
+this path. While processing runs, `/health` reports `status: "initializing"`
+with a `processing FreeMoCap recording ...` diagnostic and `/session/start`
+returns `409`. On success, health diagnostics include `processed FreeMoCap
 recording ...`, then the generated `output_data/skeleton_3d.npy` or raw 3D
 output is loaded exactly like recorded-data mode. If processing fails, `/health`
 reports `status: "error"` with the FreeMoCap processing exception and the

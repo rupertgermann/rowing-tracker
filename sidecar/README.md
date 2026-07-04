@@ -46,7 +46,10 @@ rowing-tracker-sidecar \
 This uses FreeMoCap's batch/headless recording processor with Blender export,
 notebook generation, and tqdm progress disabled. It does not claim live
 camera-runtime support; use `--freemocap-provider` for operator-owned live
-camera adapters.
+camera adapters. While processing runs, `/health` reports
+`status: "initializing"` and `/session/start` returns `409`; successful
+processing changes health to `ready`, and processing failures change health to
+`error` with diagnostics.
 
 The service binds to `127.0.0.1` by default and exposes:
 
