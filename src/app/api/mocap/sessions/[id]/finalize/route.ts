@@ -2,15 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db/prisma";
-import { getMocapStorage } from "@/lib/mocap/storage";
-import { finalizePoseStreamBlob } from "@/lib/mocap/capturePersistence";
-import { analyzeAndPersistMocapSession } from "@/lib/mocap/sessionAnalysis";
-import { finalizeMocapSessionLifecycle } from "@/lib/mocap/lifecycle";
-import {
-  setMocapCaptureFinalizationState,
-  setMocapSessionStatus,
-} from "@/lib/mocap/lifecyclePrisma";
+import { getPrismaMocapSessionLifecycle } from "@/lib/mocap/lifecyclePrisma";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -45,35 +37,10 @@ export async function POST(
     );
   }
 
-  const storage = getMocapStorage();
-  const result = await finalizeMocapSessionLifecycle(
+  const result = await getPrismaMocapSessionLifecycle().finalize(
+    session.user.id,
+    id,
     {
-      storage,
-      findSession: (userId, mocapSessionId) =>
-        prisma.mocapSession.findFirst({
-          where: { id: mocapSessionId, userId },
-          select: {
-            id: true,
-            userId: true,
-            status: true,
-            rowingSessionId: true,
-            poseStreamPath: true,
-            capturePerspective: true,
-            calibrationCatchFrame: true,
-            calibrationFinishFrame: true,
-          },
-        }),
-      setStatus: setMocapSessionStatus,
-      setCaptureFinalizationState: setMocapCaptureFinalizationState,
-      finalizePoseStream: finalizePoseStreamBlob,
-      analyzePoseSegmented: analyzeAndPersistMocapSession,
-      analyzeCsvAligned: async () => {
-        throw new Error("Finalize lifecycle must use pose-segmented analysis");
-      },
-    },
-    {
-      userId: session.user.id,
-      mocapSessionId: id,
       durationSec: body.durationSec,
       qualityScore: body.qualityScore,
       qualityFlags: body.qualityFlags,

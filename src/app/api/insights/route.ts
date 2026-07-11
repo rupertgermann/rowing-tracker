@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { buildUserSettingsCreateData } from "@/lib/server/userSettings";
 
 /**
  * GET /api/insights
@@ -158,19 +159,9 @@ export async function POST(req: Request) {
         update: {
           insightsRevision: settings?.sessionsRevision ?? 0,
         },
-        create: {
-          userId: session.user.id,
-          theme: 'system',
-          units: 'metric',
-          dateFormat: 'MM/DD/YYYY',
-          timeFormat: '24h',
-          language: 'en',
-          defaultChartType: 'line',
-          animationsEnabled: true,
-          cloudAIEnabled: false,
-          maxTokens: 4000,
+        create: buildUserSettingsCreateData(session.user.id, {
           insightsRevision: settings?.sessionsRevision ?? 0,
-        },
+        }),
       });
     }
 

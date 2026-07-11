@@ -6,8 +6,16 @@ import {
   linkMocapSessionLifecycle,
   reanalyzeMocapSessionLifecycle,
   unlinkMocapSessionLifecycle,
+  type FinalizeMocapSessionDependencies,
+  type LinkMocapSessionDependencies,
   type MocapLifecycleSession,
+  type ReanalyzeMocapSessionDependencies,
+  type UnlinkMocapSessionDependencies,
 } from "../src/lib/mocap/lifecycle";
+
+type FullLifecycleTestDeps = ReanalyzeMocapSessionDependencies &
+  LinkMocapSessionDependencies &
+  UnlinkMocapSessionDependencies;
 
 test("reanalyzeMocapSessionLifecycle keeps linked sessions csv-aligned", async () => {
   const calls: string[] = [];
@@ -196,10 +204,6 @@ test("finalizeMocapSessionLifecycle finalizes and analyzes before returning read
         calls.push(`pose-segmented:${analysisSession.status}`);
         return { strokeMetricCount: 5, faultCount: 2 };
       },
-      analyzeCsvAligned: async () => {
-        calls.push("csv-aligned");
-        return { strokeMetricCount: 0, faultCount: 0 };
-      },
       setStatus: async (_id, status) => {
         calls.push(`status:${status}`);
         return { status };
@@ -322,10 +326,6 @@ test("finalizeMocapSessionLifecycle completes record-only captures without analy
       analyzePoseSegmented: async () => {
         calls.push("pose-segmented");
         throw new Error("record-only should not run pose analysis");
-      },
-      analyzeCsvAligned: async () => {
-        calls.push("csv-aligned");
-        throw new Error("record-only should not run csv-aligned analysis");
       },
     }),
     {
@@ -787,8 +787,8 @@ function makeSession(
 }
 
 function makeDeps(
-  overrides: Partial<Parameters<typeof reanalyzeMocapSessionLifecycle>[0]> = {},
-): Parameters<typeof reanalyzeMocapSessionLifecycle>[0] {
+  overrides: Partial<FullLifecycleTestDeps> = {},
+): FullLifecycleTestDeps {
   return {
     storage: { exists: async () => true },
     findSession: async () => makeSession(),
@@ -805,8 +805,8 @@ function makeDeps(
 }
 
 function makeFinalizeDeps(
-  overrides: Partial<Parameters<typeof finalizeMocapSessionLifecycle>[0]> = {},
-): Parameters<typeof finalizeMocapSessionLifecycle>[0] {
+  overrides: Partial<FinalizeMocapSessionDependencies> = {},
+): FinalizeMocapSessionDependencies {
   return {
     ...makeDeps(),
     findSession: async () => makeSession({ status: "capturing" }),

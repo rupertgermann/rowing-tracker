@@ -120,37 +120,17 @@ export interface MocapCaptureFinalizationState {
   qualityFlags: string[];
 }
 
-export interface MocapLifecycleDependencies {
+export interface ReanalyzeMocapSessionDependencies {
   storage: Pick<MocapStorage, "exists">;
   findSession(
     userId: string,
     mocapSessionId: string,
   ): Promise<MocapLifecycleSession | null>;
-  findRowingSession?(
-    userId: string,
-    rowingSessionId: string,
-  ): Promise<MocapLifecycleRowingSession | null>;
   setStatus(
     mocapSessionId: string,
     status: "capturing" | "analyzing" | "ready",
     transition?: { from: string | string[] },
   ): Promise<{ status: string } | null>;
-  assignMocapSession?(
-    mocapSessionId: string,
-    userId: string,
-    rowingSessionId: string,
-  ): Promise<MocapAssignmentResult>;
-  unassignMocapSession?(
-    mocapSessionId: string,
-    userId: string,
-    rowingSessionId: string,
-  ): Promise<boolean>;
-  restoreMocapSessionAssignment?(
-    mocapSessionId: string,
-    rowingSessionId: string | null,
-    status: "ready",
-  ): Promise<void>;
-  bumpSessionsRevision?(userId: string): Promise<void>;
   analyzePoseSegmented(
     storage: MocapStorage,
     session: MocapLifecycleSession,
@@ -162,8 +142,78 @@ export interface MocapLifecycleDependencies {
   ): Promise<PersistedMocapAnalysisSummary>;
 }
 
+interface MocapLifecycleStorageDependencies {
+  storage: Pick<MocapStorage, "exists">;
+}
+
+interface MocapLifecycleSessionLookupDependencies
+  extends MocapLifecycleStorageDependencies {
+  findSession(
+    userId: string,
+    mocapSessionId: string,
+  ): Promise<MocapLifecycleSession | null>;
+}
+
+export interface LinkMocapSessionDependencies
+  extends MocapLifecycleSessionLookupDependencies {
+  findRowingSession(
+    userId: string,
+    rowingSessionId: string,
+  ): Promise<MocapLifecycleRowingSession | null>;
+  setStatus(
+    mocapSessionId: string,
+    status: "capturing" | "analyzing" | "ready",
+    transition?: { from: string | string[] },
+  ): Promise<{ status: string } | null>;
+  assignMocapSession(
+    mocapSessionId: string,
+    userId: string,
+    rowingSessionId: string,
+  ): Promise<MocapAssignmentResult>;
+  restoreMocapSessionAssignment(
+    mocapSessionId: string,
+    rowingSessionId: string | null,
+    status: "ready",
+  ): Promise<void>;
+  bumpSessionsRevision?(userId: string): Promise<void>;
+  analyzeCsvAligned(
+    storage: MocapStorage,
+    session: MocapLifecycleSession,
+    rowingSessionId: string,
+  ): Promise<PersistedMocapAnalysisSummary>;
+}
+
+export interface UnlinkMocapSessionDependencies
+  extends MocapLifecycleSessionLookupDependencies {
+  setStatus(
+    mocapSessionId: string,
+    status: "capturing" | "analyzing" | "ready",
+    transition?: { from: string | string[] },
+  ): Promise<{ status: string } | null>;
+  unassignMocapSession(
+    mocapSessionId: string,
+    userId: string,
+    rowingSessionId: string,
+  ): Promise<boolean>;
+  restoreMocapSessionAssignment(
+    mocapSessionId: string,
+    rowingSessionId: string | null,
+    status: "ready",
+  ): Promise<void>;
+  bumpSessionsRevision?(userId: string): Promise<void>;
+  analyzePoseSegmented(
+    storage: MocapStorage,
+    session: MocapLifecycleSession,
+  ): Promise<PersistedMocapAnalysisSummary>;
+}
+
 export interface FinalizeMocapSessionDependencies
-  extends MocapLifecycleDependencies {
+  extends MocapLifecycleSessionLookupDependencies {
+  setStatus(
+    mocapSessionId: string,
+    status: "capturing" | "analyzing" | "ready",
+    transition?: { from: string | string[] },
+  ): Promise<{ status: string } | null>;
   finalizePoseStream(
     storage: MocapStorage,
     poseStreamPath: string,
@@ -173,6 +223,10 @@ export interface FinalizeMocapSessionDependencies
     state: MocapCaptureFinalizationState,
     transition?: { from: string | string[] },
   ): Promise<{ status: string; durationSec: number } | null>;
+  analyzePoseSegmented(
+    storage: MocapStorage,
+    session: MocapLifecycleSession,
+  ): Promise<PersistedMocapAnalysisSummary>;
 }
 
 export async function finalizeMocapSessionLifecycle(
@@ -289,7 +343,7 @@ export async function finalizeMocapSessionLifecycle(
 }
 
 export async function reanalyzeMocapSessionLifecycle(
-  deps: MocapLifecycleDependencies,
+  deps: ReanalyzeMocapSessionDependencies,
   input: ReanalyzeMocapSessionInput,
 ): Promise<ReanalyzeMocapSessionResult> {
   const session = await deps.findSession(input.userId, input.mocapSessionId);
@@ -358,7 +412,7 @@ export async function reanalyzeMocapSessionLifecycle(
 }
 
 export async function linkMocapSessionLifecycle(
-  deps: MocapLifecycleDependencies,
+  deps: LinkMocapSessionDependencies,
   input: LinkMocapSessionInput,
 ): Promise<LinkMocapSessionResult> {
   const session = await deps.findSession(input.userId, input.mocapSessionId);
@@ -376,9 +430,6 @@ export async function linkMocapSessionLifecycle(
       error: "Mocap session is already linked to a rowing session. Unlink first.",
     };
   }
-  if (!deps.findRowingSession) {
-    throw new Error("findRowingSession dependency is required for linking");
-  }
   const rowingSession = await deps.findRowingSession(
     input.userId,
     input.rowingSessionId,
@@ -392,9 +443,6 @@ export async function linkMocapSessionLifecycle(
       status: 409,
       error: "Rowing session is already linked to another mocap session.",
     };
-  }
-  if (!deps.assignMocapSession) {
-    throw new Error("assignMocapSession dependency is required for linking");
   }
   const assigned = await deps.assignMocapSession(
     session.id,
@@ -452,7 +500,7 @@ export async function linkMocapSessionLifecycle(
 }
 
 export async function unlinkMocapSessionLifecycle(
-  deps: MocapLifecycleDependencies,
+  deps: UnlinkMocapSessionDependencies,
   input: ReanalyzeMocapSessionInput,
 ): Promise<UnlinkMocapSessionResult> {
   const session = await deps.findSession(input.userId, input.mocapSessionId);
@@ -470,9 +518,6 @@ export async function unlinkMocapSessionLifecycle(
       status: 409,
       error: "Mocap session is not linked to a rowing session.",
     };
-  }
-  if (!deps.unassignMocapSession) {
-    throw new Error("unassignMocapSession dependency is required for unlinking");
   }
   const unassigned = await deps.unassignMocapSession(
     session.id,
@@ -521,7 +566,7 @@ export async function unlinkMocapSessionLifecycle(
 }
 
 async function validateReadyAnalyzableSession(
-  deps: MocapLifecycleDependencies,
+  deps: MocapLifecycleStorageDependencies,
   session: MocapLifecycleSession,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   if (session.status !== "ready") {
@@ -542,13 +587,10 @@ async function validateReadyAnalyzableSession(
 }
 
 async function restoreAssignment(
-  deps: MocapLifecycleDependencies,
+  deps: Pick<UnlinkMocapSessionDependencies, "restoreMocapSessionAssignment">,
   mocapSessionId: string,
   rowingSessionId: string | null,
 ): Promise<void> {
-  if (!deps.restoreMocapSessionAssignment) {
-    throw new Error("restoreMocapSessionAssignment dependency is required");
-  }
   await deps.restoreMocapSessionAssignment(mocapSessionId, rowingSessionId, "ready");
 }
 
