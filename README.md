@@ -129,7 +129,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
 
 ### Prerequisites
 
-- Node.js 22.12+
+- Node.js 24+
 - npm 10.8+
 - Docker & Docker Compose (for local development)
 - OpenAI API Key (optional, for AI features)

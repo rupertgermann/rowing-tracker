@@ -1,4 +1,4 @@
-const minimum = [22, 12, 0];
+const minimum = [24, 0, 0];
 const current = process.versions.node.split(".").map(Number);
 
 let isSupported = true;
