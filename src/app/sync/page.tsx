@@ -878,10 +878,10 @@ export default function UploadPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4">
                 <div className="flex items-start space-x-3">
-                  <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold">
+                  <div className="bg-primary text-primary-foreground rounded-full size-6 shrink-0 flex items-center justify-center text-sm font-semibold">
                     1
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">Open SmartRow App</p>
                     <p className="text-sm text-muted-foreground">
                       Open https://smartrow.fit/ in your browser and ensure you&apos;re logged in to your account.
@@ -889,10 +889,10 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold">
+                  <div className="bg-primary text-primary-foreground rounded-full size-6 shrink-0 flex items-center justify-center text-sm font-semibold">
                     2
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">Export Your Data</p>
                     <p className="text-sm text-muted-foreground">
                       Go to &quot;My Workouts&quot; → Click &quot;Export All&quot; then click &quot;Spreadsheet .csv file&quot; under &quot;List of your workouts&quot; to download the session list.
@@ -902,10 +902,10 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-semibold">
+                  <div className="bg-primary text-primary-foreground rounded-full size-6 shrink-0 flex items-center justify-center text-sm font-semibold">
                     3
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">Upload Here</p>
                     <p className="text-sm text-muted-foreground">
                       Drag and drop the exported CSV file or ZIP archive above (csv first then zip)
