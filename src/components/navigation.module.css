@@ -1,0 +1,24 @@
+.wideNavigation {
+  display: none;
+}
+
+.compactNavigation {
+  display: flex;
+}
+
+@media (max-width: 39.999rem) {
+  .compactOptionalLabel {
+    display: none;
+  }
+}
+
+/* The complete link row needs more space than the standard desktop breakpoint. */
+@media (min-width: 100rem) {
+  .wideNavigation {
+    display: flex;
+  }
+
+  .compactNavigation {
+    display: none;
+  }
+}

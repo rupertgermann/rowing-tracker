@@ -16,7 +16,27 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { settings } from '@/lib/settings';
-import { Upload, BarChart3, List, Trophy, MessageCircle, Target, Settings as SettingsIcon, Gauge, Brain, User, LogOut, UserCircle, Sun, Moon, Monitor, RefreshCw, Video } from 'lucide-react';
+import {
+  Upload,
+  BarChart3,
+  List,
+  Trophy,
+  MessageCircle,
+  Target,
+  Settings as SettingsIcon,
+  Gauge,
+  Brain,
+  User,
+  LogOut,
+  UserCircle,
+  Sun,
+  Moon,
+  Monitor,
+  RefreshCw,
+  Video,
+  Menu,
+} from 'lucide-react';
+import styles from './navigation.module.css';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
@@ -117,13 +137,18 @@ export function Navigation() {
             <div className="flex h-8 w-8 items-center justify-center rounded bg-primary">
               <BarChart3 className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground whitespace-nowrap pr-2">
+            <span
+              className={cn(
+                styles.compactOptionalLabel,
+                'text-xl font-bold text-foreground whitespace-nowrap pr-2'
+              )}
+            >
               Rowing Tracker
             </span>
           </Link>
 
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-4">
+          <nav className={cn(styles.wideNavigation, 'items-center space-x-4')}>
             {navigation.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -195,8 +220,8 @@ export function Navigation() {
             )}
           </nav>
 
-          {/* Mobile Navigation - User Menu */}
-          <div className="md:hidden flex items-center space-x-2">
+          {/* Compact Navigation */}
+          <div className={cn(styles.compactNavigation, 'items-center space-x-1')}>
             <ThemeToggle />
             {status === 'authenticated' && session?.user && (
               <DropdownMenu>
@@ -239,43 +264,43 @@ export function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <Button asChild variant="outline" size="sm">
-              <Link href="/sync" className="flex items-center space-x-2">
-                <RefreshCw className="h-4 w-4" />
-                <span>Sync</span>
-              </Link>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  aria-label="Open navigation menu"
+                >
+                  <Menu className="h-4 w-4" />
+                  <span className={styles.compactOptionalLabel}>Menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {navigation.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <DropdownMenuItem key={item.name} asChild>
+                      <Link
+                        href={item.href}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(
+                          'cursor-pointer',
+                          isActive && 'bg-accent text-accent-foreground'
+                        )}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.name}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {/* Mobile Navigation Links */}
-        <nav className="md:hidden border-t py-2">
-          <div className="flex space-x-1 overflow-x-auto">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Button
-                  key={item.name}
-                  asChild
-                  variant={isActive ? 'default' : 'ghost'}
-                  size="sm"
-                  className="flex-shrink-0"
-                >
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'flex items-center space-x-1',
-                      isActive && 'bg-primary text-primary-foreground'
-                    )}
-                  >
-                    <item.icon className="h-3 w-3" />
-                    <span className="text-xs">{item.name}</span>
-                  </Link>
-                </Button>
-              );
-            })}
-          </div>
-        </nav>
       </div>
     </header>
   );
