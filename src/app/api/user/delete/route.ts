@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { applyRateLimit } from "@/lib/rateLimit";
+import { getMocapStorage } from "@/lib/mocap/storage";
+import { avatarStorageDetails } from "@/lib/userAvatar";
 
 const deleteSchema = z.object({
   password: z.string().min(1, "Password is required"),
@@ -49,6 +51,7 @@ export async function DELETE(req: Request) {
         id: true,
         passwordHash: true,
         email: true,
+        image: true,
       },
     });
 
@@ -75,6 +78,15 @@ export async function DELETE(req: Request) {
     await prisma.user.delete({
       where: { id: session.user.id },
     });
+
+    const avatar = avatarStorageDetails(user.image, user.id);
+    if (avatar) {
+      try {
+        await getMocapStorage().delete(avatar.storagePath);
+      } catch (error) {
+        console.error("Failed to remove avatar during account deletion:", error);
+      }
+    }
 
     return NextResponse.json({
       success: true,

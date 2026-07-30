@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { avatarImageUrl } from "@/lib/userAvatar";
 import { z } from "zod";
 
 const profileSchema = z.object({
@@ -43,10 +44,14 @@ export async function PATCH(req: Request) {
         id: true,
         name: true,
         email: true,
+        image: true,
       },
     });
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json({
+      ...updatedUser,
+      image: avatarImageUrl(updatedUser.image),
+    });
   } catch (error) {
     console.error("Profile update error:", error);
     return NextResponse.json(

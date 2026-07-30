@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { UserAvatar } from '@/components/ui/user-avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,6 @@ import {
 import { cn } from '@/lib/utils';
 import { settings } from '@/lib/settings';
 import {
-  Upload,
   BarChart3,
   List,
   Trophy,
@@ -51,10 +51,12 @@ const navigation = [
 ];
 
 function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // The client-only theme state must wait until hydration has completed.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -180,12 +182,31 @@ export function Navigation() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                    <UserCircle className="h-4 w-4" />
+                    <UserAvatar
+                      image={session.user.image}
+                      name={session.user.name || session.user.email}
+                      size="sm"
+                    />
                     <span>{session.user.name || session.user.email}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuLabel className="flex items-center gap-3">
+                    <UserAvatar
+                      image={session.user.image}
+                      name={session.user.name || session.user.email}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        {session.user.name || session.user.email}
+                      </span>
+                      {session.user.name && session.user.email && (
+                        <span className="block truncate text-xs font-normal text-muted-foreground">
+                          {session.user.email}
+                        </span>
+                      )}
+                    </span>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/profile" className="flex items-center cursor-pointer">
@@ -226,12 +247,35 @@ export function Navigation() {
             {status === 'authenticated' && session?.user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <UserCircle className="h-4 w-4" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Open account menu"
+                  >
+                    <UserAvatar
+                      image={session.user.image}
+                      name={session.user.name || session.user.email}
+                      size="sm"
+                    />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>{session.user.name || session.user.email}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="flex items-center gap-3">
+                    <UserAvatar
+                      image={session.user.image}
+                      name={session.user.name || session.user.email}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        {session.user.name || session.user.email}
+                      </span>
+                      {session.user.name && session.user.email && (
+                        <span className="block truncate text-xs font-normal text-muted-foreground">
+                          {session.user.email}
+                        </span>
+                      )}
+                    </span>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/profile" className="cursor-pointer">

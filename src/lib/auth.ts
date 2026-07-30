@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import EmailProvider from "next-auth/providers/email";
 import { prisma } from "@/lib/db/prisma";
+import { avatarImageUrl } from "@/lib/userAvatar";
 import bcrypt from "bcryptjs";
 
 // Extend the built-in session types
@@ -98,16 +99,39 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error"
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.picture = avatarImageUrl(user.image);
+      }
+
+      if (trigger === "update" && token.id) {
+        const currentUser = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: {
+            name: true,
+            email: true,
+            image: true,
+            role: true,
+          },
+        });
+
+        if (currentUser) {
+          token.name = currentUser.name;
+          token.email = currentUser.email;
+          token.picture = avatarImageUrl(currentUser.image);
+          token.role = currentUser.role;
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
+        session.user.image = avatarImageUrl(token.picture);
         session.user.role = token.role;
       }
       return session;

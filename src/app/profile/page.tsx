@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, Mail, Save } from "lucide-react";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { Camera, Loader2, User, Mail, Save, Trash2 } from "lucide-react";
 
 export default function ProfilePage() {
   const { data: session, status, update } = useSession();
@@ -15,13 +16,17 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAvatarLoading, setIsAvatarLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (session?.user) {
       setName(session.user.name || "");
       setEmail(session.user.email || "");
+      setAvatarUrl(session.user.image || null);
     }
   }, [session]);
 
@@ -58,10 +63,10 @@ export default function ProfilePage() {
         return;
       }
 
-      // Update session
-      await update({ name, email });
+      // Refresh session fields from the persisted profile.
+      await update();
       setMessage({ type: 'success', text: "Profile updated successfully!" });
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: "An error occurred. Please try again." });
     } finally {
       setIsLoading(false);
@@ -104,10 +109,76 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: "An error occurred. Please try again." });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsAvatarLoading(true);
+    setMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+
+      const res = await fetch("/api/user/avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to upload avatar",
+        });
+        return;
+      }
+
+      setAvatarUrl(data.image);
+      await update();
+      setMessage({ type: "success", text: "Profile photo updated." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to upload avatar. Please try again." });
+    } finally {
+      setIsAvatarLoading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setIsAvatarLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/user/avatar", { method: "DELETE" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to remove avatar",
+        });
+        return;
+      }
+
+      setAvatarUrl(null);
+      await update();
+      setMessage({ type: "success", text: "Profile photo removed." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to remove avatar. Please try again." });
+    } finally {
+      setIsAvatarLoading(false);
     }
   };
 
@@ -134,6 +205,57 @@ export default function ProfilePage() {
           <User className="w-5 h-5" />
           Profile Information
         </h2>
+        <div className="mb-6 flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center">
+          <UserAvatar
+            image={avatarUrl}
+            name={name || email}
+            size="lg"
+          />
+          <div className="flex-1">
+            <p className="font-medium">Profile photo</p>
+            <p className="mb-3 text-sm text-muted-foreground">
+              JPG, PNG, or WebP. Maximum 2 MB.
+            </p>
+            <input
+              ref={avatarInputRef}
+              id="avatar"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={handleAvatarUpload}
+              disabled={isAvatarLoading}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isAvatarLoading}
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {isAvatarLoading ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Camera />
+                )}
+                {avatarUrl ? "Change photo" : "Upload photo"}
+              </Button>
+              {avatarUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isAvatarLoading}
+                  onClick={handleAvatarRemove}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 />
+                  Remove
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
         <form onSubmit={handleUpdateProfile} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-2">
