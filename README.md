@@ -166,7 +166,7 @@ Rowing Tracker is a modern, AI-powered web app built specifically for rowers who
    npm run db:start
    ```
    This starts:
-   - PostgreSQL on port 5432
+   - PostgreSQL on port 55432
    - Mailpit SMTP on port 1025
    - Mailpit Web UI on http://localhost:9025
 

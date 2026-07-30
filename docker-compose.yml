@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: rowing_dev_password
       POSTGRES_DB: rowing_tracker
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
