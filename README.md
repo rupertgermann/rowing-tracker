@@ -8,6 +8,8 @@ An AI-powered web application for tracking rowing workouts with analytics, train
 
 Rowing Tracker is a modern, AI-powered web app built specifically for rowers who use SmartRow equipment. Workouts are imported either via automated SmartRow.fit sync or manual CSV/ZIP upload, and the app turns them into deep analytics, personalized AI training plans, automated coaching insights, and motion-capture posture analysis. Each rower gets a private workspace with data stored in PostgreSQL (local or Supabase) and isolated by authenticated user.
 
+For a screenshot-based explanation of every module and interactive control, see the [complete user guide](docs/user-guide/README.md).
+
 ## Features
 
 ### 🤖 AI-Powered Intelligence
