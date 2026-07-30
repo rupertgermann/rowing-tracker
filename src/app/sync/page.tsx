@@ -244,7 +244,7 @@ export default function UploadPage() {
       }
 
       // Save sessions to database with progress tracking
-      if (result.importedSessions > 0) {
+      if (sessions.length > 0) {
         setUploadState('saving');
         setUploadProgress({
           current: 0,
@@ -365,7 +365,8 @@ export default function UploadPage() {
       updateSmartRowSettings({ lastSync: new Date() });
 
       let totalImported = 0;
-      let totalUpdated = 0;
+      let summaryUpdated = 0;
+      let detailedUpdated = 0;
       let totalDistance = 0;
       let totalTime = 0;
       let duplicatesSkipped = 0;
@@ -391,7 +392,7 @@ export default function UploadPage() {
           console.log(`Parsed ${sessions.length} sessions from CSV. Result stats:`, result);
           csvImportResult = result;
 
-          if (result.importedSessions > 0) {
+          if (sessions.length > 0) {
             csvSessionsToSave = sessions;
           } else {
             console.log('No new sessions to import from CSV (all duplicates or invalid).');
@@ -479,25 +480,28 @@ export default function UploadPage() {
 
       if (csvImportResult && syncPersistence.csvResult?.success) {
         totalImported += csvImportResult.importedSessions;
+        summaryUpdated += csvImportResult.updatedSessions;
         totalDistance += csvImportResult.totalDistance;
         totalTime += csvImportResult.totalTime;
         duplicatesSkipped += csvImportResult.duplicatesSkipped;
       }
 
       if (syncPersistence.zipResult?.success) {
-        totalUpdated += processedZipUpdatedSessions;
+        detailedUpdated += processedZipUpdatedSessions;
       }
 
       setImportResult({
-        totalRows: totalImported + duplicatesSkipped,
+        totalRows: totalImported + summaryUpdated + duplicatesSkipped,
         importedSessions: totalImported,
+        updatedSessions: summaryUpdated,
         duplicatesSkipped: duplicatesSkipped,
         totalDistance: totalDistance,
         totalTime: totalTime,
         errors: []
       });
 
-      setSyncMessage(`Sync complete! ${totalImported > 0 ? `Imported ${totalImported} new sessions.` : ''} ${totalUpdated > 0 ? `Updated ${totalUpdated} sessions with detailed data.` : ''}`);
+      const totalUpdated = summaryUpdated + detailedUpdated;
+      setSyncMessage(`Sync complete! ${totalImported > 0 ? `Imported ${totalImported} new sessions.` : ''} ${totalUpdated > 0 ? `Updated ${totalUpdated} existing sessions.` : ''}`);
       setUploadState('success');
 
     } catch (err) {
@@ -717,6 +721,12 @@ export default function UploadPage() {
                       <p className="text-2xl font-bold text-primary">{importResult.importedSessions}</p>
                       <p className="text-sm text-muted-foreground">Sessions Imported</p>
                     </div>
+                    {importResult.updatedSessions > 0 && (
+                      <div className="bg-primary/10 p-4 rounded-lg">
+                        <p className="text-2xl font-bold text-primary">{importResult.updatedSessions}</p>
+                        <p className="text-sm text-muted-foreground">Sessions Repaired</p>
+                      </div>
+                    )}
                     {importResult.duplicatesSkipped > 0 && (
                       <div className="bg-muted p-4 rounded-lg">
                         <p className="text-2xl font-bold text-muted-foreground">{importResult.duplicatesSkipped}</p>

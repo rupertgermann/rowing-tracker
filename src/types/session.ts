@@ -126,6 +126,7 @@ export interface SessionFilters {
 export interface ImportResult {
   totalRows: number;
   importedSessions: number;
+  updatedSessions: number;
   duplicatesSkipped: number;
   errors: string[];
   totalDistance: number;   // meters

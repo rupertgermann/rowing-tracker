@@ -52,6 +52,10 @@ function transformRowToSession(row: RawCsvRow): Session {
   const timestamp = parseTimestamp(row['Time stamp (UTC)']);
   const distance = parseEuropeanNumber(row['Distance (m)']);
   const duration = parseEuropeanNumber(row['Time']);
+  const parsedAvgSplit = parseEuropeanNumber(row['Average split (s)']);
+  const avgSplit = parsedAvgSplit > 0 || distance <= 0 || duration <= 0
+    ? parsedAvgSplit
+    : duration * 500 / distance;
 
   return {
     id: generateSessionId(timestamp, distance),
@@ -63,7 +67,7 @@ function transformRowToSession(row: RawCsvRow): Session {
     avgPower: parseEuropeanNumber(row['Average power (W)']),
     maxPower: parseEuropeanNumber(row['Maximum power (W)']),
     wattPerKg: parseEuropeanNumber(row['Watt per KG']),
-    avgSplit: parseEuropeanNumber(row['Average split (s)']),
+    avgSplit,
     minSplit: parseEuropeanNumber(row['Minimum split (s)']),
     avgWork: parseEuropeanNumber(row['Average work (J)']),
     avgStrokeLength: parseEuropeanNumber(row['Average stroke length (m)']),
@@ -73,10 +77,10 @@ function transformRowToSession(row: RawCsvRow): Session {
 }
 
 /**
- * Check if a session is a duplicate based on timestamp and distance
+ * Find an existing session with the same stable identity.
  */
-function isDuplicateSession(newSession: Session, existingSessions: Session[]): boolean {
-  return existingSessions.some(existing => {
+function findDuplicateSession(newSession: Session, existingSessions: Session[]): Session | undefined {
+  return existingSessions.find(existing => {
     const existingTime = existing.timestamp instanceof Date ? existing.timestamp.getTime() : new Date(existing.timestamp).getTime();
     const newTime = newSession.timestamp instanceof Date ? newSession.timestamp.getTime() : new Date(newSession.timestamp).getTime();
 
@@ -106,7 +110,9 @@ export async function parseSmartRowCsv(
 ): Promise<{ sessions: Session[], result: ImportResult }> {
   return new Promise((resolve) => {
     const errors: string[] = [];
-    const importedSessions: Session[] = [];
+    const sessionsToSave: Session[] = [];
+    let importedSessions = 0;
+    let updatedSessions = 0;
     let duplicatesSkipped = 0;
     let totalDistance = 0;
     let totalTime = 0;
@@ -151,6 +157,7 @@ export async function parseSmartRowCsv(
                 result: {
                   totalRows: results.data.length,
                   importedSessions: 0,
+                  updatedSessions: 0,
                   duplicatesSkipped: 0,
                   errors,
                   totalDistance: 0,
@@ -171,13 +178,24 @@ export async function parseSmartRowCsv(
                   return;
                 }
 
-                // Check for duplicates
-                if (isDuplicateSession(session, existingSessions)) {
+                const existingSession = findDuplicateSession(session, existingSessions);
+                if (existingSession) {
+                  if (existingSession.avgSplit <= 0 && session.avgSplit > 0) {
+                    sessionsToSave.push({
+                      ...existingSession,
+                      ...session,
+                      id: existingSession.id,
+                    });
+                    updatedSessions++;
+                    return;
+                  }
+
                   duplicatesSkipped++;
                   return;
                 }
 
-                importedSessions.push(session);
+                sessionsToSave.push(session);
+                importedSessions++;
                 totalDistance += session.distance;
                 totalTime += session.duration;
 
@@ -187,10 +205,11 @@ export async function parseSmartRowCsv(
             });
 
             resolve({
-              sessions: importedSessions,
+              sessions: sessionsToSave,
               result: {
                 totalRows: results.data.length,
-                importedSessions: importedSessions.length,
+                importedSessions,
+                updatedSessions,
                 duplicatesSkipped,
                 errors,
                 totalDistance,
@@ -205,6 +224,7 @@ export async function parseSmartRowCsv(
               result: {
                 totalRows: results.data.length,
                 importedSessions: 0,
+                updatedSessions: 0,
                 duplicatesSkipped: 0,
                 errors,
                 totalDistance: 0,
@@ -220,6 +240,7 @@ export async function parseSmartRowCsv(
             result: {
               totalRows: 0,
               importedSessions: 0,
+              updatedSessions: 0,
               duplicatesSkipped: 0,
               errors,
               totalDistance: 0,
@@ -237,6 +258,7 @@ export async function parseSmartRowCsv(
         result: {
           totalRows: 0,
           importedSessions: 0,
+          updatedSessions: 0,
           duplicatesSkipped: 0,
           errors,
           totalDistance: 0,

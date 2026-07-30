@@ -54,7 +54,14 @@ function memoryStore(initialSessions: Session[] = []): RowingImportStoreActions 
   return {
     sessions: [...initialSessions],
     addSessions(sessions) {
-      this.sessions.push(...sessions);
+      const existingKeys = new Set(
+        this.sessions.map((row) => `${row.timestamp.getTime()}-${row.distance}`),
+      );
+      this.sessions.push(
+        ...sessions.filter(
+          (row) => !existingKeys.has(`${row.timestamp.getTime()}-${row.distance}`),
+        ),
+      );
     },
     updateSessionsInStore(sessions) {
       const updatesById = new Map(sessions.map((row) => [row.id, row]));
@@ -89,6 +96,20 @@ test("persistCsvImportSessions saves through persistence and adds database-retur
   assert.equal(saveCalls[0][0].id, "client-generated-id");
   assert.equal(store.sessions[0].id, "db-session-id");
   assert.deepEqual(savedIdsForOverlap, [["db-session-id"]]);
+});
+
+test("persistCsvImportSessions updates repaired sessions without duplicating them", async () => {
+  const existing = session({ id: "db-session-id", avgSplit: 0 });
+  const repaired = session({ id: existing.id, avgSplit: 158.5 });
+  const store = memoryStore([existing]);
+
+  const result = await persistCsvImportSessions([repaired], store, {
+    saveSessions: async (sessions) => ({ success: true, sessions }),
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(store.sessions.length, 1);
+  assert.equal(store.sessions[0].avgSplit, 158.5);
 });
 
 test("persistZipImportSessions saves stroke-data updates and applies saved sessions locally", async () => {

@@ -54,6 +54,7 @@ export async function persistCsvImportSessions(
 
   const savedSessions = savedSessionsFrom(result);
   if (savedSessions.length > 0) {
+    store.updateSessionsInStore(savedSessions);
     store.addSessions(savedSessions);
     await options.checkMocapOverlap?.(savedSessions);
   }
