@@ -4,7 +4,7 @@ Route: `/prs`
 
 Personal Records summarizes standout workouts and the complete achievement catalog. Record cards link back to the workout that earned the result.
 
-![Personal Records with account-derived record values and dates masked](images/05-personal-records.png)
+![Personal Records with live record values and dates](images/05-personal-records.png)
 
 ## Record sections
 
@@ -32,7 +32,7 @@ Personal Records summarizes standout workouts and the complete achievement catal
 
 ## AI award suggestions
 
-![AI Award Suggestions dialog with the underlying account content and available-session count masked](images/05-personal-records-suggestions.png)
+![AI Award Suggestions dialog with the live available-session count](images/05-personal-records-suggestions.png)
 
 | Control | What it does | State or caution |
 | --- | --- | --- |

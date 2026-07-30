@@ -4,7 +4,7 @@ Route: `/analytics`
 
 Analytics is the detailed multi-session analysis workspace. It combines time-filtered summary metrics, selectable trend charts, posture-fault frequency, and performance correlations.
 
-![Analytics with account-derived metric values and chart data masked](images/02-analytics.png)
+![Analytics with live metric values and chart data](images/02-analytics.png)
 
 ## Sections
 

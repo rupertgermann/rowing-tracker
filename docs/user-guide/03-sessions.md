@@ -4,7 +4,7 @@ Routes: `/sessions` and `/sessions/{sessionId}`
 
 Sessions is the workout history and the entry point to individual workout analysis. The current account contains both summary-only workouts and enhanced workouts with stroke-by-stroke data.
 
-![Session list with workout rows and the account image masked](images/03-sessions.png)
+![Session list with live workout rows](images/03-sessions.png)
 
 ## Session list
 
@@ -26,7 +26,7 @@ Sessions is the workout history and the entry point to individual workout analys
 
 ## Session detail
 
-![A stroke-rich session detail with workout values masked and the Deep Analysis tab selected](images/03-sessions-detail.png)
+![A stroke-rich session detail with live values and the Deep Analysis tab selected](images/03-sessions-detail.png)
 
 The header and summary area displays distance, duration, average pace, average power, pace/power details, stroke rate, energy, work, stroke count, stroke length, and power per kilogram when the source data provides them.
 

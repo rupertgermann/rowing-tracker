@@ -2,9 +2,9 @@
 
 Route: `/admin`
 
-Admin Dashboard is available only to administrator accounts. Non-admin users are redirected to the Dashboard. User rows are deliberately excluded from the screenshot so names, email addresses, account IDs, and activity totals remain private.
+Admin Dashboard is available only to administrator accounts. Non-admin users are redirected to the Dashboard. Names, email addresses, and account IDs are masked in the screenshot; roles, verification states, activity totals, creation dates, and action controls remain visible.
 
-![The Admin Dashboard title and privacy-safe table headers](images/12-admin.png)
+![The Admin Dashboard with user identity columns masked and operational columns visible](images/12-admin.png)
 
 ## User table
 

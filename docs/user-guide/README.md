@@ -2,11 +2,11 @@
 
 This guide documents the authenticated Rowing Tracker interface as observed in the running app on July 30, 2026. It covers all nine entries in the main navigation plus the Profile, Settings, and Admin Panel destinations in the account menu.
 
-The screenshots were captured with the current authenticated account. Opaque privacy masks cover direct identifiers, the account photo, workout values and dates, AI-generated content, private document names, video frames, and other account-derived data. Visible availability and enabled states are live examples and will change with the account.
+The screenshots were captured with the current authenticated account. Numbers, dates, statistics, graphs, records, and ordinary training content remain visible as live examples. Direct identifiers, account photos, credentials, private documents, personal system-prompt/context text, and recognizable Mocap video frames are masked or kept outside the frame.
 
 ## Navigation
 
-![The open Rowing Tracker navigation menu with account content masked](images/00-navigation-menu.png)
+![The open Rowing Tracker navigation menu](images/00-navigation-menu.png)
 
 | Control | What it does |
 | --- | --- |

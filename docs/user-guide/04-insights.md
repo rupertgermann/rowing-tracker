@@ -4,7 +4,7 @@ Route: `/insights`
 
 AI Insights is the searchable history of generated training observations. The current tab holds the newest batch; older batches live in the archive.
 
-![Current AI Insights with account-derived dates, counts, and generated content masked](images/04-insights.png)
+![Current AI Insights with live dates, counts, generated content, filters, and feedback controls](images/04-insights.png)
 
 ## Controls and active elements
 

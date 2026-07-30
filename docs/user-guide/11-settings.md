@@ -25,7 +25,7 @@ The left category buttons switch the visible card. **Reset Category** restores e
 
 ## Data Management
 
-![Data Management settings with account-specific storage totals masked](images/11-settings-data-management.png)
+![Data Management settings with live storage totals and credential placeholders](images/11-settings-data-management.png)
 
 | Control or active element | What it does | State or caution |
 | --- | --- | --- |

@@ -2,9 +2,9 @@
 
 Route: `/chat`
 
-AI Coach combines normal conversations, chart explanations, plan analyses, and insight discussions. The current account had no configured API key during capture, so existing conversation counts remained visible while New Chat and the message composer were unavailable.
+AI Coach combines normal conversations, chart explanations, plan analyses, and insight discussions. AI was configured during the new capture, with an existing chart explanation selected so the conversation controls, ordinary training metrics, and generated analysis are visible. Direct account identifiers and one health-context phrase are masked; private document contents remain outside the frame.
 
-![AI Coach showing the current AI-not-configured state with the memory count masked](images/07-ai-coach.png)
+![AI Coach with a live chart-explanation conversation and memory count](images/07-ai-coach.png)
 
 ## Header controls
 

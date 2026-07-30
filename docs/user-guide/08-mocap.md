@@ -24,7 +24,7 @@ The status panel exposes the capture state, worker state, received frames, frame
 
 ## Session library
 
-![The Mocap session library with capture dates and derived values masked](images/08-mocap-sessions.png)
+![The Mocap session library with live capture dates and derived values](images/08-mocap-sessions.png)
 
 Each card reports capture time, status, mode, perspective, duration, optional quality score, assignment state, stroke/fault totals, and quality flags.
 
@@ -40,7 +40,7 @@ Status badges distinguish Ready, Analyzing, Capturing, Linked, Ready to assign, 
 
 ## Replay and assignment
 
-![A Mocap replay with the private video, dates, and derived technique values masked](images/08-mocap-replay.png)
+![A Mocap replay with only the recognizable private video frame masked](images/08-mocap-replay.png)
 
 | Control or active element | What it does | State or caution |
 | --- | --- | --- |

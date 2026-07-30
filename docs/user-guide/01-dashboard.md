@@ -4,7 +4,7 @@ Route: `/dashboard`
 
 The Dashboard is the at-a-glance home screen. It combines lifetime and time-filtered rowing metrics, streaks, month-to-month comparisons, the latest AI insights, and a configurable metric comparison chart.
 
-![Dashboard with account-derived values and insight content masked](images/01-dashboard.png)
+![Dashboard with live metrics, comparisons, and insight controls](images/01-dashboard.png)
 
 ## Sections
 
