@@ -878,7 +878,7 @@ export default function UploadPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4">
                 <div className="flex items-start space-x-3">
-                  <div className="bg-primary text-primary-foreground rounded-full size-6 shrink-0 flex items-center justify-center text-sm font-semibold">
+                  <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 shrink-0 flex items-center justify-center text-sm font-semibold">
                     1
                   </div>
                   <div className="min-w-0 flex-1">
@@ -889,7 +889,7 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="bg-primary text-primary-foreground rounded-full size-6 shrink-0 flex items-center justify-center text-sm font-semibold">
+                  <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 shrink-0 flex items-center justify-center text-sm font-semibold">
                     2
                   </div>
                   <div className="min-w-0 flex-1">
@@ -902,7 +902,7 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="bg-primary text-primary-foreground rounded-full size-6 shrink-0 flex items-center justify-center text-sm font-semibold">
+                  <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 shrink-0 flex items-center justify-center text-sm font-semibold">
                     3
                   </div>
                   <div className="min-w-0 flex-1">
