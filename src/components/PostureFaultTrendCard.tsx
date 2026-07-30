@@ -101,9 +101,11 @@ function deserializeSessions(raw: PostureTrendApiResponse['sessions']): SessionF
 
 export function PostureFaultTrendCard() {
   const [data, setData] = useState<PostureTrendResult | null>(null);
+  const [postureSessions, setPostureSessions] = useState<SessionFaultInput[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const evaluatePostureAwards = useRowingStore((s) => s.evaluatePostureAwards);
+  const hasInitializedFromDB = useRowingStore((s) => s.hasInitializedFromDB);
 
   useEffect(() => {
     fetch('/api/mocap/posture-trend')
@@ -114,12 +116,17 @@ export function PostureFaultTrendCard() {
       .then((response) => {
         const { sessions: rawSessions, ...trendResult } = response;
         setData(trendResult);
-        const sessions = deserializeSessions(rawSessions);
-        if (sessions.length > 0) evaluatePostureAwards(sessions);
+        setPostureSessions(deserializeSessions(rawSessions));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Unknown error'))
       .finally(() => setLoading(false));
-  }, [evaluatePostureAwards]);
+  }, []);
+
+  useEffect(() => {
+    if (hasInitializedFromDB && postureSessions.length > 0) {
+      evaluatePostureAwards(postureSessions);
+    }
+  }, [evaluatePostureAwards, hasInitializedFromDB, postureSessions]);
 
   const lowQualityDates = data ? lowQualitySessionDates(data) : new Set<string>();
   const chartData = data ? buildChartData(data) : [];

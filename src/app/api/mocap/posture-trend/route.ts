@@ -23,7 +23,11 @@ export async function GET() {
   const userId = session.user.id;
 
   const mocapSessions = await prisma.mocapSession.findMany({
-    where: { userId, status: "ready" },
+    where: {
+      userId,
+      status: "ready",
+      rowingSessionId: { not: null },
+    },
     select: {
       id: true,
       createdAt: true,

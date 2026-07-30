@@ -135,6 +135,7 @@ interface RowingStore {
   earnedAwards: EarnedAward[];
   aiAwardSuggestions: AIAwardSuggestion[];
   newlyEarnedAward: EarnedAward | null; // For notification
+  hasInitializedFromDB: boolean;
   filters: SessionFilters;
   chartSettings: ChartSettings;
   dashboardSettings: DashboardSettings;
@@ -269,6 +270,7 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
   earnedAwards: [],
   aiAwardSuggestions: [],
   newlyEarnedAward: null,
+  hasInitializedFromDB: false,
   filters: defaultFilters,
   chartSettings: defaultChartSettings,
   dashboardSettings: defaultDashboardSettings,
@@ -467,6 +469,8 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
 
   evaluatePostureAwards: (postureSessions: SessionFaultInput[]) => {
     const state = get();
+    if (!state.hasInitializedFromDB) return;
+
     const existingIds = new Set(state.earnedAwards.map((a) => a.awardId));
     if (existingIds.has(CLEAN_CATCH_AWARD_ID)) return;
 
@@ -762,7 +766,8 @@ export const useRowingStore = create<RowingStore>()((set, get) => ({
       set({
         earnedAwards,
         chartSettings,
-        sessionAnalysisSettings
+        sessionAnalysisSettings,
+        hasInitializedFromDB: true,
       });
 
     } catch (error) {
