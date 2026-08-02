@@ -26,7 +26,7 @@ import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/h
 import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { StrokeData, Session } from '@/types/session';
 import { calculateSessionStats } from '@/lib/rowingSessionProjections';
- 
+
 
 // Chart configuration options
 
