@@ -93,15 +93,7 @@ describe("alignStrokesToCsv", () => {
   });
 
   test("mismatch case — completely non-overlapping times, no matches", () => {
-    // Pose session and CSV session have no temporal overlap at any delta
-    // Pose at 0-9s, CSV at 100-109s; with tolerance 2.5s and stroke rate 3s,
-    // the best delta will match some strokes. But if we use very sparse coverage:
-    // Actually if stride is 3s and tolerance 2.5s, there will always be some match.
-    // True mismatch means different stride patterns. Use different rates.
-    const poses = [0, 5000, 10000]; // 5s rate
-    const csv = makeCsv([0, 2500, 5000, 7500]); // 2.5s rate — interleaved, but within tolerance
-    // This will find some matches even with different rates. Let's use truly non-overlapping.
-    // Instead test with offset larger than the session itself so no cross-match is possible.
+    // The relative pattern is identical even though the sessions are far apart.
     const posesNoOverlap = [0, 3000, 6000];
     const csvNoOverlap = makeCsv([1_000_000, 1_003_000, 1_006_000]);
     const result2 = alignStrokesToCsv(posesNoOverlap, csvNoOverlap);

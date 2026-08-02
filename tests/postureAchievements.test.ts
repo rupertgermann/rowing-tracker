@@ -4,7 +4,6 @@ import {
   cleanCatchQualifies,
   firstCleanCatchDate,
   CLEAN_CATCH_MIN_STROKES,
-  CLEAN_CATCH_MAX_FAULT_RATE,
 } from "../src/lib/postureAchievements.js";
 import type { SessionFaultInput } from "../src/lib/mocap/postureTrendAggregation.js";
 
