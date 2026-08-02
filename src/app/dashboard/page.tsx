@@ -1,154 +1,22 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useRowingStore, ChartMetric } from '@/lib/store';
+import { useRowingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Gauge, Brain, RefreshCw, Trophy, Medal, BarChart3 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
+import { Upload, TrendingUp, Clock, Zap, Target, Activity, Flame, Brain, RefreshCw, Trophy } from 'lucide-react';
 import { InsightCard } from '@/components/ai/InsightCard';
 import { useAIInsights } from '@/hooks/useAIInsights';
-import { SettingsService } from '@/lib/settings';
-import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { Insight } from '@/lib/aiAnalysis';
-import { calculateAdvancedStats } from '@/lib/analysisUtils';
-import { formatChartDate, formatSessionDate, formatDateOnly, formatTime } from '@/lib/dateTimeUtils';
-import { chartTheme } from '@/lib/chartUtils';
+import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { MigrationPrompt } from '@/components/MigrationPrompt';
 import { calculateSessionStats } from '@/lib/rowingSessionProjections';
-import type { Session } from '@/types/session';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
 import { TimeRangeSelector, defaultTimeRangeOptions, type TimeRange } from '@/components/ui/time-range-selector';
-
-// Chart type options
-type ChartType = 'line' | 'bar' | 'area';
-
-// Chart configuration options
-
-interface ChartConfig {
-  metric: ChartMetric;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  fillOpacity?: number;
-  formatter: (value: number) => string;
-  yAxisFormatter: (value: number) => string;
-  unit: string;
-  isSpecial?: boolean; // For charts that don't follow standard metric pattern
-}
-
-interface DistanceChartDataPoint {
-  date: string;
-  distance: number;
-  fullDate: Date;
-}
-
-interface MetricChartDataPoint {
-  date: string;
-  fullDate: Date;
-  sessionId: string;
-  [key: string]: string | number | Date;
-}
-
-interface CustomTooltipPayload {
-  value?: unknown;
-}
-
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: ReadonlyArray<CustomTooltipPayload>;
-  label?: string | number;
-  config: ChartConfig;
-}
-
-const chartConfigs: Record<ChartMetric, ChartConfig> = {
-  distance: {
-    metric: 'distance',
-    label: 'Distance',
-    icon: TrendingUp,
-    color: '#3b82f6', // Blue-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${value}m`,
-    yAxisFormatter: (value: number) => `${value}m`,
-    unit: 'meters'
-  },
-  pace: {
-    metric: 'pace',
-    label: 'Average Pace',
-    icon: Target,
-    color: '#10b981', // Emerald-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => formatPace(value),
-    yAxisFormatter: (value: number) => formatPace(value),
-    unit: 'time per 500m'
-  },
-  power: {
-    metric: 'power',
-    label: 'Average Power',
-    icon: Zap,
-    color: '#f59e0b', // Amber-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)}W`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}W`,
-    unit: 'watts'
-  },
-  strokeRate: {
-    metric: 'strokeRate',
-    label: 'Stroke Rate',
-    icon: Activity,
-    color: '#8b5cf6', // Violet-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)} SPM`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'strokes per minute'
-  },
-  energy: {
-    metric: 'energy',
-    label: 'Energy',
-    icon: Flame,
-    color: '#ef4444', // Red-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)} kCal`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'kilocalories'
-  },
-  duration: {
-    metric: 'duration',
-    label: 'Duration',
-    icon: Clock,
-    color: '#06b6d4', // Cyan-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => formatDuration(value),
-    yAxisFormatter: (value: number) => `${Math.round(value / 60)}m`,
-    unit: 'minutes'
-  },
-  splitTime: {
-    metric: 'splitTime',
-    label: 'Pace Analysis',
-    icon: Target,
-    color: '#f97316', // Orange-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => formatPace(value),
-    yAxisFormatter: (value: number) => formatPace(value),
-    unit: 'time per 500m',
-    isSpecial: true
-  },
-  consistencyScore: {
-    metric: 'consistencyScore',
-    label: 'Consistency Score',
-    icon: BarChart3,
-    color: '#14b8a6', // Teal-500
-    fillOpacity: 0.3,
-    formatter: (value: number) => `${Math.round(value)}/100`,
-    yAxisFormatter: (value: number) => `${Math.round(value)}`,
-    unit: 'score (0-100)'
-  }
-};
 
 // Helper functions for formatting data
 function formatDistance(meters: number): string {
@@ -176,103 +44,15 @@ function formatPace(secondsPer500m: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')} / 500m`;
 }
 
-function formatPower(watts: number): string {
-  if (watts <= 0) return '--W';
-  return `${Math.round(watts)}W`;
-}
-
-
-// Prepare chart data for distance over time
-function prepareChartData(sessions: Session[]): DistanceChartDataPoint[] {
-  return sessions
-    .slice()
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .map(session => ({
-      date: formatChartDate(new Date(session.timestamp)),
-      distance: session.distance,
-      fullDate: session.timestamp
-    }));
-}
-
-// Custom tooltip component with full styling control
-const CustomTooltip = ({ active, payload, label, config }: CustomTooltipProps) => {
-  const value = payload?.[0]?.value;
-
-  if (active && typeof value === 'number') {
-    return (
-      <div style={chartTheme.tooltip.contentStyle}>
-        <p style={chartTheme.tooltip.labelStyle}>{label}</p>
-        <p style={chartTheme.tooltip.itemStyle}>
-          {config.formatter(value)} - {config.label}
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-function getMetricValue(session: Session, metric: ChartMetric): number {
-  switch (metric) {
-    case 'distance': return session.distance;
-    case 'pace': return session.avgSplit;
-    case 'power': return session.avgPower;
-    case 'strokeRate': return session.avgStrokeRate;
-    case 'energy': return session.energy;
-    case 'duration': return session.duration;
-    case 'splitTime': return session.avgSplit;
-    case 'consistencyScore': {
-      // Calculate consistency score from stroke data if available
-      if (session.strokeData && session.strokeData.length > 0) {
-        const stats = calculateAdvancedStats(session.strokeData);
-        return stats.consistencyScore;
-      }
-      return -1; // Return -1 to indicate no data available
-    }
-    default: return 0;
-  }
-}
-
-function prepareMetricChartData(sessions: Session[], metric: ChartMetric): MetricChartDataPoint[] {
-  return sessions
-    .map<MetricChartDataPoint>(session => ({
-      date: formatChartDate(new Date(session.timestamp)),
-      [metric]: getMetricValue(session, metric),
-      fullDate: session.timestamp,
-      sessionId: session.id
-    }))
-    // Filter out sessions without data (e.g., consistency score requires strokeData)
-    .filter(dataPoint => dataPoint[metric] !== -1);
-}
-
-function getActiveIndex(data: unknown): number | undefined {
-  if (typeof data !== 'object' || data === null || !('activeIndex' in data)) {
-    return undefined;
-  }
-
-  const activeIndex = data.activeIndex;
-  return typeof activeIndex === 'number' ? activeIndex : undefined;
-}
-
-function hasDate(value: unknown): value is { date: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'date' in value &&
-    typeof value.date === 'string'
-  );
-}
-
 const subscribeToMount = () => () => {};
 const getClientMounted = () => true;
 const getServerMounted = () => false;
 
 const Dashboard = () => {
-  const router = useRouter();
   const sessions = useRowingStore((state) => state.sessions);
-  const { getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings } = useRowingStore();
+  const { dashboardSettings, updateDashboardSettings } = useRowingStore();
   const stats = useMemo(() => calculateSessionStats(sessions), [sessions]);
 
-  const chartSettings = getChartSettings();
   const mounted = useSyncExternalStore(subscribeToMount, getClientMounted, getServerMounted);
 
   const timeRange = dashboardSettings.timeRange;
@@ -281,18 +61,11 @@ const Dashboard = () => {
   // AI Insights hook
   const {
     insights,
-    trends,
-    trainingLoad,
-    anomalies,
     isAnalyzable,
     lastAnalyzed,
     refreshInsights,
     archivedInsights,
     archiveInsight,
-    unarchiveInsight,
-    deleteInsight,
-    isArchivedView,
-    setIsArchivedView,
     isGenerating,
     cloudAIError,
     isCloudAIConfigured
@@ -335,128 +108,6 @@ const Dashboard = () => {
 
   // Check if user has data
   const hasData = sessions.length > 0;
-  const hasFilteredData = filteredSessions.length > 0;
-
-  // Toggle chart visibility
-  const toggleChart = (metric: ChartMetric) => {
-    const currentCharts = chartSettings.enabledCharts;
-    const updatedCharts = currentCharts.includes(metric)
-      ? currentCharts.filter(m => m !== metric)
-      : [...currentCharts, metric];
-
-    updateChartSettings({ enabledCharts: updatedCharts });
-  };
-
-  // Prepare chart data for each enabled metric
-  const chartDataMap = useMemo(() => {
-    return chartSettings.enabledCharts.reduce((acc, metric) => {
-      acc[metric] = hasFilteredData ? prepareMetricChartData(filteredSessions, metric) : [];
-      return acc;
-    }, {} as Record<ChartMetric, MetricChartDataPoint[]>);
-  }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData]);
-
-  // Handle chart data point click
-  const handleChartClick = (data: unknown, chartData: MetricChartDataPoint[]) => {
-    const activeIndex = getActiveIndex(data);
-    if (activeIndex === undefined || !chartData[activeIndex]) {
-      return;
-    }
-
-    const dataPoint = chartData[activeIndex];
-    if (dataPoint.sessionId) {
-      router.push(`/sessions/${dataPoint.sessionId}`);
-    }
-  };
-
-  // Render chart based on selected type
-  const renderChart = (metric: ChartMetric, chartData: MetricChartDataPoint[], config: ChartConfig) => {
-    const commonProps = {
-      width: '100%' as const,
-      height: 300,
-      data: chartData,
-      margin: { top: 5, right: 30, left: 20, bottom: 5 }
-    };
-
-    // Props for Bar/Area charts (need container onClick)
-    const barAreaProps = {
-      ...commonProps,
-      onClick: (data: unknown) => handleChartClick(data, chartData)
-    };
-
-    const commonChartElements = (
-      <>
-        <CartesianGrid strokeDasharray={chartTheme.grid.strokeDasharray} stroke={chartTheme.grid.stroke} opacity={chartTheme.grid.opacity} />
-        <XAxis
-          dataKey="date"
-          stroke={chartTheme.axis.strokeColor}
-          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
-        />
-        <YAxis
-          stroke={chartTheme.axis.strokeColor}
-          tick={{ fill: chartTheme.axis.tickColor, fontSize: chartTheme.axis.fontSize }}
-          tickFormatter={config.yAxisFormatter}
-        />
-        <Tooltip content={<CustomTooltip config={config} />} />
-      </>
-    );
-
-    switch (chartSettings.chartType) {
-      case 'bar':
-        return (
-          <BarChart {...barAreaProps}>
-            {commonChartElements}
-            <Bar
-              dataKey={metric}
-              fill={config.color}
-              radius={[4, 4, 0, 0]}
-              cursor="pointer"
-            />
-          </BarChart>
-        );
-      case 'area':
-        return (
-          <AreaChart {...barAreaProps}>
-            {commonChartElements}
-            <Area
-              type="monotone"
-              dataKey={metric}
-              stroke={config.color}
-              fill={config.color}
-              fillOpacity={config.fillOpacity}
-              strokeWidth={2}
-              cursor="pointer"
-            />
-          </AreaChart>
-        );
-      default: // line
-        return (
-          <LineChart {...commonProps}>
-            {commonChartElements}
-            <Line
-              type="monotone"
-              dataKey={metric}
-              stroke={config.color}
-              strokeWidth={2}
-              dot={{ fill: config.color, strokeWidth: 2, r: 4, cursor: 'pointer' }}
-              activeDot={{
-                r: 6,
-                cursor: 'pointer',
-                onClick: (_event: unknown, payload: unknown) => {
-                  // For Line charts, payload is the data point, but let's be safe and use index lookup
-                  const dataIndex = hasDate(payload)
-                    ? chartData.findIndex(item => item.date === payload.date)
-                    : -1;
-                  if (dataIndex !== -1) {
-                    handleChartClick({ activeIndex: dataIndex }, chartData);
-                  }
-                }
-              }}
-            />
-          </LineChart>
-        );
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">

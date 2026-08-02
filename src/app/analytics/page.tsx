@@ -25,10 +25,7 @@ import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
 import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { StrokeData, Session } from '@/types/session';
-import { sortSessionsByDate } from '@/lib/rowingSessionProjections';
-
-// Chart type options
-type ChartType = 'line' | 'bar' | 'area' | 'scatter';
+ 
 
 // Chart configuration options
 
@@ -156,21 +153,6 @@ function formatPace(secondsPer500m: number): string {
   const minutes = Math.floor(secondsPer500m / 60);
   const seconds = Math.floor(secondsPer500m % 60);
   return `${minutes}:${seconds.toString().padStart(2, '0')} / 500m`;
-}
-
-function formatPower(watts: number): string {
-  if (watts <= 0) return '--W';
-  return `${Math.round(watts)}W`;
-}
-
-
-// Prepare chart data for distance over time
-function prepareChartData(sessions: { timestamp: Date | string; distance: number }[]) {
-  return sortSessionsByDate(sessions).map(session => ({
-      date: formatChartDate(new Date(session.timestamp)),
-      distance: session.distance,
-      fullDate: session.timestamp
-    }));
 }
 
 // Smoothing options for charts (shared across all charts)
@@ -628,21 +610,7 @@ ${explainChartPrompt}`;
   };
 
   // AI Insights hook
-  const {
-    insights,
-    trends,
-    trainingLoad,
-    anomalies,
-    isAnalyzable,
-    lastAnalyzed,
-    refreshInsights,
-    archivedInsights,
-    archiveInsight,
-    unarchiveInsight,
-    deleteInsight,
-    isArchivedView,
-    setIsArchivedView
-  } = useAIInsights();
+  useAIInsights();
 
   // Filter sessions based on custom date range (if set) or time range
   // When using analytics data, filter based on chart data instead of full sessions
