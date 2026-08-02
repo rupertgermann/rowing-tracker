@@ -25,6 +25,7 @@ import { ExplanationTooltip } from '@/components/ExplanationTooltip';
 import { useLazyAnalytics, applySmoothingToData, type ChartDataPoint } from '@/hooks/useLazyAnalytics';
 import { PostureFaultTrendCard } from '@/components/PostureFaultTrendCard';
 import { StrokeData, Session } from '@/types/session';
+import { calculateSessionStats } from '@/lib/rowingSessionProjections';
  
 
 // Chart configuration options
@@ -269,6 +270,7 @@ const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: (Scat
 const Analytics = () => {
   const router = useRouter();
   const storeSessions = useRowingStore((state) => state.sessions);
+  const projectedSessionStats = useMemo(() => calculateSessionStats(storeSessions), [storeSessions]);
   const chartSettings = useRowingStore((state) => state.chartSettings);
   const { updateChartSettings, dashboardSettings, updateDashboardSettings, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
 
@@ -739,7 +741,7 @@ ${explainChartPrompt}`;
     : 0;
 
   // Check if user has data - primarily from lazy-loaded analytics
-  const hasData = (analyticsData?.sessionCount ?? 0) > 0 || sessions.length > 0;
+  const hasData = (analyticsData?.sessionCount ?? 0) > 0 || projectedSessionStats.totalSessions > 0;
   const hasFilteredData = filteredSessions.length > 0 || (analyticsData?.sessionCount ?? 0) > 0;
 
   // Session type for metric extraction
