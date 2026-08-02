@@ -270,7 +270,6 @@ const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: (Scat
 const Analytics = () => {
   const router = useRouter();
   const storeSessions = useRowingStore((state) => state.sessions);
-  const projectedSessionStats = useMemo(() => calculateSessionStats(storeSessions), [storeSessions]);
   const chartSettings = useRowingStore((state) => state.chartSettings);
   const { updateChartSettings, dashboardSettings, updateDashboardSettings, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
 
@@ -741,7 +740,12 @@ ${explainChartPrompt}`;
     : 0;
 
   // Check if user has data - primarily from lazy-loaded analytics
-  const hasData = (analyticsData?.sessionCount ?? 0) > 0 || projectedSessionStats.totalSessions > 0;
+  const projectedSessionCount = useMemo(
+    () => calculateSessionStats(storeSessions).totalSessions,
+    [storeSessions],
+  );
+  const hasData = (analyticsData?.sessionCount ?? 0) > 0
+    || (analyticsData === null && projectedSessionCount > 0);
   const hasFilteredData = filteredSessions.length > 0 || (analyticsData?.sessionCount ?? 0) > 0;
 
   // Session type for metric extraction
