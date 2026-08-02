@@ -252,15 +252,15 @@ function ChatPageContent() {
         pendingChartExplanationRef.current = null;
       }
     }
-  }, [currentSession?.messages, isLoading, setChartExplanation, currentSession?.id]);
+  }, [currentSession, isLoading, setChartExplanation]);
 
   // Check if there are any suggestions to show (custom prompts always count, default prompts depend on toggle)
-  const hasAnySuggestions = useMemo(() => {
-    const userPreferences = settings.getUserPreferences();
+  const userPreferences = settings.getUserPreferences();
+  const hasAnySuggestions = (() => {
     const hasCustomPrompts = userPreferences.customPrompts.length > 0;
     const showDefaultPrompts = userPreferences.showPromptSuggestions;
     return hasCustomPrompts || showDefaultPrompts;
-  }, [settings]);
+  })();
 
   // Convert our ChatMessage format to the kit's Message format
   const chatMessages: Message[] = useMemo(() => {
@@ -489,7 +489,7 @@ function ChatPageContent() {
   };
 
   // Prompt suggestions for empty chat - custom prompts always shown, default prompts controlled by toggle
-  const promptSuggestions = useMemo(() => {
+  const promptSuggestions = (() => {
     const defaultPrompts = [
       "How can I improve my rowing technique?",
       "What's next on the training plan?",
@@ -503,7 +503,6 @@ function ChatPageContent() {
       "what training plans do I have?"
     ];
 
-    const userPreferences = settings.getUserPreferences();
     const customPrompts = userPreferences.customPrompts;
 
     // Always show custom prompts, default prompts only if toggle is enabled
@@ -512,7 +511,7 @@ function ChatPageContent() {
       : customPrompts;
 
     return suggestions;
-  }, [settings]);
+  })();
 
   const formatDate = (date: Date) => {
     const today = new Date();

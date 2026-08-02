@@ -92,13 +92,6 @@ export function useChat() {
     isSearching: false
   });
 
-  // Load sessions on mount and initialize AI
-  useEffect(() => {
-    loadSessions();
-    // Initialize AI from settings on mount
-    initializeCloudAIFromSettings();
-  }, []);
-
   const loadSessions = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
@@ -140,6 +133,13 @@ export function useChat() {
       }));
     }
   }, []);
+
+  // Load sessions on mount and initialize AI
+  useEffect(() => {
+    loadSessions();
+    // Initialize AI from settings on mount
+    initializeCloudAIFromSettings();
+  }, [loadSessions]);
 
   // Create new session
   const createSession = useCallback(async (title?: string, category?: 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion', chartId?: string) => {
@@ -218,6 +218,30 @@ export function useChat() {
       }));
     }
   }, [state.sessions]);
+
+  // Update session title
+  const updateSessionTitle = useCallback((sessionId: string, title: string) => {
+    setState(prev => ({
+      ...prev,
+      sessions: prev.sessions.map(session =>
+        session.id === sessionId ? { ...session, title } : session
+      ),
+      currentSession: prev.currentSession?.id === sessionId
+        ? { ...prev.currentSession, title }
+        : prev.currentSession
+    }));
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'updateSession', sessionId, title }),
+    }).catch(() => {
+      setState(prev => ({
+        ...prev,
+        error: 'Failed to update session title'
+      }));
+    });
+  }, []);
 
   // Send message to AI
   const sendMessage = useCallback(async (content: string, attachments?: FileAttachment[]) => {
@@ -411,31 +435,7 @@ export function useChat() {
         error: error instanceof Error ? error.message : 'Failed to send message'
       }));
     }
-  }, [state.currentSession, getSessions]);
-
-  // Update session title
-  const updateSessionTitle = useCallback((sessionId: string, title: string) => {
-    setState(prev => ({
-      ...prev,
-      sessions: prev.sessions.map(session =>
-        session.id === sessionId ? { ...session, title } : session
-      ),
-      currentSession: prev.currentSession?.id === sessionId
-        ? { ...prev.currentSession, title }
-        : prev.currentSession
-    }));
-
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'updateSession', sessionId, title }),
-    }).catch(() => {
-      setState(prev => ({
-        ...prev,
-        error: 'Failed to update session title'
-      }));
-    });
-  }, []);
+  }, [state.currentSession, getSessions, updateSessionTitle]);
 
   // Delete session
   const deleteSession = useCallback(async (sessionId: string) => {
