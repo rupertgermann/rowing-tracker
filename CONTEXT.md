@@ -12,7 +12,7 @@ _Avoid_: general rower, club customer, coach customer
 
 ### PaidOutcome
 
-The CoreCustomer's measurable training and technique improvement through personalized training guidance, AI coaching, and movement analysis. Data import, training history, and basic analytics are the free foundation, not the PaidOutcome.
+The CoreCustomer's measurable training improvement through personalized guidance and AI coaching based on imported workout data. Movement analysis is a possible later extension, not part of the CommercialBeta; data import, training history, and basic analytics are the free foundation.
 
 _Avoid_: premium features, paid tracking
 
@@ -24,7 +24,7 @@ _Avoid_: lifetime deal, paid license, one-time upgrade
 
 ### CommercialBeta
 
-An invitation-only hosted validation phase in which CoreCustomers import SmartRow CSV/ZIP exports without sharing SmartRow credentials. It tests activation, repeated value, and real payment before a public commercial launch.
+An invitation-only hosted validation phase in which CoreCustomers import SmartRow CSV/ZIP exports without sharing SmartRow credentials. It excludes Mocap and FreeMoCap, and tests activation, repeated value, and real payment before a public commercial launch.
 
 _Avoid_: public launch, free preview
 
