@@ -133,16 +133,18 @@ export default function PlansPage() {
     initializeCloudAIFromSettings();
   }, []);
 
+  const activePlanId = activePlan?.id;
+
   useEffect(() => {
-    if (!activePlan) {
+    if (!activePlanId) {
       setPostureGoalProgress(null);
       return;
     }
-    fetch(`/api/training-plans/${activePlan.id}/posture-goal`)
+    fetch(`/api/training-plans/${activePlanId}/posture-goal`)
       .then(r => r.ok ? r.json() : null)
       .then(data => data && setPostureGoalProgress(data))
       .catch(() => {});
-  }, [activePlan?.id]);
+  }, [activePlanId]);
 
   // Auto-select current week when active plan changes
   useEffect(() => {

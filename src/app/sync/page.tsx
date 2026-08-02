@@ -62,30 +62,6 @@ export default function UploadPage() {
     }
   }, [uploadState]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (uploadState !== 'dragging') return;
-
-    const files = e.dataTransfer.files;
-    if (files.length === 0) {
-      setUploadState('idle');
-      return;
-    }
-
-    const file = files[0];
-    processFile(file);
-  }, [uploadState]);
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    processFile(file);
-  }, []);
-
   const checkMocapOverlap = useCallback(async (savedSessions: Session[]) => {
     if (savedSessions.length === 0) return;
     try {
@@ -165,7 +141,7 @@ export default function UploadPage() {
     }
   }, [getSessions, updateSessionsInStore]);
 
-  const processFile = async (file: File) => {
+  const processFile = useCallback(async (file: File) => {
     setSelectedFile(file);
     setError('');
     setUploadState('validating');
@@ -279,7 +255,31 @@ export default function UploadPage() {
       setError(errorMessage);
       setUploadState('error');
     }
-  };
+  }, [addSessions, checkMocapOverlap, getSessions, updateSessionsInStore]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (uploadState !== 'dragging') return;
+
+    const files = e.dataTransfer.files;
+    if (files.length === 0) {
+      setUploadState('idle');
+      return;
+    }
+
+    const file = files[0];
+    processFile(file);
+  }, [processFile, uploadState]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    processFile(file);
+  }, [processFile]);
 
   const resetUpload = useCallback(() => {
     setUploadState('idle');
