@@ -6,7 +6,7 @@ import { useRowingStore, AIAwardSuggestion } from '@/lib/store';
 import { useAchievementStore } from '@/lib/achievementStore';
 import { AWARDS, Award } from '@/lib/awards';
 import { getAchievementImage } from '@/lib/imageStorage';
-import { calculateAwardPredictions, formatPrediction, AwardPrediction } from '@/lib/awardPredictions';
+import { calculateAwardPredictions, formatPrediction } from '@/lib/awardPredictions';
 import { computeEarnedAwards } from '@/lib/rowingSessionProjections';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

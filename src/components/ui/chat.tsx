@@ -310,7 +310,7 @@ interface ChatFormProps {
 }
 
 export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
-  ({ children, handleSubmit, isPending, className, externalAttachments }, ref) => {
+  ({ children, handleSubmit, className, externalAttachments }, ref) => {
     const [files, setFiles] = useState<File[] | null>(null)
 
     // Sync external attachments to local state

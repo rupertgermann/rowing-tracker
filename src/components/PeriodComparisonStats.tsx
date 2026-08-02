@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, Calendar, TrendingUp, Zap, Timer } from 'lucide-react';

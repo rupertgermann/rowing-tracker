@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
+import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Clock, Zap, Activity, Flame, Target, Calendar, BarChart3 } from 'lucide-react';
 import { ChartTypeSelector } from '@/components/ui/chart-type-selector';
 import { formatMonthYear } from '@/lib/dateTimeUtils';
@@ -93,28 +93,20 @@ export function MetricComparisonWidget() {
     sessions.forEach(session => {
       const d = new Date(session.timestamp);
       let key = '';
-      let sortKey = ''; // For sorting chronologically
-
       if (period === 'week') {
         const year = d.getFullYear();
         const week = getWeek(d);
         key = `W${week} ${year}`;
-        sortKey = `${year}-${week.toString().padStart(2, '0')}`;
       } else if (period === 'month') {
         key = formatMonthYear(d, true);
-        sortKey = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
       } else if (period === 'quarter') {
         const q = getQuarter(d);
         key = `Q${q} ${d.getFullYear()}`;
-        sortKey = `${d.getFullYear()}-Q${q}`;
       } else if (period === 'year') {
         key = `${d.getFullYear()}`;
-        sortKey = `${d.getFullYear()}`;
       }
 
       if (!groups[key]) groups[key] = [];
-      // Attach sortKey to the array for later use if needed, or map differently
-      // Actually, we'll map to an object that includes sortKey
       groups[key].push(session);
     });
 

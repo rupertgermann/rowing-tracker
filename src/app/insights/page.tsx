@@ -40,8 +40,6 @@ export default function InsightsPage() {
   const {
     insights,
     archivedInsights,
-    archiveInsight,
-    unarchiveInsight,
     deleteInsight,
     refreshInsights,
     lastAnalyzed,
@@ -349,7 +347,6 @@ export default function InsightsPage() {
                               key={featured.id || 'featured'}
                               insight={featured}
                               isArchived={false}
-                              onArchive={archiveInsight}
                             />
                           )}
                           {/* Remaining insights in 2 columns */}
@@ -360,7 +357,6 @@ export default function InsightsPage() {
                                   key={insight.id || `insight-${index}`}
                                   insight={insight}
                                   isArchived={false}
-                                  onArchive={archiveInsight}
                                 />
                               ))}
                             </div>
@@ -422,7 +418,6 @@ export default function InsightsPage() {
                               key={featured.id || 'featured-archived'}
                               insight={featured}
                               isArchived={true}
-                              onArchive={unarchiveInsight}
                               onDelete={deleteInsight}
                             />
                           )}
@@ -434,7 +429,6 @@ export default function InsightsPage() {
                                   key={insight.id || `archived-${index}`}
                                   insight={insight}
                                   isArchived={true}
-                                  onArchive={unarchiveInsight}
                                   onDelete={deleteInsight}
                                 />
                               ))}

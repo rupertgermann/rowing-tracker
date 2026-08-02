@@ -12,10 +12,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, AlertTriangle } from 'lucide-react';
 import type { PostureFaultType } from '@/lib/mocap/analysis/types';
-import type { PostureTrendResult, FaultTrendPoint, SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
+import type { PostureTrendResult, SessionFaultInput } from '@/lib/mocap/postureTrendAggregation';
 
 const FAULT_LABELS: Record<PostureFaultType, string> = {
   rounded_back_at_catch: 'Rounded Back',

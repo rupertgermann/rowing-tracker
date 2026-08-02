@@ -4,7 +4,7 @@ import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MessageCircle, Brain } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useRowingStore } from '@/lib/store';
 import { Insight } from '@/lib/aiAnalysis';
 import { CloudInsight } from '@/lib/cloudAI';

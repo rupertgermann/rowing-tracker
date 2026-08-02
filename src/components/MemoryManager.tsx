@@ -20,7 +20,6 @@ import {
   X,
   HardDrive,
   AlertCircle,
-  CheckCircle,
   Loader2,
   Eye,
   Calendar,

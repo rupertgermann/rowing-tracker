@@ -18,7 +18,6 @@ import {
   CheckCircle,
   Cloud,
   Brain,
-  Archive,
   Trash2,
   History
 } from 'lucide-react';
@@ -45,11 +44,10 @@ interface InsightCardProps {
   insight: Insight | CloudInsight;
   onFeedback?: (insightId: string, feedback: 'helpful' | 'not_helpful' | 'action_taken') => void;
   isArchived?: boolean;
-  onArchive?: (insightId: string) => void;
   onDelete?: (insightId: string) => void;
 }
 
-export function InsightCard({ insight, onFeedback, isArchived = false, onArchive, onDelete }: InsightCardProps) {
+export function InsightCard({ insight, onFeedback, isArchived = false, onDelete }: InsightCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiscussionArchive, setShowDiscussionArchive] = useState(false);
   const [discussionCount, setDiscussionCount] = useState(0);
@@ -123,10 +121,6 @@ export function InsightCard({ insight, onFeedback, isArchived = false, onArchive
   const handleFeedback = (feedback: 'helpful' | 'not_helpful' | 'action_taken') => {
     recordFeedback(insight.id, feedback);
     onFeedback?.(insight.id, feedback);
-  };
-
-  const handleArchive = () => {
-    onArchive?.(insight.id);
   };
 
   const handleDelete = () => {

@@ -10,7 +10,6 @@ import { formatChartDate } from '@/lib/dateTimeUtils';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useRowingStore, type AnalyticsChartSettings, type ChartMetric, type SmoothingOption } from '@/lib/store';

@@ -65,7 +65,6 @@ const Dashboard = () => {
     lastAnalyzed,
     refreshInsights,
     archivedInsights,
-    archiveInsight,
     isGenerating,
     cloudAIError,
     isCloudAIConfigured
@@ -393,7 +392,6 @@ const Dashboard = () => {
                             insight={featured}
                             onFeedback={() => { }}
                             isArchived={false}
-                            onArchive={archiveInsight}
                           />
                         )}
                         {/* Remaining insights in 2 columns */}
@@ -405,7 +403,6 @@ const Dashboard = () => {
                                 insight={insight}
                                 onFeedback={() => { }}
                                 isArchived={false}
-                                onArchive={archiveInsight}
                               />
                             ))}
                           </div>
