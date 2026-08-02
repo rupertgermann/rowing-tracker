@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { useMemory } from '@/hooks/useMemory';
 import { MemoryDocument, MemoryDocumentType, MEMORY_CONFIG } from '@/lib/memoryStorage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -577,11 +578,16 @@ export function MemoryManager({ onClose, onAttachToChat }: MemoryManagerProps) {
               </Button>
             </div>
             {viewingDocId && documents.find(d => d.id === viewingDocId)?.type === 'image' ? (
-              <img
-                src={viewingUrl}
-                alt="Preview"
-                className="w-full h-full object-contain"
-              />
+              <div className="relative w-full h-[80vh]">
+                <Image
+                  src={viewingUrl}
+                  alt="Preview"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 896px"
+                  className="object-contain"
+                  unoptimized
+                />
+              </div>
             ) : (
               <iframe
                 src={viewingUrl}
