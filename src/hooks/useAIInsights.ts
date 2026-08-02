@@ -290,6 +290,11 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
     archivedInsights: [],
     isArchivedView: false
   });
+  const dataRef = useRef(data);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   // Initialize cloud AI from user settings
   const initializeCloudAI = useCallback(() => {
@@ -637,12 +642,14 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
       setIsAnalyzing(true);
       analysisInFlightRef.current = true;
 
-      // Calculate what needs to be archived (but DON'T update state yet - it's in effect dependencies)
+      // Calculate what needs to be archived without making the effect depend on
+      // data, which would cause it to restart after clearing the current insights.
       let currentArchived = archivedInsightsState;
-      let insightsToArchive: typeof data.insights = [];
-      if (data.insights && data.insights.length > 0) {
+      let insightsToArchive: AIInsightData['insights'] = [];
+      const currentInsights = dataRef.current.insights;
+      if (currentInsights.length > 0) {
         const now = new Date();
-        insightsToArchive = data.insights.map(i => ({
+        insightsToArchive = currentInsights.map(i => ({
           ...i,
           archived: true,
           archivedAt: now.toISOString(),

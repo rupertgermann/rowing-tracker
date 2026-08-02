@@ -32,11 +32,6 @@ export function useMemory() {
 
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
 
-  // Load documents on mount
-  useEffect(() => {
-    loadDocuments();
-  }, []);
-
   const loadDocuments = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
@@ -58,6 +53,11 @@ export function useMemory() {
       }));
     }
   }, []);
+
+  // Load documents on mount
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   // Upload a document
   const uploadDocument = useCallback(async (
