@@ -4,7 +4,7 @@
   "private": true,
   "description": "AI-powered rowing workout tracker for SmartRow CSV exports with analytics, training plans, and achievement tracking",
   "author": "Rupert Germann",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "repository": {
     "type": "git",
     "url": "https://github.com/rupertgermann/rowing-tracker.git"

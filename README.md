@@ -573,7 +573,11 @@ Rate limiting is applied to:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Revisions after commit
+`d38df10faabb812ac8f24a0fd28c30530067764e` are proprietary. Revisions up to
+and including that commit remain available under the MIT License terms under
+which they were originally published. Third-party components retain their own
+licenses. See [LICENSE](LICENSE) for details.
 
 ## Support
 
