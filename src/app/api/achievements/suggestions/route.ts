@@ -20,7 +20,14 @@ interface SuggestionResponse {
   }>;
 }
 
-function extractResponseTextOrJson(data: Record<string, unknown>): { kind: 'text' | 'json'; value: string } | null {
+type OpenAIResponseData = Record<string, unknown> & {
+  status?: string;
+  incomplete_details?: { reason?: string };
+  output_text?: string;
+  output?: unknown;
+};
+
+function extractResponseTextOrJson(data: OpenAIResponseData): { kind: 'text' | 'json'; value: string } | null {
   if (data?.status === 'incomplete') {
     const incompleteDetails = data?.incomplete_details as { reason?: string } | undefined;
     const reason = incompleteDetails?.reason || 'unknown';
@@ -186,7 +193,7 @@ Keep output short:
       6000
     );
 
-    const callOpenAI = async (requestedMaxOutputTokens: number) => {
+    const callOpenAI = async (requestedMaxOutputTokens: number): Promise<Response | OpenAIResponseData> => {
       const resp = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
@@ -256,11 +263,11 @@ Keep output short:
         );
       }
 
-      const json = await resp.json();
+      const json: OpenAIResponseData = await resp.json();
       return json;
     };
 
-    let data: any = await callOpenAI(initialMaxOutputTokens);
+    let data = await callOpenAI(initialMaxOutputTokens);
     // If callOpenAI returned an HTTP NextResponse due to OpenAI error, return it.
     if (data instanceof Response) {
       return data;
@@ -275,7 +282,16 @@ Keep output short:
     }
     const extracted = extractResponseTextOrJson(data);
     if (!extracted) {
-      const outputTypes = Array.isArray(data?.output) ? data.output.map((o: any) => o?.type).filter(Boolean) : [];
+      const outputItems: unknown[] = Array.isArray(data?.output) ? data.output : [];
+      const outputTypes = outputItems
+        .map((outputItem: unknown) => {
+          if (typeof outputItem !== 'object' || outputItem === null || !('type' in outputItem)) {
+            return undefined;
+          }
+          const type = outputItem.type;
+          return typeof type === 'string' ? type : undefined;
+        })
+        .filter((type): type is string => typeof type === 'string');
       console.error('OpenAI response had no extractable content.', {
         status: data?.status,
         outputTypes,

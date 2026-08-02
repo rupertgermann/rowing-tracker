@@ -5,6 +5,9 @@
 
 import { Session, PersonalRecord } from '@/types/session';
 import { EarnedAward } from '@/lib/awards';
+import type { GeneratedAchievement } from '@/types/achievement';
+import type { MemoryDocumentData } from '@/lib/memorySync';
+import type { Settings } from '@/lib/settings';
 import {
   fetchRowingSessionList,
   loadRowingSessionList,
@@ -22,6 +25,11 @@ export interface SessionsListResponse {
   sessions: Session[];
   sessionsRevision: number;
   count: number;
+}
+
+interface SyncedSettings extends Partial<Settings> {
+  chartSettings?: Record<string, unknown>;
+  sessionAnalysisSettings?: Record<string, unknown>;
 }
 
 /**
@@ -466,7 +474,7 @@ export async function saveChatSessionsToDB(chatSessions: Record<string, unknown>
 /**
  * Fetch user settings from database
  */
-export async function fetchSettingsFromDB(): Promise<any> {
+export async function fetchSettingsFromDB(): Promise<SyncedSettings | null> {
   try {
     const response = await fetch('/api/settings');
     if (!response.ok) {
@@ -483,7 +491,7 @@ export async function fetchSettingsFromDB(): Promise<any> {
 /**
  * Save user settings to database
  */
-export async function saveSettingsToDB(settings: any): Promise<SyncResult> {
+export async function saveSettingsToDB(settings: Partial<Settings>): Promise<SyncResult> {
   try {
     const response = await fetch('/api/settings', {
       method: 'POST',
@@ -506,7 +514,13 @@ export async function saveSettingsToDB(settings: any): Promise<SyncResult> {
 /**
  * Fetch generated achievements from database
  */
-export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
+export type GeneratedAchievementRecord = Omit<Partial<GeneratedAchievement>, 'story' | 'imageUrl'> & {
+  awardId: string;
+  story?: string | null;
+  imageUrl?: string | null;
+};
+
+export async function fetchGeneratedAchievementsFromDB(): Promise<GeneratedAchievementRecord[]> {
   
   try {
     const response = await fetch('/api/generated-achievements');
@@ -528,7 +542,7 @@ export async function fetchGeneratedAchievementsFromDB(): Promise<any[]> {
 /**
  * Save generated achievements to database
  */
-export async function saveGeneratedAchievementsToDB(achievements: any[]): Promise<SyncResult> {
+export async function saveGeneratedAchievementsToDB(achievements: GeneratedAchievementRecord[]): Promise<SyncResult> {
   
   try {
     const response = await fetch('/api/generated-achievements', {
@@ -555,7 +569,7 @@ export async function saveGeneratedAchievementsToDB(achievements: any[]): Promis
 /**
  * Fetch memory documents from database
  */
-export async function fetchMemoryDocumentsFromDB(): Promise<any[]> {
+export async function fetchMemoryDocumentsFromDB(): Promise<MemoryDocumentData[]> {
   try {
     const response = await fetch('/api/memory');
     if (!response.ok) {
@@ -572,7 +586,7 @@ export async function fetchMemoryDocumentsFromDB(): Promise<any[]> {
 /**
  * Save memory documents to database
  */
-export async function saveMemoryDocumentsToDB(documents: any[]): Promise<SyncResult> {
+export async function saveMemoryDocumentsToDB(documents: MemoryDocumentData[]): Promise<SyncResult> {
   try {
     const response = await fetch('/api/memory', {
       method: 'POST',
@@ -623,7 +637,7 @@ export async function initializeStoreFromDB() {
     settings,
     generatedAchievements,
     memoryDocuments,
-    chartSettings: settings?.chartSettings || null,
-    sessionAnalysisSettings: settings?.sessionAnalysisSettings || null,
+    chartSettings: settings?.chartSettings ?? null,
+    sessionAnalysisSettings: settings?.sessionAnalysisSettings ?? null,
   };
 }

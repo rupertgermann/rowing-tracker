@@ -89,7 +89,7 @@ export function LazyChart({
 
   // Handle card ref
   const setRefs = (el: HTMLDivElement | null) => {
-    (containerRef as any).current = el;
+    containerRef.current = el;
     cardRef?.(el);
   };
 

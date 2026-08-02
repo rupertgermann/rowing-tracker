@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { InsightCard } from '@/components/ai/InsightCard';
@@ -80,7 +80,7 @@ export default function InsightsPage() {
     }
   };
 
-  const filterAndSortInsights = (insightList: (Insight | CloudInsight)[]) => {
+  const filterAndSortInsights = useCallback((insightList: (Insight | CloudInsight)[]) => {
     let filtered = insightList;
 
     // Filter by search query
@@ -113,10 +113,10 @@ export default function InsightsPage() {
     });
 
     return filtered;
-  };
+  }, [searchQuery, selectedTypes, sortBy]);
 
-  const currentInsights = useMemo(() => filterAndSortInsights(insights || []), [insights, searchQuery, selectedTypes, sortBy]);
-  const archivedInsightsList = useMemo(() => filterAndSortInsights(archivedInsights || []), [archivedInsights, searchQuery, selectedTypes, sortBy]);
+  const currentInsights = useMemo(() => filterAndSortInsights(insights || []), [insights, filterAndSortInsights]);
+  const archivedInsightsList = useMemo(() => filterAndSortInsights(archivedInsights || []), [archivedInsights, filterAndSortInsights]);
 
   // Group insights by date for timeline view
   const groupByDate = (insightList: (Insight | CloudInsight)[]) => {

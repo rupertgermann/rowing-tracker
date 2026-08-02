@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRowingStore, type SessionsDistanceFilter } from '@/lib/store';
@@ -60,6 +60,10 @@ function formatPace(secondsPer500m: number): string {
 // Sort configuration
 type SortField = 'date' | 'distance' | 'pace' | 'power';
 
+const emptySubscribe = () => () => {};
+const getClientMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
+
 export default function SessionsPage() {
   const sessions = useRowingStore((state) => state.sessions);
   const { replaceSessionsInStore, sessionsViewSettings, updateSessionsViewSettings } = useRowingStore();
@@ -77,14 +81,10 @@ export default function SessionsPage() {
       distances: prDistances
     };
   };
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(emptySubscribe, getClientMountedSnapshot, getServerMountedSnapshot);
 
   const sortConfig = sessionsViewSettings.sortConfig;
   const filters = sessionsViewSettings.filters;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

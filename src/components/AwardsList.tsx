@@ -15,13 +15,14 @@ import { getShadowStyle, getCardClassName } from '@/lib/cardStyles';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { AchievementGallery } from './AchievementGallery';
 import { Trash2, Sparkles, CheckCircle2, TrendingUp } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 // Unified display item for both static awards and AI-generated goals
 interface DisplayAward {
   id: string;
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   isEarned: boolean;
   earnedAt?: Date;

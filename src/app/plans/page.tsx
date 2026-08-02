@@ -694,7 +694,7 @@ Please provide:
                 <select
                   id="level"
                   value={planForm.level}
-                  onChange={(e) => setPlanForm(prev => ({ ...prev, level: e.target.value as any }))}
+                  onChange={(e) => setPlanForm(prev => ({ ...prev, level: e.target.value as TrainingPlan['level'] }))}
                   className="w-full p-2 border rounded-md"
                 >
                   <option value="beginner">Beginner</option>
@@ -707,7 +707,7 @@ Please provide:
                 <select
                   id="focus"
                   value={planForm.focus}
-                  onChange={(e) => setPlanForm(prev => ({ ...prev, focus: e.target.value as any }))}
+                  onChange={(e) => setPlanForm(prev => ({ ...prev, focus: e.target.value as TrainingPlan['focus'] }))}
                   className="w-full p-2 border rounded-md"
                 >
                   <option value="general_fitness">General Fitness</option>
@@ -1227,7 +1227,7 @@ Please provide:
                   <select
                     id="edit-level"
                     value={planForm.level}
-                    onChange={(e) => setPlanForm({ ...planForm, level: e.target.value as any })}
+                    onChange={(e) => setPlanForm({ ...planForm, level: e.target.value as TrainingPlan['level'] })}
                     className="w-full mt-1 p-2 border rounded-md"
                   >
                     <option value="beginner">Beginner</option>
@@ -1240,7 +1240,7 @@ Please provide:
                   <select
                     id="edit-focus"
                     value={planForm.focus}
-                    onChange={(e) => setPlanForm({ ...planForm, focus: e.target.value as any })}
+                    onChange={(e) => setPlanForm({ ...planForm, focus: e.target.value as TrainingPlan['focus'] })}
                     className="w-full mt-1 p-2 border rounded-md"
                   >
                     <option value="general_fitness">General Fitness</option>

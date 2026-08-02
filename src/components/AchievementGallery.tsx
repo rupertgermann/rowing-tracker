@@ -32,6 +32,7 @@ import {
   Download,
   Palette
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { ACHIEVEMENT_COLOR_PALETTES, type ColorPalette } from '@/lib/achievementColors';
 
 // Unified gallery item for both static awards and AI awards
@@ -39,7 +40,7 @@ interface GalleryAward {
   id: string;
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   earnedAt: Date;
   isAIAward: boolean;
@@ -276,11 +277,11 @@ export function AchievementGallery({
   }, [open, goToPrevious, goToNext]);
 
   // Get the color palette for the current award (per-award or fallback to global settings)
-  const getCurrentColorPalette = (): string => {
+  const getCurrentColorPalette = (): ColorPalette['value'] => {
     return generated?.colorPalette || aiSettings.achievementImageColors || 'classic';
   };
 
-  const handleColorPaletteChange = async (paletteValue: string) => {
+  const handleColorPaletteChange = async (paletteValue: ColorPalette['value']) => {
     if (!currentAward) return;
 
     // Update the store with the new color palette

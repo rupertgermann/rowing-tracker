@@ -44,7 +44,7 @@ export interface UseAnalyticsDataResult {
   // Summary statistics
   summary: AnalyticsSummary;
   // Scatter plot data
-  scatterData: any[];
+  scatterData: CachedAnalyticsData['scatterData'];
   // Available dates for date picker
   availableDates: Date[];
   // Loading state
@@ -85,7 +85,7 @@ export function useAnalyticsData(): UseAnalyticsDataResult {
   const [fromCache, setFromCache] = useState(false);
   const [cachedData, setCachedData] = useState<CachedAnalyticsData | null>(null);
   const isInitialized = useRef(false);
-  const refreshCounter = useRef(0);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   // Check cache validity and load data
   useEffect(() => {
@@ -117,7 +117,7 @@ export function useAnalyticsData(): UseAnalyticsDataResult {
     };
 
     loadData();
-  }, [refreshCounter.current]);
+  }, [refreshCounter]);
 
   // Compute chart data from sessions (only when cache is invalid)
   const computedData = useMemo(() => {
@@ -254,7 +254,7 @@ export function useAnalyticsData(): UseAnalyticsDataResult {
     clearAnalyticsCache();
     setCachedData(null);
     setFromCache(false);
-    refreshCounter.current++;
+    setRefreshCounter((counter) => counter + 1);
   }, []);
 
   // Return cached or computed data

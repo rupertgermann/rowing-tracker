@@ -22,6 +22,22 @@ interface SplitTimeChartProps {
   embedded?: boolean; // render without outer Card/header (for embedding inside another card)
 }
 
+interface SplitChartPoint extends Session {
+  movingAvg?: number;
+}
+
+interface SplitDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: SplitChartPoint;
+}
+
+interface SplitTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: SplitChartPoint }>;
+  label?: string | number;
+}
+
 // Color mapping for stroke rate (20-30 SPM)
 const getStrokeRateColor = (strokeRate: number): string => {
   // Map stroke rate to color gradient (blue for low, red for high)
@@ -50,8 +66,7 @@ const calculateMovingAverage = (sessions: Session[]): (Session & { movingAvg?: n
 };
 
 // Custom dot component with stroke rate coloring
-const CustomDot = (props: any) => {
-  const { cx, cy, payload } = props;
+const CustomDot = ({ cx, cy, payload }: SplitDotProps) => {
 
   if (!payload || payload.avgStrokeRate === undefined) {
     return null;
@@ -70,7 +85,7 @@ const CustomDot = (props: any) => {
 };
 
 // Custom tooltip
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: SplitTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (

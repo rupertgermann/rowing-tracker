@@ -35,7 +35,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { MemoryManager } from '@/components/MemoryManager';
 import { useMemory } from '@/hooks/useMemory';
 import { MemoryDocument, memoryStorage } from '@/lib/memoryStorage';
-import { FileAttachment } from '@/lib/cloudAI';
+import type { ChatSession, FileAttachment } from '@/lib/cloudAI';
 import { blobToDataUrl } from '@/lib/documentProcessor';
 import { settings } from '@/lib/settings';
 
@@ -74,8 +74,7 @@ function ChatPageContent() {
   const [attachedDocs, setAttachedDocs] = useState<MemoryDocument[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'chat' | 'explanation' | 'plan_analysis' | 'insight_discussion'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showPromptSuggestions, setShowPromptSuggestions] = useState(true);
-  const [pendingChartExplanation, setPendingChartExplanation] = useState<{ chartId: string; prompt: string; chartTitle: string } | null>(null);
+  const pendingChartExplanationRef = useRef<{ chartId: string; prompt: string; chartTitle: string } | null>(null);
   const [chartAttachments, setChartAttachments] = useState<FileAttachment[]>([]);
   const initialPromptProcessedRef = useRef(false);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
@@ -104,7 +103,7 @@ function ChatPageContent() {
 
           if (newSession) {
             // Store pending chart explanation context for tracking AI response
-            setPendingChartExplanation({ chartId: pendingData.chartId, prompt: pendingData.prompt, chartTitle: pendingData.chartTitle });
+            pendingChartExplanationRef.current = { chartId: pendingData.chartId, prompt: pendingData.prompt, chartTitle: pendingData.chartTitle };
 
             // Prepare attachments (screenshot only - data goes in prompt)
             const attachments: FileAttachment[] = [];
@@ -218,6 +217,7 @@ function ChatPageContent() {
 
   // Monitor for AI response completion to save chart explanation
   useEffect(() => {
+    const pendingChartExplanation = pendingChartExplanationRef.current;
     if (!pendingChartExplanation || !currentSession) return;
 
     // Check if current session is an explanation session matching our pending chart
@@ -249,15 +249,10 @@ function ChatPageContent() {
         });
 
         // Clear pending state
-        setPendingChartExplanation(null);
+        pendingChartExplanationRef.current = null;
       }
     }
-  }, [currentSession?.messages, isLoading, pendingChartExplanation, setChartExplanation, currentSession?.id]);
-
-  // Load prompt suggestions setting from settings
-  useEffect(() => {
-    setShowPromptSuggestions(settings.getUserPreferences().showPromptSuggestions);
-  }, []);
+  }, [currentSession?.messages, isLoading, setChartExplanation, currentSession?.id]);
 
   // Check if there are any suggestions to show (custom prompts always count, default prompts depend on toggle)
   const hasAnySuggestions = useMemo(() => {
@@ -276,7 +271,7 @@ function ChatPageContent() {
       content: msg.content,
       createdAt: new Date(msg.timestamp),
     }));
-  }, [currentSession?.messages]);
+  }, [currentSession]);
 
   // Handle input change for the Chat component
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -435,7 +430,7 @@ function ChatPageContent() {
   }, [attachedDocs]);
 
   // Start editing session title
-  const startEditingTitle = (session: any) => {
+  const startEditingTitle = (session: ChatSession) => {
     setEditingSessionId(session.id);
     setEditingTitle(session.title);
   };

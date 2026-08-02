@@ -115,13 +115,13 @@ class MemoryStorageService {
     // Deduplicate: Remove existing documents with same internal keys to ensure uniquely relevant sets
     const existingDocs = await this.filterByType(type);
 
-    const contentId = (content as any)?.id;
-    const generatedAt = (content as any)?.generatedAt;
+    const contentId = content.id;
+    const generatedAt = content.generatedAt;
 
     const duplicates = existingDocs.filter(doc => {
       // 1. Training Plan Check: Match by internal content ID
       if (type === 'training_plan' && contentId) {
-        const docContentId = (doc.content as any)?.id;
+        const docContentId = doc.content?.id;
         if (docContentId && contentId === docContentId) {
           return true;
         }
@@ -130,7 +130,7 @@ class MemoryStorageService {
       // 2. Insight Check: Match by Name AND GeneratedAt
       // This allows multiple differently-timed insights on the same day, but prevents exact duplicates
       if (type === 'insight' && generatedAt) {
-        const docGeneratedAt = (doc.content as any)?.generatedAt;
+        const docGeneratedAt = doc.content?.generatedAt;
         if (docGeneratedAt && name === doc.name && generatedAt === docGeneratedAt) {
           return true;
         }

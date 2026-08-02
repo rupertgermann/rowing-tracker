@@ -43,7 +43,7 @@ export interface AnalyticsSummary {
 export interface AnalyticsData {
   chartData: Record<ChartMetric, ChartDataPoint[]>;
   summary: AnalyticsSummary;
-  scatterData: any[];
+  scatterData: CachedAnalyticsData['scatterData'];
   availableDates: string[];
   sessionsRevision: number;
   sessionCount: number;

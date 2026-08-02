@@ -15,6 +15,34 @@ export interface ChatState {
 
 const CURRENT_SESSION_KEY = 'rowing_ai_current_session';
 
+function asDbRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+}
+
+function dbString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function dbOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function dbDate(value: unknown): Date {
+  if (value instanceof Date) return new Date(value);
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+  return new Date(0);
+}
+
+function dbCategory(value: unknown): ChatSession['category'] {
+  return value === 'chat' || value === 'explanation' || value === 'plan_analysis' || value === 'insight_discussion'
+    ? value
+    : undefined;
+}
+
+function dbRole(value: unknown): ChatMessage['role'] {
+  return value === 'user' || value === 'assistant' ? value : 'assistant';
+}
+
 function getStoredCurrentSessionId(): string | null {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
   return localStorage.getItem(CURRENT_SESSION_KEY);
@@ -29,25 +57,25 @@ function setStoredCurrentSessionId(sessionId: string | null): void {
   localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
 }
 
-function dbSessionToChatSession(s: any): ChatSession {
+function dbSessionToChatSession(s: Record<string, unknown>): ChatSession {
   return {
-    id: s.id,
-    title: s.title,
+    id: dbString(s.id),
+    title: dbString(s.title),
     messages: [],
-    createdAt: new Date(s.createdAt),
-    updatedAt: new Date(s.updatedAt),
-    category: s.category,
-    chartId: s.chartId || undefined,
-    messageCount: s.messageCount ?? 0,
+    createdAt: dbDate(s.createdAt),
+    updatedAt: dbDate(s.updatedAt),
+    category: dbCategory(s.category),
+    chartId: dbOptionalString(s.chartId),
+    messageCount: typeof s.messageCount === 'number' ? s.messageCount : 0,
   };
 }
 
-function dbMessageToChatMessage(m: any, sessionId: string): ChatMessage {
+function dbMessageToChatMessage(m: Record<string, unknown>, sessionId: string): ChatMessage {
   return {
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    timestamp: new Date(m.timestamp),
+    id: dbString(m.id),
+    role: dbRole(m.role),
+    content: dbString(m.content),
+    timestamp: dbDate(m.timestamp),
     sessionId,
   };
 }
@@ -97,7 +125,7 @@ export function useChat() {
         const messagesRes = await fetch(`/api/chat?sessionId=${encodeURIComponent(nextCurrent.id)}&limit=200`);
         if (messagesRes.ok) {
           const msgData = await messagesRes.json();
-          const msgs = (msgData.messages || []).map((m: any) => dbMessageToChatMessage(m, nextCurrent.id));
+          const msgs = (msgData.messages || []).map((m: Record<string, unknown>) => dbMessageToChatMessage(m, nextCurrent.id));
           setState(prev => ({
             ...prev,
             currentSession: prev.currentSession ? { ...prev.currentSession, messages: msgs } : prev.currentSession,
@@ -466,10 +494,13 @@ export function useChat() {
       }
 
       const data = await res.json();
-      const results = (data.results || []).map((r: any) => ({
-        session: dbSessionToChatSession(r.session),
-        message: dbMessageToChatMessage(r.message, r.session.id),
-      }));
+      const results = (data.results || []).map((r: Record<string, unknown>) => {
+        const session = asDbRecord(r.session);
+        return {
+          session: dbSessionToChatSession(session),
+          message: dbMessageToChatMessage(asDbRecord(r.message), dbString(session.id)),
+        };
+      });
 
       setState(prev => ({
         ...prev,

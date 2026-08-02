@@ -1,34 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRowingStore } from '@/lib/store';
-import { AWARDS } from '@/lib/awards';
+import { AWARDS, type EarnedAward } from '@/lib/awards';
 import { X, PartyPopper, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function AwardNotification() {
   const { newlyEarnedAward, dismissNewAward, aiAwardSuggestions } = useRowingStore();
-  const [visible, setVisible] = useState(false);
+  const [dismissedAward, setDismissedAward] = useState<EarnedAward | null>(null);
 
-  const handleDismiss = () => {
-    setVisible(false);
+  const handleDismiss = useCallback(() => {
+    if (newlyEarnedAward) {
+      setDismissedAward(newlyEarnedAward);
+    }
     setTimeout(() => {
       dismissNewAward();
     }, 300); // Wait for exit animation
-  };
+  }, [dismissNewAward, newlyEarnedAward]);
 
   useEffect(() => {
-    if (newlyEarnedAward) {
-      setVisible(true);
-      // Auto dismiss after 10 seconds
-      const timer = setTimeout(() => {
-        handleDismiss();
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [newlyEarnedAward]);
+    if (!newlyEarnedAward) return;
 
+    // Auto dismiss after 10 seconds
+    const timer = setTimeout(handleDismiss, 10000);
+    return () => clearTimeout(timer);
+  }, [handleDismiss, newlyEarnedAward]);
+
+  const visible = newlyEarnedAward !== null && newlyEarnedAward !== dismissedAward;
   if (!newlyEarnedAward || !visible) return null;
 
   // Try to find in static awards first

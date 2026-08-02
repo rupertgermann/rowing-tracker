@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRowingStore, ChartMetric } from '@/lib/store';
@@ -19,6 +19,7 @@ import { chartTheme } from '@/lib/chartUtils';
 import { CloudInsight } from '@/lib/cloudAI';
 import { MigrationPrompt } from '@/components/MigrationPrompt';
 import { calculateSessionStats } from '@/lib/rowingSessionProjections';
+import type { Session } from '@/types/session';
 
 import { MetricComparisonWidget } from '@/components/MetricComparisonWidget';
 import { PeriodComparisonStats } from '@/components/PeriodComparisonStats';
@@ -39,6 +40,30 @@ interface ChartConfig {
   yAxisFormatter: (value: number) => string;
   unit: string;
   isSpecial?: boolean; // For charts that don't follow standard metric pattern
+}
+
+interface DistanceChartDataPoint {
+  date: string;
+  distance: number;
+  fullDate: Date;
+}
+
+interface MetricChartDataPoint {
+  date: string;
+  fullDate: Date;
+  sessionId: string;
+  [key: string]: string | number | Date;
+}
+
+interface CustomTooltipPayload {
+  value?: unknown;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: ReadonlyArray<CustomTooltipPayload>;
+  label?: string | number;
+  config: ChartConfig;
 }
 
 const chartConfigs: Record<ChartMetric, ChartConfig> = {
@@ -158,7 +183,7 @@ function formatPower(watts: number): string {
 
 
 // Prepare chart data for distance over time
-function prepareChartData(sessions: any[]) {
+function prepareChartData(sessions: Session[]): DistanceChartDataPoint[] {
   return sessions
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -170,19 +195,76 @@ function prepareChartData(sessions: any[]) {
 }
 
 // Custom tooltip component with full styling control
-const CustomTooltip = ({ active, payload, label, config }: any) => {
-  if (active && payload && payload.length) {
+const CustomTooltip = ({ active, payload, label, config }: CustomTooltipProps) => {
+  const value = payload?.[0]?.value;
+
+  if (active && typeof value === 'number') {
     return (
       <div style={chartTheme.tooltip.contentStyle}>
         <p style={chartTheme.tooltip.labelStyle}>{label}</p>
         <p style={chartTheme.tooltip.itemStyle}>
-          {config.formatter(payload[0].value)} - {config.label}
+          {config.formatter(value)} - {config.label}
         </p>
       </div>
     );
   }
   return null;
 };
+
+function getMetricValue(session: Session, metric: ChartMetric): number {
+  switch (metric) {
+    case 'distance': return session.distance;
+    case 'pace': return session.avgSplit;
+    case 'power': return session.avgPower;
+    case 'strokeRate': return session.avgStrokeRate;
+    case 'energy': return session.energy;
+    case 'duration': return session.duration;
+    case 'splitTime': return session.avgSplit;
+    case 'consistencyScore': {
+      // Calculate consistency score from stroke data if available
+      if (session.strokeData && session.strokeData.length > 0) {
+        const stats = calculateAdvancedStats(session.strokeData);
+        return stats.consistencyScore;
+      }
+      return -1; // Return -1 to indicate no data available
+    }
+    default: return 0;
+  }
+}
+
+function prepareMetricChartData(sessions: Session[], metric: ChartMetric): MetricChartDataPoint[] {
+  return sessions
+    .map<MetricChartDataPoint>(session => ({
+      date: formatChartDate(new Date(session.timestamp)),
+      [metric]: getMetricValue(session, metric),
+      fullDate: session.timestamp,
+      sessionId: session.id
+    }))
+    // Filter out sessions without data (e.g., consistency score requires strokeData)
+    .filter(dataPoint => dataPoint[metric] !== -1);
+}
+
+function getActiveIndex(data: unknown): number | undefined {
+  if (typeof data !== 'object' || data === null || !('activeIndex' in data)) {
+    return undefined;
+  }
+
+  const activeIndex = data.activeIndex;
+  return typeof activeIndex === 'number' ? activeIndex : undefined;
+}
+
+function hasDate(value: unknown): value is { date: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'date' in value &&
+    typeof value.date === 'string'
+  );
+}
+
+const subscribeToMount = () => () => {};
+const getClientMounted = () => true;
+const getServerMounted = () => false;
 
 const Dashboard = () => {
   const router = useRouter();
@@ -191,7 +273,7 @@ const Dashboard = () => {
   const stats = useMemo(() => calculateSessionStats(sessions), [sessions]);
 
   const chartSettings = getChartSettings();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeToMount, getClientMounted, getServerMounted);
 
   const timeRange = dashboardSettings.timeRange;
   const setTimeRange = (range: TimeRange) => updateDashboardSettings({ timeRange: range });
@@ -215,10 +297,6 @@ const Dashboard = () => {
     cloudAIError,
     isCloudAIConfigured
   } = useAIInsights();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Filter sessions based on selected time range
   const filteredSessions = useMemo(() => {
@@ -259,41 +337,6 @@ const Dashboard = () => {
   const hasData = sessions.length > 0;
   const hasFilteredData = filteredSessions.length > 0;
 
-  // Prepare chart data for different metrics
-  const prepareChartData = (sessions: any[], metric: ChartMetric) => {
-    return sessions
-      .map(session => ({
-        date: formatChartDate(new Date(session.timestamp)),
-        [metric]: getMetricValue(session, metric),
-        fullDate: session.timestamp,
-        sessionId: session.id
-      }))
-      // Filter out sessions without data (e.g., consistency score requires strokeData)
-      .filter(dataPoint => dataPoint[metric] !== -1);
-  };
-
-  // Get metric value from session based on metric type
-  const getMetricValue = (session: any, metric: ChartMetric): number => {
-    switch (metric) {
-      case 'distance': return session.distance;
-      case 'pace': return session.avgSplit;
-      case 'power': return session.avgPower;
-      case 'strokeRate': return session.avgStrokeRate;
-      case 'energy': return session.energy;
-      case 'duration': return session.duration;
-      case 'splitTime': return session.avgSplit;
-      case 'consistencyScore': {
-        // Calculate consistency score from stroke data if available
-        if (session.strokeData && session.strokeData.length > 0) {
-          const stats = calculateAdvancedStats(session.strokeData);
-          return stats.consistencyScore;
-        }
-        return -1; // Return -1 to indicate no data available
-      }
-      default: return 0;
-    }
-  };
-
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
     const currentCharts = chartSettings.enabledCharts;
@@ -307,23 +350,26 @@ const Dashboard = () => {
   // Prepare chart data for each enabled metric
   const chartDataMap = useMemo(() => {
     return chartSettings.enabledCharts.reduce((acc, metric) => {
-      acc[metric] = hasFilteredData ? prepareChartData(filteredSessions, metric) : [];
+      acc[metric] = hasFilteredData ? prepareMetricChartData(filteredSessions, metric) : [];
       return acc;
-    }, {} as Record<ChartMetric, any[]>);
+    }, {} as Record<ChartMetric, MetricChartDataPoint[]>);
   }, [filteredSessions, chartSettings.enabledCharts, hasFilteredData]);
 
   // Handle chart data point click
-  const handleChartClick = (data: any, chartData: any[]) => {
-    if (data && data.activeIndex !== undefined && chartData[data.activeIndex]) {
-      const dataPoint = chartData[data.activeIndex];
-      if (dataPoint.sessionId) {
-        router.push(`/sessions/${dataPoint.sessionId}`);
-      }
+  const handleChartClick = (data: unknown, chartData: MetricChartDataPoint[]) => {
+    const activeIndex = getActiveIndex(data);
+    if (activeIndex === undefined || !chartData[activeIndex]) {
+      return;
+    }
+
+    const dataPoint = chartData[activeIndex];
+    if (dataPoint.sessionId) {
+      router.push(`/sessions/${dataPoint.sessionId}`);
     }
   };
 
   // Render chart based on selected type
-  const renderChart = (metric: ChartMetric, chartData: any[], config: ChartConfig) => {
+  const renderChart = (metric: ChartMetric, chartData: MetricChartDataPoint[], config: ChartConfig) => {
     const commonProps = {
       width: '100%' as const,
       height: 300,
@@ -334,7 +380,7 @@ const Dashboard = () => {
     // Props for Bar/Area charts (need container onClick)
     const barAreaProps = {
       ...commonProps,
-      onClick: (data: any) => handleChartClick(data, chartData)
+      onClick: (data: unknown) => handleChartClick(data, chartData)
     };
 
     const commonChartElements = (
@@ -395,9 +441,11 @@ const Dashboard = () => {
               activeDot={{
                 r: 6,
                 cursor: 'pointer',
-                onClick: (e: any, payload: any) => {
+                onClick: (_event: unknown, payload: unknown) => {
                   // For Line charts, payload is the data point, but let's be safe and use index lookup
-                  const dataIndex = chartData.findIndex(item => item.date === payload.date);
+                  const dataIndex = hasDate(payload)
+                    ? chartData.findIndex(item => item.date === payload.date)
+                    : -1;
                   if (dataIndex !== -1) {
                     handleChartClick({ activeIndex: dataIndex }, chartData);
                   }

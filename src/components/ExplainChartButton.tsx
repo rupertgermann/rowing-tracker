@@ -15,7 +15,7 @@ interface ExplainChartButtonProps {
   chartTitle: string;
   chartDescription: string;
   dataContext: string;
-  fullData: any[];
+  fullData: unknown[];
   variant?: 'default' | 'compact';
 }
 

@@ -1,5 +1,5 @@
 import React from "react"
-import Markdown from "react-markdown"
+import Markdown, { type Components, type ExtraProps } from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { cn } from "@/lib/utils"
@@ -54,27 +54,23 @@ const CodeBlock = ({
   )
 }
 
-function childrenTakeAllStringContents(element: any): string {
+function childrenTakeAllStringContents(element: React.ReactNode): string {
   if (typeof element === "string") {
     return element
   }
 
-  if (element?.props?.children) {
-    const children = element.props.children
+  if (Array.isArray(element)) {
+    return element.map((child) => childrenTakeAllStringContents(child)).join("")
+  }
 
-    if (Array.isArray(children)) {
-      return children
-        .map((child) => childrenTakeAllStringContents(child))
-        .join("")
-    } else {
-      return childrenTakeAllStringContents(children)
-    }
+  if (React.isValidElement<{ children?: React.ReactNode }>(element)) {
+    return childrenTakeAllStringContents(element.props.children)
   }
 
   return ""
 }
 
-const COMPONENTS = {
+const COMPONENTS: Components = {
   h1: withClass("h1", "text-2xl font-semibold"),
   h2: withClass("h2", "font-semibold text-xl"),
   h3: withClass("h3", "font-semibold text-lg"),
@@ -83,7 +79,8 @@ const COMPONENTS = {
   strong: withClass("strong", "font-semibold"),
   a: withClass("a", "text-primary underline underline-offset-2"),
   blockquote: withClass("blockquote", "border-l-2 border-primary pl-4"),
-  code: ({ children, className, node, ...rest }: any) => {
+  code: ({ children, className, node, ...rest }: React.JSX.IntrinsicElements["code"] & ExtraProps) => {
+    void node
     const match = /language-(\w+)/.exec(className || "")
     return match ? (
       <CodeBlock className={className} language={match[1]} {...rest}>
@@ -100,7 +97,10 @@ const COMPONENTS = {
       </code>
     )
   },
-  pre: ({ children }: any) => children,
+  pre: ({ children, node }: React.JSX.IntrinsicElements["pre"] & ExtraProps) => {
+    void node
+    return children
+  },
   ol: withClass("ol", "list-decimal space-y-2 pl-6"),
   ul: withClass("ul", "list-disc space-y-2 pl-6"),
   li: withClass("li", "my-1.5"),
@@ -122,7 +122,8 @@ const COMPONENTS = {
 }
 
 function withClass(Tag: keyof React.JSX.IntrinsicElements, classes: string) {
-  const Component = ({ node, ...props }: any) => {
+  const Component = ({ node, ...props }: React.HTMLAttributes<HTMLElement> & ExtraProps) => {
+    void node
     const Element = Tag as React.ElementType
     return <Element className={classes} {...props} />
   }

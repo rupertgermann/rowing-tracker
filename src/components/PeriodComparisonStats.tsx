@@ -75,8 +75,8 @@ export function PeriodComparisonStats() {
     };
   };
 
-  const statsA = useMemo(() => getStatsForMonth(periodA), [sessions, periodA]);
-  const statsB = useMemo(() => getStatsForMonth(periodB), [sessions, periodB]);
+  const statsA = useMemo(() => getStatsForMonth(periodA), [getStatsForMonth, periodA]);
+  const statsB = useMemo(() => getStatsForMonth(periodB), [getStatsForMonth, periodB]);
 
   const renderComparisonCard = (
     title: string, 

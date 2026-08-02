@@ -14,6 +14,21 @@ type Period = 'week' | 'month' | 'quarter' | 'year';
 type Metric = 'distance' | 'duration' | 'energy' | 'power' | 'pace' | 'strokeRate';
 type ChartType = 'bar' | 'line' | 'area';
 
+interface AggregatedDataPoint {
+  label: string;
+  value: number;
+  count: number;
+  sortKey: string;
+  totalDist: number;
+  totalDur: number;
+}
+
+interface MetricTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: AggregatedDataPoint }>;
+  label?: string | number;
+}
+
 const metrics: { value: Metric; label: string; icon: React.ElementType; color: string; unit: string }[] = [
   { value: 'distance', label: 'Distance', icon: TrendingUp, color: '#3b82f6', unit: 'm' },
   { value: 'duration', label: 'Duration', icon: Clock, color: '#06b6d4', unit: 'm' },
@@ -169,7 +184,7 @@ export function MetricComparisonWidget() {
 
   const activeMetric = metrics.find(m => m.value === metric)!;
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: MetricTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
@@ -215,7 +230,16 @@ export function MetricComparisonWidget() {
 
   const renderChart = () => {
     const ChartComponent = chartType === 'line' ? LineChart : chartType === 'area' ? AreaChart : BarChart;
-    const DataComponent = (chartType === 'line' ? Line : chartType === 'area' ? Area : Bar) as any;
+    const DataComponent = (chartType === 'line' ? Line : chartType === 'area' ? Area : Bar) as unknown as React.ComponentType<{
+      type?: string;
+      dataKey: string;
+      stroke?: string;
+      fill?: string;
+      fillOpacity?: number;
+      strokeWidth?: number;
+      animationDuration?: number;
+      radius?: [number, number, number, number];
+    }>;
 
     // Radius prop is only for Bar
     const barProps = chartType === 'bar' ? { radius: [4, 4, 0, 0] as [number, number, number, number] } : {};

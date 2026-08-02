@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useCallback, useState, useEffect, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +95,31 @@ type SettingsCategory =
   | 'mocapSettings'
   | 'aiSettings';
 
+type SettingsUpdates = {
+  [Category in SettingsCategory]: Partial<Settings[Category]>;
+};
+
+type StringSettingKey = {
+  [Key in keyof AISettings]: AISettings[Key] extends string ? Key : never;
+}[keyof AISettings];
+
+type SelectValue<T extends string> = T | { value: T };
+
+function getSelectedValue<T extends string>(
+  value: unknown,
+  options: readonly SelectValue<T>[],
+  fallback: T,
+): T {
+  if (
+    typeof value === 'string' &&
+    options.some(option => (typeof option === 'string' ? option : option.value) === value)
+  ) {
+    return value as T;
+  }
+
+  return fallback;
+}
+
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('userPreferences');
   // Initialize as null to avoid hydration mismatch - load from localStorage after mount
@@ -125,16 +150,16 @@ export default function SettingsPage() {
       setIsVisible(true);
     }, []);
 
-    const handleExit = () => {
+    const handleExit = useCallback(() => {
       setIsVisible(false);
       setTimeout(onExit, 300); // Wait for slide-out animation
-    };
+    }, [onExit]);
 
     useEffect(() => {
       // Auto-dismiss and trigger exit animation
       const exitTimer = setTimeout(handleExit, type === 'success' ? 3000 : 5000);
       return () => clearTimeout(exitTimer);
-    }, [type, onExit]);
+    }, [type, handleExit]);
 
     return (
       <div
@@ -184,7 +209,7 @@ export default function SettingsPage() {
   // Prompt editor modal state
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<{
-    key: string;
+    key: StringSettingKey;
     label: string;
     description: string;
     value: string;
@@ -301,7 +326,7 @@ export default function SettingsPage() {
   };
 
   const openPromptEditor = (
-    key: string,
+    key: StringSettingKey,
     label: string,
     description: string,
     value: string,
@@ -318,7 +343,7 @@ export default function SettingsPage() {
       if (editingPrompt.key === 'userProfileRawInput') {
         setProfileRawInput(promptEditorValue);
       }
-      saveSettings('aiSettings', { [editingPrompt.key]: promptEditorValue });
+      saveSettings('aiSettings', { [editingPrompt.key]: promptEditorValue } as Partial<AISettings>);
       setPromptEditorOpen(false);
       setEditingPrompt(null);
     }
@@ -333,7 +358,10 @@ export default function SettingsPage() {
     }
   };
 
-  const saveSettings = async (category: SettingsCategory, updates: any) => {
+  const saveSettings = async <Category extends SettingsCategory>(
+    category: Category,
+    updates: SettingsUpdates[Category],
+  ) => {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -341,28 +369,28 @@ export default function SettingsPage() {
     try {
       switch (category) {
         case 'userPreferences':
-          settings.updateUserPreferences(updates);
+          settings.updateUserPreferences(updates as Partial<UserPreferences>);
           break;
         case 'dataManagement':
-          settings.updateDataManagement(updates);
+          settings.updateDataManagement(updates as Partial<DataManagement>);
           break;
         case 'trainingSettings':
-          settings.updateTrainingSettings(updates);
+          settings.updateTrainingSettings(updates as Partial<TrainingSettings>);
           break;
         case 'notificationSettings':
-          settings.updateNotificationSettings(updates);
+          settings.updateNotificationSettings(updates as Partial<NotificationSettings>);
           break;
         case 'privacySettings':
-          settings.updatePrivacySettings(updates);
+          settings.updatePrivacySettings(updates as Partial<PrivacySettings>);
           break;
         case 'smartRowSettings':
-          settings.updateSmartRowSettings(updates);
+          settings.updateSmartRowSettings(updates as Partial<SmartRowSettings>);
           break;
         case 'mocapSettings':
-          settings.updateMocapSettings(updates);
+          settings.updateMocapSettings(updates as Partial<Settings['mocapSettings']>);
           break;
         case 'aiSettings':
-          settings.updateAISettings(updates);
+          settings.updateAISettings(updates as Partial<AISettings>);
           break;
       }
 
@@ -439,7 +467,7 @@ export default function SettingsPage() {
 
       // Also clear from Zustand store if clearing sessions
       if (dataCategoryToClear === 'sessions') {
-        const { useRowingStore } = require('@/lib/store');
+        const { useRowingStore } = await import('@/lib/store');
         useRowingStore.getState().clearSessions();
       }
 
@@ -481,7 +509,9 @@ export default function SettingsPage() {
           <select
             id="theme"
             value={settingsData.userPreferences.theme}
-            onChange={(e) => saveSettings('userPreferences', { theme: e.target.value as any })}
+            onChange={(e) => saveSettings('userPreferences', {
+              theme: getSelectedValue(e.target.value, ['light', 'dark', 'system'] as const, settingsData.userPreferences.theme)
+            })}
             className="w-full mt-1 p-2 border rounded-md"
           >
             <option value="light">Light</option>
@@ -515,7 +545,9 @@ export default function SettingsPage() {
           <select
             id="units"
             value={settingsData.userPreferences.units}
-            onChange={(e) => saveSettings('userPreferences', { units: e.target.value as any })}
+            onChange={(e) => saveSettings('userPreferences', {
+              units: getSelectedValue(e.target.value, ['metric', 'imperial'] as const, settingsData.userPreferences.units)
+            })}
             className="w-full mt-1 p-2 border rounded-md"
           >
             <option value="metric">Metric</option>
@@ -528,7 +560,13 @@ export default function SettingsPage() {
           <select
             id="dateFormat"
             value={settingsData.userPreferences.dateFormat}
-            onChange={(e) => saveSettings('userPreferences', { dateFormat: e.target.value as any })}
+            onChange={(e) => saveSettings('userPreferences', {
+              dateFormat: getSelectedValue(
+                e.target.value,
+                ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'] as const,
+                settingsData.userPreferences.dateFormat,
+              )
+            })}
             className="w-full mt-1 p-2 border rounded-md"
           >
             <option value="MM/DD/YYYY">MM/DD/YYYY</option>
@@ -542,7 +580,9 @@ export default function SettingsPage() {
           <select
             id="timeFormat"
             value={settingsData.userPreferences.timeFormat}
-            onChange={(e) => saveSettings('userPreferences', { timeFormat: e.target.value as any })}
+            onChange={(e) => saveSettings('userPreferences', {
+              timeFormat: getSelectedValue(e.target.value, ['12h', '24h'] as const, settingsData.userPreferences.timeFormat)
+            })}
             className="w-full mt-1 p-2 border rounded-md"
           >
             <option value="12h">12-hour</option>
@@ -555,7 +595,9 @@ export default function SettingsPage() {
           <select
             id="language"
             value={settingsData.userPreferences.language}
-            onChange={(e) => saveSettings('userPreferences', { language: e.target.value as any })}
+            onChange={(e) => saveSettings('userPreferences', {
+              language: getSelectedValue(e.target.value, ['en', 'es', 'fr', 'de'] as const, settingsData.userPreferences.language)
+            })}
             className="w-full mt-1 p-2 border rounded-md"
           >
             {settings.getAvailableLanguages().map(lang => (
@@ -569,7 +611,13 @@ export default function SettingsPage() {
           <select
             id="defaultChartType"
             value={settingsData.userPreferences.defaultChartType}
-            onChange={(e) => saveSettings('userPreferences', { defaultChartType: e.target.value as any })}
+            onChange={(e) => saveSettings('userPreferences', {
+              defaultChartType: getSelectedValue(
+                e.target.value,
+                ['line', 'bar', 'area'] as const,
+                settingsData.userPreferences.defaultChartType,
+              )
+            })}
             className="w-full mt-1 p-2 border rounded-md"
           >
             <option value="line">Line</option>
@@ -860,7 +908,14 @@ export default function SettingsPage() {
                 id="goalType"
                 value={settingsData.trainingSettings.weeklyGoal.type}
                 onChange={(e) => saveSettings('trainingSettings', {
-                  weeklyGoal: { ...settingsData.trainingSettings.weeklyGoal, type: e.target.value as any }
+                  weeklyGoal: {
+                    ...settingsData.trainingSettings.weeklyGoal,
+                    type: getSelectedValue(
+                      e.target.value,
+                      ['sessions', 'distance', 'duration'] as const,
+                      settingsData.trainingSettings.weeklyGoal.type,
+                    )
+                  }
                 })}
                 className="w-full mt-1 p-2 border rounded-md"
               >
@@ -992,7 +1047,14 @@ export default function SettingsPage() {
                     id="emailFrequency"
                     value={settingsData.notificationSettings.emailNotifications.frequency}
                     onChange={(e) => saveSettings('notificationSettings', {
-                      emailNotifications: { ...settingsData.notificationSettings.emailNotifications, frequency: e.target.value as any }
+                      emailNotifications: {
+                        ...settingsData.notificationSettings.emailNotifications,
+                        frequency: getSelectedValue(
+                          e.target.value,
+                          ['daily', 'weekly', 'monthly'] as const,
+                          settingsData.notificationSettings.emailNotifications.frequency,
+                        )
+                      }
                     })}
                     className="w-full mt-1 p-2 border rounded-md"
                   >
@@ -1768,7 +1830,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.chat?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            chat: { ...settingsData.aiSettings.chat, model: e.target.value as any }
+                            chat: {
+                              ...settingsData.aiSettings.chat,
+                              model: getSelectedValue(
+                                e.target.value,
+                                AI_TEXT_MODEL_OPTIONS,
+                                settingsData.aiSettings.chat?.model || 'gpt-5.4-mini',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1787,7 +1856,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.chat?.reasoning || 'none'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            chat: { ...settingsData.aiSettings.chat, reasoning: e.target.value as any }
+                            chat: {
+                              ...settingsData.aiSettings.chat,
+                              reasoning: getSelectedValue(
+                                e.target.value,
+                                AI_REASONING_EFFORT_OPTIONS,
+                                settingsData.aiSettings.chat?.reasoning || 'none',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1803,7 +1879,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.chat?.verbosity || 'medium'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            chat: { ...settingsData.aiSettings.chat, verbosity: e.target.value as any }
+                            chat: {
+                              ...settingsData.aiSettings.chat,
+                              verbosity: getSelectedValue(
+                                e.target.value,
+                                AI_RESPONSE_VERBOSITY_OPTIONS,
+                                settingsData.aiSettings.chat?.verbosity || 'medium',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1834,7 +1917,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.insights?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            insights: { ...settingsData.aiSettings.insights, model: e.target.value as any }
+                            insights: {
+                              ...settingsData.aiSettings.insights,
+                              model: getSelectedValue(
+                                e.target.value,
+                                AI_TEXT_MODEL_OPTIONS,
+                                settingsData.aiSettings.insights?.model || 'gpt-5.4-mini',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1853,7 +1943,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.insights?.reasoning || 'medium'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            insights: { ...settingsData.aiSettings.insights, reasoning: e.target.value as any }
+                            insights: {
+                              ...settingsData.aiSettings.insights,
+                              reasoning: getSelectedValue(
+                                e.target.value,
+                                AI_REASONING_EFFORT_OPTIONS,
+                                settingsData.aiSettings.insights?.reasoning || 'medium',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1869,7 +1966,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.insights?.verbosity || 'low'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            insights: { ...settingsData.aiSettings.insights, verbosity: e.target.value as any }
+                            insights: {
+                              ...settingsData.aiSettings.insights,
+                              verbosity: getSelectedValue(
+                                e.target.value,
+                                AI_RESPONSE_VERBOSITY_OPTIONS,
+                                settingsData.aiSettings.insights?.verbosity || 'low',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1900,7 +2004,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.trainingPlans?.model || 'gpt-5.5'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, model: e.target.value as any }
+                            trainingPlans: {
+                              ...settingsData.aiSettings.trainingPlans,
+                              model: getSelectedValue(
+                                e.target.value,
+                                AI_TEXT_MODEL_OPTIONS,
+                                settingsData.aiSettings.trainingPlans?.model || 'gpt-5.5',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1919,7 +2030,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.trainingPlans?.reasoning || 'high'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, reasoning: e.target.value as any }
+                            trainingPlans: {
+                              ...settingsData.aiSettings.trainingPlans,
+                              reasoning: getSelectedValue(
+                                e.target.value,
+                                AI_REASONING_EFFORT_OPTIONS,
+                                settingsData.aiSettings.trainingPlans?.reasoning || 'high',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1935,7 +2053,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.trainingPlans?.verbosity || 'high'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            trainingPlans: { ...settingsData.aiSettings.trainingPlans, verbosity: e.target.value as any }
+                            trainingPlans: {
+                              ...settingsData.aiSettings.trainingPlans,
+                              verbosity: getSelectedValue(
+                                e.target.value,
+                                AI_RESPONSE_VERBOSITY_OPTIONS,
+                                settingsData.aiSettings.trainingPlans?.verbosity || 'high',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1966,7 +2091,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, model: e.target.value as any }
+                            userProfileGeneration: {
+                              ...settingsData.aiSettings.userProfileGeneration,
+                              model: getSelectedValue(
+                                e.target.value,
+                                AI_TEXT_MODEL_OPTIONS,
+                                settingsData.aiSettings.userProfileGeneration?.model || 'gpt-5.4-mini',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -1985,7 +2117,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.userProfileGeneration?.reasoning || 'low'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, reasoning: e.target.value as any }
+                            userProfileGeneration: {
+                              ...settingsData.aiSettings.userProfileGeneration,
+                              reasoning: getSelectedValue(
+                                e.target.value,
+                                AI_REASONING_EFFORT_OPTIONS,
+                                settingsData.aiSettings.userProfileGeneration?.reasoning || 'low',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2001,7 +2140,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.userProfileGeneration?.verbosity || 'low'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            userProfileGeneration: { ...settingsData.aiSettings.userProfileGeneration, verbosity: e.target.value as any }
+                            userProfileGeneration: {
+                              ...settingsData.aiSettings.userProfileGeneration,
+                              verbosity: getSelectedValue(
+                                e.target.value,
+                                AI_RESPONSE_VERBOSITY_OPTIONS,
+                                settingsData.aiSettings.userProfileGeneration?.verbosity || 'low',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2032,7 +2178,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.achievementText?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            achievementText: { ...settingsData.aiSettings.achievementText, model: e.target.value as any }
+                            achievementText: {
+                              ...settingsData.aiSettings.achievementText,
+                              model: getSelectedValue(
+                                e.target.value,
+                                AI_TEXT_MODEL_OPTIONS,
+                                settingsData.aiSettings.achievementText?.model || 'gpt-5.4-mini',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2051,7 +2204,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.achievementText?.reasoning || 'low'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            achievementText: { ...settingsData.aiSettings.achievementText, reasoning: e.target.value as any }
+                            achievementText: {
+                              ...settingsData.aiSettings.achievementText,
+                              reasoning: getSelectedValue(
+                                e.target.value,
+                                AI_REASONING_EFFORT_OPTIONS,
+                                settingsData.aiSettings.achievementText?.reasoning || 'low',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2067,7 +2227,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.achievementText?.verbosity || 'medium'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            achievementText: { ...settingsData.aiSettings.achievementText, verbosity: e.target.value as any }
+                            achievementText: {
+                              ...settingsData.aiSettings.achievementText,
+                              verbosity: getSelectedValue(
+                                e.target.value,
+                                AI_RESPONSE_VERBOSITY_OPTIONS,
+                                settingsData.aiSettings.achievementText?.verbosity || 'medium',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2098,7 +2265,13 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.achievementImageModel}
                           onChange={(e) =>
-                            saveSettings('aiSettings', { achievementImageModel: e.target.value as any })
+                            saveSettings('aiSettings', {
+                              achievementImageModel: getSelectedValue(
+                                e.target.value,
+                                AI_ACHIEVEMENT_IMAGE_MODEL_OPTIONS,
+                                settingsData.aiSettings.achievementImageModel,
+                              )
+                            })
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2114,7 +2287,13 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.achievementImageQuality}
                           onChange={(e) =>
-                            saveSettings('aiSettings', { achievementImageQuality: e.target.value as any })
+                            saveSettings('aiSettings', {
+                              achievementImageQuality: getSelectedValue(
+                                e.target.value,
+                                AI_ACHIEVEMENT_IMAGE_QUALITY_OPTIONS,
+                                settingsData.aiSettings.achievementImageQuality,
+                              )
+                            })
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2130,7 +2309,13 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.achievementImageSize}
                           onChange={(e) =>
-                            saveSettings('aiSettings', { achievementImageSize: e.target.value as any })
+                            saveSettings('aiSettings', {
+                              achievementImageSize: getSelectedValue(
+                                e.target.value,
+                                AI_ACHIEVEMENT_IMAGE_SIZE_OPTIONS,
+                                settingsData.aiSettings.achievementImageSize,
+                              )
+                            })
                           }
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2211,7 +2396,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.awardSuggestions?.model || 'gpt-5.4-mini'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, model: e.target.value as any }
+                            awardSuggestions: {
+                              ...settingsData.aiSettings.awardSuggestions,
+                              model: getSelectedValue(
+                                e.target.value,
+                                AI_TEXT_MODEL_OPTIONS,
+                                settingsData.aiSettings.awardSuggestions?.model || 'gpt-5.4-mini',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2230,7 +2422,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.awardSuggestions?.reasoning || 'medium'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, reasoning: e.target.value as any }
+                            awardSuggestions: {
+                              ...settingsData.aiSettings.awardSuggestions,
+                              reasoning: getSelectedValue(
+                                e.target.value,
+                                AI_REASONING_EFFORT_OPTIONS,
+                                settingsData.aiSettings.awardSuggestions?.reasoning || 'medium',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >
@@ -2246,7 +2445,14 @@ export default function SettingsPage() {
                         <select
                           value={settingsData.aiSettings.awardSuggestions?.verbosity || 'low'}
                           onChange={(e) => saveSettings('aiSettings', {
-                            awardSuggestions: { ...settingsData.aiSettings.awardSuggestions, verbosity: e.target.value as any }
+                            awardSuggestions: {
+                              ...settingsData.aiSettings.awardSuggestions,
+                              verbosity: getSelectedValue(
+                                e.target.value,
+                                AI_RESPONSE_VERBOSITY_OPTIONS,
+                                settingsData.aiSettings.awardSuggestions?.verbosity || 'low',
+                              )
+                            }
                           })}
                           className="w-full mt-1 p-2 border rounded-md"
                         >

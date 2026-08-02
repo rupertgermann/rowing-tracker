@@ -54,6 +54,12 @@ export interface AIInsightData {
   setIsArchivedView?: (isArchived: boolean) => void;
 }
 
+type StoredInsight = (Insight | CloudInsight) & {
+  archived?: boolean;
+  archivedAt?: string | null;
+  feedback?: string | null;
+};
+
 const AUTO_ARCHIVE_DAYS = 30; // Archive insights older than 30 days
 
 // Sync insights to memory storage for AI coach access
@@ -97,9 +103,9 @@ const addToArchive = (existing: (Insight | CloudInsight)[], newItems: (Insight |
   return [...existing, ...uniqueNewItems];
 };
 
-const persistInsightUpdateToDB = async (insight: any): Promise<void> => {
+const persistInsightUpdateToDB = async (insight: StoredInsight): Promise<void> => {
   try {
-    await saveInsightsToDB([insight]);
+    await saveInsightsToDB([{ ...insight }]);
   } catch (error) {
     console.warn('[useAIInsights] Failed to persist insight update to database:', error);
   }
@@ -135,11 +141,11 @@ const fetchInsightsFromDatabase = async (): Promise<{ active: (Insight | CloudIn
     const active: (Insight | CloudInsight)[] = [];
     const archived: (Insight | CloudInsight)[] = [];
     
-    dbInsights.forEach((insight: any) => {
+    dbInsights.forEach((insight: Record<string, unknown>) => {
       const processedInsight = {
         ...insight,
-        dateGenerated: new Date(insight.dateGenerated || Date.now())
-      };
+        dateGenerated: normalizeInsightDate(insight.dateGenerated)
+      } as StoredInsight;
       
       if (insight.archived) {
         archived.push(processedInsight);
@@ -154,6 +160,14 @@ const fetchInsightsFromDatabase = async (): Promise<{ active: (Insight | CloudIn
     return { active: [], archived: [] };
   }
 };
+
+function normalizeInsightDate(value: unknown): Date {
+  if (value instanceof Date) return new Date(value);
+  if (typeof value === 'string' || typeof value === 'number') {
+    return new Date(value || Date.now());
+  }
+  return new Date();
+}
 
 
 // Auto-archive old insights
@@ -791,8 +805,8 @@ export function useInsightFeedback() {
         const allInsights = [...active, ...archived];
         const cache: Record<string, string> = {};
 
-        allInsights.forEach((insight: any) => {
-          if (insight.feedback) {
+        allInsights.forEach((insight: Insight | CloudInsight) => {
+          if ('feedback' in insight && typeof insight.feedback === 'string' && insight.feedback) {
             cache[insight.id] = insight.feedback;
           }
         });

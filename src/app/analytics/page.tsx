@@ -197,6 +197,8 @@ const defaultAnalyticsSettings: AnalyticsChartSettings = {
   }
 };
 
+const consistencyScoreCache = new WeakMap<object, number>();
+
 // Calculate moving average for smoothing
 const calculateMovingAverage = (data: number[], windowSize: number): (number | null)[] => {
   if (windowSize === 0) return data;
@@ -239,10 +241,54 @@ const CustomTooltip = ({ active, payload, label, config, smoothing }: CustomTool
   return null;
 };
 
+interface ScatterTooltipEntry {
+  name: string;
+  value: number;
+  dataKey: string;
+}
+
+interface ScatterTooltipPayload {
+  payload: { date: string };
+}
+
+const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: (ScatterTooltipEntry & ScatterTooltipPayload)[] }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div style={chartTheme.tooltip.contentStyle}>
+        <p style={chartTheme.tooltip.labelStyle}>{data.date}</p>
+        {payload.map((entry, index) => (
+          <p key={index} style={chartTheme.tooltip.itemStyle}>
+            {entry.name}: {
+              entry.dataKey === 'pace'
+                ? formatPace(entry.value)
+                : entry.dataKey === 'durationMinutes'
+                  ? `${entry.value} min`
+                  : entry.dataKey === 'distance'
+                    ? `${entry.value}m`
+                    : entry.dataKey === 'power'
+                      ? `${Math.round(entry.value)}W`
+                      : entry.dataKey === 'energy'
+                        ? `${Math.round(entry.value)} kCal`
+                        : entry.dataKey === 'strokeRate'
+                          ? `${Math.round(entry.value)} SPM`
+                          : entry.dataKey === 'strokeLength'
+                            ? `${entry.value.toFixed(2)}m`
+                            : entry.value
+            }
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 const Analytics = () => {
   const router = useRouter();
   const storeSessions = useRowingStore((state) => state.sessions);
-  const { getChartSettings, updateChartSettings, dashboardSettings, updateDashboardSettings, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
+  const chartSettings = useRowingStore((state) => state.chartSettings);
+  const { updateChartSettings, dashboardSettings, updateDashboardSettings, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
 
   // ========== LAZY LOADING - Fetch directly from API ==========
   // This bypasses the store and loads data immediately from /api/analytics
@@ -311,8 +357,6 @@ const Analytics = () => {
     return sessions; // Fallback to full sessions when analytics not available
   }, [analyticsData, sessions]);
 
-  const chartSettings = getChartSettings();
-
   // Refs for chart containers (for screenshot capture)
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -321,18 +365,20 @@ const Analytics = () => {
 
   // Analytics settings (with fallback for migration)
   const analyticsSettings = chartSettings.analyticsSettings ?? defaultAnalyticsSettings;
+  const dateRangeFrom = analyticsSettings.dateRangeFrom;
+  const dateRangeTo = analyticsSettings.dateRangeTo;
 
   // Convert stored date range to DateRange object
   const dateRange: DateRange | undefined = useMemo(() => {
-    if (!analyticsSettings.dateRangeFrom) return undefined;
+    if (!dateRangeFrom) return undefined;
     return {
-      from: new Date(analyticsSettings.dateRangeFrom),
-      to: analyticsSettings.dateRangeTo ? new Date(analyticsSettings.dateRangeTo) : undefined
+      from: new Date(dateRangeFrom),
+      to: dateRangeTo ? new Date(dateRangeTo) : undefined
     };
-  }, [analyticsSettings.dateRangeFrom, analyticsSettings.dateRangeTo]);
+  }, [dateRangeFrom, dateRangeTo]);
 
   // Update date range handler
-  const setDateRange = useCallback((range: DateRange | undefined) => {
+  const setDateRange = (range: DateRange | undefined) => {
     updateChartSettings({
       analyticsSettings: {
         ...analyticsSettings,
@@ -340,21 +386,17 @@ const Analytics = () => {
         dateRangeTo: range?.to ? range.to.toISOString() : null
       }
     });
-  }, [analyticsSettings, updateChartSettings]);
+  };
 
   // Derive a single smoothing value shared across all charts (aligned like the date selector)
-  const smoothingValue = useMemo<SmoothingOption>(() => {
-    if ('smoothingAll' in analyticsSettings && analyticsSettings.smoothingAll !== undefined) {
-      return analyticsSettings.smoothingAll as SmoothingOption;
-    }
-    // Fallback: prefer existing splitTime default (3) then distance (0)
-    return (analyticsSettings.smoothing?.splitTime ??
+  const smoothingValue: SmoothingOption = 'smoothingAll' in analyticsSettings && analyticsSettings.smoothingAll !== undefined
+    ? analyticsSettings.smoothingAll as SmoothingOption
+    : (analyticsSettings.smoothing?.splitTime ??
       analyticsSettings.smoothing?.distance ??
       0) as SmoothingOption;
-  }, [analyticsSettings]);
 
   // Update smoothing globally for every metric to keep selectors in sync
-  const setSmoothing = useCallback((value: SmoothingOption) => {
+  const setSmoothing = (value: SmoothingOption) => {
     const nextSmoothing = Object.keys(analyticsSettings.smoothing ?? chartConfigs)
       .reduce((acc, key) => {
         acc[key as ChartMetric] = value;
@@ -368,7 +410,7 @@ const Analytics = () => {
         smoothing: nextSmoothing
       }
     });
-  }, [analyticsSettings, updateChartSettings]);
+  };
 
   // Per-chart zoom settings (true = zoomed/dynamic, false = full range)
   const defaultChartZoom: Record<ChartMetric, boolean> = {
@@ -383,7 +425,7 @@ const Analytics = () => {
   };
   const chartZoom = analyticsSettings.chartZoom ?? defaultChartZoom;
 
-  const toggleChartZoom = useCallback((metric: ChartMetric) => {
+  const toggleChartZoom = (metric: ChartMetric) => {
     updateChartSettings({
       analyticsSettings: {
         ...analyticsSettings,
@@ -393,10 +435,7 @@ const Analytics = () => {
         }
       }
     });
-  }, [analyticsSettings, chartZoom, updateChartSettings]);
-
-  // Cache expensive per-session calculations (e.g., consistency score) - computed lazily on demand
-  const consistencyCache = useRef(new Map<string, { dataRef: unknown; score: number }>());
+  };
 
   // Precompute lightweight derived session values (defer heavy calculations like consistency score)
   const computedSessions = useMemo(() => {
@@ -451,7 +490,7 @@ const Analytics = () => {
     chartTitle: string,
     chartDescription: string,
     dataContext: string,
-    fullData: Record<string, unknown>[]
+    fullData: unknown[]
   ) => {
     // Check if an explanation already exists and is valid for this chart
     const existingExplanation = chartExplanations[chartId];
@@ -767,13 +806,12 @@ ${explainChartPrompt}`;
         }
         // Fallback for old sessions: compute lazily if strokeData is available
         if (session.strokeData && session.strokeData.length > 0) {
-          const cacheKey = session.id;
-          const cached = consistencyCache.current.get(cacheKey);
-          if (cached && cached.dataRef === session.strokeData) {
-            return cached.score;
+          const cachedScore = consistencyScoreCache.get(session.strokeData);
+          if (cachedScore !== undefined) {
+            return cachedScore;
           }
           const score = calculateAdvancedStats(session.strokeData as StrokeData[]).consistencyScore;
-          consistencyCache.current.set(cacheKey, { dataRef: session.strokeData, score });
+          consistencyScoreCache.set(session.strokeData, score);
           return score;
         }
         return -1; // Return -1 to indicate no data available
@@ -804,9 +842,9 @@ ${explainChartPrompt}`;
       .filter(dataPoint => dataPoint[metric] !== -1);
 
     // Add smoothed values if smoothing is enabled
-    if (smoothingValue > 0 && baseData.length > 0) {
+    if (smoothing > 0 && baseData.length > 0) {
       const values = baseData.map(d => d[metric] as number);
-      const smoothedValues = calculateMovingAverage(values, smoothingValue);
+      const smoothedValues = calculateMovingAverage(values, smoothing);
       return baseData.map((d, i) => ({
         ...d,
         smoothedValue: smoothedValues[i]
@@ -814,7 +852,7 @@ ${explainChartPrompt}`;
     }
 
     return baseData;
-  }, [smoothingValue, getMetricValue]);
+  }, [getMetricValue]);
 
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
@@ -828,16 +866,17 @@ ${explainChartPrompt}`;
   };
 
   // Prepare chart data for each enabled metric (with smoothing)
+  const enabledCharts = chartSettings.enabledCharts;
   const orderedEnabledCharts = useMemo(() => {
     const orderMap = new Map(chartOrder.map((metric, index) => [metric, index]));
-    return [...chartSettings.enabledCharts]
+    return [...enabledCharts]
       .filter(metric => metric !== 'splitTime') // Always show Split Time separately in correlations section
       .sort((a, b) => {
         const aOrder = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
         const bOrder = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
         return aOrder - bOrder;
       });
-  }, [chartSettings.enabledCharts]);
+  }, [enabledCharts]);
 
   const chartDataMap = useMemo(() => {
     // Use analytics API data for fast rendering (bypasses store load)
@@ -950,48 +989,6 @@ ${explainChartPrompt}`;
         strokeLength: session.avgStrokeLength,
       }));
   }, [filteredSessions, analyticsData, filteredSessionIds]);
-
-  // Custom scatter tooltip component
-  interface ScatterTooltipEntry {
-    name: string;
-    value: number;
-    dataKey: string;
-  }
-  interface ScatterTooltipPayload {
-    payload: { date: string };
-  }
-  const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: (ScatterTooltipEntry & ScatterTooltipPayload)[] }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div style={chartTheme.tooltip.contentStyle}>
-          <p style={chartTheme.tooltip.labelStyle}>{data.date}</p>
-          {payload.map((entry: ScatterTooltipEntry, index: number) => (
-            <p key={index} style={chartTheme.tooltip.itemStyle}>
-              {entry.name}: {
-                entry.dataKey === 'pace'
-                  ? formatPace(entry.value)
-                  : entry.dataKey === 'durationMinutes'
-                    ? `${entry.value} min`
-                    : entry.dataKey === 'distance'
-                      ? `${entry.value}m`
-                      : entry.dataKey === 'power'
-                        ? `${Math.round(entry.value)}W`
-                        : entry.dataKey === 'energy'
-                          ? `${Math.round(entry.value)} kCal`
-                          : entry.dataKey === 'strokeRate'
-                            ? `${Math.round(entry.value)} SPM`
-                            : entry.dataKey === 'strokeLength'
-                              ? `${entry.value.toFixed(2)}m`
-                              : entry.value
-              }
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Render chart based on selected type
   const renderChart = (metric: ChartMetric, chartData: Record<string, unknown>[], config: ChartConfig) => {

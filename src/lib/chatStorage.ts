@@ -1,12 +1,35 @@
 import { ChatMessage, ChatSession } from '@/lib/cloudAI';
 import { formatSessionDate } from '@/lib/dateTimeUtils';
 
+interface DatabaseMessage {
+  id: string;
+  role: ChatMessage['role'];
+  content: string;
+  timestamp: string | number;
+}
+
+interface DatabaseSession {
+  id: string;
+  title: string;
+  messages?: DatabaseMessage[];
+  createdAt: string | number;
+  updatedAt: string | number;
+  category?: ChatSession['category'];
+  chartId?: string | null;
+  messageCount?: number;
+}
+
+interface DatabaseSearchResult {
+  session: DatabaseSession;
+  message: DatabaseMessage;
+}
+
 // Helper to convert DB session to ChatSession
-function dbSessionToChatSession(s: any): ChatSession {
+function dbSessionToChatSession(s: DatabaseSession): ChatSession {
   return {
     id: s.id,
     title: s.title,
-    messages: s.messages?.map((m: any) => dbMessageToChatMessage(m, s.id)) || [],
+    messages: s.messages?.map((m) => dbMessageToChatMessage(m, s.id)) || [],
     createdAt: new Date(s.createdAt),
     updatedAt: new Date(s.updatedAt),
     category: s.category,
@@ -16,7 +39,7 @@ function dbSessionToChatSession(s: any): ChatSession {
 }
 
 // Helper to convert DB message to ChatMessage
-function dbMessageToChatMessage(m: any, sessionId: string): ChatMessage {
+function dbMessageToChatMessage(m: DatabaseMessage, sessionId: string): ChatMessage {
   return {
     id: m.id,
     role: m.role,
@@ -111,7 +134,7 @@ export class ChatStorageService {
       }
 
       const data = await response.json();
-      const messages = (data.messages || []).map((m: any) => dbMessageToChatMessage(m, sessionId));
+      const messages = (data.messages || []).map((m: DatabaseMessage) => dbMessageToChatMessage(m, sessionId));
 
       return { ...session, messages };
     } catch (error) {
@@ -280,7 +303,7 @@ export class ChatStorageService {
       }
 
       const data = await response.json();
-      return (data.results || []).map((r: any) => ({
+      return (data.results || []).map((r: DatabaseSearchResult) => ({
         session: dbSessionToChatSession(r.session),
         message: dbMessageToChatMessage(r.message, r.session.id),
       }));

@@ -14,18 +14,19 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useRowingStore, type AnalyticsChartSettings, type SmoothingOption } from '@/lib/store';
+import type { StrokeData } from '@/types/session';
 
 interface Session {
   id: string;
   timestamp: Date;
   consistencyScore?: number | null; // Pre-computed consistency score (0-100)
-  strokeData?: any[];
+  strokeData?: StrokeData[];
 }
 
 interface ConsistencyScoreChartProps {
   sessions: Session[];
   chartType?: 'line' | 'bar' | 'area';
-  onExplainChart?: (chartId: string, chartTitle: string, chartDescription: string, dataContext: string, fullData: any[]) => void;
+  onExplainChart?: (chartId: string, chartTitle: string, chartDescription: string, dataContext: string, fullData: unknown[]) => void;
   headerActions?: React.ReactNode;
 }
 
@@ -51,7 +52,19 @@ const calculateMovingAverage = (data: { consistencyScore: number }[], windowSize
 };
 
 // Custom tooltip
-const CustomTooltip = ({ active, payload, label, smoothing }: any) => {
+interface ConsistencyChartPoint {
+  consistencyScore: number;
+  smoothedScore: number | null;
+}
+
+interface ConsistencyTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: ConsistencyChartPoint }>;
+  label?: string | number;
+  smoothing: number;
+}
+
+const CustomTooltip = ({ active, payload, label, smoothing }: ConsistencyTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (

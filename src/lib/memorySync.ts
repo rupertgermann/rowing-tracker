@@ -19,6 +19,11 @@ export interface MemoryDocumentData {
   blobData?: string; // Base64 encoded blob data
 }
 
+interface MemoryStorageMigrationSource {
+  getAllDocuments: () => Promise<MemoryDocumentData[]>;
+  getDocumentBlob: (id: string) => Promise<ArrayBuffer | null>;
+}
+
 /**
  * Fetch all memory documents from database
  */
@@ -94,7 +99,7 @@ export async function deleteMemoryDocumentFromDB(documentId: string): Promise<bo
  * Fetches all documents from IndexedDB, converts blobs to base64, and saves to database
  */
 export async function migrateMemoryDocumentsToDatabase(
-  memoryStorage: any
+  memoryStorage: MemoryStorageMigrationSource
 ): Promise<{ success: boolean; migrated: number; failed: number; errors: string[] }> {
   const errors: string[] = [];
   let migrated = 0;

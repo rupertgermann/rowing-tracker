@@ -152,7 +152,7 @@ async function migratePersonalRecords(prs: Record<string, unknown>[]): Promise<{
   }
 }
 
-async function migrateTrainingPlans(plans: any[]): Promise<{ count: number; error?: string }> {
+async function migrateTrainingPlans(plans: Record<string, unknown>[]): Promise<{ count: number; error?: string }> {
   try {
     const response = await fetch('/api/migrate/plans', {
       method: 'POST',
@@ -172,7 +172,7 @@ async function migrateTrainingPlans(plans: any[]): Promise<{ count: number; erro
   }
 }
 
-async function migrateAwards(awards: any[]): Promise<{ count: number; error?: string }> {
+async function migrateAwards(awards: Record<string, unknown>[]): Promise<{ count: number; error?: string }> {
   try {
     const response = await fetch('/api/migrate/awards', {
       method: 'POST',

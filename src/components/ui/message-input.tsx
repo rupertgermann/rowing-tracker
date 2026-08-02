@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowUp, Info, Loader2, Mic, Paperclip, Square, X } from "lucide-react"
 import { omit } from "remeda"
@@ -49,7 +49,13 @@ export function MessageInput({
   ...props
 }: MessageInputProps) {
   const [isDragging, setIsDragging] = useState(false)
-  const [showInterruptPrompt, setShowInterruptPrompt] = useState(false)
+  const [interruptPrompt, setInterruptPrompt] = useState<{
+    generation: { isGenerating: boolean }
+    visible: boolean
+  } | null>(null)
+  const generation = useMemo(() => ({ isGenerating }), [isGenerating])
+  const showInterruptPrompt =
+    interruptPrompt?.generation === generation && interruptPrompt.visible
 
   const {
     isListening,
@@ -62,15 +68,9 @@ export function MessageInput({
   } = useAudioRecording({
     transcribeAudio,
     onTranscriptionComplete: (text) => {
-      props.onChange?.({ target: { value: text } } as any)
+      props.onChange?.({ target: { value: text } } as unknown as React.ChangeEvent<HTMLTextAreaElement>)
     },
   })
-
-  useEffect(() => {
-    if (!isGenerating) {
-      setShowInterruptPrompt(false)
-    }
-  }, [isGenerating])
 
   const addFiles = (files: File[] | null) => {
     if (props.allowAttachments) {
@@ -120,7 +120,6 @@ export function MessageInput({
       const blob = new Blob([text], { type: "text/plain" })
       const file = new File([blob], "Pasted text", {
         type: "text/plain",
-        lastModified: Date.now(),
       })
       addFiles([file])
       return
@@ -142,13 +141,13 @@ export function MessageInput({
       if (isGenerating && stop && enableInterrupt) {
         if (showInterruptPrompt) {
           stop()
-          setShowInterruptPrompt(false)
+          setInterruptPrompt(null)
           event.currentTarget.form?.requestSubmit()
         } else if (
           props.value ||
           (props.allowAttachments && props.files?.length)
         ) {
-          setShowInterruptPrompt(true)
+          setInterruptPrompt({ generation, visible: true })
           return
         }
       }
@@ -189,7 +188,7 @@ export function MessageInput({
       {enableInterrupt && (
         <InterruptPrompt
           isOpen={showInterruptPrompt}
-          close={() => setShowInterruptPrompt(false)}
+          close={() => setInterruptPrompt(null)}
         />
       )}
 

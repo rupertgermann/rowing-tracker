@@ -87,7 +87,7 @@ interface ToolResult {
   toolName: string
   result: {
     __cancelled?: boolean
-    [key: string]: any
+    [key: string]: unknown
   }
 }
 
@@ -111,7 +111,7 @@ interface TextPart {
 // For compatibility with AI SDK types, not used
 interface SourcePart {
   type: "source"
-  source?: any
+  source?: unknown
 }
 
 interface FilePart {
@@ -171,11 +171,15 @@ const CollapsibleMessage: React.FC<{
 
   // Load state from localStorage on mount
   useEffect(() => {
-    const savedState = localStorage.getItem(`chat_message_collapsed_${id}`)
-    if (savedState !== null) {
-      setIsOpen(savedState === 'true')
-    }
-    setHasLoadedState(true)
+    const timeoutId = window.setTimeout(() => {
+      const savedState = localStorage.getItem(`chat_message_collapsed_${id}`)
+      if (savedState !== null) {
+        setIsOpen(savedState === 'true')
+      }
+      setHasLoadedState(true)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [id])
 
   // Save state to localStorage when it changes

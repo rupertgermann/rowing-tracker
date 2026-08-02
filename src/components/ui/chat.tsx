@@ -3,9 +3,7 @@
 import {
   forwardRef,
   useCallback,
-  useRef,
   useState,
-  useEffect,
   type ReactElement,
 } from "react"
 import React from "react"
@@ -35,7 +33,7 @@ interface ChatPropsBase {
     messageId: string,
     rating: "thumbs-up" | "thumbs-down"
   ) => void
-  setMessages?: (messages: any[]) => void
+  setMessages?: (messages: Message[]) => void
   transcribeAudio?: (blob: Blob) => Promise<string>
   externalAttachments?: File[]
   onEditSuggestion?: (suggestion: string) => void
@@ -74,16 +72,13 @@ export function Chat({
   const isEmpty = messages.length === 0
   const isTyping = lastMessage?.role === "user"
 
-  const messagesRef = useRef(messages)
-  messagesRef.current = messages
-
   // Enhanced stop function that marks pending tool calls as cancelled
   const handleStop = useCallback(() => {
     stop?.()
 
     if (!setMessages) return
 
-    const latestMessages = [...messagesRef.current]
+    const latestMessages = [...messages]
     const lastAssistantMessage = latestMessages.findLast(
       (m) => m.role === "assistant"
     )
@@ -100,7 +95,7 @@ export function Chat({
             needsUpdate = true
             return {
               ...toolInvocation,
-              state: "result",
+              state: "result" as const,
               result: {
                 content: "Tool execution was cancelled",
                 __cancelled: true, // Special marker to indicate cancellation
@@ -120,7 +115,7 @@ export function Chat({
     }
 
     if (lastAssistantMessage.parts && lastAssistantMessage.parts.length > 0) {
-      const updatedParts = lastAssistantMessage.parts.map((part: any) => {
+      const updatedParts = lastAssistantMessage.parts.map((part) => {
         if (
           part.type === "tool-invocation" &&
           part.toolInvocation &&
@@ -131,7 +126,7 @@ export function Chat({
             ...part,
             toolInvocation: {
               ...part.toolInvocation,
-              state: "result",
+              state: "result" as const,
               result: {
                 content: "Tool execution was cancelled",
                 __cancelled: true,
@@ -159,7 +154,7 @@ export function Chat({
         setMessages(latestMessages)
       }
     }
-  }, [stop, setMessages, messagesRef])
+  }, [messages, stop, setMessages])
 
   const messageOptions = useCallback(
     (message: Message) => ({

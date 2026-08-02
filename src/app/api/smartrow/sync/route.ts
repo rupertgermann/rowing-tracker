@@ -87,13 +87,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
 
         try {
             await exportLink.waitFor({ state: 'visible', timeout: 20000 });
-        } catch (e: any) {
+        } catch (e) {
             // Check for login errors if we can't find the export link
             const invalidCreds = await frame.getByText('Invalid username or password').isVisible();
             if (invalidCreds) {
                 throw new Error('Invalid email or password');
             }
-            throw new Error('Login failed or could not find "Export all" button. ' + e.message);
+            const message = e instanceof Error ? e.message : String(e);
+            throw new Error('Login failed or could not find "Export all" button. ' + message);
         }
 
         // Step 5: Click "Export All" button for CSV
