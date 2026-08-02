@@ -5,14 +5,8 @@
 
 import { 
   saveSessionsToDB, 
-  savePRsToDB, 
-  saveAwardsToDB,
   saveTrainingPlansToDB,
-  saveInsightsToDB,
-  saveChatSessionsToDB,
-  saveSettingsToDB,
   saveGeneratedAchievementsToDB,
-  saveMemoryDocumentsToDB
 } from './dataSync';
 import { 
   getAllAchievementImageIdsFromIndexedDB, 

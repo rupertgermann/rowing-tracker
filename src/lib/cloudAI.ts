@@ -871,7 +871,7 @@ export class CloudAIService {
 
 
   // Get system prompt for chat AI trainer
-  private getChatSystemPrompt(posturePayload?: PostureAIPayload | null, _sessions?: Session[]): string {
+  private getChatSystemPrompt(posturePayload?: PostureAIPayload | null): string {
     return `You are a personal AI rowing coach and trainer. You specialize in indoor rowing performance, technique, and training optimization.
 
 CRITICAL FORMATTING RULES - READ CAREFULLY:
@@ -1000,7 +1000,7 @@ Remember: You're building a long-term coaching relationship. Be supportive, know
 
   // Get user's session context for personalized coaching
   // Deprecated: Context is now retrieved via tools
-  private getSessionContext(_sessions: Session[]): string {
+  private getSessionContext(): string {
     return '';
   }
 
@@ -1654,7 +1654,7 @@ Only modify what's necessary to address the user's request.`;
 
   // Build prompt for adherence analysis
   private buildAdherenceAnalysisPrompt(plan: TrainingPlan, userSessions: Session[]): string {
-    const adherenceData = this.calculateAdherenceMetrics(plan, userSessions);
+    const adherenceData = this.calculateAdherenceMetrics(plan);
 
     return `Analyze the training plan adherence and provide recommendations:
 
@@ -1911,7 +1911,7 @@ Maintain a supportive, motivational tone while being honest about adherence patt
 Use this data to create an appropriate plan that matches their current fitness and experience level.`;
   }
 
-  private calculateAdherenceMetrics(plan: TrainingPlan, _sessions: Session[]): string {
+  private calculateAdherenceMetrics(plan: TrainingPlan): string {
     const totalPlannedSessions = plan.progress.totalSessions;
     const completedSessions = plan.progress.completedSessions;
     const adherenceRate = totalPlannedSessions > 0 ? (completedSessions / totalPlannedSessions) * 100 : 0;

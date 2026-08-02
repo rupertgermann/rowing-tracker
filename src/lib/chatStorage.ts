@@ -335,7 +335,8 @@ export class ChatStorageService {
   }
 
   // Import sessions (deprecated - DB is source of truth)
-  async importSessions(_jsonData: string): Promise<{ success: boolean; imported: number }> {
+  async importSessions(jsonData: string): Promise<{ success: boolean; imported: number }> {
+    void jsonData;
     console.warn('[CHAT STORAGE] Import is not supported in DB-backed mode');
     return { success: false, imported: 0 };
   }

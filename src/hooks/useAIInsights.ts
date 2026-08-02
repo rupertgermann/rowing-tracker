@@ -196,7 +196,7 @@ const autoArchiveOldInsights = (insights: (Insight | CloudInsight)[]): {
 
 export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
   const sessions = useRowingStore((state) => state.sessions);
-  const [cloudAIError, setCloudAIError] = useState<string | null>(null);
+  const [, setCloudAIError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isArchivedView, setIsArchivedView] = useState(false);
@@ -205,7 +205,7 @@ export function useAIInsights(forceRefresh: boolean = false): AIInsightData {
 
   // Load archived insights state
   const [archivedInsightsState, setArchivedInsightsState] = useState<(Insight | CloudInsight)[]>([]);
-  const [archivedLoaded, setArchivedLoaded] = useState(false);
+  const [, setArchivedLoaded] = useState(false);
   const [dbInsightsLoaded, setDbInsightsLoaded] = useState(false);
   const [dbActiveInsightsCount, setDbActiveInsightsCount] = useState<number | null>(null); // Track DB-loaded active insights count
 

@@ -5,7 +5,7 @@ import {
   MemoryDocumentType,
   MEMORY_CONFIG 
 } from '@/lib/memoryStorage';
-import { processDocument, processPDF, processImage } from '@/lib/documentProcessor';
+import { processPDF, processImage } from '@/lib/documentProcessor';
 import { trainingPlans } from '@/lib/trainingPlans';
 
 export interface MemoryState {

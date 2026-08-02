@@ -568,6 +568,7 @@ export function useChat() {
 
   // Import sessions
   const importSessions = useCallback((jsonData: string) => {
+    void jsonData;
     setState(prev => ({
       ...prev,
       error: 'Import is not available (DB is the source of truth)'

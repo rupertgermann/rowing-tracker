@@ -558,7 +558,7 @@ export async function saveGeneratedAchievementsToDB(achievements: GeneratedAchie
       return { success: false, error: error.error || 'Failed to save generated achievements' };
     }
 
-    const result = await response.json();
+    await response.json();
     return { success: true };
   } catch (error) {
     console.error('[DATA SYNC] Error saving generated achievements:', error);

@@ -35,7 +35,7 @@ export function formatDate(
   }
 ): string {
   const d = date instanceof Date ? date : new Date(date);
-  const { dateFormat, timeFormat, timeZone } = getPreferences();
+  const { dateFormat, timeZone } = getPreferences();
   
   const includeTime = options?.includeTime ?? false;
   const includeWeekday = options?.includeWeekday ?? false;

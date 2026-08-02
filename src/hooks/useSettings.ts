@@ -58,14 +58,6 @@ export function useSettings() {
     try {
       setError(null);
 
-      // Get current settings and merge updates
-      const currentSettings = settingsService.getSettings();
-      const newSettings: Settings = {
-        ...currentSettings,
-        ...updates,
-        updatedAt: new Date()
-      };
-
       // Update each category that was changed
       if (updates.userPreferences) {
         settingsService.updateUserPreferences(updates.userPreferences);

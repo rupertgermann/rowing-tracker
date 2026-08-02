@@ -53,7 +53,7 @@ function extractInfoFromFilename(filename: string): FilenameInfo | null {
             return { timestamp, distance };
         }
         return null;
-    } catch (e) {
+    } catch {
         return null;
     }
 }

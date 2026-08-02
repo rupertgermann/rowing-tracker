@@ -123,7 +123,7 @@ function applyDelta(
   pairs.sort((a, b) => a.dist - b.dist);
 
   const matchedPoseIndices = new Set<number>();
-  for (const { poseIdx, csvIdx, dist: _ } of pairs) {
+  for (const { poseIdx, csvIdx } of pairs) {
     if (matchedPoseIndices.has(poseIdx) || usedCsvIndices.has(csvIdx)) continue;
     const csv = csvStrokes[csvIdx];
     matches.set(poseIdx, {

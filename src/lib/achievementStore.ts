@@ -76,7 +76,8 @@ export const useAchievementStore = create<AchievementStore>()(
       
       removeGeneratedAchievement: (awardId) => {
         set((state) => {
-          const { [awardId]: removed, ...rest } = state.generatedAchievements;
+          const rest = { ...state.generatedAchievements };
+          delete rest[awardId];
           return { generatedAchievements: rest };
         });
       },
