@@ -68,7 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
         // Wait for the iframe content to load and username input to be available
         try {
             await frame.locator('input[name="username"]').waitFor({ state: 'visible', timeout: 15000 });
-        } catch (e) {
+        } catch {
             throw new Error('Login form not found. The website structure might have changed.');
         }
 
@@ -220,16 +220,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
 
             let detailedExport = null;
 
-            // Look for ZIP file containing detailed stroke data for all workouts
-            for (let i = 0; i < exportLinks.length; i++) {
-                const link = exportLinks[i];
-                const text = await link.textContent().catch(() => 'N/A');
-                const href = await link.getAttribute('href').catch(() => 'N/A');
-                const textLower = (text || '').toLowerCase();
-                const hrefLower = (href || '').toLowerCase();
-
-                console.log(`  Detailed link ${i}: text="${text?.trim()}", href="${href}"`);
-
             // Look for ZIP files or links mentioning "all workouts" or "workout files"
             for (let i = 0; i < exportLinks.length; i++) {
                 const link = exportLinks[i];
@@ -252,7 +242,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<SyncRespo
                     console.log(`✓ Found detailed export: "${text}" (href: ${href})`);
                     break;
                 }
-            }
             }
 
             // Fallback: look for "csv-eu-all" or "csv-us-all" which might have detailed data

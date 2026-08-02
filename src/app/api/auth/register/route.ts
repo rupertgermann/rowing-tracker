@@ -62,8 +62,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // Send verification email
-    const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-request?email=${encodeURIComponent(email)}`;
+    // Require email verification
     
     return NextResponse.json({
       id: user.id,

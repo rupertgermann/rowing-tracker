@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { InsightCard } from '@/components/ai/InsightCard';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +45,6 @@ export default function InsightsPage() {
     deleteInsight,
     refreshInsights,
     lastAnalyzed,
-    isAnalyzable,
     isGenerating,
     cloudAIError,
     isCloudAIConfigured
@@ -133,9 +132,6 @@ export default function InsightsPage() {
 
   const currentGrouped = useMemo(() => groupByDate(currentInsights), [currentInsights]);
   const archivedGrouped = useMemo(() => groupByDate(archivedInsightsList), [archivedInsightsList]);
-
-  const activeInsights = activeTab === 'current' ? currentInsights : archivedInsightsList;
-  const activeGrouped = activeTab === 'current' ? currentGrouped : archivedGrouped;
 
   return (
     <div className="min-h-screen bg-background">

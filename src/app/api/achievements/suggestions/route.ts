@@ -303,7 +303,7 @@ Keep output short:
     let parsed: SuggestionResponse;
     try {
       parsed = JSON.parse(extracted.value);
-    } catch (e) {
+    } catch {
       console.error('Failed to parse JSON from AI output:', extracted.value);
       return NextResponse.json({ error: 'Invalid JSON from AI', details: extracted.value.slice(0, 1000) }, { status: 500 });
     }

@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { trainingPlans, TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
 import { POSTURE_FAULT_CATALOG_V1 } from '@/lib/mocap/analysis/postureThresholds';
 import type { PostureFaultType } from '@/lib/mocap/analysis/types';
@@ -18,9 +17,7 @@ import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMe
 import { useRowingStore } from '@/lib/store';
 import { formatDateOnly } from '@/lib/dateTimeUtils';
 import { memoryStorage } from '@/lib/memoryStorage';
-import { chatStorage } from '@/lib/chatStorage';
 import {
-  Calendar,
   Play,
   Pause,
   CheckCircle,
@@ -36,9 +33,6 @@ import {
   AlertTriangle,
   Loader2,
   Eye,
-  Settings,
-  Download,
-  Upload,
   History,
   RotateCcw,
   Activity,
@@ -190,7 +184,7 @@ export default function PlansPage() {
       setPlans(allPlans);
       setActivePlan(active);
       setError(null);
-    } catch (err) {
+    } catch {
       setError('Failed to load training plans');
     }
   };
@@ -304,7 +298,7 @@ export default function PlansPage() {
       const plan = await trainingPlans.getPlan(planId);
       if (plan) {
         // Update plan status to active and set start date
-        const updatedPlan = await trainingPlans.updatePlan(planId, {
+        await trainingPlans.updatePlan(planId, {
           status: 'active',
           startDate: new Date()
         });
@@ -344,7 +338,7 @@ export default function PlansPage() {
         // Reload plans from localStorage to ensure state synchronization
         loadPlans();
       }
-    } catch (err) {
+    } catch {
       setError('Failed to activate plan');
     }
   };
@@ -375,7 +369,7 @@ export default function PlansPage() {
       // Update plans list
       const updatedPlans = await trainingPlans.getPlans();
       setPlans(updatedPlans);
-    } catch (err) {
+    } catch {
       setError('Failed to complete session');
     }
   };
@@ -392,7 +386,7 @@ export default function PlansPage() {
       if (activePlan?.id === deletePlanId) {
         setActivePlan(null);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to delete plan');
     }
     setDeletePlanId(null);
@@ -417,7 +411,7 @@ export default function PlansPage() {
         }
       });
       loadPlans();
-    } catch (err) {
+    } catch {
       setError('Failed to reset plan');
     }
     setResetPlanId(null);
@@ -451,7 +445,7 @@ export default function PlansPage() {
       loadPlans();
       setEditingPlan(null);
       resetForm();
-    } catch (err) {
+    } catch {
       setError('Failed to update plan');
     }
   };

@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -61,17 +60,14 @@ import {
   Upload,
   Trash2,
   RotateCcw,
-  Save,
   AlertTriangle,
   CheckCircle,
   Info,
   Key,
-  TestTube,
   FileText,
   Sparkles,
   Heart,
   Loader2,
-  Trophy,
   Eye,
   EyeOff,
   RefreshCw
@@ -291,7 +287,7 @@ export default function SettingsPage() {
     try {
       const data = settings.getSettings();
       setSettingsData(data);
-    } catch (error) {
+    } catch {
       setErrorMessage('Failed to load settings');
     }
   };
@@ -310,19 +306,11 @@ export default function SettingsPage() {
 
       await refreshArchivedInsights?.();
       setSuccessMessage('Insights archive cleared');
-    } catch (error) {
+    } catch {
       setErrorMessage('Failed to clear insights archive');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleResetPrompt = async (
-    promptKey: 'systemPrompt' | 'chatSystemPrompt' | 'planGenerationPrompt' | 'insightsPrompt' | 'explainChartPrompt' | 'awardSuggestionsPrompt',
-    defaultValue: string
-  ) => {
-    await saveSettings('aiSettings', { [promptKey]: defaultValue });
-    setSuccessMessage('Prompt reset to default');
   };
 
   const openPromptEditor = (
@@ -396,7 +384,7 @@ export default function SettingsPage() {
 
       loadSettings();
       setSuccessMessage('Settings saved successfully');
-    } catch (error) {
+    } catch {
       setErrorMessage('Failed to save settings');
     } finally {
       setIsLoading(false);
@@ -414,7 +402,7 @@ export default function SettingsPage() {
       a.click();
       URL.revokeObjectURL(url);
       setSuccessMessage('Settings exported successfully');
-    } catch (error) {
+    } catch {
       setErrorMessage('Failed to export settings');
     }
   };
@@ -472,7 +460,7 @@ export default function SettingsPage() {
       }
 
       setSuccessMessage(`${dataCategoryToClear} cleared successfully`);
-    } catch (error) {
+    } catch {
       setErrorMessage(`Failed to clear ${dataCategoryToClear}`);
     } finally {
       setShowClearDataConfirm(false);
@@ -1469,7 +1457,7 @@ export default function SettingsPage() {
         } else {
           setConnectionStatus('error');
         }
-      } catch (error) {
+      } catch {
         setConnectionStatus('error');
       } finally {
         setIsTestingConnection(false);

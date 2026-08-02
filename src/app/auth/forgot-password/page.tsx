@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail, ArrowLeft, Waves } from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -41,7 +39,7 @@ export default function ForgotPasswordPage() {
       if (data.resetUrl) {
         setResetUrl(data.resetUrl);
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: "An error occurred. Please try again." });
     } finally {
       setIsLoading(false);
