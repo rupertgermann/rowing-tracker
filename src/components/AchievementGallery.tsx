@@ -193,7 +193,7 @@ export function AchievementGallery({
         setCurrentIndex(index);
       }
     }
-  }, [open, initialAwardId]); // Remove earnedAwardsList from deps - it's stable now
+  }, [earnedAwardsList, open, initialAwardId]);
 
   // Load image from filesystem when current award changes
   useEffect(() => {
