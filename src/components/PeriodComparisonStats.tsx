@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, Calendar, TrendingUp, Zap, Timer } from 'lucide-react';
@@ -46,7 +46,7 @@ export function PeriodComparisonStats() {
   };
 
   // Calculate stats for a given month
-  const getStatsForMonth = (monthKey: string): MonthlyStats => {
+  const getStatsForMonth = useCallback((monthKey: string): MonthlyStats => {
     if (!monthKey) return { distance: 0, avgPower: 0, avgPace: 0, count: 0 };
 
     const [year, month] = monthKey.split('-').map(Number);
@@ -73,7 +73,7 @@ export function PeriodComparisonStats() {
       avgPace,
       count: monthSessions.length
     };
-  };
+  }, [sessions]);
 
   const statsA = useMemo(() => getStatsForMonth(periodA), [getStatsForMonth, periodA]);
   const statsB = useMemo(() => getStatsForMonth(periodB), [getStatsForMonth, periodB]);

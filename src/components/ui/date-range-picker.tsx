@@ -32,7 +32,7 @@ export function DateRangePicker({
   disabled = false,
   availableDates = [],
 }: DateRangePickerProps) {
-  const now = new Date()
+  const [now] = React.useState(() => new Date())
   
   // Calculate the range of months with data
   const { earliestMonth, monthsWithData } = React.useMemo(() => {

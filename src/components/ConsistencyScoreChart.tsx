@@ -13,7 +13,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { useRowingStore, type AnalyticsChartSettings, type SmoothingOption } from '@/lib/store';
+import { useRowingStore, type AnalyticsChartSettings, type ChartMetric, type SmoothingOption } from '@/lib/store';
 import type { StrokeData } from '@/types/session';
 
 interface Session {
@@ -100,6 +100,17 @@ const defaultAnalyticsSettings: AnalyticsChartSettings = {
   }
 };
 
+const defaultChartZoom: Record<ChartMetric, boolean> = {
+  distance: true,
+  pace: true,
+  power: true,
+  strokeRate: true,
+  energy: true,
+  duration: true,
+  splitTime: true,
+  consistencyScore: true
+};
+
 export const ConsistencyScoreChart = ({ 
   sessions, 
   chartType = 'line',
@@ -147,17 +158,6 @@ export const ConsistencyScoreChart = ({
 
   // Zoom toggle (true = zoomed/dynamic, false = full range 0-100)
   const isZoomed = analyticsSettings.chartZoom?.consistencyScore ?? true;
-  
-  const defaultChartZoom = {
-    distance: true,
-    pace: true,
-    power: true,
-    strokeRate: true,
-    energy: true,
-    duration: true,
-    splitTime: true,
-    consistencyScore: true
-  };
   
   const toggleZoom = useCallback(() => {
     updateChartSettings({
@@ -256,7 +256,7 @@ export const ConsistencyScoreChart = ({
     const max = Math.min(100, Math.ceil(Math.max(...allValues) + 5));
 
     return [min, max];
-  }, [chartData]);
+  }, [chartData, isZoomed]);
 
   // Helper to format date range for display
   const getDateRangeLabel = () => {

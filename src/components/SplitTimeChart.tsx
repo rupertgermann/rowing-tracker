@@ -38,6 +38,17 @@ interface SplitTooltipProps {
   label?: string | number;
 }
 
+const defaultChartZoom: Record<ChartMetric, boolean> = {
+  distance: true,
+  pace: true,
+  power: true,
+  strokeRate: true,
+  energy: true,
+  duration: true,
+  splitTime: true,
+  consistencyScore: true
+};
+
 // Color mapping for stroke rate (20-30 SPM)
 const getStrokeRateColor = (strokeRate: number): string => {
   // Map stroke rate to color gradient (blue for low, red for high)
@@ -120,17 +131,6 @@ export const SplitTimeChart = ({ sessions, headerActions, embedded = false }: Sp
   const updateChartSettings = useRowingStore(state => state.updateChartSettings);
   
   const isZoomed = storedSettings?.chartZoom?.splitTime ?? true;
-  
-  const defaultChartZoom: Record<ChartMetric, boolean> = {
-    distance: true,
-    pace: true,
-    power: true,
-    strokeRate: true,
-    energy: true,
-    duration: true,
-    splitTime: true,
-    consistencyScore: true
-  };
   
   const toggleZoom = useCallback(() => {
     updateChartSettings({
