@@ -25,6 +25,7 @@ export interface Award {
   description: string;
   icon: LucideIcon;
   color: string; // Tailwind color class for icon
+  /** Once true for a chronological session prefix, it must remain true for later prefixes. */
   condition: (sessions: Session[], stats?: AwardStats) => boolean;
 }
 

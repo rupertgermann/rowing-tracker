@@ -1,5 +1,5 @@
 import type { Session, SessionFilters, SessionStats, PersonalRecord } from '@/types/session';
-import { AWARDS, type EarnedAward } from '@/lib/awards';
+import { AWARDS, type Award, type EarnedAward } from '@/lib/awards';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
 
 export type ProjectionTimeRange = '7days' | '30days' | '90days' | 'all';
@@ -391,28 +391,78 @@ export function computeAwardEarnedAt(
   options: ProjectionOptions = {},
 ): Date | null {
   const sorted = sortSessionsByDate(sessions);
+  const award = AWARDS.find((candidate) => candidate.id === awardId);
 
-  for (let i = 0; i < sorted.length; i++) {
-    const prefix = sorted.slice(0, i + 1);
-    const stats = calculateSessionStats(prefix, options);
-    const award = AWARDS.find((candidate) => candidate.id === awardId);
+  if (!award) return null;
 
-    if (award?.condition(prefix, stats)) {
-      return timestampDate(sorted[i]);
+  return findAwardEarnedAt(sorted, award, createPrefixProjection(sorted, options));
+}
+
+interface PrefixProjection {
+  sessions: Session[];
+  stats: SessionStats;
+}
+
+function createPrefixProjection(
+  sortedSessions: Session[],
+  options: ProjectionOptions,
+): (index: number) => PrefixProjection {
+  const cache = new Map<number, PrefixProjection>();
+
+  return (index) => {
+    const cached = cache.get(index);
+    if (cached) return cached;
+
+    const prefix = sortedSessions.slice(0, index + 1);
+    const projection = {
+      sessions: prefix,
+      stats: calculateSessionStats(prefix, options),
+    };
+    cache.set(index, projection);
+    return projection;
+  };
+}
+
+function findAwardEarnedAt(
+  sortedSessions: Session[],
+  award: Award,
+  projectPrefix: (index: number) => PrefixProjection,
+): Date | null {
+  if (sortedSessions.length === 0) return null;
+
+  const lastIndex = sortedSessions.length - 1;
+  const lastPrefix = projectPrefix(lastIndex);
+  if (!award.condition(lastPrefix.sessions, lastPrefix.stats)) return null;
+
+  let low = 0;
+  let high = lastIndex;
+
+  // Award conditions are cumulative, so the first qualifying prefix can be
+  // located without rebuilding and rescanning every earlier prefix.
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    const prefix = projectPrefix(middle);
+
+    if (award.condition(prefix.sessions, prefix.stats)) {
+      high = middle;
+    } else {
+      low = middle + 1;
     }
   }
 
-  return null;
+  return timestampDate(sortedSessions[low]);
 }
 
 export function computeEarnedAwards(
   sessions: Session[],
   options: ProjectionOptions = {},
 ): EarnedAward[] {
+  const sorted = sortSessionsByDate(sessions);
+  const projectPrefix = createPrefixProjection(sorted, options);
   const earned: EarnedAward[] = [];
 
   AWARDS.forEach((award) => {
-    const earnedAt = computeAwardEarnedAt(sessions, award.id, options);
+    const earnedAt = findAwardEarnedAt(sorted, award, projectPrefix);
     if (earnedAt) {
       earned.push({ awardId: award.id, earnedAt });
     }
