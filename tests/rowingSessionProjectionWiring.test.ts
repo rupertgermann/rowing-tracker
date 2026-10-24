@@ -6,7 +6,6 @@ import { join } from "node:path";
 const repoRoot = process.cwd();
 
 const projectionConsumers = [
-  "src/app/(routes)/page.tsx",
   "src/app/dashboard/page.tsx",
   "src/app/analytics/page.tsx",
   "src/app/prs/page.tsx",
