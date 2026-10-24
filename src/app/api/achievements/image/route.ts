@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { existsSync } from 'fs';
+import path from 'path';
 import { getColorPalettePrompt } from '@/lib/achievementColors';
 
 export async function POST(request: NextRequest) {
@@ -151,4 +155,19 @@ Style guidelines:
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = session.user.id;
+  const awardId = new URL(request.url).searchParams.get('awardId');
+  if (!/^[a-zA-Z0-9_-]+$/.test(userId) || !awardId || awardId.length > 200) {
+    return NextResponse.json({ error: 'Invalid award' }, { status: 400 });
+  }
+  const safeAwardId = awardId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const candidates = ['png', 'jpg', 'jpeg', 'webp'].map(ext => `/assets/awards/${userId}/${safeAwardId}.${ext}`);
+  candidates.push(`/assets/awards/${safeAwardId}.png`);
+  const filePath = candidates.find(candidate => existsSync(path.join(process.cwd(), 'public', candidate)));
+  return NextResponse.json({ filePath: filePath ?? null });
 }

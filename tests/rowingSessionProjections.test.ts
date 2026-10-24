@@ -52,6 +52,15 @@ test("calculateSessionStats projects aggregate stats and streaks from sessions",
   assert.equal(stats.bestStreak, 2);
 });
 
+test("current streak continues through yesterday before today's workout", () => {
+  const stats = calculateSessionStats([
+    session({ id: "day-before", timestamp: new Date("2026-10-22T12:00:00Z") }),
+    session({ id: "yesterday", timestamp: new Date("2026-10-23T12:00:00Z") }),
+  ], { now: new Date("2026-10-24T12:00:00Z") });
+
+  assert.equal(stats.currentStreak, 2);
+});
+
 test("calculatePersonalRecords finds fastest exact standard-distance sessions", () => {
   const records = calculatePersonalRecords([
     session({ id: "slow-1k", distance: 1000, duration: 250, avgSplit: 125 }),

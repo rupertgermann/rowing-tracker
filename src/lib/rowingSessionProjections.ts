@@ -147,12 +147,13 @@ function calculateStreaks(
   const today = now.toISOString().split('T')[0];
   const yesterday = new Date(now.getTime() - 86400000).toISOString().split('T')[0];
   const hasRecentSession = uniqueDates.includes(today) || uniqueDates.includes(yesterday);
+  const streakStart = uniqueDates.includes(today) ? today : yesterday;
 
   if (hasRecentSession) {
     for (let i = 0; i < uniqueDates.length; i++) {
       const currentDate = new Date(uniqueDates[i]);
-      const expectedDate = new Date(today);
-      expectedDate.setDate(expectedDate.getDate() - i);
+      const expectedDate = new Date(streakStart);
+      expectedDate.setUTCDate(expectedDate.getUTCDate() - i);
 
       if (currentDate.toISOString().split('T')[0] === expectedDate.toISOString().split('T')[0]) {
         currentStreak += 1;

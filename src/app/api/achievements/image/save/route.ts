@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { imageExtension } from '@/lib/uploadValidation';
 
 const AWARDS_DIR = path.join(process.cwd(), 'public', 'assets', 'awards');
 const NEXT_DIR = path.join(process.cwd(), '.next');
@@ -35,47 +38,52 @@ async function clearNextImageCache(): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = session.user.id;
+    if (!/^[a-zA-Z0-9_-]+$/.test(userId)) return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });
+
     const body = await request.json();
     const { awardId, imageData } = body;
 
-    if (!awardId || !imageData) {
+    if (typeof awardId !== 'string' || !awardId || awardId.length > 200 || typeof imageData !== 'string') {
       return NextResponse.json(
         { error: 'Missing required fields: awardId and imageData' },
         { status: 400 }
       );
     }
 
-    // Ensure the awards directory exists
-    if (!existsSync(AWARDS_DIR)) {
-      await mkdir(AWARDS_DIR, { recursive: true });
+    // Bound decoded image size before allocating the base64 buffer.
+    if (imageData.length > 14 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Image must be 10 MB or smaller' }, { status: 413 });
     }
-
-    // Extract base64 data from data URL
-    const base64Match = imageData.match(/^data:image\/(\w+);base64,(.+)$/);
-    if (!base64Match) {
-      return NextResponse.json(
-        { error: 'Invalid image data format. Expected base64 data URL.' },
-        { status: 400 }
-      );
-    }
-
-    const extension = base64Match[1] === 'jpeg' ? 'jpg' : base64Match[1];
-    const base64Data = base64Match[2];
-    const buffer = Buffer.from(base64Data, 'base64');
+    const match = imageData.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
+    if (!match) return NextResponse.json({ error: 'Expected a PNG, JPEG, or WebP data URL' }, { status: 400 });
+    const buffer = Buffer.from(match[2], 'base64');
+    const extension = imageExtension(buffer, match[1]);
+    if (!extension) return NextResponse.json({ error: 'Image content does not match its type' }, { status: 400 });
+    if (buffer.length > 10 * 1024 * 1024) return NextResponse.json({ error: 'Image must be 10 MB or smaller' }, { status: 413 });
+    const userDir = path.join(AWARDS_DIR, userId);
+    await mkdir(userDir, { recursive: true });
 
     // Sanitize awardId for filename (replace special chars)
     const safeAwardId = awardId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `${safeAwardId}.${extension}`;
-    const filePath = path.join(AWARDS_DIR, filename);
+    const filePath = path.join(userDir, filename);
 
     // Write the file
     await writeFile(filePath, buffer);
+    for (const oldExtension of ['png', 'jpg', 'jpeg', 'webp']) {
+      if (oldExtension !== extension) {
+        await rm(path.join(userDir, `${safeAwardId}.${oldExtension}`), { force: true });
+      }
+    }
 
     // Clear Next.js image optimization cache to ensure fresh images are served
     const cacheCleared = await clearNextImageCache();
 
     // Return the public URL path
-    const publicUrl = `/assets/awards/${filename}`;
+    const publicUrl = `/assets/awards/${userId}/${filename}`;
 
     return NextResponse.json({ 
       success: true,

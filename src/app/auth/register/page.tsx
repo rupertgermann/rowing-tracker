@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Loader2, Waves } from "lucide-react";
@@ -51,8 +52,18 @@ export default function RegisterPage() {
         return;
       }
 
-      // Show success message and redirect to verification page
-      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+      let deliveryFailed = false;
+      try {
+        const verification = await signIn("email", {
+          email,
+          redirect: false,
+          callbackUrl: "/dashboard",
+        });
+        deliveryFailed = !verification || Boolean(verification.error);
+      } catch {
+        deliveryFailed = true;
+      }
+      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}${deliveryFailed ? '&delivery=failed' : ''}`);
       router.refresh();
     } catch {
       setErrorMessage("An error occurred. Please try again.");

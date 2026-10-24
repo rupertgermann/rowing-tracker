@@ -94,7 +94,7 @@ function hasBytes(
   return expected.every((byte, index) => bytes[offset + index] === byte);
 }
 
-function hasMatchingSignature(
+export function hasMatchingSignature(
   bytes: Uint8Array,
   mimeType: AvatarImageType["mimeType"],
 ): boolean {

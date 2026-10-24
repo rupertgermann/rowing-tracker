@@ -13,6 +13,10 @@ unless a release note says public publishing has happened.
 - Python 3.10+ with `venv`
 - The app running locally with `npm run dev`
 
+Browser access is restricted to `http://localhost:3000`. If the app uses another
+host or port, start the sidecar with `--app-origin http://127.0.0.1:3001`, using
+the exact origin shown in your browser's address bar.
+
 The optional `sidecar[freemocap]` extra follows current FreeMoCap releases and
 requires Python 3.10 through 3.12. Synthetic mode and recorded-data mode can run
 without that extra.

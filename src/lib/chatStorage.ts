@@ -49,6 +49,23 @@ function dbMessageToChatMessage(m: DatabaseMessage, sessionId: string): ChatMess
   };
 }
 
+export async function loadChatMessages(sessionId: string): Promise<ChatMessage[]> {
+  const messages: ChatMessage[] = [];
+  let cursor: string | null = null;
+  do {
+    const params = new URLSearchParams({ sessionId, limit: '200' });
+    if (cursor) params.set('cursor', cursor);
+    const response = await fetch(`/api/chat?${params}`);
+    if (!response.ok) {
+      throw new Error('Failed to load chat messages');
+    }
+    const data = await response.json();
+    messages.push(...(data.messages || []).map((m: DatabaseMessage) => dbMessageToChatMessage(m, sessionId)));
+    cursor = data.nextCursor ?? null;
+  } while (cursor);
+  return messages;
+}
+
 export class ChatStorageService {
   private static instance: ChatStorageService;
   private readonly CURRENT_SESSION_KEY = 'rowing_ai_current_session';
@@ -126,16 +143,7 @@ export class ChatStorageService {
       const session = sessions.find(s => s.id === sessionId);
       if (!session) return null;
 
-      // Fetch messages for this session
-      const response = await fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}&limit=200`);
-      if (!response.ok) {
-        console.error('[CHAT STORAGE] Failed to fetch session messages:', response.status);
-        return session; // Return session without messages
-      }
-
-      const data = await response.json();
-      const messages = (data.messages || []).map((m: DatabaseMessage) => dbMessageToChatMessage(m, sessionId));
-
+      const messages = await loadChatMessages(sessionId);
       return { ...session, messages };
     } catch (error) {
       console.error('[CHAT STORAGE] Failed to load session:', error);

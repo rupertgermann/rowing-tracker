@@ -3,7 +3,7 @@
 // =============================================================================
 //
 // Architecture:
-// - Image files are stored on filesystem at /public/assets/awards/
+// - User images are stored at /public/assets/awards/<userId>/; shared defaults stay read-only.
 // - Image metadata is stored in database (GeneratedAchievement model)
 // - Images are saved/deleted via API endpoints
 //
@@ -51,15 +51,11 @@ export async function storeAchievementImage(awardId: string, imageData: string):
  * Returns the image URL if it exists, null otherwise
  */
 export async function getAchievementImage(awardId: string): Promise<string | null> {
-  const imagePath = getAwardImagePath(awardId);
-
   try {
-    // Check if the image exists by making a HEAD request
-    const response = await fetch(imagePath, { method: 'HEAD' });
-    if (response.ok) {
-      return imagePath;
-    }
-    return null;
+    const response = await fetch(`/api/achievements/image?awardId=${encodeURIComponent(awardId)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.filePath;
   } catch {
     return null;
   }

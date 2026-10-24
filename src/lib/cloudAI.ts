@@ -568,97 +568,45 @@ export class CloudAIService {
       let buffer = '';
       let finalResponse: { id: string; output: Array<{ type: string; content?: Array<{ type: string; text?: string }> }> } = { id: '', output: [] };
 
-      // Track items being built by index
-      const activeItems: Record<number, Record<string, unknown>> = {};
-
+      let completed = false;
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
+          buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
 
           for (const line of lines) {
-            if (line.trim() === '') continue;
-            if (line.startsWith('data: ')) {
-              const dataStr = line.slice(6);
-              if (dataStr === '[DONE]') continue;
+            if (!line.startsWith('data: ')) continue;
+            const dataStr = line.slice(6);
+            if (dataStr === '[DONE]') continue;
 
-              try {
-                const event = JSON.parse(dataStr);
+            let event;
+            try {
+              event = JSON.parse(dataStr);
+            } catch {
+              continue;
+            }
 
-                // Capture Response ID
-                if (event.response_id && !finalResponse.id) {
-                  finalResponse.id = event.response_id;
-                }
-
-                // Handle Event Types based on documented API
-                if (event.type === 'response.output_text.delta') {
-                  // Simple text delta - just call the callback
-                  if (event.delta) {
-                    config.onToken(event.delta);
-                  }
-                } else if (event.type === 'response.completed') {
-                  // Stream is complete - the event contains the full response
-                  if (event.response) {
-                    finalResponse = event.response;
-                  }
-                } else if (event.type === 'response.output_item.added') {
-                  const index = event.output_index;
-                  activeItems[index] = event.item;
-                  if (event.item.type === 'message' && !activeItems[index].content) {
-                    activeItems[index].content = [];
-                  }
-                } else if (event.type === 'response.content_part.added') {
-                  const index = event.output_index;
-                  const partIndex = event.content_index || 0;
-                  if (activeItems[index] && activeItems[index].type === 'message') {
-                    const content = (activeItems[index].content as unknown[]) || [];
-                    if (!content[partIndex]) {
-                      content[partIndex] = event.part;
-                      activeItems[index].content = content;
-                    }
-                  }
-                } else if (event.type === 'response.content_part.delta') {
-                  const index = event.output_index;
-                  const partIndex = event.content_index || 0;
-                  if (event.delta) {
-                    const content = activeItems[index]?.content as unknown[] | undefined;
-                    if (activeItems[index] && content && content[partIndex]) {
-                      const part = content[partIndex] as { text?: string };
-                      if (part.text !== undefined) {
-                        part.text += event.delta;
-                      }
-                    }
-                    config.onToken(event.delta);
-                  }
-                } else if (event.type === 'response.function_call_arguments.delta') {
-                  const index = event.output_index;
-                  if (activeItems[index] && activeItems[index].type === 'function_call') {
-                    activeItems[index].arguments += event.delta;
-                  }
-                } else if (event.type === 'response.output_item.done') {
-                  const index = event.output_index;
-                  activeItems[index] = event.item;
-                }
-
-              } catch {
-                // Ignore malformed SSE chunks
-              }
+            if (event.type === 'response.output_text.delta' && event.delta) {
+              config.onToken(event.delta);
+            } else if (event.type === 'response.completed' && event.response) {
+              finalResponse = event.response;
+              completed = true;
+            } else if (event.type === 'error' || event.type === 'response.failed' || event.type === 'response.incomplete') {
+              throw new Error(event.message || event.response?.error?.message || 'AI response incomplete or failed');
             }
           }
         }
-      } catch (error) {
-        console.error('Error reading stream:', error);
       } finally {
         reader.releaseLock();
       }
 
-      // Construct final response object
-      finalResponse.output = Object.values(activeItems) as Array<{ type: string; content?: Array<{ type: string; text?: string }> }>;
+      if (!completed) {
+        throw new Error('AI response interrupted before completion. Please try again.');
+      }
 
       // Safeguard: if output is empty, this is an error
       if (!finalResponse.output || finalResponse.output.length === 0) {

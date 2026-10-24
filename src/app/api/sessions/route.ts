@@ -77,188 +77,90 @@ export async function POST(req: Request) {
       );
     }
 
-    const created = [];
-    let createdAnyNewSession = false;
-    let updatedAnyExistingSession = false;
-
-    for (const sessionData of newSessions) {
-      const normalizedTimestamp = new Date(sessionData.timestamp);
-      const hasStrokeDataInput =
-        Object.prototype.hasOwnProperty.call(sessionData, 'strokeData') &&
-        Array.isArray(sessionData.strokeData);
-
-      // Check if session already exists (for updates)
-      // 1) Prefer matching by id (stable across re-imports if client keeps it)
-      // 2) Fallback to matching by the DB unique constraint (userId, timestamp, distance)
-      const existingById = sessionData.id
-        ? await prisma.rowingSession.findFirst({
-            where: {
-              id: sessionData.id,
-              userId: session.user.id,
-            },
-          })
-        : null;
-
-      const existingByUnique = !existingById
-        ? await prisma.rowingSession.findFirst({
-            where: {
-              userId: session.user.id,
-              timestamp: normalizedTimestamp,
-              distance: sessionData.distance,
-            },
-          })
-        : null;
-
-      const existing = existingById || existingByUnique;
-
-      let sessionRecord;
-
-      // Pre-compute consistency score from stroke data
-      const consistencyScore = hasStrokeDataInput
-        ? calculateConsistencyScore(sessionData.strokeData)
-        : undefined;
-
-      if (existing) {
-        // Update existing session
-        console.log(`[SESSIONS API] Updating existing session ${sessionData.id}`);
-        updatedAnyExistingSession = true;
-
-        sessionRecord = await prisma.rowingSession.update({
-          where: { id: existing.id },
-          data: {
+    const saveSessions = () => prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const sessionData of newSessions) {
+        const normalizedTimestamp = new Date(sessionData.timestamp);
+        const hasStrokeDataInput = Array.isArray(sessionData.strokeData);
+        const existingById = sessionData.id
+          ? await tx.rowingSession.findFirst({
+              where: { id: sessionData.id, userId: session.user.id },
+            })
+          : null;
+        const existing = existingById ?? await tx.rowingSession.findFirst({
+          where: {
+            userId: session.user.id,
             timestamp: normalizedTimestamp,
             distance: sessionData.distance,
-            duration: sessionData.duration,
-            energy: sessionData.energy || 0,
-            strokeCount: sessionData.strokeCount || 0,
-            avgPower: sessionData.avgPower || 0,
-            maxPower: sessionData.maxPower || 0,
-            wattPerKg: sessionData.wattPerKg || 0,
-            avgSplit: sessionData.avgSplit || 0,
-            minSplit: sessionData.minSplit || 0,
-            avgWork: sessionData.avgWork || 0,
-            avgStrokeLength: sessionData.avgStrokeLength || 0,
-            avgStrokeRate: sessionData.avgStrokeRate || 0,
-            maxStrokeRate: sessionData.maxStrokeRate || 0,
-            ...(hasStrokeDataInput ? { consistencyScore } : {}),
-            sourceFile: sessionData.sourceFile || null,
           },
         });
+        const data = {
+          timestamp: normalizedTimestamp,
+          distance: sessionData.distance,
+          duration: sessionData.duration,
+          energy: sessionData.energy || 0,
+          strokeCount: sessionData.strokeCount || 0,
+          avgPower: sessionData.avgPower || 0,
+          maxPower: sessionData.maxPower || 0,
+          wattPerKg: sessionData.wattPerKg || 0,
+          avgSplit: sessionData.avgSplit || 0,
+          minSplit: sessionData.minSplit || 0,
+          avgWork: sessionData.avgWork || 0,
+          avgStrokeLength: sessionData.avgStrokeLength || 0,
+          avgStrokeRate: sessionData.avgStrokeRate || 0,
+          maxStrokeRate: sessionData.maxStrokeRate || 0,
+          ...(hasStrokeDataInput
+            ? { consistencyScore: calculateConsistencyScore(sessionData.strokeData) }
+            : {}),
+          sourceFile: sessionData.sourceFile || null,
+        };
+        const sessionRecord = existing
+          ? await tx.rowingSession.update({ where: { id: existing.id }, data })
+          : await tx.rowingSession.create({ data: { ...data, userId: session.user.id } });
 
-        // Delete existing stroke data before adding new
-        if (hasStrokeDataInput) {
-          await prisma.strokeData.deleteMany({
-            where: { sessionId: existing.id },
+        if (existing && hasStrokeDataInput) {
+          await tx.strokeData.deleteMany({ where: { sessionId: existing.id } });
+        }
+
+        // Save stroke data if present - use bulk insert for performance
+        if (hasStrokeDataInput && sessionData.strokeData.length > 0) {
+          console.log(`[SESSIONS API] Bulk inserting ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
+
+          const strokeDataRecords = sessionData.strokeData.map((stroke: Record<string, unknown>) => ({
+            sessionId: sessionRecord.id,
+            strokeIndex: stroke.strokeIndex,
+            time: stroke.time,
+            timestamp: stroke.timestamp,
+            distance: stroke.distance,
+            work: stroke.work,
+            power: stroke.power,
+            avgPower: stroke.avgPower,
+            split: stroke.split,
+            avgSplit: stroke.avgSplit,
+            strokeRate: stroke.strokeRate,
+            heartRate: stroke.heartRate || null,
+            strokeLength: stroke.strokeLength || null,
+          }));
+
+          await tx.strokeData.createMany({
+            data: strokeDataRecords,
+            skipDuplicates: true,
           });
         }
-      } else {
-        // Create new session
-        console.log(`[SESSIONS API] Creating new session`);
 
-        try {
-          sessionRecord = await prisma.rowingSession.create({
-            data: {
-              userId: session.user.id,
-              timestamp: normalizedTimestamp,
-              distance: sessionData.distance,
-              duration: sessionData.duration,
-              energy: sessionData.energy || 0,
-              strokeCount: sessionData.strokeCount || 0,
-              avgPower: sessionData.avgPower || 0,
-              maxPower: sessionData.maxPower || 0,
-              wattPerKg: sessionData.wattPerKg || 0,
-              avgSplit: sessionData.avgSplit || 0,
-              minSplit: sessionData.minSplit || 0,
-              avgWork: sessionData.avgWork || 0,
-              avgStrokeLength: sessionData.avgStrokeLength || 0,
-              avgStrokeRate: sessionData.avgStrokeRate || 0,
-              maxStrokeRate: sessionData.maxStrokeRate || 0,
-              consistencyScore: consistencyScore ?? null,
-              sourceFile: sessionData.sourceFile || null,
-            },
-          });
-          createdAnyNewSession = true;
-        } catch (err: unknown) {
-          // Handle race/duplicate imports gracefully
-          if ((err as { code?: string })?.code === 'P2002') {
-            const dupe = await prisma.rowingSession.findFirst({
-              where: {
-                userId: session.user.id,
-                timestamp: normalizedTimestamp,
-                distance: sessionData.distance,
-              },
-            });
-
-            if (!dupe) {
-              throw err;
-            }
-
-            console.log(`[SESSIONS API] Duplicate detected, updating existing session ${dupe.id}`);
-            updatedAnyExistingSession = true;
-            sessionRecord = await prisma.rowingSession.update({
-              where: { id: dupe.id },
-              data: {
-                duration: sessionData.duration,
-                energy: sessionData.energy || 0,
-                strokeCount: sessionData.strokeCount || 0,
-                avgPower: sessionData.avgPower || 0,
-                maxPower: sessionData.maxPower || 0,
-                wattPerKg: sessionData.wattPerKg || 0,
-                avgSplit: sessionData.avgSplit || 0,
-                minSplit: sessionData.minSplit || 0,
-                avgWork: sessionData.avgWork || 0,
-                avgStrokeLength: sessionData.avgStrokeLength || 0,
-                avgStrokeRate: sessionData.avgStrokeRate || 0,
-                maxStrokeRate: sessionData.maxStrokeRate || 0,
-                ...(hasStrokeDataInput ? { consistencyScore } : {}),
-                sourceFile: sessionData.sourceFile || null,
-              },
-            });
-
-            if (hasStrokeDataInput) {
-              await prisma.strokeData.deleteMany({
-                where: { sessionId: dupe.id },
-              });
-            }
-          } else {
-            throw err;
-          }
-        }
+        created.push(sessionRecord);
       }
+      await bumpUserSessionsRevision(session.user.id, tx);
+      return created;
+    }, { timeout: 30000 });
 
-      // Save stroke data if present - use bulk insert for performance
-      if (hasStrokeDataInput && sessionData.strokeData.length > 0) {
-        console.log(`[SESSIONS API] Bulk inserting ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
-
-        const strokeDataRecords = sessionData.strokeData.map((stroke: Record<string, unknown>) => ({
-          sessionId: sessionRecord.id,
-          strokeIndex: stroke.strokeIndex,
-          time: stroke.time,
-          timestamp: stroke.timestamp,
-          distance: stroke.distance,
-          work: stroke.work,
-          power: stroke.power,
-          avgPower: stroke.avgPower,
-          split: stroke.split,
-          avgSplit: stroke.avgSplit,
-          strokeRate: stroke.strokeRate,
-          heartRate: stroke.heartRate || null,
-          strokeLength: stroke.strokeLength || null,
-        }));
-
-        await prisma.strokeData.createMany({
-          data: strokeDataRecords,
-          skipDuplicates: true,
-        });
-      }
-
-      created.push(sessionRecord);
-    }
-
-    const shouldBumpSessionsRevision =
-      createdAnyNewSession || updatedAnyExistingSession || newSessions.length > 1;
-    if (shouldBumpSessionsRevision) {
-      await bumpUserSessionsRevision(session.user.id);
+    let created;
+    try {
+      created = await saveSessions();
+    } catch (error) {
+      // A concurrent import can win the unique key; retry only after its failed transaction rolls back.
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'P2002') throw error;
+      created = await saveSessions();
     }
 
     return NextResponse.json({ 

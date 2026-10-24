@@ -64,10 +64,13 @@ export async function DELETE(
   }
 
   const storage = getMocapStorage();
-  await Promise.allSettled([
-    storage.delete(row.videoStoragePath),
-    storage.delete(row.poseStreamPath),
-  ]);
+  try {
+    await storage.delete(row.videoStoragePath);
+    await storage.delete(row.poseStreamPath);
+  } catch (error) {
+    console.error("Failed to delete motion-capture files:", error);
+    return NextResponse.json({ error: "Failed to delete session files" }, { status: 500 });
+  }
   await prisma.mocapSession.delete({ where: { id } });
 
   return NextResponse.json({ success: true, id });

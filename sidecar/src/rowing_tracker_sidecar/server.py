@@ -108,7 +108,7 @@ class _ThreadingHTTPServer(ThreadingHTTPServer):
 
 
 class SidecarServer:
-    def __init__(self, host: str, port: int, source: FrameSource) -> None:
+    def __init__(self, host: str, port: int, source: FrameSource, app_origin: str = "http://localhost:3000") -> None:
         self.state = SidecarState(source)
         self._shutdown = threading.Event()
 
@@ -118,6 +118,7 @@ class SidecarServer:
         class Handler(SidecarRequestHandler):
             sidecar_state = state
             shutdown_event_ref = shutdown_event
+            allowed_origin = app_origin
 
         self._server = _ThreadingHTTPServer((host, port), Handler)
         self.host = host
@@ -138,14 +139,26 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
     server_version = "RowingTrackerSidecar/0.1"
     sidecar_state: SidecarState
     shutdown_event_ref: threading.Event
+    allowed_origin = "http://localhost:3000"
+
+    def _check_origin(self) -> bool:
+        if self.headers.get("Origin") not in (None, self.allowed_origin):
+            self.close_connection = True
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Untrusted app origin"})
+            return False
+        return True
 
     def do_OPTIONS(self) -> None:
+        if not self._check_origin():
+            return
         self.send_response(HTTPStatus.NO_CONTENT)
         self._send_cors_headers()
         self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self) -> None:
+        if not self._check_origin():
+            return
         if self.path == "/health":
             self._send_json(HTTPStatus.OK, self.sidecar_state.health().to_json())
             return
@@ -155,6 +168,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": f"Unknown path: {self.path}"})
 
     def do_POST(self) -> None:
+        if not self._check_origin():
+            return
         self._drain_request_body()
         if self.path == "/session/start":
             status, body = self.sidecar_state.start()
@@ -184,7 +199,9 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def _send_cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        if self.headers.get("Origin") == self.allowed_origin:
+            self.send_header("Access-Control-Allow-Origin", self.allowed_origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 

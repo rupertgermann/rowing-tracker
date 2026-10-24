@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRowingStore } from '@/lib/store';
 import { cloudAI, ChatMessage, ChatSession, FileAttachment } from '@/lib/cloudAI';
 import { initializeCloudAIFromSettings, isAIAvailable, getAIConfigurationErrorMessage } from '@/lib/aiConfig';
+import { loadChatMessages } from '@/lib/chatStorage';
 
 export interface ChatState {
   currentSession: ChatSession | null;
@@ -115,15 +116,13 @@ export function useChat() {
       }));
 
       if (nextCurrent) {
-        const messagesRes = await fetch(`/api/chat?sessionId=${encodeURIComponent(nextCurrent.id)}&limit=200`);
-        if (messagesRes.ok) {
-          const msgData = await messagesRes.json();
-          const msgs = (msgData.messages || []).map((m: Record<string, unknown>) => dbMessageToChatMessage(m, nextCurrent.id));
-          setState(prev => ({
-            ...prev,
-            currentSession: prev.currentSession ? { ...prev.currentSession, messages: msgs } : prev.currentSession,
-          }));
-        }
+        const messages = await loadChatMessages(nextCurrent.id);
+        setState(prev => ({
+          ...prev,
+          currentSession: prev.currentSession && prev.currentSession.id === nextCurrent.id
+            ? { ...prev.currentSession, messages }
+            : prev.currentSession,
+        }));
       }
     } catch (error) {
       setState(prev => ({
@@ -195,14 +194,7 @@ export function useChat() {
 
       setStoredCurrentSessionId(sessionId);
 
-      const res = await fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}&limit=200`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'Failed to load messages');
-      }
-
-      const data = await res.json();
-      const messages = (data.messages || []).map((m: Record<string, unknown>) => dbMessageToChatMessage(m, sessionId));
+      const messages = await loadChatMessages(sessionId);
 
       setState(prev => ({
         ...prev,
