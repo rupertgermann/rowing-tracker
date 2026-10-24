@@ -6,6 +6,12 @@
 - **Adapter**: `@prisma/adapter-pg` over `pg` `Pool` (configured in `prisma.config.ts`).
 - **Source of truth**: `prisma/schema.prisma`. This document is a condensed, annotated mirror.
 
+## Migration validation
+
+Run `TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:PORT/rowing_migration_test npm run test:migrations` against an empty, disposable local PostgreSQL database. The test role needs permission to create databases for the upgrade check. The tests apply committed migrations, exercise the current Prisma client, and verify that upgrades preserve existing counters, time zones, and legacy memory bytes.
+
+Migrations retain the legacy `MemoryBlob` table to preserve uploaded document bytes. It is absent from the Prisma client schema, so schema-diff tools still propose removing it. Do not treat that proposal as an automatic cleanup step.
+
 ## Core Models (Prisma)
 ```prisma
 // prisma/schema.prisma
