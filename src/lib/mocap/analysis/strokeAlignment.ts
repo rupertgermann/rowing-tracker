@@ -48,8 +48,12 @@ function estimateDelta(
   tolerance: number,
 ): number {
   // Score each candidate delta (csv[j] - pose[i], rounded to nearest bucket).
-  // Limit brute-force to at most 50 pose × all csv pairs.
+  // Limit candidate generation to at most 50 pose × all csv pairs.
   const csvTimes = csvStrokes.map((s) => s.timeMs);
+  const scorer = new DeltaMatchScorer(csvTimes);
+  const poseTimesAreSorted = poseTimes.every(
+    (time, index) => index === 0 || time >= poseTimes[index - 1],
+  );
   const candidates = new Set<number>();
   const poseLimit = Math.min(poseTimes.length, 50);
 
@@ -63,7 +67,7 @@ function estimateDelta(
   let bestDelta = 0;
   let bestScore = -1;
   for (const delta of candidates) {
-    const score = scoreWithDelta(poseTimes, csvTimes, delta, tolerance);
+    const score = scorer.score(poseTimes, delta, tolerance, poseTimesAreSorted);
     if (score > bestScore) {
       bestScore = score;
       bestDelta = delta;
@@ -72,32 +76,173 @@ function estimateDelta(
   return bestDelta;
 }
 
-function scoreWithDelta(
-  poseTimes: number[],
-  csvTimes: number[],
-  delta: number,
-  tolerance: number,
-): number {
-  let matched = 0;
-  const usedCsv = new Set<number>();
-  for (const poseTime of poseTimes) {
-    const adjusted = poseTime + delta;
-    let bestDist = tolerance;
-    let bestIdx = -1;
-    for (let j = 0; j < csvTimes.length; j++) {
-      if (usedCsv.has(j)) continue;
-      const dist = Math.abs(adjusted - csvTimes[j]);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIdx = j;
+interface IndexedTime {
+  timeMs: number;
+  originalIndex: number;
+}
+
+class DeltaMatchScorer {
+  private readonly entries: IndexedTime[];
+
+  constructor(csvTimes: number[]) {
+    this.entries = csvTimes
+      .map((timeMs, originalIndex) => ({ timeMs, originalIndex }))
+      .sort((left, right) =>
+        left.timeMs - right.timeMs || left.originalIndex - right.originalIndex,
+      );
+  }
+
+  score(
+    poseTimes: number[],
+    delta: number,
+    tolerance: number,
+    poseTimesAreSorted: boolean,
+  ): number {
+    const available = new AvailableTimeIndex(this.entries);
+    let matched = 0;
+    let insertionIndex = 0;
+
+    for (const poseTime of poseTimes) {
+      const targetTime = poseTime + delta;
+      if (poseTimesAreSorted) {
+        while (
+          insertionIndex < this.entries.length &&
+          this.entries[insertionIndex].timeMs < targetTime
+        ) {
+          insertionIndex += 1;
+        }
+      }
+
+      if (
+        available.takeNearest(
+          targetTime,
+          tolerance,
+          poseTimesAreSorted ? insertionIndex : undefined,
+        ) !== -1
+      ) {
+        matched += 1;
       }
     }
-    if (bestIdx !== -1) {
-      matched++;
-      usedCsv.add(bestIdx);
+
+    return matched;
+  }
+}
+
+class AvailableTimeIndex {
+  private readonly nextAvailable: Int32Array;
+  private readonly previousAvailable: Int32Array;
+
+  constructor(private readonly entries: IndexedTime[]) {
+    this.nextAvailable = new Int32Array(entries.length + 1);
+    this.previousAvailable = new Int32Array(entries.length + 1);
+
+    for (let index = 0; index <= entries.length; index += 1) {
+      this.nextAvailable[index] = index;
+      this.previousAvailable[index] = index;
     }
   }
-  return matched;
+
+  // Successor/predecessor disjoint sets keep nearest-unused lookup cheap while
+  // retaining the original scorer's distance and CSV-index tie breaking.
+  takeNearest(
+    targetTimeMs: number,
+    toleranceMs: number,
+    knownInsertionIndex?: number,
+  ): number {
+    const insertionIndex = knownInsertionIndex ?? this.lowerBound(targetTimeMs);
+    const previousPosition = this.findPrevious(insertionIndex);
+    const leftIndex = previousPosition > 0
+      ? this.firstAvailableAtTime(previousPosition - 1)
+      : -1;
+    const nextPosition = this.findNext(insertionIndex);
+    const rightIndex = nextPosition < this.entries.length ? nextPosition : -1;
+
+    const chosenIndex = this.nearerIndex(leftIndex, rightIndex, targetTimeMs);
+    if (
+      chosenIndex === -1 ||
+      Math.abs(targetTimeMs - this.entries[chosenIndex].timeMs) >= toleranceMs
+    ) {
+      return -1;
+    }
+
+    this.remove(chosenIndex);
+    return this.entries[chosenIndex].originalIndex;
+  }
+
+  private nearerIndex(leftIndex: number, rightIndex: number, targetTimeMs: number): number {
+    if (leftIndex === -1) return rightIndex;
+    if (rightIndex === -1) return leftIndex;
+
+    const left = this.entries[leftIndex];
+    const right = this.entries[rightIndex];
+    const leftDistance = Math.abs(targetTimeMs - left.timeMs);
+    const rightDistance = Math.abs(targetTimeMs - right.timeMs);
+
+    if (leftDistance !== rightDistance) {
+      return leftDistance < rightDistance ? leftIndex : rightIndex;
+    }
+
+    return left.originalIndex < right.originalIndex ? leftIndex : rightIndex;
+  }
+
+  private firstAvailableAtTime(index: number): number {
+    const timeMs = this.entries[index].timeMs;
+    const firstAtTime = this.lowerBound(timeMs);
+    const firstAvailable = this.findNext(firstAtTime);
+
+    return this.entries[firstAvailable].timeMs === timeMs ? firstAvailable : index;
+  }
+
+  private lowerBound(targetTimeMs: number): number {
+    let low = 0;
+    let high = this.entries.length;
+
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (this.entries[middle].timeMs < targetTimeMs) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+
+    return low;
+  }
+
+  private findNext(index: number): number {
+    let root = index;
+    while (this.nextAvailable[root] !== root) {
+      root = this.nextAvailable[root];
+    }
+
+    while (this.nextAvailable[index] !== index) {
+      const next = this.nextAvailable[index];
+      this.nextAvailable[index] = root;
+      index = next;
+    }
+
+    return root;
+  }
+
+  private findPrevious(position: number): number {
+    let root = position;
+    while (this.previousAvailable[root] !== root) {
+      root = this.previousAvailable[root];
+    }
+
+    while (this.previousAvailable[position] !== position) {
+      const previous = this.previousAvailable[position];
+      this.previousAvailable[position] = root;
+      position = previous;
+    }
+
+    return root;
+  }
+
+  private remove(index: number): void {
+    this.nextAvailable[index] = this.findNext(index + 1);
+    this.previousAvailable[index + 1] = this.findPrevious(index);
+  }
 }
 
 function applyDelta(

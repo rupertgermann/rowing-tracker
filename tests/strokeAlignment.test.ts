@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   alignStrokesToCsv,
   ALIGNMENT_TOLERANCE_MS,
+  type AlignmentResult,
   type CsvStrokeTarget,
+  type StrokeMatch,
 } from "../src/lib/mocap/analysis/strokeAlignment";
 
 function makeCsv(timesMs: number[]): CsvStrokeTarget[] {
@@ -12,6 +14,103 @@ function makeCsv(timesMs: number[]): CsvStrokeTarget[] {
     strokeIndex: i,
     timeMs,
   }));
+}
+
+function referenceAlignStrokesToCsv(
+  poseCatchTimesMs: number[],
+  csvStrokes: CsvStrokeTarget[],
+  toleranceMs: number,
+): AlignmentResult {
+  if (poseCatchTimesMs.length === 0 || csvStrokes.length === 0) {
+    return {
+      matches: new Map(),
+      deltaMs: 0,
+      matchedCount: 0,
+      unmatchedPoseStrokes: poseCatchTimesMs.map((_, index) => index),
+      unmatchedCsvStrokes: csvStrokes.map((stroke) => stroke.strokeIndex),
+    };
+  }
+
+  const csvTimes = csvStrokes.map((stroke) => stroke.timeMs);
+  const candidates = new Set<number>();
+  const poseLimit = Math.min(poseCatchTimesMs.length, 50);
+
+  for (let poseIndex = 0; poseIndex < poseLimit; poseIndex += 1) {
+    for (const csvTime of csvTimes) {
+      const rawDelta = csvTime - poseCatchTimesMs[poseIndex];
+      candidates.add(Math.round(rawDelta / 100) * 100);
+    }
+  }
+
+  let deltaMs = 0;
+  let bestScore = -1;
+  for (const candidate of candidates) {
+    const usedCsv = new Set<number>();
+    let score = 0;
+
+    for (const poseTime of poseCatchTimesMs) {
+      const adjusted = poseTime + candidate;
+      let bestDistance = toleranceMs;
+      let bestIndex = -1;
+
+      for (let csvIndex = 0; csvIndex < csvTimes.length; csvIndex += 1) {
+        if (usedCsv.has(csvIndex)) continue;
+        const distance = Math.abs(adjusted - csvTimes[csvIndex]);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = csvIndex;
+        }
+      }
+
+      if (bestIndex !== -1) {
+        score += 1;
+        usedCsv.add(bestIndex);
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      deltaMs = candidate;
+    }
+  }
+
+  const pairs: Array<{ poseIndex: number; csvIndex: number; distance: number }> = [];
+  for (let poseIndex = 0; poseIndex < poseCatchTimesMs.length; poseIndex += 1) {
+    const adjusted = poseCatchTimesMs[poseIndex] + deltaMs;
+    for (let csvIndex = 0; csvIndex < csvStrokes.length; csvIndex += 1) {
+      const distance = Math.abs(adjusted - csvStrokes[csvIndex].timeMs);
+      if (distance <= toleranceMs) pairs.push({ poseIndex, csvIndex, distance });
+    }
+  }
+  pairs.sort((left, right) => left.distance - right.distance);
+
+  const matches = new Map<number, StrokeMatch>();
+  const usedCsv = new Set<number>();
+  const matchedPose = new Set<number>();
+
+  for (const pair of pairs) {
+    if (matchedPose.has(pair.poseIndex) || usedCsv.has(pair.csvIndex)) continue;
+    const csvStroke = csvStrokes[pair.csvIndex];
+    matches.set(pair.poseIndex, {
+      csvStrokeDataId: csvStroke.id,
+      csvStrokeIndex: csvStroke.strokeIndex,
+      offsetMs: poseCatchTimesMs[pair.poseIndex] + deltaMs - csvStroke.timeMs,
+    });
+    matchedPose.add(pair.poseIndex);
+    usedCsv.add(pair.csvIndex);
+  }
+
+  return {
+    matches,
+    deltaMs,
+    matchedCount: matchedPose.size,
+    unmatchedPoseStrokes: poseCatchTimesMs
+      .map((_, index) => index)
+      .filter((index) => !matchedPose.has(index)),
+    unmatchedCsvStrokes: csvStrokes
+      .map((stroke) => stroke.strokeIndex)
+      .filter((_, index) => !usedCsv.has(index)),
+  };
 }
 
 describe("alignStrokesToCsv", () => {
@@ -140,6 +239,40 @@ describe("alignStrokesToCsv", () => {
       assert.ok(match);
       // After delta correction, offsetMs should be small
       assert.ok(Math.abs(match.offsetMs) <= ALIGNMENT_TOLERANCE_MS);
+    }
+  });
+
+  test("matches the exhaustive scorer across deterministic varied inputs", () => {
+    let seed = 0x5eed1234;
+    const random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x1_0000_0000;
+    };
+
+    for (let caseIndex = 0; caseIndex < 100; caseIndex += 1) {
+      const poseCount = 1 + Math.floor(random() * 8);
+      const csvCount = 1 + Math.floor(random() * 8);
+      const toleranceMs = [100, 500, 2500][caseIndex % 3];
+      const poseTimes = Array.from(
+        { length: poseCount },
+        () => Math.round(random() * 20_000 / 50) * 50,
+      );
+      const csv = makeCsv(Array.from(
+        { length: csvCount },
+        () => Math.round(random() * 20_000 / 50) * 50,
+      ));
+
+      assert.deepEqual(
+        alignStrokesToCsv(poseTimes, csv, toleranceMs),
+        referenceAlignStrokesToCsv(poseTimes, csv, toleranceMs),
+        `case ${caseIndex}`,
+      );
+      const sortedPoseTimes = [...poseTimes].sort((left, right) => left - right);
+      assert.deepEqual(
+        alignStrokesToCsv(sortedPoseTimes, csv, toleranceMs),
+        referenceAlignStrokesToCsv(sortedPoseTimes, csv, toleranceMs),
+        `sorted case ${caseIndex}`,
+      );
     }
   });
 });

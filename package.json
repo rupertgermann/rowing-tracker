@@ -31,6 +31,8 @@
     "db:reset": "npx prisma migrate reset",
     "admin:promote": "npx tsx scripts/promote-admin.ts",
     "test": "npx tsx --test tests/*.test.ts",
+    "perf:alignment": "npx tsx scripts/benchmark-stroke-alignment.ts",
+    "perf:projections": "npx tsx scripts/benchmark-session-projections.ts",
     "test:sidecar": "npx tsx --test tests/sidecarPackageInstall.test.ts tests/sidecarCliContract.test.ts tests/sidecarPoseSource.test.ts tests/freemocapSidecarSource.test.ts tests/sidecarMockContract.test.ts tests/sidecarTracer.test.ts",
     "test:e2e": "npx playwright test",
     "test:e2e:sidecar-smoke": "npx playwright test tests/e2e/sidecar-hardware-smoke.spec.ts",

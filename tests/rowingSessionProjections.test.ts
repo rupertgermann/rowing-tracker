@@ -7,10 +7,12 @@ import {
   calculateSessionStats,
   checkAIAwardSuggestions,
   computeEarnedAwards,
+  computeAwardEarnedAt,
   filterAndSortSessions,
   filterAndSortSessionsForView,
   type AIAwardSuggestion,
 } from "../src/lib/rowingSessionProjections";
+import { AWARDS, type EarnedAward } from "../src/lib/awards";
 import type { Session } from "../src/types/session";
 
 function session(overrides: Partial<Session> & { id: string }): Session {
@@ -148,4 +150,53 @@ test("computeEarnedAwards and checkAIAwardSuggestions expose award eligibility a
   assert.equal(updatedSuggestions[0].status, "earned");
   assert.equal(updatedSuggestions[0].earnedAt?.toISOString(), "2026-06-18T12:00:00.000Z");
   assert.equal(aiSuggestion.status, "approved");
+});
+
+function computeEarnedAwardsExhaustively(sessions: Session[]): EarnedAward[] {
+  const sorted = [...sessions].sort(
+    (left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime(),
+  );
+
+  return AWARDS.flatMap((award) => {
+    for (let index = 0; index < sorted.length; index += 1) {
+      const prefix = sorted.slice(0, index + 1);
+      const stats = calculateSessionStats(prefix, { now: new Date("2026-06-20T12:00:00.000Z") });
+      if (award.condition(prefix, stats)) {
+        return [{ awardId: award.id, earnedAt: new Date(sorted[index].timestamp) }];
+      }
+    }
+
+    return [];
+  });
+}
+
+test("computeEarnedAwards preserves exhaustive first-earned dates", () => {
+  const sessions = Array.from({ length: 140 }, (_, index) => session({
+    id: `history-${index}`,
+    timestamp: new Date(Date.UTC(2026, 4, 1 + index)),
+    distance: [500, 1000, 2000, 5000][index % 4],
+    duration: 310 + (index % 90),
+    avgPower: 130 + index,
+    avgSplit: 135 - index / 3,
+  })).reverse();
+  const options = { now: new Date("2026-06-20T12:00:00.000Z") };
+
+  assert.deepEqual(
+    computeEarnedAwards(sessions, options),
+    computeEarnedAwardsExhaustively(sessions),
+  );
+});
+
+test("award dates preserve earlier qualification when later totals decrease", () => {
+  for (const correction of [{ distance: -12000 }, { duration: -4000 }]) {
+    const sessions = [
+      session({ id: "earned", timestamp: new Date("2026-06-18T12:00:00Z"), distance: 12000, duration: 4000 }),
+      session({ id: "correction", timestamp: new Date("2026-06-19T12:00:00Z"), ...correction }),
+    ];
+    const expected = computeEarnedAwardsExhaustively(sessions);
+    assert.deepEqual(computeEarnedAwards(sessions), expected);
+    for (const award of expected) {
+      assert.deepEqual(computeAwardEarnedAt(sessions, award.awardId), award.earnedAt);
+    }
+  }
 });
