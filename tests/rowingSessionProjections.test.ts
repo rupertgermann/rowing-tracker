@@ -7,6 +7,7 @@ import {
   calculateSessionStats,
   checkAIAwardSuggestions,
   computeEarnedAwards,
+  computeAwardEarnedAt,
   filterAndSortSessions,
   filterAndSortSessionsForView,
   type AIAwardSuggestion,
@@ -184,4 +185,18 @@ test("computeEarnedAwards preserves exhaustive first-earned dates", () => {
     computeEarnedAwards(sessions, options),
     computeEarnedAwardsExhaustively(sessions),
   );
+});
+
+test("award dates preserve earlier qualification when later totals decrease", () => {
+  for (const correction of [{ distance: -12000 }, { duration: -4000 }]) {
+    const sessions = [
+      session({ id: "earned", timestamp: new Date("2026-06-18T12:00:00Z"), distance: 12000, duration: 4000 }),
+      session({ id: "correction", timestamp: new Date("2026-06-19T12:00:00Z"), ...correction }),
+    ];
+    const expected = computeEarnedAwardsExhaustively(sessions);
+    assert.deepEqual(computeEarnedAwards(sessions), expected);
+    for (const award of expected) {
+      assert.deepEqual(computeAwardEarnedAt(sessions, award.awardId), award.earnedAt);
+    }
+  }
 });

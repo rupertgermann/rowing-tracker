@@ -267,6 +267,12 @@ describe("alignStrokesToCsv", () => {
         referenceAlignStrokesToCsv(poseTimes, csv, toleranceMs),
         `case ${caseIndex}`,
       );
+      const sortedPoseTimes = [...poseTimes].sort((left, right) => left - right);
+      assert.deepEqual(
+        alignStrokesToCsv(sortedPoseTimes, csv, toleranceMs),
+        referenceAlignStrokesToCsv(sortedPoseTimes, csv, toleranceMs),
+        `sorted case ${caseIndex}`,
+      );
     }
   });
 });

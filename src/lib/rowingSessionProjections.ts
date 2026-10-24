@@ -430,6 +430,17 @@ function findAwardEarnedAt(
 ): Date | null {
   if (sortedSessions.length === 0) return null;
 
+  // Legacy imports can contain negative totals, so their award eligibility can decrease.
+  if (sortedSessions.some((session) => session.distance < 0 || session.duration < 0)) {
+    for (let index = 0; index < sortedSessions.length; index += 1) {
+      const prefix = projectPrefix(index);
+      if (award.condition(prefix.sessions, prefix.stats)) {
+        return timestampDate(sortedSessions[index]);
+      }
+    }
+    return null;
+  }
+
   const lastIndex = sortedSessions.length - 1;
   const lastPrefix = projectPrefix(lastIndex);
   if (!award.condition(lastPrefix.sessions, lastPrefix.stats)) return null;

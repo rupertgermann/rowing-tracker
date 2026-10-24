@@ -25,7 +25,7 @@ export interface Award {
   description: string;
   icon: LucideIcon;
   color: string; // Tailwind color class for icon
-  /** Once true for a chronological session prefix, it must remain true for later prefixes. */
+  /** For nonnegative session totals, eligibility must remain true after the first qualifying prefix. */
   condition: (sessions: Session[], stats?: AwardStats) => boolean;
 }
 
