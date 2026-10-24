@@ -1,4 +1,4 @@
-import { DEFAULT_AWARD_SUGGESTIONS_PROMPT } from '@/lib/aiPromptDefaults';
+import { DEFAULT_AWARD_SUGGESTIONS_PROMPT, DEFAULT_CHAT_SYSTEM_PROMPT } from '@/lib/aiPromptDefaults';
 import {
   defaultPostureThresholdSettings,
   resolvePostureThresholdSettings,
@@ -284,7 +284,7 @@ export class SettingsService {
         model: 'gpt-5.4-mini'
       },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
-      chatSystemPrompt: 'You are a personal AI rowing coach...',
+      chatSystemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT,
       planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...',
       insightsPrompt: `Analyze the following indoor rowing workout data and provide personalized insights:
 
