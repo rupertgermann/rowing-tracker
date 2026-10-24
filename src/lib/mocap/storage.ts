@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { del, head, list, put } from "@vercel/blob";
+import { del, get, head, list, put } from "@vercel/blob";
 
 export type ByteRange = { start: number; end?: number };
 
@@ -141,17 +141,16 @@ class VercelBlobStorage implements MocapStorage {
   }
 
   async read(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
-    const meta = await head(storagePath);
     const headers: HeadersInit = {};
     if (range) {
       const end = range.end === undefined ? "" : String(range.end - 1);
       headers.Range = `bytes=${range.start}-${end}`;
     }
-    const res = await fetch(meta.url, { headers, cache: "no-store" });
-    if (!res.ok && res.status !== 206) {
-      throw new Error(`Failed to read blob ${storagePath}: ${res.status}`);
+    const result = await get(storagePath, { access: "private", useCache: false, headers });
+    if (!result || result.statusCode !== 200) {
+      throw new Error(`Failed to read blob ${storagePath}: ${result?.statusCode ?? 404}`);
     }
-    return new Uint8Array(await res.arrayBuffer());
+    return new Uint8Array(await new Response(result.stream).arrayBuffer());
   }
 
   async size(storagePath: string): Promise<number> {

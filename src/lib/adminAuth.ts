@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/db/prisma";
 import { NextResponse } from "next/server";
 
 /**
@@ -15,7 +16,12 @@ export async function requireAdmin() {
     );
   }
   
-  if (session.user.role !== "admin") {
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  if (user?.role !== "admin") {
     return NextResponse.json(
       { error: "Forbidden - Admin access required" },
       { status: 403 }
@@ -30,7 +36,12 @@ export async function requireAdmin() {
  */
 export async function isAdmin(): Promise<boolean> {
   const session = await getServerSession(authOptions);
-  return session?.user?.role === "admin";
+  if (!session?.user?.id) return false;
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+  return user?.role === "admin";
 }
 
 /**

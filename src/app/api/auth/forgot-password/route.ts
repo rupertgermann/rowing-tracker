@@ -1,3 +1,4 @@
+import { applyRateLimit } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
@@ -10,6 +11,9 @@ const forgotPasswordSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const limited = await applyRateLimit(req, null, "auth");
+    if (limited) return limited;
+
     const body = await req.json();
     const result = forgotPasswordSchema.safeParse(body);
 

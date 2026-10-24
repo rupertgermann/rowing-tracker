@@ -14,6 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--app-origin", default="http://localhost:3000", help="Exact browser app origin allowed to access capture.")
     parser.add_argument(
         "--source",
         choices=["synthetic", "freemocap"],
@@ -64,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         freemocap_calibration_toml=args.freemocap_calibration_toml,
         freemocap_provider=args.freemocap_provider,
     )
-    server = SidecarServer(args.host, args.port, source)
+    server = SidecarServer(args.host, args.port, source, app_origin=args.app_origin)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { unlink, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 const AWARDS_DIR = path.join(process.cwd(), 'public', 'assets', 'awards');
 const NEXT_DIR = path.join(process.cwd(), '.next');
@@ -35,10 +37,15 @@ async function clearNextImageCache(): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = session.user.id;
+    if (!/^[a-zA-Z0-9_-]+$/.test(userId)) return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });
+
     const body = await request.json();
     const { awardId } = body;
 
-    if (!awardId) {
+    if (typeof awardId !== 'string' || !awardId || awardId.length > 200) {
       return NextResponse.json(
         { error: 'Missing required field: awardId' },
         { status: 400 }
@@ -53,11 +60,10 @@ export async function POST(request: NextRequest) {
     let deleted = false;
 
     for (const ext of extensions) {
-      const filePath = path.join(AWARDS_DIR, `${safeAwardId}.${ext}`);
+      const filePath = path.join(AWARDS_DIR, userId, `${safeAwardId}.${ext}`);
       if (existsSync(filePath)) {
         await unlink(filePath);
         deleted = true;
-        break;
       }
     }
 

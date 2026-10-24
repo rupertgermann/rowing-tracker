@@ -63,6 +63,11 @@ export async function POST(req: Request) {
       );
     }
 
+    if (documents.some(doc => !doc || typeof doc !== "object" ||
+        (doc.size !== undefined && (!Number.isSafeInteger(doc.size) || doc.size < 0)))) {
+      return NextResponse.json({ error: "Document size must be a nonnegative integer" }, { status: 400 });
+    }
+
     const savedDocuments = [];
 
     for (const docData of documents) {
@@ -83,7 +88,6 @@ export async function POST(req: Request) {
             ...(docData.type !== undefined ? { type: docData.type } : {}),
             ...(docData.source !== undefined ? { source: docData.source } : {}), // Update source if provided
             ...(docData.mimeType !== undefined ? { mimeType: docData.mimeType } : {}),
-            ...(docData.size !== undefined ? { size: docData.size } : {}),
             ...(docData.description !== undefined ? { description: docData.description } : {}),
             ...(docData.extractedText !== undefined ? { extractedText: docData.extractedText } : {}),
             ...(docData.tags !== undefined ? { tags: docData.tags } : {}),

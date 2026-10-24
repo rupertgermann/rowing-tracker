@@ -361,12 +361,8 @@ export class TrainingPlansService {
 
   // Private helper methods
   private async savePlans(plans: TrainingPlan[]): Promise<void> {
-    try {
-      console.log('[TRAINING PLANS] Saving plans to database:', plans.length);
-      await saveTrainingPlansToDB(plans as unknown as Record<string, unknown>[]);
-    } catch (error) {
-      console.error('Failed to save training plans:', error);
-    }
+    const result = await saveTrainingPlansToDB(plans as unknown as Record<string, unknown>[]);
+    if (!result.success) throw new Error(result.error || 'Failed to save training plans');
   }
 
   private generateId(): string {

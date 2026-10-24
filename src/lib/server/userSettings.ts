@@ -40,8 +40,11 @@ export function buildUserSettingsCreateData(
   };
 }
 
-export async function bumpUserSessionsRevision(userId: string): Promise<void> {
-  await prisma.userSettings.upsert({
+export async function bumpUserSessionsRevision(
+  userId: string,
+  db: Pick<Prisma.TransactionClient, "userSettings"> = prisma,
+): Promise<void> {
+  await db.userSettings.upsert({
     where: { userId },
     update: {
       sessionsRevision: { increment: 1 },

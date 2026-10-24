@@ -12,6 +12,7 @@ function VerifyEmailContent() {
   const email = searchParams.get("email");
   const [isResending, setIsResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [sendError, setSendError] = useState(searchParams.get("delivery") === "failed");
 
   const handleResendVerification = async () => {
     if (!email) return;
@@ -19,14 +20,20 @@ function VerifyEmailContent() {
     setIsResending(true);
     try {
       // Trigger magic link email
-      await signIn("email", {
+      const result = await signIn("email", {
         email,
         redirect: false,
         callbackUrl: "/dashboard"
       });
+      if (!result || result.error) {
+        setSendError(true);
+        return;
+      }
+      setSendError(false);
       setResent(true);
     } catch (error) {
       console.error("Failed to resend verification:", error);
+      setSendError(true);
     } finally {
       setIsResending(false);
     }
@@ -40,7 +47,7 @@ function VerifyEmailContent() {
         </div>
         <h1 className="text-2xl font-bold text-white">Check Your Email</h1>
         <p className="text-slate-400 mt-2">
-          We&apos;ve sent a verification link to
+          {sendError ? "Your account was created, but the verification email could not be sent to" : "We've sent a verification link to"}
         </p>
         {email && (
           <p className="text-blue-400 font-medium mt-1">{email}</p>
@@ -54,7 +61,7 @@ function VerifyEmailContent() {
             <div className="text-sm text-slate-300">
               <p className="font-medium mb-1">Next Steps:</p>
               <ol className="list-decimal list-inside space-y-1 text-slate-400">
-                <li>Check your email inbox</li>
+                <li>{sendError ? "Use Resend verification to try again" : "Check your email inbox"}</li>
                 <li>Click the verification link</li>
                 <li>Sign in with your credentials</li>
               </ol>

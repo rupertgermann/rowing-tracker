@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import { prisma } from "@/lib/db/prisma";
-import { getMocapStorage } from "@/lib/mocap/storage";
-import { avatarStorageDetails } from "@/lib/userAvatar";
+import { deleteUserFiles } from "@/lib/deleteUserFiles";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -177,19 +176,10 @@ export async function DELETE(
       );
     }
 
-    // Delete user (cascade will delete all related data)
+    await deleteUserFiles(user);
     await prisma.user.delete({
-      where: { id: userId }
+      where: { id: user.id },
     });
-
-    const avatar = avatarStorageDetails(user.image, user.id);
-    if (avatar) {
-      try {
-        await getMocapStorage().delete(avatar.storagePath);
-      } catch (error) {
-        console.error("Failed to remove avatar during user deletion:", error);
-      }
-    }
 
     return NextResponse.json({ 
       message: "User and all associated data deleted successfully" 
