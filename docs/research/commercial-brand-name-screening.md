@@ -6,6 +6,8 @@
 
 **Recherche- und Entscheidungsstand:** 2026-08-02, 22:30 CEST
 
+> **Historischer Stand:** Die Empfehlungen unten gehören zu einer früheren Runde. Siehe die [spätere Memory-Coach-Runde](commercial-brand-memory-coach-round.md) und die anschließende [Ablehnung von Memorow](memorow-brand-clearance.md). Kein Produktname ist ausgewählt oder freigegeben.
+
 ## Bindende Screening-Empfehlung
 
 **PaceHelm** geht als klarer erster Kandidat in den UI-Prototyp. **Ruderlotse** und **Rowerly** bilden zwei absichtlich gegensätzliche Challenger: einmal deutsch-vertrauensbildend und funktional, einmal international und verbrauchernah. **Oarbit wird nicht weiterverwendet und durch Rowerly ersetzt.**

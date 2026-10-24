@@ -6,6 +6,10 @@
 
 **Status:** preliminary product/name screen only — **WIPO UNKNOWN, Legal HOLD, no legal clearance**
 
+> **Superseded recommendation:** Memorow was subsequently [rejected](memorow-brand-clearance.md) and is no longer an active candidate. The ranking and prototype recommendation below are retained as historical evidence. No product name has been selected.
+
+> **Source snapshot:** Implementation links refer to pre-audit revision [`169bdba`](https://github.com/rupertgermann/rowing-tracker/tree/169bdba95944b96624295a77fdeba6c3840ed907), preserving the historical source anchors rather than describing current runtime behavior.
+
 ## Outcome
 
 This round advances exactly five new candidates, in this order:
@@ -22,13 +26,13 @@ All five new names remain **Legal HOLD**. No candidate is approved for public us
 
 ## Product truth and naming boundary
 
-The product kernel is broader than workout analytics. The README describes conversation history and selected documents, tools that retrieve sessions/achievements/memory documents, personalized multi-week plans, automated insights, and Personal Context across coach/plans/insights ([README](../../README.md#L15-L23)). Source-backed limits from the prior AI-coach round remain binding:
+The product kernel is broader than workout analytics. The README describes conversation history and selected documents, tools that retrieve sessions/achievements/memory documents, personalized multi-week plans, automated insights, and Personal Context across coach/plans/insights ([README](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/README.md#L15-L23)). Source-backed limits from the prior AI-coach round remain binding:
 
-- Chat continuity is persisted conversation data, not autonomous learning or perfect lifelong memory. Only the last ten conversation messages are replayed in the inspected request path ([`cloudAI.ts`](../../src/lib/cloudAI.ts#L302-L309)).
-- The active coach can retrieve sessions, memory documents, and achievements through real tool calls ([`cloudAI.ts`](../../src/lib/cloudAI.ts#L180-L299), [`cloudAI.ts`](../../src/lib/cloudAI.ts#L677-L866)).
-- Personal Context can combine selected document text with free text and is injected into chat, insights, and plans ([`settings/page.tsx`](../../src/app/settings/page.tsx#L2550-L2681), [`cloudAI.ts`](../../src/lib/cloudAI.ts#L1121-L1150), [`cloudAI.ts`](../../src/lib/cloudAI.ts#L1676-L1683)).
-- Personalized plans and automated/local plus cloud insights are implemented ([`cloudAI.ts`](../../src/lib/cloudAI.ts#L1395-L1438), [`useAIInsights.ts`](../../src/hooks/useAIInsights.ts#L65-L97)).
-- `chatSystemPrompt` is stored/editable while the inspected active `getChatSystemPrompt()` remains hard-coded. A name or descriptor must not imply that every prompt is configurable ([`settings.ts`](../../src/lib/settings.ts#L132-L159), [`cloudAI.ts`](../../src/lib/cloudAI.ts#L873-L998)).
+- Chat continuity is persisted conversation data, not autonomous learning or perfect lifelong memory. Only the last ten conversation messages are replayed in the inspected request path ([`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L302-L309)).
+- The active coach can retrieve sessions, memory documents, and achievements through real tool calls ([`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L180-L299), [`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L677-L866)).
+- Personal Context can combine selected document text with free text and is injected into chat, insights, and plans ([`settings/page.tsx`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/app/settings/page.tsx#L2550-L2681), [`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L1121-L1150), [`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L1676-L1683)).
+- Personalized plans and automated/local plus cloud insights are implemented ([`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L1395-L1438), [`useAIInsights.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/hooks/useAIInsights.ts#L65-L97)).
+- `chatSystemPrompt` is stored/editable while the inspected active `getChatSystemPrompt()` remains hard-coded. A name or descriptor must not imply that every prompt is configurable ([`settings.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/settings.ts#L132-L159), [`cloudAI.ts`](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/src/lib/cloudAI.ts#L873-L998)).
 - Health information, including COPD, may constrain training context only. The product must not imply detection, diagnosis, treatment, therapy, pulmonary rehabilitation, medical monitoring, or guaranteed safety. A verified non-medical refusal/guardrail remains a launch gate, not an assumed runtime property.
 - Motion capture is optional context, not the brand core. A viable name must still cover coach continuity, documents, plans, insights, and retrieval without mocap.
 

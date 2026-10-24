@@ -7,6 +7,8 @@
 **Register- und Registry-Snapshot:** 2026-08-09, zuletzt 20:16:59 CEST
 **Status:** vertiefte Vorprüfung, **keine Rechtsberatung und keine Markenfreigabe**
 
+> **Historischer Stand:** Nach dieser Runde folgten weitere Kandidaten in der [Memory-Coach-Runde](commercial-brand-memory-coach-round.md); deren Memorow-Empfehlung wurde anschließend [verworfen](memorow-brand-clearance.md). Die Rangfolge unten bleibt als Recherchehistorie erhalten, nicht als aktuelle Shortlist.
+
 ## Ergebnis in einem Satz
 
 Fünf ausreichend unterschiedliche Kandidaten überstehen den dokumentierten Vorfilter: **TempoRoot**, **SteadyWake**, **TraceTide**, **PaceMosaic** und **Kineweave**. Für einen Marken-/Copy-Prototyp werden **TempoRoot** und **SteadyWake** empfohlen, weil sie bewusst zwei verschiedene Hypothesen testen: langfristig personalisierter Trainingsrhythmus versus ruhiger, nachhaltiger Fortschritt. **Keiner der fünf Namen ist rechtlich freigegeben.**

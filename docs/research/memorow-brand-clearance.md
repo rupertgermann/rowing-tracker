@@ -22,7 +22,7 @@ The existing private prototype may remain as explicitly rejected historical evid
 
 ## Product and naming boundary
 
-The relevant product is an AI-powered rowing application, not a narrow workout log. The repository describes analytics, personalized training plans, coaching insights, achievements, and motion-capture posture analysis ([README](../../README.md#L5-L9)). Its AI coach uses conversation history, workout data, achievements, and selected documents; Personal Context can inform chat, plans, and insights ([README](../../README.md#L15-L23)). The discarded private prototype recorded that cloud-provider transfer is conditional, visible retrieval traces were only a prototype concept, and health context was non-diagnostic.
+The relevant product is an AI-powered rowing application, not a narrow workout log. The repository describes analytics, personalized training plans, coaching insights, achievements, and motion-capture posture analysis ([README](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/README.md#L5-L9)). Its AI coach uses conversation history, workout data, achievements, and selected documents; Personal Context can inform chat, plans, and insights ([README](https://github.com/rupertgermann/rowing-tracker/blob/169bdba95944b96624295a77fdeba6c3840ed907/README.md#L15-L23)). The discarded private prototype recorded that cloud-provider transfer is conditional, visible retrieval traces were only a prototype concept, and health context was non-diagnostic.
 
 This breadth defines the screen:
 
