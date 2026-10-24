@@ -63,7 +63,7 @@ For a screenshot-based explanation of every module and interactive control, see 
 - **Local Development**: Docker-based PostgreSQL plus Mailpit for SMTP
 - **Cloud Ready**: Supabase (pooler + direct URL) supported for production
 - **Memory System**: Upload and store PDFs and images for AI analysis; files are kept on disk (or Vercel Blob in deployed environments) and referenced by `MemoryDocument.filePath`
-- **Mocap Storage**: Recorded video and the `PoseFrameStream` binary blob are stored side-by-side on the same backend (local `storage/` directory or Vercel Blob), referenced by `MocapSession.videoStoragePath` and `MocapSession.poseStreamPath`
+- **Mocap Storage**: Recorded video and the `PoseFrameStream` binary blob are stored side-by-side on the same backend (local `storage/` directory or Vercel Blob), referenced by `MocapSession.videoStoragePath` and `MocapSession.poseStreamPath`. Cloud uploads store ordered chunks and a small index; reads expose one logical file without rewriting earlier chunks during capture.
 - **Session Cache Invalidation**: Rowing-session mutations bump `UserSettings.sessionsRevision`; client caches use the revision plus row count to reuse lean lists safely and hydrate detail data only when needed
 - **Data Privacy**: Workout data, mocap video, and pose data are scoped by user ID; AI keys are encrypted at rest
 

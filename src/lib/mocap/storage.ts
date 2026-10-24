@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { del, get, head, list, put } from "@vercel/blob";
+import { BlobNotFoundError, del, get, head, list, put } from "@vercel/blob";
+import { z } from "zod";
 
 export type ByteRange = { start: number; end?: number };
 
@@ -109,6 +110,14 @@ export class LocalDiskStorage implements MocapStorage {
   }
 }
 
+const chunkIndexSchema = z.object({
+  count: z.number().int().positive(),
+  size: z.number().int().nonnegative(),
+  baseSize: z.number().int().nonnegative(),
+});
+type ChunkIndex = z.infer<typeof chunkIndexSchema>;
+type StoredChunk = { pathname: string; size: number };
+
 class VercelBlobStorage implements MocapStorage {
   videoPath(userId: string, sessionId: string): string {
     return path.posix.join(MOCAP_ROOT, userId, sessionId, "video.webm");
@@ -119,28 +128,75 @@ class VercelBlobStorage implements MocapStorage {
   }
 
   async appendBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
-    const existing = await this.readIfExists(storagePath);
-    const combined = new Uint8Array(existing.byteLength + bytes.byteLength);
-    combined.set(existing, 0);
-    combined.set(bytes, existing.byteLength);
-    await this.putBytes(storagePath, combined);
+    if (bytes.byteLength === 0) return;
+    const index = await this.readIndex(storagePath);
+    if (!index && !(await this.exists(storagePath))) {
+      await this.putBytes(storagePath, bytes);
+      return;
+    }
+    const baseSize = index?.baseSize ?? (await head(storagePath)).size;
+    const count = index?.count ?? 0;
+    const partPath = `${storagePath}.parts/${String(count).padStart(12, "0")}`;
+    await this.putBytes(partPath, bytes);
+    // shortcut: each recording has one serialized uploader; coordinate writes before allowing multiple writers.
+    await put(`${storagePath}.parts/index.json`, JSON.stringify({
+      count: count + 1,
+      size: (index?.size ?? baseSize) + bytes.byteLength,
+      baseSize,
+    }), { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" });
   }
 
-  async writeAt(
-    storagePath: string,
-    bytes: Uint8Array,
-    offset: number,
-  ): Promise<void> {
-    const existing = await this.read(storagePath);
-    if (offset < 0 || offset + bytes.byteLength > existing.byteLength) {
+  async writeAt(storagePath: string, bytes: Uint8Array, offset: number): Promise<void> {
+    const index = await this.readIndex(storagePath);
+    const chunks = index
+      ? await this.chunks(storagePath, index)
+      : [{ pathname: storagePath, size: (await head(storagePath)).size }];
+    const total = index?.size ?? chunks[0].size;
+    if (offset < 0 || offset + bytes.byteLength > total) {
       throw new Error(`writeAt outside blob bounds for ${storagePath}`);
     }
-    const updated = new Uint8Array(existing);
-    updated.set(bytes, offset);
-    await this.putBytes(storagePath, updated);
+    let position = 0;
+    for (const chunk of chunks) {
+      const start = Math.max(offset, position);
+      const end = Math.min(offset + bytes.byteLength, position + chunk.size);
+      if (end > start) {
+        const updated = await this.readBlob(chunk.pathname);
+        updated.set(bytes.subarray(start - offset, end - offset), start - position);
+        await this.putBytes(chunk.pathname, updated);
+      }
+      position += chunk.size;
+    }
   }
 
   async read(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
+    const index = await this.readIndex(storagePath);
+    if (!index || (range && (range.end ?? index.size) <= index.baseSize)) {
+      return this.readBlob(storagePath, range);
+    }
+    const start = range?.start ?? 0;
+    const end = Math.min(range?.end ?? index.size, index.size);
+    const bytes = new Uint8Array(Math.max(0, end - start));
+    let position = 0;
+    const reads: { pathname: string; start: number; end: number; offset: number }[] = [];
+    for (const chunk of await this.chunks(storagePath, index)) {
+      const from = Math.max(start, position);
+      const to = Math.min(end, position + chunk.size);
+      if (to > from) reads.push({ pathname: chunk.pathname, start: from - position, end: to - position, offset: from - start });
+      position += chunk.size;
+    }
+    for (let i = 0; i < reads.length; i += 8) {
+      await Promise.all(reads.slice(i, i + 8).map(async (chunk) => {
+        bytes.set(await this.readBlob(chunk.pathname, chunk), chunk.offset);
+      }));
+    }
+    return bytes;
+  }
+
+  async size(storagePath: string): Promise<number> {
+    return (await this.readIndex(storagePath))?.size ?? (await head(storagePath)).size;
+  }
+
+  private async readBlob(storagePath: string, range?: ByteRange): Promise<Uint8Array> {
     const headers: HeadersInit = {};
     if (range) {
       const end = range.end === undefined ? "" : String(range.end - 1);
@@ -153,35 +209,60 @@ class VercelBlobStorage implements MocapStorage {
     return new Uint8Array(await new Response(result.stream).arrayBuffer());
   }
 
-  async size(storagePath: string): Promise<number> {
-    const meta = await head(storagePath);
-    return meta.size;
+  private async readIndex(storagePath: string): Promise<ChunkIndex | null> {
+    const result = await get(`${storagePath}.parts/index.json`, { access: "private", useCache: false });
+    if (!result) return null;
+    if (result.statusCode !== 200) throw new Error(`Failed to read chunk index for ${storagePath}`);
+    return chunkIndexSchema.parse(await new Response(result.stream).json());
+  }
+
+  private async listParts(storagePath: string): Promise<StoredChunk[]> {
+    const chunks: StoredChunk[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix: `${storagePath}.parts/`, cursor });
+      chunks.push(...page.blobs);
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+    return chunks;
+  }
+
+  private async chunks(storagePath: string, index: ChunkIndex): Promise<StoredChunk[]> {
+    const prefix = `${storagePath}.parts/`;
+    const parts = (await this.listParts(storagePath)).filter(chunk => {
+      const suffix = chunk.pathname.slice(prefix.length);
+      return /^\d{12}$/.test(suffix) && Number(suffix) < index.count;
+    }).sort((a, b) => a.pathname.localeCompare(b.pathname));
+    if (parts.length !== index.count || parts.reduce((sum, part) => sum + part.size, index.baseSize) !== index.size) {
+      throw new Error(`Incomplete recording chunks for ${storagePath}`);
+    }
+    return [{ pathname: storagePath, size: index.baseSize }, ...parts];
   }
 
   async exists(storagePath: string): Promise<boolean> {
     try {
       await head(storagePath);
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (error instanceof BlobNotFoundError) return false;
+      throw error;
     }
   }
 
   async delete(storagePath: string): Promise<void> {
-    const blobs = await list({ prefix: storagePath, limit: 1 });
-    if (blobs.blobs.length === 0) return;
-    await del(storagePath);
-  }
-
-  private async readIfExists(storagePath: string): Promise<Uint8Array> {
-    if (!(await this.exists(storagePath))) return new Uint8Array(0);
-    return this.read(storagePath);
+    const indexPath = `${storagePath}.parts/index.json`;
+    const allParts = await this.listParts(storagePath);
+    const parts = allParts.filter(part => part.pathname !== indexPath);
+    if (parts.length) await del(parts.map(part => part.pathname));
+    if (await this.exists(storagePath)) await del(storagePath);
+    if (allParts.some(part => part.pathname === indexPath)) await del(indexPath);
   }
 
   private async putBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
     await put(storagePath, Buffer.from(bytes), {
       access: "private",
       allowOverwrite: true,
+      addRandomSuffix: false,
       contentType: "application/octet-stream",
     });
   }

@@ -120,7 +120,7 @@ test("private blob reads authenticate through SDK and retain exclusive byte rang
     const headers = new Headers(init?.headers);
     requests.push({ url, headers });
     if (headers.get("authorization") !== `Bearer ${token}`) return new Response(null, { status: 403 });
-    if (url.pathname.includes("missing")) return new Response(null, { status: 404 });
+    if (url.pathname.includes("missing") || url.pathname.endsWith("index.json")) return new Response(null, { status: 404 });
     const range = headers.get("Range");
     const match = range?.match(/^bytes=(\d+)-(\d*)$/);
     const selected = match ? bytes.slice(Number(match[1]), match[2] ? Number(match[2]) + 1 : undefined) : bytes;
@@ -139,7 +139,8 @@ test("private blob reads authenticate through SDK and retain exclusive byte rang
   assert.deepEqual(await storage.read("video", { start: 1, end: 3 }), Uint8Array.from([20, 30]));
   assert.deepEqual(await storage.read("video", { start: 2 }), Uint8Array.from([30, 40]));
   await assert.rejects(storage.read("missing"), /Failed to read blob/);
-  assert.equal(requests[1].headers.get("Range"), "bytes=1-2");
-  assert.equal(requests[2].headers.get("Range"), "bytes=2-");
+  const videoRequests = requests.filter(request => request.url.pathname === "/video");
+  assert.equal(videoRequests[1].headers.get("Range"), "bytes=1-2");
+  assert.equal(videoRequests[2].headers.get("Range"), "bytes=2-");
   for (const request of requests) assert.equal(request.url.searchParams.get("cache"), "0");
 });
