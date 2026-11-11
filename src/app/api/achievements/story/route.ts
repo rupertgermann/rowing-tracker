@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { applyRateLimit } from '@/lib/rateLimit';
-import { normalizeAITextModel, SettingsService } from '@/lib/settings';
+import { getUserAchievementAISettings } from '@/lib/server/userSettings';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,10 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load AI settings from database
-    const settings = SettingsService.getInstance();
-    const aiSettings = settings.getAISettings();
-    const useCaseConfig = aiSettings.achievementText;
+    const { config: useCaseConfig } = await getUserAchievementAISettings(session.user.id, 'achievementText');
 
     // Build the prompt
     const defaultPrompt = `You are a creative writer crafting inspiring achievement stories for rowers. 
@@ -77,7 +74,7 @@ Write the achievement story:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: normalizeAITextModel(useCaseConfig.model, 'gpt-5.4-mini'),
+        model: useCaseConfig.model,
         input: prompt,
         max_output_tokens: 500,
         reasoning: { effort: useCaseConfig.reasoning },

@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { applyRateLimit } from '@/lib/rateLimit';
 import { AWARDS } from '@/lib/awards';
-import { normalizeAITextModel, SettingsService } from '@/lib/settings';
+import { getUserAchievementAISettings } from '@/lib/server/userSettings';
 
 
 interface SuggestionCriteria {
@@ -111,11 +111,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing sessions' }, { status: 400 });
     }
 
-    // Load AI settings from database
-    const settings = SettingsService.getInstance();
-    const aiSettings = settings.getAISettings();
-    const useCaseConfig = aiSettings.awardSuggestions;
-
     const earnedAwardsList = Array.isArray(earnedAwardsInput) ? earnedAwardsInput : [];
 
     const earnedAwardsForPrompt = earnedAwardsList
@@ -138,6 +133,8 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const { config: useCaseConfig, maxTokens } = await getUserAchievementAISettings(session.user.id, 'awardSuggestions');
 
     const sortedSessions = [...sessions].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -201,7 +198,7 @@ Keep output short:
 
     const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
     const initialMaxOutputTokens = clamp(
-      aiSettings.maxTokens || 2500,
+      maxTokens,
       800,
       6000
     );
@@ -214,7 +211,7 @@ Keep output short:
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: normalizeAITextModel(useCaseConfig.model, 'gpt-5.4-mini'),
+          model: useCaseConfig.model,
           input: prompt,
           instructions,
           max_output_tokens: requestedMaxOutputTokens,

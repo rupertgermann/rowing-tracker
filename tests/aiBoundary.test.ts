@@ -25,6 +25,7 @@ for (const name of ['story', 'image', 'suggestions']) {
       '@/lib/auth': { authOptions: {} },
       '@/lib/rateLimit': { applyRateLimit: async () => null },
       '@/lib/aiMode': { isPersonalAIEnabled },
+      '@/lib/server/userSettings': {},
       '@/lib/settings': { SettingsService: { getInstance: () => ({ getAISettings: () => ({ achievementText: {}, achievementImage: {} }) }) }, normalizeAITextModel: () => 'gpt-5.4-mini' },
       '@/lib/db/prisma': { prisma: {} },
     }, { fetch: async () => { calls++; return Response.json({}); }, console: { error() {} } });
