@@ -30,7 +30,8 @@ export class VideoUploader {
           },
         );
         if (!res.ok) {
-          throw new Error(`Video upload failed: ${res.status}`);
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Video upload failed: ${res.status}`);
         }
         this.bytesUploaded += chunk.size;
       } catch (err) {

@@ -1,3 +1,5 @@
+import { InputError } from "../server/requestBody";
+import { INGESTION_LIMITS } from "../ingestionLimits";
 import {
   BYTES_PER_FRAME_V1,
   HEADER_SIZE,
@@ -27,9 +29,26 @@ export function validatePoseFrameChunk(
 ): number {
   if (bytes.byteLength === 0) return 0;
   if (bytes.byteLength % bytesPerFrame !== 0) {
-    throw new Error(
+    throw new InputError(
       `Body length ${bytes.byteLength} not multiple of frame size ${bytesPerFrame}`,
     );
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const dimensions = bytesPerFrame === BYTES_PER_FRAME_V1 ? 3 : 4;
+  for (let frame = 0; frame < bytes.byteLength; frame += bytesPerFrame) {
+    const timestamp = view.getFloat32(frame, true);
+    if (!Number.isFinite(timestamp) || timestamp < 0 || timestamp > INGESTION_LIMITS.recordingSeconds * 1000) {
+      throw new InputError('Pose timestamp must be finite and within the 8 hour recording limit');
+    }
+    for (let index = 0; index < 33 * dimensions; index++) {
+      const value = view.getFloat32(frame + 4 + index * 4, true);
+      const confidence = index % dimensions === dimensions - 1;
+      // MediaPipe can extrapolate image coordinates outside the visible frame.
+      const bound = dimensions === 3 ? 10 : 1_000_000;
+      if (!Number.isFinite(value) || (confidence ? value < 0 || value > 1 : Math.abs(value) > bound)) {
+        throw new InputError('Invalid pose coordinate or confidence');
+      }
+    }
   }
   return bytes.byteLength / bytesPerFrame;
 }

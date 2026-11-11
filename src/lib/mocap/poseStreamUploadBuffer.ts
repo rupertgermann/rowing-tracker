@@ -67,7 +67,8 @@ export class PoseStreamUploadBuffer {
       },
     );
     if (!res.ok) {
-      throw new Error(`Pose upload failed: ${res.status}`);
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Pose upload failed: ${res.status}`);
     }
   }
 }

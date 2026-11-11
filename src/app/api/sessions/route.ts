@@ -1,3 +1,8 @@
+import { sessionsInput } from "@/lib/sessionInput";
+import { INGESTION_LIMITS } from "@/lib/ingestionLimits";
+import { InputError, readBoundedJson } from "@/lib/server/requestBody";
+import { applyRateLimit } from "@/lib/rateLimit";
+import { ZodError } from "zod";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -68,20 +73,16 @@ export async function POST(req: Request) {
       );
     }
 
-    const { sessions: newSessions } = await req.json();
-
-    if (!Array.isArray(newSessions) || newSessions.length === 0) {
-      return NextResponse.json(
-        { error: "Invalid sessions data" },
-        { status: 400 }
-      );
-    }
+    const rateLimit = await applyRateLimit(req, session.user.id, "api");
+    if (rateLimit) return rateLimit;
+    const { sessions: newSessions } = sessionsInput.parse(await readBoundedJson(req, INGESTION_LIMITS.sessionBodyBytes));
 
     const saveSessions = () => prisma.$transaction(async (tx) => {
       const created = [];
       for (const sessionData of newSessions) {
         const normalizedTimestamp = new Date(sessionData.timestamp);
-        const hasStrokeDataInput = Array.isArray(sessionData.strokeData);
+        const strokeData = sessionData.strokeData;
+        const hasStrokeDataInput = strokeData !== undefined;
         const existingById = sessionData.id
           ? await tx.rowingSession.findFirst({
               where: { id: sessionData.id, userId: session.user.id },
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
           avgStrokeRate: sessionData.avgStrokeRate || 0,
           maxStrokeRate: sessionData.maxStrokeRate || 0,
           ...(hasStrokeDataInput
-            ? { consistencyScore: calculateConsistencyScore(sessionData.strokeData) }
+            ? { consistencyScore: calculateConsistencyScore(strokeData) }
             : {}),
           sourceFile: sessionData.sourceFile || null,
         };
@@ -123,10 +124,10 @@ export async function POST(req: Request) {
         }
 
         // Save stroke data if present - use bulk insert for performance
-        if (hasStrokeDataInput && sessionData.strokeData.length > 0) {
-          console.log(`[SESSIONS API] Bulk inserting ${sessionData.strokeData.length} stroke data points for session ${sessionRecord.id}`);
+        if (hasStrokeDataInput && strokeData.length > 0) {
+          console.log(`[SESSIONS API] Bulk inserting ${strokeData.length} stroke data points for session ${sessionRecord.id}`);
 
-          const strokeDataRecords = sessionData.strokeData.map((stroke: Record<string, unknown>) => ({
+          const strokeDataRecords = strokeData.map((stroke) => ({
             sessionId: sessionRecord.id,
             strokeIndex: stroke.strokeIndex,
             time: stroke.time,
@@ -168,6 +169,9 @@ export async function POST(req: Request) {
       count: created.length 
     });
   } catch (error) {
+    if (error instanceof InputError || error instanceof ZodError) {
+      return NextResponse.json({ error: error.message }, { status: error instanceof InputError ? error.status : 400 });
+    }
     console.error("Error creating sessions:", error);
     console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
