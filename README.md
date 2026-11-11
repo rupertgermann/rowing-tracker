@@ -408,6 +408,24 @@ rowing-tracker/
 
 ## Development
 
+### Application CI
+
+The `Application CI` workflow runs on every pull request and push, plus manual dispatch.
+Its single job, `Application checks`, installs dependencies on Node 24 (from `.nvmrc`)
+and Python 3.12, then runs `npm test`, `npm run lint`, `npx tsc --noEmit`, and
+`npm run build`. It uses synthetic configuration, needs no repository secrets or
+running database, and does not deploy anything.
+
+The intended required status check is **Application checks**. Repository rules or
+branch protection must be configured separately with explicit authorization; this
+workflow does not change them. There are no path filters, so the required check
+also completes for documentation-only changes.
+
+The existing sidecar release gate remains separate. The application suite includes
+synthetic sidecar contracts, but does not run real-camera/FreeMoCap hardware tests,
+Playwright browser tests, or disposable-database integration tests. Hardware
+qualification stays an explicit separate step (`npm run test:e2e:sidecar-smoke`).
+
 ### Available Scripts
 
 **Development:**
