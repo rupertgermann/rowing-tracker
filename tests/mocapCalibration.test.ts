@@ -24,9 +24,9 @@ const stored = (f: analysis.PoseAnalysisFrame) => ({ capturePerspective: "side-r
 
 test("persisted analysis reports catch/finish reference deltas for standalone and linked sessions", async () => {
   const rows: Array<{ metricsJson: Record<string, unknown> }> = [];
-  const tx = { mocapSession: { updateMany: async () => ({ count: 1 }) }, postureFault: { deleteMany: async () => {}, createMany: async () => {} }, strokePostureMetric: { deleteMany: async () => { rows.length = 0; }, createMany: async ({ data }: { data: typeof rows }) => rows.push(...data) } };
+  const tx = { $queryRaw: async () => [{ id: "rowing" }], strokeData: { findMany: async () => [0, 3, 6].map((time, strokeIndex) => ({ id: `csv-${strokeIndex}`, time, strokeIndex })) }, mocapSession: { updateMany: async () => ({ count: 1 }) }, postureFault: { deleteMany: async () => {}, createMany: async () => {} }, strokePostureMetric: { deleteMany: async () => { rows.length = 0; }, createMany: async ({ data }: { data: typeof rows }) => rows.push(...data) } };
   const service = loadModule<typeof import("../src/lib/mocap/sessionAnalysis")>("src/lib/mocap/sessionAnalysis.ts", {
-    "@/lib/db/prisma": { prisma: { userSettings: { findUnique: async () => null }, strokeData: { findMany: async () => [0, 3, 6].map((time, strokeIndex) => ({ id: `csv-${strokeIndex}`, time, strokeIndex })) }, $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) } },
+    "@/lib/db/prisma": { prisma: { userSettings: { findUnique: async () => null }, $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) } },
     "@/lib/mocap/analysis": analysis,
   });
   const session = { id: "capture", userId: "rower", poseStreamPath: "pose", capturePerspective: "side-right", calibrationCatchFrame: stored(frame(0)), calibrationFinishFrame: stored(frame(0, true)) };
