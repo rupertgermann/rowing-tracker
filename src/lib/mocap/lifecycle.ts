@@ -397,7 +397,7 @@ export async function reanalyzeMocapSessionLifecycle(
     };
   }
 
-  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  const updated = analysis.status === "ready" ? { status: "ready" } : await deps.setStatus(session.id, "ready", { from: "analyzing" });
   if (!updated) {
     return transitionConflict("Session status changed during analysis");
   }
@@ -483,7 +483,7 @@ export async function linkMocapSessionLifecycle(
     return analysisFailure(err);
   }
 
-  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  const updated = analysis.status === "ready" ? { status: "ready" } : await deps.setStatus(session.id, "ready", { from: "analyzing" });
   if (!updated) {
     await restoreAssignment(deps, session.id, null);
     return transitionConflict("Session status changed during analysis");

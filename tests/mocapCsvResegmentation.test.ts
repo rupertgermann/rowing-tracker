@@ -55,7 +55,8 @@ test('linked service publishes CSV metrics with the link and preserves existing 
     return encodeFrame({ timestampMs: frame.timestampMs, keypoints, qualityFlags: 0 });
   })]);
   let csv = csvStrokes;
-  let state = { link: null as string | null, metrics: [] as DerivedStrokePostureMetric[], faults: [] as DerivedPostureFault[] };
+  let failWrite = false;
+  let state = { status: "analyzing", link: null as string | null, metrics: [] as DerivedStrokePostureMetric[], faults: [] as DerivedPostureFault[] };
   const service = loadModule<typeof import('../src/lib/mocap/sessionAnalysis')>('src/lib/mocap/sessionAnalysis.ts', {
     '@/lib/mocap/analysis': analysis,
     '@/lib/db/prisma': { prisma: {
@@ -63,9 +64,10 @@ test('linked service publishes CSV metrics with the link and preserves existing 
       strokeData: { findMany: async () => csv.map(c => ({ id: c.id, strokeIndex: c.strokeIndex, time: c.timeMs / 1000 })) },
       $transaction: async (fn: (tx: unknown) => Promise<void>) => {
         const pending = structuredClone(state);
+        const publishedLink = state.link;
         await fn({
-          mocapSession: { updateMany: async ({ data }: { data: { rowingSessionId: string } }) => { pending.link = data.rowingSessionId; return { count: 1 }; } },
-          strokePostureMetric: { deleteMany: async () => { pending.metrics = []; }, createMany: async ({ data }: { data: typeof pending.metrics }) => { assert.equal(state.link, null); pending.metrics = data; } },
+          mocapSession: { updateMany: async ({ data }: { data: { rowingSessionId: string; status: string } }) => { pending.link = data.rowingSessionId; pending.status = data.status; return { count: 1 }; } },
+          strokePostureMetric: { deleteMany: async () => { pending.metrics = []; }, createMany: async ({ data }: { data: typeof pending.metrics }) => { assert.equal(state.link, publishedLink); pending.metrics = data; if (failWrite) throw new Error("database write failed"); } },
           postureFault: { deleteMany: async () => { pending.faults = []; }, createMany: async ({ data }: { data: typeof pending.faults }) => { pending.faults = data; } },
         });
         state = pending;
@@ -78,9 +80,14 @@ test('linked service publishes CSV metrics with the link and preserves existing 
   assert.equal(summary.strokeMetricCount, 3);
   assert.equal(summary.faultCount, state.faults.length);
   assert.equal(state.link, 'rowing');
+  assert.equal(state.status, 'ready');
+  assert.equal(summary.status, 'ready');
   assert.equal(state.metrics[1].phaseBoundariesJson.catchFrameIndex, 99);
   assert.equal(state.metrics[1].metricsJson.backAngleAtCatchDeg, 90);
   const previous = structuredClone(state);
+  failWrite = true;
+  await assert.rejects(service.analyzeAndPersistMocapSessionLinked(storage, session, 'other'), /database write failed/);
+  assert.equal(JSON.stringify(state), JSON.stringify(previous));
   csv = [];
   await assert.rejects(service.analyzeAndPersistMocapSessionLinked(storage, session, 'other'), /No complete CSV-aligned/);
   assert.equal(JSON.stringify(state), JSON.stringify(previous));

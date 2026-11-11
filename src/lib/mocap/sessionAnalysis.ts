@@ -11,6 +11,7 @@ import { decodeBrowserCalibration } from "./browserCalibration";
 import type { MocapStorage } from "@/lib/mocap/storage";
 
 export interface PersistedMocapAnalysisSummary {
+  status?: "ready";
   strokeMetricCount: number;
   faultCount: number;
 }
@@ -138,7 +139,7 @@ export async function analyzeAndPersistMocapSessionLinked(
     // Publish the link only with its recomputed rows; the lifecycle already claimed analyzing.
     const linked = await tx.mocapSession.updateMany({
       where: { id: session.id, userId: session.userId, status: "analyzing", OR: [{ rowingSessionId: null }, { rowingSessionId }] },
-      data: { rowingSessionId },
+      data: { rowingSessionId, status: "ready" },
     });
     if (linked.count !== 1) throw new Error("Session changed during CSV analysis");
     await tx.postureFault.deleteMany({
@@ -174,6 +175,7 @@ export async function analyzeAndPersistMocapSessionLinked(
   });
 
   return {
+    status: "ready",
     strokeMetricCount: result.metrics.length,
     faultCount: result.faults.length,
   };
