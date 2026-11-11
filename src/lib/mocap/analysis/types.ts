@@ -87,7 +87,7 @@ export interface Calibration {
 
 export interface UnavailableMetric {
   available: false;
-  reason: "requires-sidecar-3d" | "insufficient-tracking";
+  reason: "requires-sidecar-3d" | "insufficient-tracking" | "missing-calibration" | "unusable-calibration" | "browser-calibration-only";
 }
 
 export interface AvailableMetric<T> {
@@ -111,6 +111,8 @@ export interface PostureMetrics {
   backAngleAtCatchDeg: number;
   backAngleAtFinishDeg: number;
   laybackAngleDeg: number;
+  catchReferenceDeltaDeg: MaybeMetric<number>;
+  finishReferenceDeltaDeg: MaybeMetric<number>;
   hipKneeOpeningOffsetFrames: number | null;
   armBendOnsetFrameIndex: number | null;
   legExtensionCompleteFrameIndex: number | null;
