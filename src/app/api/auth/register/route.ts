@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { applyRateLimit } from "@/lib/rateLimit";
+import { USER_SETTINGS_DEFAULT_VALUES } from "@/lib/server/userSettings";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -51,14 +52,8 @@ export async function POST(req: Request) {
         email,
         name,
         passwordHash,
-        emailVerified: null // Will be set when user clicks verification link
-      }
-    });
-
-    // Create default settings for the user
-    await prisma.userSettings.create({
-      data: {
-        userId: user.id
+        emailVerified: null, // Will be set when user clicks verification link
+        settings: { create: USER_SETTINGS_DEFAULT_VALUES }
       }
     });
 
