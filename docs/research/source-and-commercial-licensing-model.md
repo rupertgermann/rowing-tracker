@@ -5,6 +5,8 @@
 **Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)
 **Stand:** 2026-08-02 · Recherchebericht, keine Rechtsberatung
 
+**Nachtrag vom 2026-11-11:** Die GPLv3-Lizenzierung des aktuellen Rowing-Tracker-Codes ersetzt die unten dokumentierte Lizenzentscheidung. Die frühere MIT-Veröffentlichung bleibt unter ihren ursprünglichen Bedingungen verfügbar. Maßgeblich für den aktuellen Stand ist der [Lizenzabschnitt der README](../../README.md#license).
+
 ## Entscheidung
 
 Das Produktmodell ist **privates proprietäres Produkt mit späterem, neuem MIT-Community-Kern**:
