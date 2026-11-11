@@ -102,6 +102,14 @@ Fault rules for the three sidecar-only fault slots emit `pending` severity until
 - `leftKneeTrackDeviationMm` / `rightKneeTrackDeviationMm` — peak lateral knee deviation from ankle x during drive phase
 - `nearShinAngleDeg` — shin angle computed from the nearer (lower z) ankle/knee pair, unambiguous in 3D
 
+### 5a. Supported orientation for sagittal posture analysis
+
+The v1-compatible side-view adapter uses world **z as horizontal** and world **y as vertical** (image-down convention), discarding world x. It selects right-side landmarks. Supported input has the rowing motion in the yz plane, with y aligned to gravity and x lateral to the rower. This is a prerequisite for this adapter, not a guarantee of arbitrary Charuco calibration: a right-handed coordinate frame and millimeter units alone do not establish gravity or rowing direction. Tilted or differently oriented rigs must be aligned upstream before relying on these posture angles; no rig rotation is inferred here.
+
+For tracked points, projection subtracts the session's y/z minima and divides both axes by the same maximum y/z range. Translation and uniform scaling preserve angles in the yz plane, including when unrelated frames widen either recording bound. The shorter axis need not fill [0,1]. This preserves sagittal geometry, not arbitrary 3D angles with a lateral component. Raw world coordinates remain available to the separate 3D metric calculations. Confidence values and unavailable-metric handling are unchanged.
+
+Synthetic known-angle fixtures verify unequal bounds and unrelated extreme frames. Calibrated real recordings are still required to validate rig alignment and clinical/technique interpretation; these fixtures do not establish hardware calibration accuracy.
+
 ### 6. Timing model for alignment
 
 For live streaming: `timestampMs` in each frame is wall-clock epoch ms, set by the sidecar wrapper at frame capture time. This is the join key for SmartRow CSV alignment (same cross-correlation approach used in v1, `StrokeSegmentationSource.csv-aligned`).
