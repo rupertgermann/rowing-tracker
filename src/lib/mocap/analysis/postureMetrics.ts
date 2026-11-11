@@ -14,13 +14,14 @@ import { toProjectedStream } from "./projection";
 
 const MIN_CONFIDENCE = 0.25;
 
+// Share a projection within a batch; retain stream for world-space 3D measurements.
 export function PostureMetricsCalculator(
   stream: PoseFrameStream,
   stroke: Stroke,
   calibration?: Calibration,
+  projectedStream: PoseFrameStream = toProjectedStream(stream),
 ): PostureMetrics {
   void calibration;
-  const projectedStream = toProjectedStream(stream);
   const catchFrame = frameAt(projectedStream, stroke.catchFrameIndex);
   const finishFrame = frameAt(projectedStream, stroke.finishFrameIndex);
   const backAngleAtCatchDeg = torsoBackAngleDeg(projectedStream, catchFrame);

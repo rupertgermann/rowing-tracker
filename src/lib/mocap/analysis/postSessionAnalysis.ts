@@ -1,5 +1,6 @@
 import { PostureFaultDetector } from "./postureFaultDetector";
 import { PostureMetricsCalculator } from "./postureMetrics";
+import { toProjectedStream } from "./projection";
 import { StrokePhaseSegmenter } from "./strokePhaseSegmenter";
 import type {
   Calibration,
@@ -53,7 +54,8 @@ export function analyzePoseFrameStream(
   } = {},
 ): PostSessionAnalysisResult {
   const thresholds = opts.thresholds ?? postureThresholdsV1.thresholds;
-  const strokes = StrokePhaseSegmenter(stream);
+  const projectedStream = toProjectedStream(stream);
+  const strokes = StrokePhaseSegmenter(projectedStream);
   const metrics: DerivedStrokePostureMetric[] = [];
   const faults: DerivedPostureFault[] = [];
 
@@ -62,6 +64,7 @@ export function analyzePoseFrameStream(
       stream,
       stroke,
       opts.calibration,
+      projectedStream,
     );
     metrics.push(metricToDerivedRow(stroke, postureMetrics));
     for (const fault of PostureFaultDetector(postureMetrics, thresholds)) {
