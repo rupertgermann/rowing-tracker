@@ -1,3 +1,4 @@
+import { isLegacyDataQuarantined } from './accountBoundary';
 interface LocalStorageData {
   sessions?: Record<string, unknown>[];
   personalRecords?: Record<string, unknown>[];
@@ -72,6 +73,7 @@ export async function migrateLocalStorageToDatabase(): Promise<MigrationResult> 
 
 function getLocalStorageData(): LocalStorageData {
   const data: LocalStorageData = {};
+  if (isLegacyDataQuarantined(localStorage)) return data;
 
   try {
     const sessionsStr = localStorage.getItem('rowingSessions');
@@ -207,6 +209,7 @@ function markMigrationComplete(): void {
 }
 
 export function clearLocalStorageData(): void {
+  if (isLegacyDataQuarantined(localStorage)) return;
   localStorage.removeItem('rowingSessions');
   localStorage.removeItem('personalRecords');
   localStorage.removeItem('trainingPlans');

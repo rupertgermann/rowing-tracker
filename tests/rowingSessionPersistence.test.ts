@@ -537,3 +537,52 @@ for (const failure of ['http', 'network']) {
     assert.equal(localStorage.getItem('rowing_analytics_cache'), null);
   });
 }
+
+test('import batches respect request stroke, count and UTF-8 byte limits', async () => {
+  const { INGESTION_LIMITS } = await import('../src/lib/ingestionLimits');
+  const { sessionsInput } = await import('../src/lib/sessionInput');
+  for (const [count, strokes, timestamp, expected] of [
+    [25, 2100, '00:01', [23, 2]],
+    [2, 25000, '00:01', [2]],
+    [3, 25000, '界'.repeat(64), [1, 1, 1]],
+    [1001, 0, '00:01', [1000, 1]],
+  ] as const) {
+    const rows = Array.from({ length: count }, (_, i) => session({ id: `batch-${i}`, strokeData: Array.from({ length: strokes }, () => stroke({ timestamp })) }));
+    const sizes: number[] = [];
+    const result = await saveRowingSessions(rows, { chunkSize: 2000, persistDerivedData: false, fetchImpl: async (_url, init) => {
+      const body = String(init?.body);
+      assert.ok(Buffer.byteLength(body) <= INGESTION_LIMITS.sessionBodyBytes);
+      const parsed = sessionsInput.parse(JSON.parse(body));
+      sizes.push(parsed.sessions.length);
+      return jsonResponse({ sessions: parsed.sessions.map(row => ({ ...row, strokeData: undefined })) });
+    } });
+    assert.equal(result.success, true, result.error);
+    assert.deepEqual(sizes, expected);
+    assert.equal(result.sessions?.length, count);
+  }
+});
+
+test('oversized individual workouts fail before any partial upload with an actionable error', async () => {
+  for (const strokeData of [
+    Array.from({ length: 50001 }, () => stroke()),
+    Array.from({ length: 50000 }, () => stroke({ timestamp: '界'.repeat(64) })),
+  ]) {
+    const oversized = session({ id: 'too-large', strokeData });
+    let posts = 0;
+    const result = await saveRowingSessions([session({ id: 'valid' }), oversized], { fetchImpl: async () => { posts++; return jsonResponse({}); } });
+    assert.equal(result.success, false);
+    assert.match(result.error!, /too-large.*split|split.*too-large/i);
+    assert.equal(posts, 0);
+  }
+});
+
+test('linked-session mutations retain the server unlink instruction and tolerate non-JSON errors', async () => {
+  const message = 'Unlink the mocap session before changing stroke data or deleting this rowing session';
+  globalThis.fetch = async () => jsonResponse({ error: message }, 409);
+  const row = session({ id: 'linked' });
+  for (const operation of [() => saveRowingSessionStrokeData(row, [stroke()]), () => clearRowingSessionStrokeData(row), () => deleteRowingSession(row.id)]) {
+    await assert.rejects(operation, { message });
+  }
+  globalThis.fetch = async () => new Response('gateway unavailable', { status: 502 });
+  await assert.rejects(() => deleteRowingSession(row.id), { message: 'Failed to delete rowing session' });
+});

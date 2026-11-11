@@ -133,3 +133,14 @@ The isolated browser servers were stopped, generated Next dev instructions remov
 ## Continuing this record
 
 Append a dated entry for each completed ticket with its repository commit, public behavior tested, commands/results, and remaining limits. Mark an earlier decision superseded when a later approved decision replaces it. Reconcile all 18 tickets before declaring the remediation complete; code completion and real-recording qualification are separate claims.
+
+
+## PR #141 Astra review follow-up: 2026-11-11
+
+All three reproduced findings were valid and fixed in the commit introducing this entry. Unowned legacy records now remain in place behind a quarantine marker instead of requiring duplicate localStorage capacity; both migration readers and cleanup paths, plus settings usage/cleanup, honor that marker. Existing copied quarantines remain preserved. Recovery still requires explicit ownership and no recovery UI was added.
+
+Session persistence preflights every workout, batches by session count, total strokes and exact serialized UTF-8 bytes using the shared limits, and rejects an individually oversized workout before any partial upload with a split instruction. ZIP and SmartRow imports use this same boundary. Session detail now preserves the server's unlink-first instruction for stroke upload, clearing and deletion, with a fallback for malformed/non-JSON errors.
+
+Node 24 checks: **408/408** application tests, ESLint and TypeScript passed. Focused storage/persistence/ZIP/SmartRow tests passed **30/30**, including 25 ordinary 2,100-stroke workouts, exact stroke/count boundaries, multibyte byte limits, individual oversize preflight and safe server-error fallbacks. New batching and mutation tests failed before the fix. Chromium passed **10/10** relevant cases across the initial nine passes and the targeted mutation rerun: actual 3 MiB localStorage initialization and A→B isolation, existing account/expiry and import-retry paths, session detail, and upload/clear/delete unlink instructions without local mutation. The initial mutation test raced a Cancel click against automatic dialog closure; its harness was corrected and the expanded three-action case passed. Independent architect review found no functional blockers and independently passed the 30 focused tests.
+
+Browser auth and HTTP boundaries were synthetic on isolated localhost:3199; the database URL was unreachable. The test server was stopped and its generated AGENTS.md suffix removed. No production, live database, daily-driver preview, original dirty checkout, merge or deployment was touched. No new build, hardware/cloud/real-recording qualification, or unmeasured CSV performance change was performed; GitHub checks for the pushed commit remain to be observed.

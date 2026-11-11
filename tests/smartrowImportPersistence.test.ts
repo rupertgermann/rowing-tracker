@@ -233,3 +233,28 @@ test('failed ZIP import and failed refresh preserve visible workouts and report 
   assert.match(result.error!, /may have been saved.*refresh failed.*out of date/i);
   assert.doesNotMatch(result.error!, /has been refreshed|complete/i);
 });
+
+test('ZIP and SmartRow imports split ordinary workouts to fit the real request schema', async () => {
+  const { sessionsInput } = await import('../src/lib/sessionInput');
+  const rows = Array.from({ length: 25 }, (_, i) => session({ id: `zip-${i}`, strokeData: Array.from({ length: 2100 }, () => stroke()) }));
+  for (const mode of ['zip', 'sync']) {
+    const store = memoryStore(rows.map(row => ({ ...row, strokeData: undefined })));
+    const sizes: number[] = [];
+    const saveSessions: SaveRowingSessionsForImport = (sessions, options) => saveRowingSessions(sessions, {
+      ...options, persistDerivedData: false,
+      fetchImpl: async (_url, init) => {
+        const body = sessionsInput.parse(JSON.parse(String(init?.body)));
+        sizes.push(body.sessions.length);
+        return Response.json({ sessions: body.sessions });
+      },
+    });
+    if (mode === 'zip') {
+      assert.equal((await persistZipImportSessions(rows, store, { saveSessions })).success, true);
+    } else {
+      const result = await persistSmartRowSyncImport({ csvSessions: [], loadZipSessions: async () => rows, store }, { saveSessions });
+      assert.equal(result.zipResult?.success, true);
+    }
+    assert.deepEqual(sizes, [23, 2]);
+    assert.equal(store.sessions.filter(row => row.strokeData?.length === 2100).length, 25);
+  }
+});

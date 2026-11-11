@@ -83,3 +83,23 @@ test('session expiry clears account state and logout uses the same boundary', as
   await expect.poll(() => page.evaluate(() => localStorage.getItem('rowing_account_owner')).catch(() => undefined)).toBe('');
   await expect(page.getByText('2.2km', { exact: true })).toHaveCount(0);
 });
+
+test('large legacy data stays quarantined in place through initialization and account switches', async ({ page, context }) => {
+  const auth = await fixture(context);
+  await context.addInitScript(() => {
+    if (!localStorage.getItem('quota-fixture-seeded')) {
+      localStorage.setItem('rowingSessions', JSON.stringify([{ id: 'private-legacy', padding: 'x'.repeat(3 * 1024 * 1024) }]));
+      localStorage.setItem('quota-fixture-seeded', 'true');
+    }
+  });
+  await page.goto('/analytics');
+  await expect(page.getByText('1.1km', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('rowing_account_owner'))).toBe('A');
+  expect(await page.evaluate(() => localStorage.getItem('rowing_legacy_quarantine'))).toBe('in-place');
+  auth.switchTo('B');
+  await refreshSession(page);
+  await expect(page.getByText('2.2km', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('rowingSessions')!)[0].padding.length)).toBe(3 * 1024 * 1024);
+  await page.goto('/settings');
+  await expect(page.getByText('private-legacy', { exact: true })).toHaveCount(0);
+});

@@ -1,3 +1,4 @@
+import { INGESTION_LIMITS } from '@/lib/ingestionLimits';
 import type { Session } from '@/types/session';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 import {
@@ -285,17 +286,43 @@ export async function saveRowingSessions(
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
-  const chunkSize = options.chunkSize ?? 25;
+  const chunkSize = Math.min(INGESTION_LIMITS.sessions, Math.max(1, Math.floor(options.chunkSize || 25)));
   const persistDerivedData = options.persistDerivedData ?? true;
-  const totalChunks = Math.ceil(sessions.length / chunkSize);
+  const chunks: { sessions: Session[]; json: string[] }[] = [];
+  const encoder = new TextEncoder();
+  const envelopeBytes = encoder.encode('{"sessions":[]}').length;
+  let chunk = { sessions: [] as Session[], json: [] as string[] };
+  let bytes = envelopeBytes;
+  let strokes = 0;
+  for (const session of sessions) {
+    const json = JSON.stringify(session);
+    const sessionBytes = encoder.encode(json).length;
+    const sessionStrokes = session.strokeData?.length ?? 0;
+    if (sessionBytes + envelopeBytes > INGESTION_LIMITS.sessionBodyBytes || sessionStrokes > INGESTION_LIMITS.strokes) {
+      return { success: false, error: `Workout ${session.id} exceeds the upload limit; split its stroke data into smaller workouts before importing.` };
+    }
+    if (chunk.sessions.length && (chunk.sessions.length >= chunkSize ||
+      bytes + 1 + sessionBytes > INGESTION_LIMITS.sessionBodyBytes || strokes + sessionStrokes > INGESTION_LIMITS.strokes)) {
+      chunks.push(chunk);
+      chunk = { sessions: [], json: [] };
+      bytes = envelopeBytes;
+      strokes = 0;
+    }
+    bytes += sessionBytes + (chunk.sessions.length ? 1 : 0);
+    strokes += sessionStrokes;
+    chunk.sessions.push(session);
+    chunk.json.push(json);
+  }
+  if (chunk.sessions.length) chunks.push(chunk);
+  const totalChunks = chunks.length;
   let sessionsProcessed = 0;
   const savedSessions: Session[] = [];
   let derivedDataError: string | undefined;
 
   for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, sessions.length);
-    const chunk = sessions.slice(start, end);
+    const chunk = chunks[i].sessions;
+    const start = sessionsProcessed;
+    const end = start + chunk.length;
 
     options.onProgress?.({
       current: i + 1,
@@ -309,7 +336,7 @@ export async function saveRowingSessions(
       const response = await fetchImpl('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: chunk }),
+        body: `{"sessions":[${chunks[i].json.join(',')}]}`,
       });
 
       if (!response.ok) {
@@ -387,9 +414,8 @@ export async function saveRowingSession(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[RowingSessionPersistence] Failed to save session:', errorText);
-    throw new Error('Failed to save rowing session');
+    const error = await response.json().catch(() => null);
+    throw new Error(typeof error?.error === 'string' && error.error ? error.error : 'Failed to save rowing session');
   }
 
   const data: RowingSessionMutationApiResponse = await response.json();
@@ -450,9 +476,8 @@ export async function deleteRowingSession(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[RowingSessionPersistence] Failed to delete session:', errorText);
-    throw new Error('Failed to delete rowing session');
+    const error = await response.json().catch(() => null);
+    throw new Error(typeof error?.error === 'string' && error.error ? error.error : 'Failed to delete rowing session');
   }
 
   const data: RowingSessionMutationApiResponse = await response.json();

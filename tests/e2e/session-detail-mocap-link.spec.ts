@@ -255,3 +255,34 @@ test("session detail stroke-analysis charts render without Recharts dimension wa
 
   expect(rechartsWarnings).toEqual([]);
 });
+
+test('linked workout edits show the server unlink instruction without changing the workout', async ({ page }) => {
+  await installAuthenticatedSessionRoutes(page, [rowingSessionWithStrokeData, rowingSession]);
+  const instruction = 'Unlink the mocap session before modifying stroke data';
+  await page.route('**/api/sessions?*', route => route.request().method() === 'DELETE'
+    ? route.fulfill({ status: 409, json: { error: instruction } }) : route.fallback());
+  await page.route('**/api/sessions', route => route.request().method() === 'POST'
+    ? route.fulfill({ status: 409, json: { error: instruction } }) : route.fallback());
+  await page.goto('/sessions/session-with-strokes');
+  await expect(page.getByText('Analysis Modules')).toBeVisible();
+  const messages: string[] = [];
+  page.on('dialog', async dialog => { messages.push(dialog.message()); await dialog.accept(); });
+  for (const action of ['Clear', 'Delete']) {
+    await page.getByRole('button', { name: action, exact: true }).click();
+    const previousMessages = messages.length;
+    await page.getByRole('alertdialog').getByRole('button', { name: action, exact: true }).click();
+    await expect.poll(() => messages.length).toBe(previousMessages + 1);
+    expect(messages.at(-1)).toBe(instruction);
+    await expect(page.getByText('Analysis Modules')).toBeVisible();
+    await expect(page.getByRole('alertdialog')).not.toBeVisible();
+  }
+  expect(page.url()).toContain('/sessions/session-with-strokes');
+  await page.goto('/sessions/linked-rowing-session');
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'strokes.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('Stroke (#);Second (#);Timestamp (UTC);Distance (m);Work (J);Actual power (W);Average power (W);Actual split (s);Average split (s);Stroke rate (SPM)\n1;1;00:01;10;100;100;100;200;200;24'),
+  });
+  await expect.poll(() => messages.length).toBe(3);
+  expect(messages.at(-1)).toBe(instruction);
+  await expect(page.getByText('Upload Stroke Data')).toBeVisible();
+});

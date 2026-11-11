@@ -1,3 +1,4 @@
+import { isLegacyDataQuarantined } from './accountBoundary';
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT, DEFAULT_CHAT_SYSTEM_PROMPT } from '@/lib/aiPromptDefaults';
 import {
   defaultPostureThresholdSettings,
@@ -897,7 +898,7 @@ Be specific and actionable. Only include information relevant to rowing training
       }
 
       // Fallback to local calculation for remaining localStorage items
-      const rowingStore = localStorage.getItem('rowing-tracker-storage');
+      const rowingStore = isLegacyDataQuarantined(localStorage) ? null : localStorage.getItem('rowing-tracker-storage');
       const settings = localStorage.getItem(this.STORAGE_KEY);
 
       let sessionsSize = 0;
@@ -975,7 +976,9 @@ Be specific and actionable. Only include information relevant to rowing training
       this.STORAGE_KEY
     ];
 
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+    keysToRemove.forEach(key => {
+      if (key !== 'rowing-tracker-storage' || !isLegacyDataQuarantined(localStorage)) localStorage.removeItem(key);
+    });
   }
 
   /**

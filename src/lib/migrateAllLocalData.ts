@@ -1,3 +1,4 @@
+import { isLegacyDataQuarantined } from './accountBoundary';
 /**
  * Complete Migration Utility
  * Migrates ALL local data (localStorage + IndexedDB) to PostgreSQL database
@@ -39,7 +40,7 @@ async function migrateLocalStorage(): Promise<Partial<MigrationResult['migrated'
 
   try {
     // Get data from localStorage
-    const localData = localStorage.getItem('rowing-tracker-storage');
+    const localData = isLegacyDataQuarantined(localStorage) ? null : localStorage.getItem('rowing-tracker-storage');
     if (!localData) {
       return result;
     }
@@ -207,7 +208,7 @@ export async function clearAllLocalData(): Promise<void> {
   console.log('[CLEANUP] Clearing all local data...');
 
   // Clear localStorage
-  localStorage.removeItem('rowing-tracker-storage');
+  if (!isLegacyDataQuarantined(localStorage)) localStorage.removeItem('rowing-tracker-storage');
 
   // Clear IndexedDB achievement images
   try {
