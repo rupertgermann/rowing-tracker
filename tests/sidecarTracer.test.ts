@@ -168,6 +168,8 @@ function makeMockMetrics(sidecar3D: Sidecar3DMetrics): PostureMetrics {
     segmentationSource: "pose-segmented",
     backAngleAtCatchDeg: 60,
     backAngleAtFinishDeg: 50,
+    catchReferenceDeltaDeg: { available: false, reason: "browser-calibration-only" },
+    finishReferenceDeltaDeg: { available: false, reason: "browser-calibration-only" },
     laybackAngleDeg: 15,
     hipKneeOpeningOffsetFrames: 2,
     armBendOnsetFrameIndex: 20,

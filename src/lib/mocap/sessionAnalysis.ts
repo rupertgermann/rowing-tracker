@@ -8,6 +8,7 @@ import {
   type CapturePerspective,
   type CsvStrokeTarget,
 } from "@/lib/mocap/analysis";
+import { decodeBrowserCalibration } from "./browserCalibration";
 import type { MocapStorage } from "@/lib/mocap/storage";
 
 export interface PersistedMocapAnalysisSummary {
@@ -43,7 +44,14 @@ export async function analyzeAndPersistMocapSession(
     poseBlob,
     session.capturePerspective as CapturePerspective,
   );
-  const result = analyzePoseFrameStream(stream, { thresholds });
+  const result = analyzePoseFrameStream(stream, {
+    thresholds,
+    calibration: decodeBrowserCalibration(
+      stream.capturePerspective,
+      session.calibrationCatchFrame,
+      session.calibrationFinishFrame,
+    ),
+  });
 
   await prisma.$transaction(async (tx) => {
     await tx.postureFault.deleteMany({
@@ -116,7 +124,14 @@ export async function analyzeAndPersistMocapSessionLinked(
     poseBlob,
     session.capturePerspective as CapturePerspective,
   );
-  const result = analyzePoseFrameStream(stream, { thresholds });
+  const result = analyzePoseFrameStream(stream, {
+    thresholds,
+    calibration: decodeBrowserCalibration(
+      stream.capturePerspective,
+      session.calibrationCatchFrame,
+      session.calibrationFinishFrame,
+    ),
+  });
 
   // Build CSV stroke targets with elapsed ms for alignment
   const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map((sd) => ({
