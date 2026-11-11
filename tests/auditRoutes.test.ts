@@ -174,6 +174,7 @@ for (const endpoint of ['achievements/story', 'achievements/image', 'achievement
           rateChecks++;
           return Response.json({}, { status: 429 });
         } },
+        '@/lib/server/userSettings': {},
         '@/lib/settings': {}, '@/lib/awards': {}, '@/lib/achievementColors': {},
         playwright: { chromium: { launch: () => { throw new Error('Browser must not launch'); } } },
       }, { fetch: () => { throw new Error('AI must not be called'); } });

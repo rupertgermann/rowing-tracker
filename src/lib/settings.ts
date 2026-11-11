@@ -120,6 +120,11 @@ export interface UseCaseConfig {
   model: AITextModel;
 }
 
+export const ACHIEVEMENT_AI_DEFAULTS = {
+  achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5.4-mini' },
+  awardSuggestions: { reasoning: 'medium', verbosity: 'low', model: 'gpt-5.4-mini' },
+} as const satisfies Record<string, UseCaseConfig>;
+
 export interface AISettings {
   cloudAIEnabled: boolean;
   mocapDetailedAIShare: boolean;
@@ -272,11 +277,7 @@ export class SettingsService {
         verbosity: 'high',        // Detailed explanations
         model: 'gpt-5.5'          // Best quality for complex plans
       },
-      awardSuggestions: {
-        reasoning: 'medium',
-        verbosity: 'low',
-        model: 'gpt-5.4-mini'
-      },
+      awardSuggestions: { ...ACHIEVEMENT_AI_DEFAULTS.awardSuggestions },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT,
       planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...',
@@ -324,7 +325,7 @@ Be brief and direct. No fluff.`,
       awardSuggestionsPrompt: DEFAULT_AWARD_SUGGESTIONS_PROMPT,
 
       // Achievement generator (defaults)
-      achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5.4-mini' },
+      achievementText: { ...ACHIEVEMENT_AI_DEFAULTS.achievementText },
       achievementImageModel: 'gpt-image-2',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',
