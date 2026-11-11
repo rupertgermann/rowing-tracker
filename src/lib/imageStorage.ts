@@ -86,6 +86,7 @@ export async function deleteAchievementImage(awardId: string): Promise<void> {
 // =============================================================================
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { ACCOUNT_OWNER_KEY } from './accountBoundary';
 
 interface AchievementImageDB extends DBSchema {
   images: {
@@ -106,7 +107,10 @@ let dbPromise: Promise<IDBPDatabase<AchievementImageDB>> | null = null;
 
 function getDB(): Promise<IDBPDatabase<AchievementImageDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<AchievementImageDB>(DB_NAME, DB_VERSION, {
+    const owner = localStorage.getItem(ACCOUNT_OWNER_KEY);
+    if (!owner) throw new Error('An authenticated account is required for image storage');
+    // Unowned legacy databases remain on disk; never offer another account their contents.
+    dbPromise = openDB<AchievementImageDB>(`${DB_NAME}:${owner}`, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'awardId' });
