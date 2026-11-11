@@ -4,7 +4,6 @@ import {
   adaptPoseFrameStreamBlob,
   analyzePoseFrameStream,
   resolvePostureThresholdSettings,
-  alignStrokesToCsv,
   type CapturePerspective,
   type CsvStrokeTarget,
 } from "@/lib/mocap/analysis";
@@ -94,10 +93,8 @@ export async function analyzeAndPersistMocapSession(
 
 /**
  * Run analysis for a MocapSession that is linked to a RowingSession.
- * Aligns pose-derived strokes to StrokeData rows by timestamp cross-correlation
- * rather than array position. Sets segmentationSource = "csv-aligned" and
- * strokeDataId on each metric row. Unmatched pose strokes get strokeDataId=null
- * and csvMatchOffsetMs=null in phaseBoundariesJson.
+ * Recomputes metrics over aligned CSV catch windows; the finish remains pose-derived.
+ * Incomplete/unmatched windows are omitted, never relabeled pose metrics.
  */
 export async function analyzeAndPersistMocapSessionLinked(
   storage: MocapStorage,
@@ -124,7 +121,9 @@ export async function analyzeAndPersistMocapSessionLinked(
     poseBlob,
     session.capturePerspective as CapturePerspective,
   );
+  const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map(sd => ({ id: sd.id, strokeIndex: sd.strokeIndex, timeMs: sd.time * 1000 }));
   const result = analyzePoseFrameStream(stream, {
+    csvStrokes,
     thresholds,
     calibration: decodeBrowserCalibration(
       stream.capturePerspective,
@@ -133,21 +132,15 @@ export async function analyzeAndPersistMocapSessionLinked(
     ),
   });
 
-  // Build CSV stroke targets with elapsed ms for alignment
-  const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map((sd) => ({
-    id: sd.id,
-    strokeIndex: sd.strokeIndex,
-    timeMs: sd.time * 1000, // StrokeData.time is elapsed seconds from session start
-  }));
-
-  // Extract pose catch timestamps (elapsed ms from pose session start)
-  const poseCatchTimesMs = result.metrics.map(
-    (m) => stream.frames[m.phaseBoundariesJson.catchFrameIndex]?.timestampMs ?? 0,
-  );
-
-  const alignment = alignStrokesToCsv(poseCatchTimesMs, csvStrokes);
+  if (result.metrics.length === 0) throw new Error("No complete CSV-aligned stroke windows with usable pose tracking");
 
   await prisma.$transaction(async (tx) => {
+    // Publish the link only with its recomputed rows; the lifecycle already claimed analyzing.
+    const linked = await tx.mocapSession.updateMany({
+      where: { id: session.id, userId: session.userId, status: "analyzing", OR: [{ rowingSessionId: null }, { rowingSessionId }] },
+      data: { rowingSessionId },
+    });
+    if (linked.count !== 1) throw new Error("Session changed during CSV analysis");
     await tx.postureFault.deleteMany({
       where: { mocapSessionId: session.id },
     });
@@ -156,21 +149,14 @@ export async function analyzeAndPersistMocapSessionLinked(
     });
     if (result.metrics.length > 0) {
       await tx.strokePostureMetric.createMany({
-        data: result.metrics.map((metric) => {
-          const match = alignment.matches.get(metric.strokeIndex);
-          const phaseBoundariesJson = {
-            ...metric.phaseBoundariesJson,
-            csvMatchOffsetMs: match ? match.offsetMs : null,
-          };
-          return {
-            mocapSessionId: session.id,
-            strokeIndex: metric.strokeIndex,
-            phaseBoundariesJson: phaseBoundariesJson as unknown as Prisma.InputJsonValue,
-            metricsJson: metric.metricsJson as unknown as Prisma.InputJsonValue,
-            segmentationSource: "csv-aligned",
-            strokeDataId: match?.csvStrokeDataId ?? null,
-          };
-        }),
+        data: result.metrics.map((metric) => ({
+          mocapSessionId: session.id,
+          strokeIndex: metric.strokeIndex,
+          phaseBoundariesJson: metric.phaseBoundariesJson as unknown as Prisma.InputJsonValue,
+          metricsJson: metric.metricsJson as unknown as Prisma.InputJsonValue,
+          segmentationSource: metric.segmentationSource,
+          strokeDataId: metric.strokeDataId,
+        })),
       });
     }
     if (result.faults.length > 0) {

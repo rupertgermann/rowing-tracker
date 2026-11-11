@@ -183,7 +183,6 @@ export function createPrismaMocapSessionLifecycle(
           assignMocapSession: async (
             targetMocapSessionId,
             ownerId,
-            targetRowingSessionId,
           ) => {
             try {
               const update = await db.mocapSession.updateMany({
@@ -194,7 +193,6 @@ export function createPrismaMocapSessionLifecycle(
                   status: "ready",
                 },
                 data: {
-                  rowingSessionId: targetRowingSessionId,
                   status: "analyzing",
                 },
               });

@@ -54,6 +54,9 @@ test("sidecar posture preserves known angles with unequal bounds and unrelated e
     keypoints: { rightHip: { x: 0, y: -10000, z: 50000, confidence: 1 } },
   }]]) {
     const metrics = PostureMetricsCalculator({ ...stream, frames }, stroke);
+    assert.ok(metrics.backAngleAtCatchDeg !== null);
+    assert.ok(metrics.backAngleAtFinishDeg !== null);
+    assert.ok(metrics.laybackAngleDeg !== null);
     assert.ok(Math.abs(metrics.backAngleAtCatchDeg - 45) < 1e-9);
     assert.ok(Math.abs(metrics.backAngleAtFinishDeg - 90) < 1e-9);
     assert.ok(Math.abs(metrics.laybackAngleDeg) < 1e-9);
@@ -89,5 +92,5 @@ test("projection retains low-confidence rejection and unavailable metric states"
       },
     })),
   };
-  assert.throws(() => PostureMetricsCalculator(untracked, stroke), /Missing tracked landmark rightShoulder/);
+  assert.equal(PostureMetricsCalculator(untracked, stroke).backAngleAtCatchDeg, null);
 });

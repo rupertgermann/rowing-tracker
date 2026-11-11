@@ -46,6 +46,7 @@ test("replay comparison controls render and select strokes", async ({ page }) =>
 
   const linkedSession = page.getByTestId("mocap-linked-session");
   await expect(linkedSession).toBeVisible();
+  await expect(page.getByTestId("mocap-csv-provenance")).toContainText("finish timing is inferred from pose");
   await expect(linkedSession).toContainText("100m · 0:40 · 61W");
   await expect(page.getByTestId("mocap-linked-rowing-session-link")).toHaveAttribute(
     "href",
@@ -72,7 +73,7 @@ function metric(strokeIndex: number, startFrame: number) {
   return {
     id: `metric-${strokeIndex}`,
     strokeIndex,
-    segmentationSource: "pose-segmented",
+    segmentationSource: "csv-aligned",
     phaseBoundariesJson: {
       catchFrameIndex: startFrame,
       driveStartFrameIndex: startFrame + 10,

@@ -895,10 +895,15 @@ export default function MocapReplayPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center justify-between gap-3 text-sm font-medium">
               <span>Linked rowing session</span>
-              <Badge variant="secondary">CSV-aligned</Badge>
+              <Badge variant="secondary">{segmentationSource === "csv-aligned" ? "CSV-aligned" : "Re-analysis needed"}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground" data-testid="mocap-csv-provenance">
+              {segmentationSource === "csv-aligned"
+                ? "Catch windows follow aligned CSV timestamps; finish timing is inferred from pose. Incomplete or unmatched windows are omitted."
+                : "This recording has legacy pose-derived analysis. Re-analyze to derive catch windows from CSV timestamps."}
+            </p>
             <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <span>
                 {fmtDate(session.rowingSession.timestamp)} ·{" "}

@@ -26,7 +26,7 @@ export function PostureMetricsCalculator(
   const finishFrame = frameAt(projectedStream, stroke.finishFrameIndex);
   const backAngleAtCatchDeg = torsoBackAngleDeg(projectedStream, catchFrame);
   const backAngleAtFinishDeg = torsoBackAngleDeg(projectedStream, finishFrame);
-  const laybackAngleDeg = Math.max(0, 90 - backAngleAtFinishDeg);
+  const laybackAngleDeg = backAngleAtFinishDeg === null ? null : Math.max(0, 90 - backAngleAtFinishDeg);
 
   const legSignal = legExtensionSignal(projectedStream, stroke);
   const catchLeg = legSignal[0]?.value ?? 0;
@@ -113,7 +113,7 @@ function referenceDelta(
   if (!usable(measuredFrame)) return { available: false, reason: "insufficient-tracking" };
   return {
     available: true,
-    value: torsoBackAngleDeg(stream, measuredFrame) - torsoBackAngleDeg(stream, reference),
+    value: torsoBackAngleDeg(stream, measuredFrame)! - torsoBackAngleDeg(stream, reference)!,
   };
 }
 
@@ -145,21 +145,20 @@ function sideNames(stream: PoseFrameStream): {
 function requiredPoint(
   frame: PoseAnalysisFrame,
   name: PoseLandmarkName,
-): PosePoint {
+): PosePoint | null {
   const point = getPosePoint(frame, name);
-  if (!point || point.confidence < MIN_CONFIDENCE) {
-    throw new Error(`Missing tracked landmark ${name}`);
-  }
+  if (!point || !Number.isFinite(point.confidence) || point.confidence < MIN_CONFIDENCE || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
   return point;
 }
 
 function torsoBackAngleDeg(
   stream: PoseFrameStream,
   frame: PoseAnalysisFrame,
-): number {
+): number | null {
   const names = sideNames(stream);
   const hip = requiredPoint(frame, names.hip);
   const shoulder = requiredPoint(frame, names.shoulder);
+  if (!hip || !shoulder || (hip.x === shoulder.x && hip.y === shoulder.y)) return null;
   const dx = shoulder.x - hip.x;
   const dyUp = hip.y - shoulder.y;
   const raw = radiansToDegrees(Math.atan2(dyUp, dx));
@@ -183,7 +182,7 @@ function legExtensionSignal(
     const knee = requiredPoint(frame, names.knee);
     signal.push({
       frameIndex,
-      value: Math.hypot(hip.x - knee.x, hip.y - knee.y),
+      value: hip && knee ? Math.hypot(hip.x - knee.x, hip.y - knee.y) : Number.NaN,
     });
   }
   return signal;
@@ -193,6 +192,7 @@ function firstSignalFrameAtLeast(
   signal: Array<{ frameIndex: number; value: number }>,
   threshold: number,
 ): number | null {
+  if (signal.some(point => !Number.isFinite(point.value))) return null;
   for (const point of signal) {
     if (point.value >= threshold) return point.frameIndex;
   }
@@ -202,15 +202,18 @@ function firstSignalFrameAtLeast(
 function firstTorsoChangeFrame(
   stream: PoseFrameStream,
   stroke: Stroke,
-  catchAngleDeg: number,
+  catchAngleDeg: number | null,
 ): number | null {
+  if (catchAngleDeg === null) return null;
   for (
     let frameIndex = stroke.catchFrameIndex + 1;
     frameIndex <= stroke.finishFrameIndex;
     frameIndex++
   ) {
     const frame = frameAt(stream, frameIndex);
-    if (Math.abs(torsoBackAngleDeg(stream, frame) - catchAngleDeg) >= 5) {
+    const angle = torsoBackAngleDeg(stream, frame);
+    if (angle === null) return null;
+    if (Math.abs(angle - catchAngleDeg) >= 5) {
       return frameIndex;
     }
   }
@@ -222,6 +225,7 @@ function firstArmBendFrame(
   stroke: Stroke,
 ): number | null {
   const initialAngle = elbowAngleDeg(stream, frameAt(stream, stroke.catchFrameIndex));
+  if (initialAngle === null) return null;
   const threshold = Math.min(160, initialAngle - 15);
   for (
     let frameIndex = stroke.catchFrameIndex + 1;
@@ -229,6 +233,7 @@ function firstArmBendFrame(
     frameIndex++
   ) {
     const angle = elbowAngleDeg(stream, frameAt(stream, frameIndex));
+    if (angle === null) return null;
     if (angle <= threshold) return frameIndex;
   }
   return null;
@@ -237,11 +242,12 @@ function firstArmBendFrame(
 function elbowAngleDeg(
   stream: PoseFrameStream,
   frame: PoseAnalysisFrame,
-): number {
+): number | null {
   const names = sideNames(stream);
   const shoulder = requiredPoint(frame, names.shoulder);
   const elbow = requiredPoint(frame, names.elbow);
   const wrist = requiredPoint(frame, names.wrist);
+  if (!shoulder || !elbow || !wrist) return null;
   return angleAtPointDeg(shoulder, elbow, wrist);
 }
 

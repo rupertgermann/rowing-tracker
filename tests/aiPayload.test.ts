@@ -104,8 +104,8 @@ describe("buildPostureAIPayload", () => {
     });
     assert.ok(result !== null && result.strokeMetrics);
     const m = result.strokeMetrics[0];
-    assert.equal(m.backAngleAtCatchDeg, 0);
-    assert.equal(m.laybackAngleDeg, 0);
+    assert.equal(m.backAngleAtCatchDeg, null);
+    assert.equal(m.laybackAngleDeg, null);
     assert.equal(m.recoveryDriveRatio, 0);
   });
 });

@@ -479,6 +479,7 @@ export async function linkMocapSessionLifecycle(
     );
   } catch (err) {
     await restoreAssignment(deps, session.id, null);
+    if ((err as { code?: string })?.code === "P2002") return transitionConflict("Rowing session is already linked to another mocap session.");
     return analysisFailure(err);
   }
 
