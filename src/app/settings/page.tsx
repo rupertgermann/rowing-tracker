@@ -1,5 +1,7 @@
 'use client';
 
+import { isPersonalAIEnabled } from '@/lib/aiMode';
+
 import { useCallback, useState, useEffect, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1428,6 +1430,7 @@ export default function SettingsPage() {
   };
 
   const renderAISettings = () => {
+    if (!isPersonalAIEnabled()) return <Card><CardHeader><CardTitle>Hosted AI unavailable</CardTitle><CardDescription>AI features and personal API keys are disabled in this deployment. Basic workout tracking and analysis remain available.</CardDescription></CardHeader></Card>;
     // ✅ No hooks here - moved to component level
     // Conditional logic is safe now
     if (!settingsData?.aiSettings) {

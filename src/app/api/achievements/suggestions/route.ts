@@ -1,3 +1,4 @@
+import { isPersonalAIEnabled } from '@/lib/aiMode';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -77,6 +78,10 @@ export async function POST(request: NextRequest) {
     const limited = await applyRateLimit(request, session.user.id, 'ai');
     if (limited) return limited;
 
+    if (!isPersonalAIEnabled()) {
+      return NextResponse.json({ error: 'Hosted AI is unavailable in this deployment.' }, { status: 503 });
+    }
+
     const body = await request.json();
 
     const {
@@ -126,7 +131,7 @@ export async function POST(request: NextRequest) {
     // Build list of all existing awards to prevent duplicates
     const existingAwardsList = AWARDS.map(a => `- "${a.title}": ${a.description}`).join('\n');
 
-    const openaiApiKey = apiKey || process.env.OPENAI_API_KEY;
+    const openaiApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
     if (!openaiApiKey) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },

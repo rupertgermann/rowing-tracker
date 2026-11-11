@@ -1,3 +1,4 @@
+import { isPersonalAIEnabled } from './aiMode';
 import { Session } from '@/types/session';
 import { TrainingPlan, TrainingWeek, TrainingSession } from '@/lib/trainingPlans';
 import type { PostureAIPayload } from '@/lib/mocap/aiPayload';
@@ -123,8 +124,9 @@ export class CloudAIService {
 
   // Initialize with API key and configuration from settings
   initialize(apiKey?: string): boolean {
-    // Priority: user-provided key > environment variable
-    const key = apiKey || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+    this.config = null;
+    if (!isPersonalAIEnabled()) return false;
+    const key = apiKey?.trim();
 
     if (!key) {
       console.warn('OpenAI API key not provided');
@@ -150,7 +152,7 @@ export class CloudAIService {
 
   // Check if service is configured
   isConfigured(): boolean {
-    return this.config !== null;
+    return isPersonalAIEnabled() && this.config !== null;
   }
 
   private mapModel(model: string): SupportedTextModel {

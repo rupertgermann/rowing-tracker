@@ -44,7 +44,11 @@ test('same-tab and cross-tab account switch replaces equal-revision analytics an
   const other = await context.newPage();
   await other.goto('/settings');
   await other.getByRole('button', { name: /AI Settings Configure/ }).click();
-  await expect(other.getByText('sk-...1111', { exact: true })).toBeVisible();
+  if (process.env.NEXT_PUBLIC_AI_MODE === 'personal') {
+    await expect(other.getByText('sk-...1111', { exact: true })).toBeVisible();
+  } else {
+    await expect(other.getByText('Hosted AI unavailable', { exact: true })).toBeVisible();
+  }
   const staleAnalytics = await page.evaluate(() => localStorage.getItem('rowing_analytics_cache'));
   let capture!: (route: Route) => void;
   const pending = new Promise<Route>(resolve => { capture = resolve; });
