@@ -112,43 +112,6 @@ class MemoryStorageService {
     content: Record<string, unknown>,
     options?: { description?: string; status?: 'active' | 'archived' }
   ): Promise<MemoryDocument> {
-    // Deduplicate: Remove existing documents with same internal keys to ensure uniquely relevant sets
-    const existingDocs = await this.filterByType(type);
-
-    const contentId = content.id;
-    const generatedAt = content.generatedAt;
-
-    const duplicates = existingDocs.filter(doc => {
-      // 1. Training Plan Check: Match by internal content ID
-      if (type === 'training_plan' && contentId) {
-        const docContentId = doc.content?.id;
-        if (docContentId && contentId === docContentId) {
-          return true;
-        }
-      }
-
-      // 2. Insight Check: Match by Name AND GeneratedAt
-      // This allows multiple differently-timed insights on the same day, but prevents exact duplicates
-      if (type === 'insight' && generatedAt) {
-        const docGeneratedAt = doc.content?.generatedAt;
-        if (docGeneratedAt && name === doc.name && generatedAt === docGeneratedAt) {
-          return true;
-        }
-      }
-
-      // No fallback generic name check for other types as requested
-      return false;
-    });
-
-    for (const doc of duplicates) {
-      await this.deleteDocument(doc.id);
-    }
-
-    // For training plans, archive existing active plans
-    if (type === 'training_plan' && options?.status === 'active') {
-      await this.archiveActivePlans();
-    }
-
     const contentString = JSON.stringify(content);
     const uploadedAt = new Date();
 
@@ -537,15 +500,6 @@ class MemoryStorageService {
       ...doc,
       uploadedAt: new Date(doc.uploadedAt),
     };
-  }
-
-  private async archiveActivePlans(): Promise<void> {
-    const plans = await this.filterByType('training_plan');
-    for (const plan of plans) {
-      if (plan.status === 'active') {
-        await this.updateDocument(plan.id, { status: 'archived' });
-      }
-    }
   }
 
   private formatBytes(bytes: number): string {

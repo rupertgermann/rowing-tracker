@@ -68,57 +68,83 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Document size must be a nonnegative integer" }, { status: 400 });
     }
 
-    const savedDocuments = [];
+    const savedDocuments = await prisma.$transaction(async tx => {
+      // Serialize replacement and activation for this account, including concurrent retries.
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${session.user.id} FOR UPDATE`;
+      const savedDocuments = [];
 
-    for (const docData of documents) {
-      // Check if document exists (only if ID is provided)
-      const existing = docData.id ? await prisma.memoryDocument.findFirst({
-        where: {
-          id: docData.id,
-          userId: session.user.id,
-        },
-      }) : null;
+      for (const docData of documents) {
+        if (docData.source === 'system') {
+          // Plans replace by content ID; insights replace by name + generatedAt, within the account.
+          const identity = docData.type === 'training_plan' && docData.content?.id
+            ? { content: { path: ['id'], equals: docData.content.id } }
+            : docData.type === 'insight' && docData.content?.generatedAt
+              ? { name: docData.name, content: { path: ['generatedAt'], equals: docData.content.generatedAt } }
+              : null;
+          if (identity) {
+            await tx.memoryDocument.deleteMany({
+              where: { userId: session.user.id, source: 'system', type: docData.type, ...identity,
+                ...(docData.id ? { id: { not: docData.id } } : {}) },
+            });
+          }
+        }
+        if (docData.type === 'training_plan' && docData.status === 'active') {
+          await tx.memoryDocument.updateMany({
+            where: { userId: session.user.id, type: 'training_plan', status: 'active' },
+            data: { status: 'archived' },
+          });
+        }
 
-      if (existing) {
-        // Update existing document
-        const updated = await prisma.memoryDocument.update({
-          where: { id: existing.id },
-          data: {
-            ...(docData.name !== undefined ? { name: docData.name } : {}),
-            ...(docData.type !== undefined ? { type: docData.type } : {}),
-            ...(docData.source !== undefined ? { source: docData.source } : {}), // Update source if provided
-            ...(docData.mimeType !== undefined ? { mimeType: docData.mimeType } : {}),
-            ...(docData.description !== undefined ? { description: docData.description } : {}),
-            ...(docData.extractedText !== undefined ? { extractedText: docData.extractedText } : {}),
-            ...(docData.tags !== undefined ? { tags: docData.tags } : {}),
-            ...(docData.content !== undefined ? { content: docData.content } : {}),
-            ...(docData.status !== undefined ? { status: docData.status } : {}),
-          },
-        });
-
-        savedDocuments.push(updated);
-      } else {
-        // Create new document
-        const created = await prisma.memoryDocument.create({
-          data: {
+        // Check if document exists (only if ID is provided)
+        const existing = docData.id ? await tx.memoryDocument.findFirst({
+          where: {
+            id: docData.id,
             userId: session.user.id,
-            name: docData.name,
-            type: docData.type,
-            source: docData.source || 'user',
-            mimeType: docData.mimeType || 'application/octet-stream',
-            size: docData.size,
-            description: docData.description,
-            extractedText: docData.extractedText,
-            tags: docData.tags || [],
-            content: docData.content,
-            status: docData.status,
-            uploadedAt: docData.uploadedAt ? new Date(docData.uploadedAt) : new Date(),
           },
-        });
+        }) : null;
 
-        savedDocuments.push(created);
+        if (existing) {
+          // Update existing document
+          const updated = await tx.memoryDocument.update({
+            where: { id: existing.id },
+            data: {
+              ...(docData.name !== undefined ? { name: docData.name } : {}),
+              ...(docData.type !== undefined ? { type: docData.type } : {}),
+              ...(docData.source !== undefined ? { source: docData.source } : {}), // Update source if provided
+              ...(docData.mimeType !== undefined ? { mimeType: docData.mimeType } : {}),
+              ...(docData.description !== undefined ? { description: docData.description } : {}),
+              ...(docData.extractedText !== undefined ? { extractedText: docData.extractedText } : {}),
+              ...(docData.tags !== undefined ? { tags: docData.tags } : {}),
+              ...(docData.content !== undefined ? { content: docData.content } : {}),
+              ...(docData.status !== undefined ? { status: docData.status } : {}),
+            },
+          });
+
+          savedDocuments.push(updated);
+        } else {
+          // Create new document
+          const created = await tx.memoryDocument.create({
+            data: {
+              userId: session.user.id,
+              name: docData.name,
+              type: docData.type,
+              source: docData.source || 'user',
+              mimeType: docData.mimeType || 'application/octet-stream',
+              size: docData.size,
+              description: docData.description,
+              extractedText: docData.extractedText,
+              tags: docData.tags || [],
+              content: docData.content,
+              status: docData.status,
+              uploadedAt: docData.uploadedAt ? new Date(docData.uploadedAt) : new Date(),
+            },
+          });
+
+          savedDocuments.push(created);
+        }
       }
-    }
+      return savedDocuments;
+    });
 
     return NextResponse.json({
       documents: savedDocuments,
