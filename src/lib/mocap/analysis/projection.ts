@@ -24,7 +24,7 @@ export function toProjectedStream(stream: PoseFrameStream): PoseFrameStream {
         );
     return { ...frame, keypoints: projected };
   });
-  return { ...stream, frames: projectedFrames as PoseFrameStream["frames"] };
+  return { ...stream, coordinateSpace: "normalized-2d", frames: projectedFrames as PoseFrameStream["frames"] };
 }
 
 function computeSessionBounds(stream: PoseFrameStream): SessionBounds {
