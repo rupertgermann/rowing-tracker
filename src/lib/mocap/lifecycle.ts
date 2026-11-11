@@ -252,43 +252,8 @@ export async function finalizeMocapSessionLifecycle(
     qualityFlags: input.qualityFlags ?? [],
   };
 
-  if (input.skipAnalysis) {
-    let finalized = { frameCount: 0, poseStreamBytes: 0 };
-    if (await deps.storage.exists(session.poseStreamPath)) {
-      try {
-        finalized = await deps.finalizePoseStream(
-          deps.storage as MocapStorage,
-          session.poseStreamPath,
-        );
-      } catch (err) {
-        return finalizeFailure(err);
-      }
-    }
-    const updated = await deps.setCaptureFinalizationState(session.id, {
-      status: "ready",
-      ...captureState,
-      qualityFlags: uniqueFlags([
-        ...captureState.qualityFlags,
-        MOCAP_RECORD_ONLY_FLAG,
-      ]),
-    }, { from: "capturing" });
-    if (!updated) {
-      return transitionConflict("Session no longer capturing");
-    }
-    return {
-      ok: true,
-      id: session.id,
-      status: updated.status,
-      analysisMode: "record-only",
-      durationSec: updated.durationSec,
-      frameCount: finalized.frameCount,
-      poseStreamBytes: finalized.poseStreamBytes,
-      strokeMetricCount: 0,
-      faultCount: 0,
-    };
-  }
-
-  if (!(await deps.storage.exists(session.poseStreamPath))) {
+  const hasPoseStream = await deps.storage.exists(session.poseStreamPath);
+  if (!input.skipAnalysis && !hasPoseStream) {
     return {
       ok: false,
       status: 409,
@@ -304,15 +269,42 @@ export async function finalizeMocapSessionLifecycle(
     return transitionConflict("Session no longer capturing");
   }
 
-  let finalized: FinalizedPoseStream;
+  let finalized: FinalizedPoseStream = { frameCount: 0, poseStreamBytes: 0 };
   try {
-    finalized = await deps.finalizePoseStream(
-      deps.storage as MocapStorage,
-      session.poseStreamPath,
-    );
+    if (hasPoseStream) {
+      finalized = await deps.finalizePoseStream(
+        deps.storage as MocapStorage,
+        session.poseStreamPath,
+      );
+    }
   } catch (err) {
     await deps.setStatus(session.id, "capturing", { from: "analyzing" });
     return finalizeFailure(err);
+  }
+
+  if (input.skipAnalysis) {
+    const updated = await deps.setCaptureFinalizationState(session.id, {
+      status: "ready",
+      ...captureState,
+      qualityFlags: uniqueFlags([
+        ...captureState.qualityFlags,
+        MOCAP_RECORD_ONLY_FLAG,
+      ]),
+    }, { from: "analyzing" });
+    if (!updated) {
+      return transitionConflict("Session status changed during finalization");
+    }
+    return {
+      ok: true,
+      id: session.id,
+      status: updated.status,
+      analysisMode: "record-only",
+      durationSec: updated.durationSec,
+      frameCount: finalized.frameCount,
+      poseStreamBytes: finalized.poseStreamBytes,
+      strokeMetricCount: 0,
+      faultCount: 0,
+    };
   }
 
   let analysis: PersistedMocapAnalysisSummary;
