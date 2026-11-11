@@ -1,5 +1,7 @@
 'use client';
 
+import { isPersonalAIEnabled } from '@/lib/aiMode';
+
 import { useEffect, useState, useRef, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1045,6 +1047,7 @@ function ChatPageContent() {
 }
 
 export default function ChatPage() {
+  if (!isPersonalAIEnabled()) return <div className="container mx-auto p-4"><h1>Hosted AI unavailable</h1><p>AI chat is disabled in this deployment. Basic workout tracking and analysis remain available.</p></div>;
   return (
     <Suspense fallback={<div className="container mx-auto p-4 h-screen flex flex-col items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
       <ChatPageContent />

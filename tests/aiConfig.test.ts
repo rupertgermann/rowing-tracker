@@ -4,6 +4,7 @@ import { afterEach, test } from "node:test";
 import { initializeCloudAIFromSettings } from "../src/lib/aiConfig";
 import { settings, type Settings } from "../src/lib/settings";
 
+const originalMode = process.env.NEXT_PUBLIC_AI_MODE;
 const originalEnvKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -33,6 +34,8 @@ function installSettingsStorage(settingsJson: string) {
 }
 
 afterEach(() => {
+  if (originalMode === undefined) delete process.env.NEXT_PUBLIC_AI_MODE;
+  else process.env.NEXT_PUBLIC_AI_MODE = originalMode;
   if (originalEnvKey === undefined) {
     delete process.env.NEXT_PUBLIC_OPENAI_API_KEY;
   } else {
@@ -53,6 +56,7 @@ afterEach(() => {
 });
 
 test("initializeCloudAIFromSettings treats a missing API key as quiet unconfigured state", () => {
+  process.env.NEXT_PUBLIC_AI_MODE = "personal";
   delete process.env.NEXT_PUBLIC_OPENAI_API_KEY;
   const storedSettings = JSON.parse(JSON.stringify(settings.getSettings())) as Settings;
   storedSettings.aiSettings.cloudAIEnabled = true;
@@ -71,4 +75,14 @@ test("initializeCloudAIFromSettings treats a missing API key as quiet unconfigur
   } finally {
     console.warn = originalWarn;
   }
+});
+
+test("operator environment keys never initialize browser AI", () => {
+  process.env.NEXT_PUBLIC_AI_MODE = 'personal';
+  process.env.NEXT_PUBLIC_OPENAI_API_KEY = 'synthetic-public-key';
+  const storedSettings = JSON.parse(JSON.stringify(settings.getSettings())) as Settings;
+  storedSettings.aiSettings.cloudAIEnabled = true;
+  storedSettings.aiSettings.openaiApiKey = '';
+  installSettingsStorage(JSON.stringify(storedSettings));
+  assert.equal(initializeCloudAIFromSettings(), false);
 });

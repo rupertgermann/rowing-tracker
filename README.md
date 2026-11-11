@@ -511,7 +511,9 @@ See `prisma/schema.prisma` for the complete, authoritative schema, and `docs/DAT
 - **Data Encryption**: Database and disk encryption depend on the deployment configuration.
 - **Privacy First**: Your workout data is never shared with other users
 - **Account Data**: Account deletion and a JSON export are available. The export does not include all stored data or uploaded files.
-- **API Keys**: User-provided OpenAI keys are stored in browser settings and used directly by browser AI calls or sent to authenticated achievement API routes. A `NEXT_PUBLIC_OPENAI_API_KEY` value is public client configuration and must not contain an operator's secret key.
+- **AI deployment mode**: Cloud AI is disabled by default, including achievement generation. Hosted AI is not yet implemented: EU-region/DPA/ZDR evidence, granular consent and deletion/security release gates in [the hosted privacy decision](docs/research/hosted-ai-privacy-boundary.md) must precede a server-owned, aggregate-allowlisted route. Setting an operator key does not enable AI. No public or server environment key fallback exists.
+- **Personal BYOK**: For a personal installation only, set `NEXT_PUBLIC_AI_MODE=personal` **before building**, then enter your own OpenAI key in Settings → AI Settings. Personal mode preserves browser provider calls and authenticated achievement routes using the caller’s key; it is not suitable for CommercialBeta. Keys remain in browser settings and are sent to those routes. Rebuild to change modes; the mode flag is public, never a secret. ADR-0004's mocap sharing applies only to this personal workflow; hosted mode sends no mocap or other AI context.
+- **Exposure checks**: Verify builds with synthetic canary values only. Real deployment history inspection and key rotation require separate authorization; removing the fallback does not revoke a previously exposed key.
 
 ## API Rate Limiting
 
