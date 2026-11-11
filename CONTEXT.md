@@ -67,6 +67,8 @@ Lifecycle states: `capturing` → `analyzing` → `ready`. Linking is represente
 
 **Linking to a `RowingSession`** is bidirectional and exclusive — one `MocapSession` is linked to at most one `RowingSession` and vice versa. Either side may be unlinked; relinking is allowed. Linking triggers mandatory re-analysis (`pose-segmented` → `csv-aligned`); the mocap row is `analyzing` until re-analysis completes. Unlinking reverts to `pose-segmented` and re-runs metrics. CSV import auto-prompts to link when a capture window overlaps a new `RowingSession` by ±2 minutes — user confirms, never silent. Manual assignment may link any ready, unlinked `MocapSession` to any unlinked `RowingSession` for the same user. Capture-window overlap is a recommendation signal, not an eligibility rule; warn before linking sessions that do not overlap.
 
+**Changing linked rowing data requires explicit unlink first.** Replacing strokes, clearing strokes, and deleting a rowing session return HTTP 409 with an unlink instruction while its capture is linked. Unlink retains the link until pose-only metrics, faults, and ready status publish atomically; failure preserves the previous CSV analysis and link. CSV analysis and destructive rowing mutations serialize on the rowing session row (rowing before capture), so a concurrent link either analyzes the current strokes or fails without publishing stale results.
+
 A **record-only `MocapSession`** has video but no `PoseFrameStream`. It finalizes with `analysisMode: "record-only"` and cannot be linked to a `RowingSession`, because linking must produce `csv-aligned` posture analysis.
 
 ### CueLatencyBand

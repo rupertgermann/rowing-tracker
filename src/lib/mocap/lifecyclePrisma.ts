@@ -239,7 +239,7 @@ export function createPrismaMocapSessionLifecycle(
                 rowingSessionId,
                 status: "ready",
               },
-              data: { rowingSessionId: null, status: "analyzing" },
+              data: { status: "analyzing" },
             });
             return update.count === 1;
           },
