@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import { prisma } from "@/lib/db/prisma";
@@ -105,7 +106,7 @@ export async function PATCH(
     }
 
     // Prepare update data
-    const updateData: Record<string, string> = {};
+    const updateData: Prisma.UserUpdateInput = {};
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (role !== undefined) updateData.role = role;
@@ -113,6 +114,7 @@ export async function PATCH(
     // Hash new password if provided
     if (newPassword) {
       updateData.passwordHash = await bcrypt.hash(newPassword, 12);
+      updateData.sessionVersion = { increment: 1 };
     }
 
     // Update user

@@ -73,7 +73,7 @@ export async function POST(req: Request) {
 
       await tx.user.update({
         where: { email: resetToken.email },
-        data: { passwordHash },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
       });
       await tx.passwordResetToken.deleteMany({ where: { email: resetToken.email } });
       return true;
