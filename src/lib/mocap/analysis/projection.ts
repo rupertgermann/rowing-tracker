@@ -52,9 +52,11 @@ function projectToNormalized(point: PosePoint, bounds: SessionBounds): PosePoint
   if (point.z === undefined) return point;
   const yRange = bounds.yMax - bounds.yMin;
   const zRange = bounds.zMax - bounds.zMin;
+  // A shared scale preserves sagittal angles despite unequal recording bounds.
+  const scale = Math.max(yRange, zRange);
   return {
-    x: zRange > 0 ? (point.z - bounds.zMin) / zRange : 0.5,
-    y: yRange > 0 ? (point.y - bounds.yMin) / yRange : 0.5,
+    x: scale > 0 ? (point.z - bounds.zMin) / scale : 0.5,
+    y: scale > 0 ? (point.y - bounds.yMin) / scale : 0.5,
     confidence: point.confidence,
   };
 }
