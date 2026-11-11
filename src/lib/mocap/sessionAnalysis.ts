@@ -28,6 +28,7 @@ type AnalyzeSessionInput = {
 export async function analyzeAndPersistMocapSession(
   storage: MocapStorage,
   session: AnalyzeSessionInput,
+  unlinkRowingSessionId?: string,
 ): Promise<PersistedMocapAnalysisSummary> {
   const [poseBlob, userSettings] = await Promise.all([
     storage.read(session.poseStreamPath),
@@ -54,6 +55,14 @@ export async function analyzeAndPersistMocapSession(
   });
 
   await prisma.$transaction(async (tx) => {
+    if (unlinkRowingSessionId) {
+      await tx.$queryRaw`SELECT id FROM "RowingSession" WHERE id = ${unlinkRowingSessionId} FOR UPDATE`;
+      const unlinked = await tx.mocapSession.updateMany({
+        where: { id: session.id, userId: session.userId, status: "analyzing", rowingSessionId: unlinkRowingSessionId },
+        data: { rowingSessionId: null, status: "ready" },
+      });
+      if (unlinked.count !== 1) throw new Error("Session changed during unlink analysis");
+    }
     await tx.postureFault.deleteMany({
       where: { mocapSessionId: session.id },
     });
@@ -87,6 +96,7 @@ export async function analyzeAndPersistMocapSession(
   });
 
   return {
+    ...(unlinkRowingSessionId ? { status: "ready" as const } : {}),
     strokeMetricCount: result.metrics.length,
     faultCount: result.faults.length,
   };
@@ -102,16 +112,11 @@ export async function analyzeAndPersistMocapSessionLinked(
   session: AnalyzeSessionInput,
   rowingSessionId: string,
 ): Promise<PersistedMocapAnalysisSummary> {
-  const [poseBlob, userSettings, strokeDataRows] = await Promise.all([
+  const [poseBlob, userSettings] = await Promise.all([
     storage.read(session.poseStreamPath),
     prisma.userSettings.findUnique({
       where: { userId: session.userId },
       select: { postureThresholds: true },
-    }),
-    prisma.strokeData.findMany({
-      where: { sessionId: rowingSessionId },
-      orderBy: { strokeIndex: "asc" },
-      select: { id: true, strokeIndex: true, time: true },
     }),
   ]);
 
@@ -122,20 +127,23 @@ export async function analyzeAndPersistMocapSessionLinked(
     poseBlob,
     session.capturePerspective as CapturePerspective,
   );
-  const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map(sd => ({ id: sd.id, strokeIndex: sd.strokeIndex, timeMs: sd.time * 1000 }));
-  const result = analyzePoseFrameStream(stream, {
-    csvStrokes,
-    thresholds,
-    calibration: decodeBrowserCalibration(
-      stream.capturePerspective,
-      session.calibrationCatchFrame,
-      session.calibrationFinishFrame,
-    ),
-  });
+  return prisma.$transaction(async (tx) => {
+    // Rowing first, then capture: mutation guards and unlink publication use this order too.
+    const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "RowingSession" WHERE id = ${rowingSessionId} AND "userId" = ${session.userId} FOR UPDATE`;
+    if (rows.length !== 1) throw new Error("Rowing session no longer exists");
+    const strokeDataRows = await tx.strokeData.findMany({
+      where: { sessionId: rowingSessionId },
+      orderBy: { strokeIndex: "asc" },
+      select: { id: true, strokeIndex: true, time: true },
+    });
+    const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map(sd => ({ id: sd.id, strokeIndex: sd.strokeIndex, timeMs: sd.time * 1000 }));
+    const result = analyzePoseFrameStream(stream, {
+      csvStrokes,
+      thresholds,
+      calibration: decodeBrowserCalibration(stream.capturePerspective, session.calibrationCatchFrame, session.calibrationFinishFrame),
+    });
+    if (result.metrics.length === 0) throw new Error("No complete CSV-aligned stroke windows with usable pose tracking");
 
-  if (result.metrics.length === 0) throw new Error("No complete CSV-aligned stroke windows with usable pose tracking");
-
-  await prisma.$transaction(async (tx) => {
     // Publish the link only with its recomputed rows; the lifecycle already claimed analyzing.
     const linked = await tx.mocapSession.updateMany({
       where: { id: session.id, userId: session.userId, status: "analyzing", OR: [{ rowingSessionId: null }, { rowingSessionId }] },
@@ -172,11 +180,10 @@ export async function analyzeAndPersistMocapSessionLinked(
         })),
       });
     }
-  });
-
-  return {
-    status: "ready",
-    strokeMetricCount: result.metrics.length,
-    faultCount: result.faults.length,
-  };
+    return {
+      status: "ready" as const,
+      strokeMetricCount: result.metrics.length,
+      faultCount: result.faults.length,
+    };
+  }, { timeout: 30000 });
 }

@@ -204,6 +204,7 @@ export interface UnlinkMocapSessionDependencies
   analyzePoseSegmented(
     storage: MocapStorage,
     session: MocapLifecycleSession,
+    unlinkRowingSessionId: string,
   ): Promise<PersistedMocapAnalysisSummary>;
 }
 
@@ -544,13 +545,14 @@ export async function unlinkMocapSessionLifecycle(
     analysis = await deps.analyzePoseSegmented(
       deps.storage as MocapStorage,
       unlinkedSession,
+      previousRowingSessionId,
     );
   } catch (err) {
     await restoreAssignment(deps, session.id, previousRowingSessionId);
     return analysisFailure(err);
   }
 
-  const updated = await deps.setStatus(session.id, "ready", { from: "analyzing" });
+  const updated = analysis.status === "ready" ? { status: "ready" } : await deps.setStatus(session.id, "ready", { from: "analyzing" });
   if (!updated) {
     await restoreAssignment(deps, session.id, previousRowingSessionId);
     return transitionConflict("Session status changed during analysis");
