@@ -1,3 +1,4 @@
+import { accountSummaryScope } from "@/lib/accountSummaryScope";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
 
     const userId = session.user.id;
 
-    // Fetch all user data in parallel
+    // Fetch the documented summary categories in parallel
     const [
       user,
       rowingSessions,
@@ -141,7 +142,8 @@ export async function GET(req: Request) {
     // Compile export data
     const exportData = {
       exportedAt: new Date().toISOString(),
-      exportFormat: "Rowing Tracker JSON export",
+      exportFormat: "Rowing Tracker limited summary",
+      exportScope: accountSummaryScope,
       user: user,
       settings: userSettings,
       rowingSessions: rowingSessions.map((s) => ({
@@ -187,7 +189,7 @@ export async function GET(req: Request) {
 
     // Return as downloadable JSON file
     const jsonString = JSON.stringify(exportData, null, 2);
-    const fileName = `rowing-tracker-export-${new Date().toISOString().split("T")[0]}.json`;
+    const fileName = `rowing-tracker-summary-${new Date().toISOString().split("T")[0]}.json`;
 
     return new NextResponse(jsonString, {
       status: 200,

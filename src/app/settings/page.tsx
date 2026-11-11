@@ -1,5 +1,6 @@
 'use client';
 
+import { accountSummaryScope } from '@/lib/accountSummaryScope';
 import { isPersonalAIEnabled } from '@/lib/aiMode';
 
 import { useCallback, useState, useEffect, type ReactNode } from 'react';
@@ -764,6 +765,34 @@ export default function SettingsPage() {
               Your credentials are stored locally and never sent to our servers.
               Use the &quot;Sync from SmartRow&quot; button on the Upload page to download new workouts.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Account summary</CardTitle>
+            <CardDescription>A limited JSON summary of your server-saved account data</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert><AlertDescription>{accountSummaryScope.warning}</AlertDescription></Alert>
+            <div>
+              <h3 className="font-medium">Included</h3>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                {Object.entries(accountSummaryScope.included).map(([key, description]) => <li key={key}>{description}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-medium">Not included</h3>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                {accountSummaryScope.excluded.map(description => <li key={description}>{description}</li>)}
+              </ul>
+            </div>
+            <Button variant="outline" asChild>
+              <a href="/api/user/export">
+                <Download className="h-4 w-4 mr-2" />
+                Download account summary (JSON)
+              </a>
+            </Button>
           </CardContent>
         </Card>
 
@@ -3080,7 +3109,7 @@ export default function SettingsPage() {
         open={showClearDataConfirm}
         onOpenChange={setShowClearDataConfirm}
         title={`Clear ${dataCategoryToClear}?`}
-        description={`Are you sure you want to clear all ${dataCategoryToClear}? This action cannot be undone and will permanently remove all stored data.`}
+        description={`Are you sure you want to clear all ${dataCategoryToClear}? This action cannot be undone and will permanently remove all stored data. ${accountSummaryScope.warning}`}
         confirmLabel="Clear"
         cancelLabel="Cancel"
         onConfirm={executeClearDataCategory}
