@@ -10,6 +10,12 @@ import { prisma } from "@/lib/db/prisma";
 import { calculateConsistencyScore } from "@/lib/analysisUtils";
 import { bumpUserSessionsRevision } from "@/lib/server/userSettings";
 
+const unlinkRequired = "Unlink the motion capture before replacing strokes, clearing strokes, or deleting this rowing session.";
+
+class LinkedRowingSessionError extends Error {
+  constructor() { super(unlinkRequired); }
+}
+
 /**
  * GET /api/sessions
  * Fetch all sessions for the authenticated user
@@ -95,6 +101,13 @@ export async function POST(req: Request) {
             distance: sessionData.distance,
           },
         });
+        if (existing && hasStrokeDataInput) {
+          // Lock before checking the link; CSV analysis uses the same rowing-first lock order.
+          await tx.$queryRaw`SELECT id FROM "RowingSession" WHERE id = ${existing.id} FOR UPDATE`;
+          if (await tx.mocapSession.findUnique({ where: { rowingSessionId: existing.id }, select: { id: true } })) {
+            throw new LinkedRowingSessionError();
+          }
+        }
         const data = {
           timestamp: normalizedTimestamp,
           distance: sessionData.distance,
@@ -172,6 +185,7 @@ export async function POST(req: Request) {
     if (error instanceof InputError || error instanceof ZodError) {
       return NextResponse.json({ error: error.message }, { status: error instanceof InputError ? error.status : 400 });
     }
+    if (error instanceof LinkedRowingSessionError) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Error creating sessions:", error);
     console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
@@ -222,6 +236,10 @@ export async function DELETE(req: Request) {
     }
 
     await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "RowingSession" WHERE id = ${sessionId} FOR UPDATE`;
+      if (await tx.mocapSession.findUnique({ where: { rowingSessionId: sessionId }, select: { id: true } })) {
+        throw new LinkedRowingSessionError();
+      }
       // Related stroke rows are deleted by the database cascade.
       await tx.rowingSession.delete({ where: { id: sessionId } });
       await bumpUserSessionsRevision(session.user.id, tx);
@@ -234,6 +252,7 @@ export async function DELETE(req: Request) {
       sessionId 
     });
   } catch (error) {
+    if (error instanceof LinkedRowingSessionError) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Error deleting session:", error);
     return NextResponse.json(
       { error: "Failed to delete session" },

@@ -109,7 +109,7 @@ test('session deletion and revision updates commit or roll back together', async
   let deleted = false;
   let revision = 0;
   let failRevision = true;
-  const tx = { rowingSession: { delete: async () => { deleted = true; } } };
+  const tx = { $queryRaw: async () => [], mocapSession: { findUnique: async () => null }, rowingSession: { delete: async () => { deleted = true; } } };
   const route = loadModule<Route>('src/app/api/sessions/route.ts', {
     ...imports,
     '@/lib/analysisUtils': {},

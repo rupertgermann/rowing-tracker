@@ -243,8 +243,14 @@ function makeFactory(state: FactoryState) {
   return createPrismaMocapSessionLifecycle({
     prisma: makeFakePrisma(state),
     storage: makeFakeStorage(),
-    analyzePoseSegmented: async () => {
+    analyzePoseSegmented: async (_storage, _session, unlinkRowingSessionId) => {
       if (state.failPoseAnalysis) throw new Error("pose analysis failed");
+      if (unlinkRowingSessionId) {
+        assert.equal(state.mocapSession.rowingSessionId, unlinkRowingSessionId);
+        state.mocapSession.rowingSessionId = null;
+        state.mocapSession.status = "ready";
+        return { status: "ready", strokeMetricCount: 3, faultCount: 1 };
+      }
       return { strokeMetricCount: 3, faultCount: 1 };
     },
     analyzeCsvAligned: async (_storage, _session, rowingSessionId) => {

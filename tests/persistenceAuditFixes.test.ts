@@ -20,7 +20,7 @@ function database(initial: Tables, fail: (model: string, action: string) => void
     const hydrate = (model: string, row: Row) => model === 'trainingPlan'
       ? { ...row, weeks: tables.trainingWeek.filter(w => w.planId === row.id).map(w => ({ ...w, sessions: tables.trainingSession.filter(s => s.weekId === w.id) })) }
       : row;
-    const result: Record<string, unknown> = {};
+    const result: Record<string, unknown> = { $queryRaw: async () => [], mocapSession: { findUnique: async () => null } };
     for (const model of ['rowingSession', 'strokeData', 'userSettings', 'trainingPlan', 'trainingWeek', 'trainingSession', 'trainingSessionLink']) {
       tables[model] ??= [];
       result[model] = {
@@ -91,6 +91,7 @@ function route(file: string, db: ReturnType<typeof database>) {
   });
 }
 const request = (body: unknown) => new Request('http://localhost/api', { method: 'POST', body: JSON.stringify(body) });
+const stroke = { strokeIndex: 0, time: 3, timestamp: '00:03', distance: 10, work: 100, power: 200, avgPower: 200, split: 120, avgSplit: 120, strokeRate: 20 };
 const session = { id: 'session', userId: 'user', timestamp: '2026-10-23T12:00:00Z', distance: 1000, duration: 240 };
 const plan = { id: 'plan_existing', userId: 'user', title: 'Original', description: '', goals: [], duration: 1 };
 const week = { id: 'week', planId: plan.id, weekNumber: 1, focus: 'Endurance', totalVolume: 30, completed: true, actualVolume: 30 };
@@ -101,7 +102,7 @@ for (const failure of ['strokeData', 'userSettings']) {
   test(`session replacement rolls back strokes, metadata and revision if ${failure} fails`, async () => {
     const db = database({ rowingSession: [session], strokeData: [{ id: 'old', sessionId: session.id, power: 180 }], userSettings: [{ id: 'settings', sessionsRevision: 4 }] }, model => { if (model === failure) throw new Error('Injected write failure'); });
     const before = db.read();
-    const result = await route('src/app/api/sessions/route.ts', db).POST(request({ sessions: [{ ...session, duration: 300, strokeData: [{ strokeIndex: 0, power: 200 }] }] }));
+    const result = await route('src/app/api/sessions/route.ts', db).POST(request({ sessions: [{ ...session, duration: 300, strokeData: [stroke] }] }));
     assert.equal(result.status, 500);
     assert.deepEqual(db.read(), before);
   });
@@ -177,6 +178,8 @@ test('concurrent session import retries after the aborted transaction and commit
       let draftRevision = revision;
       const check = () => { if (aborted) throw new Error('Transaction is aborted'); };
       const result = await run({
+        $queryRaw: async () => [],
+        mocapSession: { findUnique: async () => null },
         rowingSession: {
           findFirst: async () => { check(); return exists ? session : null; },
           create: async () => {
@@ -206,7 +209,7 @@ test('concurrent session import retries after the aborted transaction and commit
     '@/lib/analysisUtils': { calculateConsistencyScore: () => 90 },
     '@/lib/server/userSettings': settings,
   });
-  const result = await endpoint.POST(request({ sessions: [{ ...session, strokeData: [{ strokeIndex: 0, power: 200 }] }] }));
+  const result = await endpoint.POST(request({ sessions: [{ ...session, strokeData: [stroke] }] }));
   assert.equal(result.status, 200);
   assert.equal(attempts, 2);
   assert.equal(revision, 1);

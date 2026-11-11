@@ -61,16 +61,18 @@ test('linked service publishes CSV metrics with the link and preserves existing 
     '@/lib/mocap/analysis': analysis,
     '@/lib/db/prisma': { prisma: {
       userSettings: { findUnique: async () => null },
-      strokeData: { findMany: async () => csv.map(c => ({ id: c.id, strokeIndex: c.strokeIndex, time: c.timeMs / 1000 })) },
-      $transaction: async (fn: (tx: unknown) => Promise<void>) => {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
         const pending = structuredClone(state);
         const publishedLink = state.link;
-        await fn({
+        const result = await fn({
+          $queryRaw: async () => [{ id: 'rowing' }],
+          strokeData: { findMany: async () => csv.map(c => ({ id: c.id, strokeIndex: c.strokeIndex, time: c.timeMs / 1000 })) },
           mocapSession: { updateMany: async ({ data }: { data: { rowingSessionId: string; status: string } }) => { pending.link = data.rowingSessionId; pending.status = data.status; return { count: 1 }; } },
           strokePostureMetric: { deleteMany: async () => { pending.metrics = []; }, createMany: async ({ data }: { data: typeof pending.metrics }) => { assert.equal(state.link, publishedLink); pending.metrics = data; if (failWrite) throw new Error("database write failed"); } },
           postureFault: { deleteMany: async () => { pending.faults = []; }, createMany: async ({ data }: { data: typeof pending.faults }) => { pending.faults = data; } },
         });
         state = pending;
+        return result;
       },
     } },
   });
