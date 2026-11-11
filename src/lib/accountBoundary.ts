@@ -7,11 +7,21 @@ interface AccountBoundary {
 const boundaries = new WeakMap<Window, AccountBoundary>();
 
 export const ACCOUNT_OWNER_KEY = 'rowing_account_owner';
+const LEGACY_QUARANTINE_KEY = 'rowing_legacy_quarantine';
+const LEGACY_RECORD_KEYS = ['rowing-tracker-storage', 'rowingSessions', 'personalRecords', 'trainingPlans', 'earnedAwards'];
 
 function clearAccountStorage(storage: Storage) {
+  if (storage.getItem(ACCOUNT_OWNER_KEY) === null && storage.getItem(LEGACY_QUARANTINE_KEY) === null) {
+    // These migration inputs may be the only copy; remove them from discovery without destroying them.
+    const legacy = Object.fromEntries(LEGACY_RECORD_KEYS.flatMap(key => {
+      const value = storage.getItem(key);
+      return value === null ? [] : [[key, value]];
+    }));
+    if (Object.keys(legacy).length) storage.setItem(LEGACY_QUARANTINE_KEY, JSON.stringify(legacy));
+  }
   for (let i = storage.length - 1; i >= 0; i--) {
     const key = storage.key(i)!;
-    if (key === ACCOUNT_OWNER_KEY) continue;
+    if (key === ACCOUNT_OWNER_KEY || key === LEGACY_QUARANTINE_KEY) continue;
     if (/^(rowing[_-]|chat_message_collapsed_|selectedWeek_|aiInsightsFeedback_)/.test(key) ||
       ['rowingSessions', 'personalRecords', 'trainingPlans', 'earnedAwards', 'migrationDismissed', 'migrationComplete'].includes(key)) {
       storage.removeItem(key);

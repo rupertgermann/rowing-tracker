@@ -43,3 +43,24 @@ test('legacy image migration lists only images owned by the authenticated accoun
     assert.deepEqual(await service.getAllAchievementImageIdsFromIndexedDB(), expected);
   }
 });
+
+test('unowned local-only migration records are quarantined without being offered to a new account', () => {
+  const values = new Map([['rowingSessions', '[{"id":"legacy-private-session"}]'], ['rowing-tracker-storage', '{"state":{"sessions":[{"id":"old"}]}}'], ['personalRecords', '[{"id":"pr"}]'], ['trainingPlans', '[{"id":"plan"}]'], ['earnedAwards', '[{"id":"award"}]'], ['rowing_analytics_cache', 'server-cache'], ['rowing_app_settings', 'old-api-key']]);
+  const storage = { get length() { return values.size; }, key: (i: number) => [...values.keys()][i], getItem: (k: string) => values.get(k) ?? null, setItem: (k: string, v: string) => values.set(k, v), removeItem: (k: string) => values.delete(k) };
+  const { createAccountBoundary } = loadModule<typeof import('../src/lib/accountBoundary')>('src/lib/accountBoundary.ts', {}, { DOMException, AbortController, AbortSignal });
+  const browser = { localStorage: storage, fetch: async () => Response.json({}) };
+  createAccountBoundary(browser as unknown as Window).enter('A');
+  for (const key of ['rowingSessions', 'personalRecords', 'trainingPlans', 'earnedAwards']) assert.equal(storage.getItem(key), null);
+  assert.equal(storage.getItem('rowing-tracker-storage'), null);
+  assert.deepEqual(JSON.parse(storage.getItem('rowing_legacy_quarantine')!), {
+    rowingSessions: '[{"id":"legacy-private-session"}]',
+    personalRecords: '[{"id":"pr"}]',
+    trainingPlans: '[{"id":"plan"}]',
+    earnedAwards: '[{"id":"award"}]',
+    'rowing-tracker-storage': '{"state":{"sessions":[{"id":"old"}]}}',
+  });
+  const freshBrowser = { localStorage: storage, fetch: async () => Response.json({}) };
+  createAccountBoundary(freshBrowser as unknown as Window).enter('B');
+  assert.ok(storage.getItem('rowing_legacy_quarantine'));
+  assert.equal(storage.getItem('rowing_app_settings'), null);
+});
