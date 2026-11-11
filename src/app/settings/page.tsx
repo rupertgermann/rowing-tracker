@@ -770,7 +770,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Export & Import</CardTitle>
-            <CardDescription>Backup your settings and data</CardDescription>
+            <CardDescription>Export or import your settings as a JSON file</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">

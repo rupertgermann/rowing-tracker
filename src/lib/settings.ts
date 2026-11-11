@@ -48,9 +48,6 @@ export interface UserPreferences {
 }
 
 export interface DataManagement {
-  exportFormat: 'json' | 'csv';
-  backupEnabled: boolean;
-  lastBackup: Date | null;
   storageUsage: {
     sessions: number;
     chatHistory: number;
@@ -195,9 +192,6 @@ export class SettingsService {
       customPrompts: []
     },
     dataManagement: {
-      exportFormat: 'json',
-      backupEnabled: false,
-      lastBackup: null,
       storageUsage: {
         sessions: 0,
         chatHistory: 0,
@@ -551,9 +545,6 @@ Be specific and actionable. Only include information relevant to rowing training
       },
       dataManagement: {
         ...this.defaultSettings.dataManagement,
-        exportFormat: (dbSettings.exportFormat as 'json' | 'csv') || 'json',
-        backupEnabled: (dbSettings.backupEnabled as boolean) || false,
-        lastBackup: dbSettings.lastBackup ? new Date(dbSettings.lastBackup as string) : null,
       },
       trainingSettings: {
         ...this.defaultSettings.trainingSettings,
@@ -650,9 +641,6 @@ Be specific and actionable. Only include information relevant to rowing training
       animationsEnabled: settings.userPreferences.animationsEnabled,
       showPromptSuggestions: settings.userPreferences.showPromptSuggestions,
       customPrompts: settings.userPreferences.customPrompts,
-      exportFormat: settings.dataManagement.exportFormat,
-      backupEnabled: settings.dataManagement.backupEnabled,
-      lastBackup: settings.dataManagement.lastBackup,
       trainingZones: settings.trainingSettings.defaultTrainingZones,
       preferredMetrics: settings.trainingSettings.preferredMetrics,
       weeklyGoalType: settings.trainingSettings.weeklyGoal.type,
@@ -1034,6 +1022,10 @@ Be specific and actionable. Only include information relevant to rowing training
 
   private migrateSettings(settings: Partial<Settings>): Settings {
     const migratedSettings = { ...settings } as Settings;
+
+    migratedSettings.dataManagement = {
+      storageUsage: settings.dataManagement?.storageUsage ?? this.defaultSettings.dataManagement.storageUsage,
+    };
 
     // Ensure UserPreferences has all required fields
     migratedSettings.userPreferences = {
