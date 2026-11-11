@@ -313,6 +313,7 @@ export async function saveRowingSessions(
       });
 
       if (!response.ok) {
+        invalidateRowingSessionCaches();
         const error = await response.json().catch(() => ({}));
         console.error(`[RowingSessionPersistence] Save chunk ${i + 1}/${totalChunks} failed:`, error);
         return {
@@ -326,6 +327,8 @@ export async function saveRowingSessions(
 
       sessionsProcessed += chunk.length;
     } catch (error) {
+      // The server may have committed this or earlier chunks before the request failed.
+      invalidateRowingSessionCaches();
       console.error(`[RowingSessionPersistence] Error saving chunk ${i + 1}/${totalChunks}:`, error);
       return {
         success: false,

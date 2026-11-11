@@ -88,14 +88,21 @@ test("mocap DELETE retains pointers after partial deletion and succeeds on retry
   const remaining = new Set([mocap.videoStoragePath, mocap.poseStreamPath]);
   let fail = true;
   let metadataDeleted = false;
+  let revisionBumped = false;
+  const tx = { mocapSession: { delete: async () => { metadataDeleted = true; } } };
   const route = loadModule<DeleteRoute>("src/app/api/mocap/sessions/[id]/route.ts", {
     "next/server": responseModule,
     "next-auth": { getServerSession: async () => ({ user: { id: user.id } }) },
     "@/lib/auth": { authOptions: {} },
-    "@/lib/db/prisma": { prisma: { mocapSession: {
-      findFirst: async () => mocap,
-      delete: async () => { metadataDeleted = true; },
-    } } },
+    "@/lib/db/prisma": { prisma: {
+      mocapSession: { findFirst: async () => mocap },
+      $transaction: async (fn: (db: typeof tx) => Promise<void>) => fn(tx),
+    } },
+    "@/lib/server/userSettings": { bumpUserSessionsRevision: async (owner: string, db: unknown) => {
+      assert.equal(owner, user.id);
+      assert.equal(db, tx);
+      revisionBumped = true;
+    } },
     "@/lib/mocap/storage": { getMocapStorage: () => ({ delete: async (file: string) => {
       if (file === mocap.poseStreamPath && fail) throw new Error("storage unavailable");
       remaining.delete(file);
@@ -105,9 +112,11 @@ test("mocap DELETE retains pointers after partial deletion and succeeds on retry
   const context = { params: Promise.resolve({ id: mocap.id }) };
   assert.equal((await route.DELETE(request, context)).status, 500);
   assert.equal(metadataDeleted, false);
+  assert.equal(revisionBumped, false);
   fail = false;
   assert.equal((await route.DELETE(request, context)).status, 200);
   assert.equal(metadataDeleted, true);
+  assert.equal(revisionBumped, true);
   assert.equal(remaining.size, 0);
 });
 

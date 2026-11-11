@@ -42,9 +42,9 @@ export function formatDate(
   const shortMonth = options?.shortMonth ?? true;
 
   // Build date parts based on format preference
-  const day = d.getDate();
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
+  const day = Number(d.toLocaleDateString('en-US', { day: 'numeric', timeZone }));
+  const month = Number(d.toLocaleDateString('en-US', { month: 'numeric', timeZone }));
+  const year = d.toLocaleDateString('en-US', { year: 'numeric', timeZone });
   
   // Format month name if using short format
   const monthName = d.toLocaleDateString('en-US', { 
@@ -134,7 +134,7 @@ export function formatChartDate(date: Date | string): string {
   const d = date instanceof Date ? date : new Date(date);
   const { dateFormat, timeZone } = getPreferences();
   
-  const day = d.getDate();
+  const day = d.toLocaleDateString('en-US', { day: 'numeric', timeZone });
   const monthName = d.toLocaleDateString('en-US', { month: 'short', timeZone });
   
   switch (dateFormat) {
@@ -165,20 +165,12 @@ export function formatDateOnly(date: Date | string): string {
  */
 export function formatMonthYear(date: Date | string, shortMonth: boolean = false): string {
   const d = date instanceof Date ? date : new Date(date);
-  const { dateFormat, timeZone } = getPreferences();
+  const { timeZone } = getPreferences();
   
   const monthName = d.toLocaleDateString('en-US', { 
     month: shortMonth ? 'short' : 'long', 
     timeZone 
   });
-  const year = d.getFullYear();
-  
-  switch (dateFormat) {
-    case 'DD/MM/YYYY':
-    case 'YYYY-MM-DD':
-      return `${monthName} ${year}`;
-    case 'MM/DD/YYYY':
-    default:
-      return `${monthName} ${year}`;
-  }
+  const year = d.toLocaleDateString('en-US', { year: 'numeric', timeZone });
+  return `${monthName} ${year}`;
 }

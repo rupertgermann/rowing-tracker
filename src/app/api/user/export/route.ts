@@ -141,7 +141,7 @@ export async function GET(req: Request) {
     // Compile export data
     const exportData = {
       exportedAt: new Date().toISOString(),
-      exportFormat: "GDPR-compliant data export",
+      exportFormat: "Rowing Tracker JSON export",
       user: user,
       settings: userSettings,
       rowingSessions: rowingSessions.map((s) => ({

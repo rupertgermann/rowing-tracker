@@ -513,3 +513,27 @@ test("deleteRowingSession persists deletion through the RowingSession boundary a
   assert.equal(deletedSessionId, "session-to-delete");
   assert.equal(getCachedSessions(), null);
 });
+
+for (const failure of ['http', 'network']) {
+  test(`partial imports invalidate stale caches after a later ${failure} failure`, async () => {
+    const first = session({ id: 'first' });
+    const second = session({ id: 'second' });
+    cacheSessionsData([], 1);
+    localStorage.setItem('rowing_analytics_cache', '{}');
+    let writes = 0;
+    const result = await saveRowingSessions([first, second], {
+      chunkSize: 1,
+      persistDerivedData: false,
+      fetchImpl: async () => {
+        writes++;
+        if (writes === 1) return jsonResponse({ sessions: [first] });
+        if (failure === 'network') throw new Error('connection lost');
+        return jsonResponse({ error: 'write failed' }, 500);
+      },
+    });
+    assert.equal(result.success, false);
+    assert.equal(writes, 2);
+    assert.equal(getCachedSessions(), null);
+    assert.equal(localStorage.getItem('rowing_analytics_cache'), null);
+  });
+}

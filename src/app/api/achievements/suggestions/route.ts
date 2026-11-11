@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { applyRateLimit } from '@/lib/rateLimit';
 import { AWARDS } from '@/lib/awards';
 import { normalizeAITextModel, SettingsService } from '@/lib/settings';
 
@@ -69,6 +72,11 @@ function extractResponseTextOrJson(data: OpenAIResponseData): { kind: 'text' | '
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const limited = await applyRateLimit(request, session.user.id, 'ai');
+    if (limited) return limited;
+
     const body = await request.json();
 
     const {

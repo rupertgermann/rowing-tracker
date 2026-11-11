@@ -41,9 +41,9 @@ const headers = [
   "Maximum stroke rate (SPM)",
 ];
 
-function summaryFile(averageSplit: string): File {
+function summaryFile(averageSplit: string, timestamp = "2026-03-09 17:58:44.627"): File {
   const values = [
-    "2026-03-09 17:58:44.627",
+    timestamp,
     "1000",
     "317",
     "0",
@@ -73,6 +73,17 @@ test("parseSmartRowCsv derives average pace when the summary split is missing", 
   assert.equal(parsed.sessions[0].avgSplit, 158.5);
   assert.equal(parsed.result.importedSessions, 1);
   assert.deepEqual(parsed.result.errors, []);
+});
+
+test("parseSmartRowCsv rejects invalid dates instead of inventing a workout today", async () => {
+  for (const timestamp of ['', 'not a date', '2026-13-09 17:58:44.627', '2026-03-09 25:58:44', '2026-02-30 17:58:44']) {
+    const parsed = await parseSmartRowCsv(summaryFile('158.5', timestamp));
+    assert.equal(parsed.sessions.length, 0);
+    assert.equal(parsed.result.importedSessions, 0);
+    assert.match(parsed.result.errors[0], /Invalid timestamp/);
+  }
+  const parsed = await parseSmartRowCsv(summaryFile('158.5', '2026-03-09 17:58:44'));
+  assert.equal(parsed.sessions[0].timestamp.toISOString(), '2026-03-09T17:58:44.000Z');
 });
 
 test("parseSmartRowCsv returns an update when derived pace repairs an existing session", async () => {

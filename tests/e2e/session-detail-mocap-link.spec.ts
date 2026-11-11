@@ -203,6 +203,24 @@ test("session detail links to the connected mocap session", async ({ page }) => 
   );
 });
 
+test("session detail uses the selected time zone across midnight", async ({ browser }) => {
+  const context = await browser.newContext({ timezoneId: "UTC" });
+  try {
+    const page = await context.newPage();
+    await installAuthenticatedSessionRoutes(page, [{
+      ...rowingSession,
+      timestamp: "2025-12-31T23:30:00.000Z",
+    }]);
+    await page.route("**/api/settings", (route) => route.fulfill({
+      json: { settings: { timeZone: "Europe/Berlin", dateFormat: "DD/MM/YYYY", timeFormat: "24h" } },
+    }));
+    await page.goto("/sessions/linked-rowing-session");
+    await expect(page.getByText("Thursday, 01/01/2026, 00:30", { exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
 test("session detail loads stroke data when the session list is lean", async ({ page }) => {
   const routes = await installAuthenticatedSessionRoutes(page, [
     rowingSessionWithStrokeData,

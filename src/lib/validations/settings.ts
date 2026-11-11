@@ -156,7 +156,14 @@ export const settingsUpdateSchema = z.object({
   dateFormat: dateFormatSchema,
   timeFormat: timeFormatSchema,
   language: languageSchema,
-  timeZone: z.string().max(100),
+  timeZone: z.string().max(100).refine((value) => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value });
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'Invalid time zone'),
   defaultChartType: chartTypeSchema,
   animationsEnabled: z.boolean(),
   showPromptSuggestions: z.boolean(),

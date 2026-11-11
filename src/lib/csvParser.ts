@@ -16,24 +16,16 @@ function parseEuropeanNumber(value: string): number {
  * Parse timestamp from SmartRow format: "YYYY-MM-DD HH:MM:SS.mmm"
  */
 function parseTimestamp(timestamp: string): Date {
-  // Handle both with and without milliseconds
   const cleanTimestamp = timestamp.trim();
-
-  // Try parsing with milliseconds first
-  const withMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})$/.exec(cleanTimestamp);
-  if (withMs) {
-    return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
+  const isSmartRowTimestamp = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{3})?$/.test(cleanTimestamp);
+  const date = new Date(isSmartRowTimestamp
+    ? cleanTimestamp.replace(' ', 'T') + 'Z'
+    : cleanTimestamp);
+  if (Number.isNaN(date.getTime())) throw new Error('Invalid timestamp');
+  if (isSmartRowTimestamp && date.toISOString().slice(0, 19) !== cleanTimestamp.replace(' ', 'T').slice(0, 19)) {
+    throw new Error('Invalid timestamp');
   }
-
-  // Try parsing without milliseconds
-  const withoutMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$/.exec(cleanTimestamp);
-  if (withoutMs) {
-    return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
-  }
-
-  // Fallback - try direct parsing
-  const date = new Date(cleanTimestamp);
-  return isNaN(date.getTime()) ? new Date() : date;
+  return date;
 }
 
 /**

@@ -55,23 +55,23 @@ For a screenshot-based explanation of every module and interactive control, see 
 - **ZIP Batch Import**: Upload the SmartRow archive ZIP to import many detailed-stroke sessions at once with progress reporting
 - **Duplicate-Safe Imports**: Sessions are deduplicated by `(userId, timestamp, distance)`; existing sessions are updated, not duplicated
 - **Lean Session Loading**: Session lists use `/api/sessions/list` without stroke rows and include `strokeDataCount`; detail pages fetch full stroke data on demand through `/api/sessions?id=<sessionId>`
-- **Last-Sync Timestamp**: SmartRow credentials and the most recent sync time are stored in `UserSettings.smartRowSettings`
+- **Last-Sync Timestamp**: SmartRow credentials and the most recent sync time are stored in browser settings (`localStorage`), not in the database.
 
 ### 💾 Data & Storage
 
 - **PostgreSQL Database**: Robust, scalable data storage with full ACID compliance via Prisma
 - **Local Development**: Docker-based PostgreSQL plus Mailpit for SMTP
 - **Cloud Ready**: Supabase (pooler + direct URL) supported for production
-- **Memory System**: Upload and store PDFs and images for AI analysis; files are kept on disk (or Vercel Blob in deployed environments) and referenced by `MemoryDocument.filePath`
+- **Memory System**: Upload and store PDFs and images for AI analysis; files are kept on disk and referenced by `MemoryDocument.filePath`. Deployments need persistent disk storage for these uploads.
 - **Mocap Storage**: Recorded video and the `PoseFrameStream` binary blob are stored side-by-side on the same backend (local `storage/` directory or Vercel Blob), referenced by `MocapSession.videoStoragePath` and `MocapSession.poseStreamPath`. Cloud uploads store ordered chunks and a small index; reads expose one logical file without rewriting earlier chunks during capture.
 - **Session Cache Invalidation**: Rowing-session mutations bump `UserSettings.sessionsRevision`; client caches use the revision plus row count to reuse lean lists safely and hydrate detail data only when needed
-- **Data Privacy**: Workout data, mocap video, and pose data are scoped by user ID; AI keys are encrypted at rest
+- **Data Privacy**: Workout data, mocap video, and pose data are scoped by user ID. User-provided AI keys are stored in browser `localStorage`.
 
 ### 🎨 User Experience
 
 - **Dark Theme**: Modern, easy-on-the-eyes interface
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
-- **Offline-First**: All features work offline except AI-powered capabilities
+- **Local Caching**: Some previously loaded data can be read from browser caches. Authentication, imports, saves, and AI features require connectivity.
 - **Rich Tooltips**: AI explanations display in beautifully formatted tooltips with markdown rendering, responsive sizing, and smooth scrolling
 - **Smart Navigation**: "Back to chart" links from chat explanations navigate directly to the source chart (both analytics and session detail pages) with automatic scroll-to-view
 
@@ -117,7 +117,7 @@ For a screenshot-based explanation of every module and interactive control, see 
 - **State Management**: Zustand with persist middleware
 - **Storage**:
   - PostgreSQL for user data, sessions, plans, achievements, mocap rows
-  - File system (or Vercel Blob via `@vercel/blob`) for award images, memory documents, mocap video, and pose stream blobs
+  - File system for award images and memory documents; file system or Vercel Blob via `@vercel/blob` for mocap video, pose streams, and avatars
 - **Pose Estimation**: `@mediapipe/tasks-vision` Pose Landmarker, Web Worker, WASM; optional freemocap sidecar via localhost HTTP/WebSocket contract
 - **CSV / ZIP Parsing**: `papaparse`, `jszip`
 - **PDF Extraction**: `unpdf`
@@ -398,7 +398,7 @@ rowing-tracker/
 3. **Mocap Capture**: Browser webcam or freemocap sidecar → chunked HTTP uploads of video and `PoseFrameStream` → guarded finalize → pose-segmented metrics and faults for analyzable captures, or `record-only` for video-only captures
 4. **Storage**:
    - User data, sessions, plans, mocap rows → PostgreSQL via Prisma
-   - Award images, memory documents, mocap video, pose stream blobs → file system or Vercel Blob
+   - Award images and memory documents → persistent file system; mocap video, pose streams, and avatars → file system or Vercel Blob
    - Client rowing-session state → Zustand store for local UI state; RowingSession persistence runs through API/service helpers
 5. **Display**: Session lists use `/api/sessions/list` with `strokeDataCount`; detail views hydrate full `StrokeData` through `/api/sessions?id=<sessionId>`; cache busts via `UserSettings.sessionsRevision` / `insightsRevision`
 6. **Analysis**: Real-time PR calculations, trend analysis, consistency score, posture metrics, fault counts
@@ -470,7 +470,7 @@ PostgreSQL with Prisma ORM. Key models:
 - `AuthSession` — Active sessions
 - `VerificationToken` — Email verification + magic-link tokens
 - `PasswordResetToken` — Password reset flow
-- `UserSettings` — Preferences, AI config, SmartRow credentials, posture thresholds, mocap preferences, dashboard/sessions/analytics view state, cache-busting revisions
+- `UserSettings` — Preferences, AI config, posture thresholds, mocap preferences, dashboard/sessions/analytics view state, cache-busting revisions. SmartRow credentials remain in browser settings.
 - `UserApiKey` — Encrypted per-provider API keys (e.g. OpenAI)
 
 **Rowing Data:**
@@ -508,10 +508,10 @@ See `prisma/schema.prisma` for the complete, authoritative schema, and `docs/DAT
 - **User Isolation**: Each user's data is completely isolated in the database
 - **Secure Authentication**: Passwords hashed with bcrypt, JWT sessions
 - **Email Verification**: Double opt-in ensures account ownership
-- **Data Encryption**: Sensitive data encrypted at rest (database level)
+- **Data Encryption**: Database and disk encryption depend on the deployment configuration.
 - **Privacy First**: Your workout data is never shared with other users
-- **GDPR Ready**: User data can be exported or deleted on request
-- **API Keys**: OpenAI keys encrypted in database, never exposed to client
+- **Account Data**: Account deletion and a JSON export are available. The export does not include all stored data or uploaded files.
+- **API Keys**: User-provided OpenAI keys are stored in browser settings and used directly by browser AI calls or sent to authenticated achievement API routes. A `NEXT_PUBLIC_OPENAI_API_KEY` value is public client configuration and must not contain an operator's secret key.
 
 ## API Rate Limiting
 
@@ -552,7 +552,7 @@ Rate limiting is applied to:
 - `/api/auth/forgot-password`, `/api/auth/reset-password` — Limits password-reset abuse
 - `/api/chat` (POST) — Controls AI usage costs
 - `/api/smartrow/sync` — Limits Playwright-driven SmartRow scrapes
-- `/api/mocap/sessions/*` (upload + finalize) — Caps mocap capture write volume
+- `/api/achievements/story`, `/api/achievements/image` (POST), `/api/achievements/suggestions` — Limits achievement generation
 - `/api/user/delete` — Protects account deletion
 - `/api/user/export` — Prevents data export abuse
 

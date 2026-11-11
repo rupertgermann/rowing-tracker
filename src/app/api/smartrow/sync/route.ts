@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { applyRateLimit } from '@/lib/rateLimit';
 import { chromium } from 'playwright';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -19,19 +22,18 @@ interface SyncRequest {
     password: string;
 }
 
-interface SyncResponse {
-    success: boolean;
-    error?: string;
-    csvData?: string;
-    zipData?: string; // Base64 encoded ZIP file
-    message?: string;
-}
-
-export async function POST(request: NextRequest): Promise<NextResponse<SyncResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
     let browser = null;
     let tempDir = '';
 
     try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+        const limited = await applyRateLimit(request, session.user.id, 'sensitive');
+        if (limited) return limited;
+
         const body: SyncRequest = await request.json();
 
         if (!body.email || !body.password) {

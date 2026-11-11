@@ -217,17 +217,11 @@ export async function DELETE(req: Request) {
       );
     }
 
-    // Delete stroke data first (cascade should handle this, but being explicit)
-    await prisma.strokeData.deleteMany({
-      where: { sessionId },
+    await prisma.$transaction(async (tx) => {
+      // Related stroke rows are deleted by the database cascade.
+      await tx.rowingSession.delete({ where: { id: sessionId } });
+      await bumpUserSessionsRevision(session.user.id, tx);
     });
-
-    // Delete the session
-    await prisma.rowingSession.delete({
-      where: { id: sessionId },
-    });
-
-    await bumpUserSessionsRevision(session.user.id);
 
     console.log(`[SESSIONS API] Deleted session ${sessionId}`);
 
