@@ -573,11 +573,15 @@ Rate limiting is applied to:
 
 ## License
 
-Revisions after commit
-`d38df10faabb812ac8f24a0fd28c30530067764e` are proprietary. Revisions up to
-and including that commit remain available under the MIT License terms under
-which they were originally published. Third-party components retain their own
-licenses. See [LICENSE](LICENSE) for details.
+Copyright (c) 2025–2026 Rupert Germann.
+
+The current Rowing Tracker code is licensed under the GNU General Public License
+version 3 only (`GPL-3.0-only`). See [LICENSE](LICENSE) for the full text.
+
+Revisions through the
+[`mit-public-cutoff-2026-08-02`](https://github.com/rupertgermann/rowing-tracker/tree/mit-public-cutoff-2026-08-02)
+tag remain available under their original MIT terms. Third-party components
+retain their own licenses, including AGPLv3 for the optional FreeMoCap dependency.
 
 ## Support
 

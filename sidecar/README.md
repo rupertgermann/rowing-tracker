@@ -101,3 +101,9 @@ npm run test:sidecar
 
 The sidecar makes no cloud calls and is local-only by default. Keep FreeMoCap as
 a separate local process when adding live camera runtime support.
+
+## License
+
+Copyright (c) 2025–2026 Rupert Germann. The sidecar is licensed under the GNU
+General Public License version 3 only. See [LICENSE](LICENSE). The optional
+FreeMoCap dependency is licensed under AGPLv3.
