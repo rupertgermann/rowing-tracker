@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { INGESTION_LIMITS } from './ingestionLimits';
 import { Session } from '@/types/session';
 import { parseStrokeCsv } from './strokeParser';
 
@@ -89,6 +90,49 @@ function findMatchingSession(timestamp: Date, sessions: Session[], distance: num
     return bestMatch;
 }
 
+class ZipLimitError extends Error {}
+
+// Count directory records before JSZip allocates its entry objects; ZIP64 is outside this import budget.
+function checkZipDirectory(bytes: ArrayBuffer): void {
+    const view = new DataView(bytes);
+    let end = view.byteLength - 22;
+    const earliest = Math.max(0, end - 65535);
+    while (end >= earliest && view.getUint32(end, true) !== 0x06054b50) end--;
+    if (end < earliest) throw new Error('Invalid ZIP directory');
+    let offset = view.getUint32(end + 16, true);
+    let count = 0;
+    while (offset + 46 <= end && view.getUint32(offset, true) === 0x02014b50) {
+        if (++count > INGESTION_LIMITS.zipEntries) throw new ZipLimitError('ZIP entry limit is 2000');
+        offset += 46 + view.getUint16(offset + 28, true) + view.getUint16(offset + 30, true) + view.getUint16(offset + 32, true);
+    }
+    if (offset !== end || count !== view.getUint16(end + 10, true)) throw new Error('Unsupported or invalid ZIP directory');
+}
+
+function readZipCsv(entry: JSZip.JSZipObject, budget: { expanded: number }): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        const chunks: Uint8Array<ArrayBuffer>[] = [];
+        let length = 0;
+        let stopped = false;
+        // JSZip 3.10 exposes this streaming reader but omits it from JSZipObject's typings.
+        const stream = (entry as JSZip.JSZipObject & { internalStream(type: 'uint8array'): JSZip.JSZipStreamHelper<Uint8Array<ArrayBuffer>> }).internalStream('uint8array');
+        stream.on('data', (chunk: Uint8Array<ArrayBuffer>) => {
+            if (stopped) return;
+            length += chunk.byteLength;
+            budget.expanded += chunk.byteLength;
+            if (length > INGESTION_LIMITS.csvBytes || budget.expanded > INGESTION_LIMITS.zipExpandedBytes) {
+                stopped = true;
+                stream.pause();
+                reject(new ZipLimitError('ZIP expanded size limit exceeded (8 MiB per CSV, 64 MiB total)'));
+                return;
+            }
+            chunks.push(chunk);
+        });
+        stream.on('error', reject);
+        stream.on('end', () => { if (!stopped) resolve(new Blob(chunks, { type: 'text/csv' })); });
+        stream.resume();
+    });
+}
+
 /**
  * Process a ZIP file containing detailed workout CSVs
  * Returns the updated sessions for bulk saving (doesn't save to DB directly)
@@ -108,8 +152,12 @@ export async function processZipFile(
     };
 
     try {
-        const zip = new JSZip();
-        const loadedZip = await zip.loadAsync(file);
+        if (file.size > INGESTION_LIMITS.zipBytes) throw new ZipLimitError('ZIP compressed size limit is 32 MiB');
+        const bytes = await file.arrayBuffer();
+        if (bytes.byteLength > INGESTION_LIMITS.zipBytes) throw new ZipLimitError('ZIP compressed size limit is 32 MiB');
+        checkZipDirectory(bytes);
+        const loadedZip = await new JSZip().loadAsync(bytes);
+        const budget = { expanded: 0 };
 
         const files = Object.values(loadedZip.files).filter(f => !f.dir && f.name.endsWith('.csv'));
         result.totalFiles = files.length;
@@ -140,7 +188,7 @@ export async function processZipFile(
                     continue;
                 }
 
-                const content = await zipEntry.async('blob');
+                const content = await readZipCsv(zipEntry, budget);
                 const csvFile = new File([content], zipEntry.name, { type: 'text/csv' });
 
                 const parseResult = await parseStrokeCsv(csvFile);
@@ -158,6 +206,7 @@ export async function processZipFile(
                 }
 
             } catch (err) {
+                if (err instanceof ZipLimitError) throw err;
                 result.skippedFiles++;
                 result.errors.push(`Error processing ${zipEntry.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }

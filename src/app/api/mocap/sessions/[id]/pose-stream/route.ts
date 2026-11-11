@@ -1,8 +1,8 @@
+import { uploadCaptureChunk } from "@/lib/mocap/captureUpload";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { appendPoseFrames } from "@/lib/mocap/capturePersistence";
 import { getMocapStorage } from "@/lib/mocap/storage";
 
 export const dynamic = "force-dynamic";
@@ -18,37 +18,7 @@ export async function POST(
   }
 
   const { id } = await params;
-  const row = await prisma.mocapSession.findFirst({
-    where: { id, userId: session.user.id },
-    select: { id: true, status: true, poseStreamPath: true },
-  });
-  if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  if (row.status !== "capturing") {
-    return NextResponse.json(
-      { error: `Session not capturing (status=${row.status})` },
-      { status: 409 },
-    );
-  }
-
-  const buf = new Uint8Array(await req.arrayBuffer());
-  const storage = getMocapStorage();
-  try {
-    const framesAppended = await appendPoseFrames(
-      storage,
-      row.poseStreamPath,
-      buf,
-    );
-    return NextResponse.json({ appended: framesAppended });
-  } catch (err) {
-    return NextResponse.json(
-      {
-        error: err instanceof Error ? err.message : String(err),
-      },
-      { status: 400 },
-    );
-  }
+  return uploadCaptureChunk(req, session.user.id, id, "pose");
 }
 
 function parseRange(

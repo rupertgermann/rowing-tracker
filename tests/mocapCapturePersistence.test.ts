@@ -125,7 +125,7 @@ async function makeStorage(): Promise<{
 function makeFrame(seed: number): PoseFrame {
   const keypoints = new Float32Array(KEYPOINTS_PER_FRAME_V1 * 3);
   for (let i = 0; i < keypoints.length; i++) {
-    keypoints[i] = Math.fround(seed + i / 100);
+    keypoints[i] = i % 3 === 2 ? 0.9 : Math.fround(seed + i / 100);
   }
   return {
     timestampMs: seed * 33.333,
@@ -137,7 +137,7 @@ function makeFrame(seed: number): PoseFrame {
 function makeFrameV2(seed: number): PoseFrame {
   const keypoints = new Float32Array(KEYPOINTS_PER_FRAME_V2 * 4);
   for (let i = 0; i < keypoints.length; i++) {
-    keypoints[i] = Math.fround(seed + i / 100);
+    keypoints[i] = i % 4 === 3 ? 0.9 : Math.fround(seed + i / 100);
   }
   return {
     timestampMs: seed * 16.667,

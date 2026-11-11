@@ -1,3 +1,8 @@
+import { sessionsInput } from "@/lib/sessionInput";
+import { INGESTION_LIMITS } from "@/lib/ingestionLimits";
+import { InputError, readBoundedJson } from "@/lib/server/requestBody";
+import { ZodError } from "zod";
+import { applyRateLimit } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -14,11 +19,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const { sessions } = await req.json();
-
-    if (!Array.isArray(sessions) || sessions.length === 0) {
-      return NextResponse.json({ count: 0 });
-    }
+    const limited = await applyRateLimit(req, session.user.id, "api");
+    if (limited) return limited;
+    const { sessions } = sessionsInput.parse(await readBoundedJson(req, INGESTION_LIMITS.sessionBodyBytes));
 
     let migratedCount = 0;
 
@@ -71,6 +74,9 @@ export async function POST(req: Request) {
       message: `Successfully migrated ${migratedCount} sessions`
     });
   } catch (error) {
+    if (error instanceof InputError || error instanceof ZodError) {
+      return NextResponse.json({ error: error.message }, { status: error instanceof InputError ? error.status : 400 });
+    }
     console.error("Session migration error:", error);
     return NextResponse.json(
       { error: "Failed to migrate sessions" },

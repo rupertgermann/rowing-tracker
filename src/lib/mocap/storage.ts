@@ -41,7 +41,16 @@ export class LocalDiskStorage implements MocapStorage {
   async appendBytes(storagePath: string, bytes: Uint8Array): Promise<void> {
     const abs = this.resolve(storagePath);
     await fs.mkdir(path.dirname(abs), { recursive: true });
-    await fs.appendFile(abs, bytes);
+    const file = await fs.open(abs, "a+");
+    const previousSize = (await file.stat()).size;
+    try {
+      await file.writeFile(bytes);
+    } catch (error) {
+      await file.truncate(previousSize);
+      throw error;
+    } finally {
+      await file.close();
+    }
   }
 
   async writeAt(
@@ -138,12 +147,18 @@ class VercelBlobStorage implements MocapStorage {
     const count = index?.count ?? 0;
     const partPath = `${storagePath}.parts/${String(count).padStart(12, "0")}`;
     await this.putBytes(partPath, bytes);
-    // shortcut: each recording has one serialized uploader; coordinate writes before allowing multiple writers.
-    await put(`${storagePath}.parts/index.json`, JSON.stringify({
-      count: count + 1,
-      size: (index?.size ?? baseSize) + bytes.byteLength,
-      baseSize,
-    }), { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" });
+    try {
+      await put(`${storagePath}.parts/index.json`, JSON.stringify({
+        count: count + 1,
+        size: (index?.size ?? baseSize) + bytes.byteLength,
+        baseSize,
+      }), { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" });
+    } catch (error) {
+      // A failed response may still have published the index: never delete a referenced part.
+      const published = await this.readIndex(storagePath);
+      if (!published || published.count <= count) await del(partPath);
+      throw error;
+    }
   }
 
   async writeAt(storagePath: string, bytes: Uint8Array, offset: number): Promise<void> {

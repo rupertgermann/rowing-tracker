@@ -55,11 +55,18 @@ function cloud() {
 test("cloud video uploads send each chunk once without downloading previous recording bytes", async (t) => {
   const fixture = cloud();
   const file = "mocap/owner/capture/video.webm";
+  const row = { id: "capture", status: "capturing", videoStoragePath: file };
+  const db = { mocapSession: { findFirst: async () => row }, $queryRaw: async () => [row] };
+  const prisma = { ...db, $transaction: async (fn: (tx: typeof db) => unknown) => fn(db) };
+  const upload = loadModule('src/lib/mocap/captureUpload.ts', {
+    '@/lib/db/prisma': { prisma }, './storage': { getMocapStorage: fixture.storage },
+  });
   const route = loadModule<{ POST(req: Request, context: { params: Promise<{ id: string }> }): Promise<Response> }>(
     "src/app/api/mocap/sessions/[id]/video/route.ts", {
       "next/server": { NextResponse: { json: Response.json } },
       "next-auth": { getServerSession: async () => ({ user: { id: "owner" } }) },
       "@/lib/auth": { authOptions: {} },
+      "@/lib/mocap/captureUpload": upload,
       "@/lib/db/prisma": { prisma: { mocapSession: { findFirst: async () => ({ id: "capture", status: "capturing", videoStoragePath: file }) } } },
       "@/lib/mocap/storage": { getMocapStorage: fixture.storage },
     });
@@ -134,6 +141,7 @@ test("unpublished cloud chunks are ignored, replaceable and cleaned up", async (
   fixture.failIndex(true);
   await assert.rejects(fixture.storage().appendBytes(file, Uint8Array.of(2)), /index unavailable/);
   assert.deepEqual(await fixture.storage().read(file), Uint8Array.of(1));
+  assert.equal(fixture.objects.size, 1);
   fixture.failIndex(false);
   await fixture.storage().appendBytes(file, Uint8Array.of(3));
   assert.deepEqual(await fixture.storage().read(file), Uint8Array.of(1, 3));

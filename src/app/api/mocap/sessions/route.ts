@@ -1,3 +1,6 @@
+import { INGESTION_LIMITS } from "@/lib/ingestionLimits";
+import { InputError, readBoundedJson } from "@/lib/server/requestBody";
+import { applyRateLimit } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -61,7 +64,7 @@ const CalibrationFrame = z.object({
   meanKeypointConfidence: z.number().min(0).max(1),
   trackedKeypointCount: z.number().int().nonnegative().max(33),
   qualityFlags: z.number().int().nonnegative(),
-  poseFrameBase64: z.string().min(1),
+  poseFrameBase64: z.string().min(1).max(1024),
 });
 
 const CreateBody = z
@@ -108,13 +111,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const limited = await applyRateLimit(req, session.user.id, "upload");
+  if (limited) return limited;
+
   let body: z.infer<typeof CreateBody>;
   try {
-    body = CreateBody.parse(await req.json());
+    body = CreateBody.parse(await readBoundedJson(req, INGESTION_LIMITS.captureBodyBytes));
   } catch (err) {
     return NextResponse.json(
       { error: "Invalid request body", details: err instanceof Error ? err.message : String(err) },
-      { status: 400 },
+      { status: err instanceof InputError ? err.status : 400 },
     );
   }
 
@@ -162,7 +168,13 @@ export async function POST(req: Request) {
           : {},
       );
     } catch (err) {
-      await prisma.mocapSession.delete({ where: { id: created.id } }).catch(() => {});
+      try {
+        await storage.delete(created.poseStreamPath);
+        await prisma.mocapSession.delete({ where: { id: created.id } });
+      } catch (cleanupError) {
+        // Keep the row when blob cleanup fails so the recording can still be deleted later.
+        console.error('Failed to clean up capture initialization:', cleanupError);
+      }
       return NextResponse.json(
         { error: "Failed to initialize pose stream blob", details: err instanceof Error ? err.message : String(err) },
         { status: 500 },

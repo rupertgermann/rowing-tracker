@@ -52,6 +52,11 @@ export const rateLimiters = {
       })
     : null,
 
+  // Up to 1200 pose chunks/min (240 fps / 12) + 60 video chunks/min, with burst headroom.
+  capture: redis
+    ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(1800, "1 m"), analytics: true, prefix: "ratelimit:capture" })
+    : null,
+
   // Sensitive operations (delete, export): 5 requests per minute
   sensitive: redis
     ? new Ratelimit({

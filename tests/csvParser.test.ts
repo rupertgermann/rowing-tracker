@@ -143,3 +143,13 @@ test("parseSmartRowCsv keeps an existing valid pace and skips the duplicate", as
   assert.equal(parsed.result.updatedSessions, 0);
   assert.equal(parsed.result.duplicatesSkipped, 1);
 });
+
+test('CSV parser rejects invalid numeric fields and oversized files before import', async () => {
+  const bad = new File([(await summaryFile('').text()).replace(';1000;', ';1000oops;')], 'bad.csv');
+  const parsed = await parseSmartRowCsv(bad);
+  assert.equal(parsed.sessions.length, 0);
+  assert.match(parsed.result.errors.join(' '), /Invalid number/);
+  const huge = await parseSmartRowCsv(new File([new Uint8Array(8 * 1024 * 1024 + 1)], 'huge.csv'));
+  assert.equal(huge.sessions.length, 0);
+  assert.match(huge.result.errors.join(' '), /8 MiB/);
+});
