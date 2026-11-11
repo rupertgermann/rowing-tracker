@@ -13,7 +13,7 @@ interface SignalPoint {
   tracked: boolean;
 }
 
-export function StrokePhaseSegmenter(stream: PoseFrameStream): Stroke[] {
+export function StrokePhaseSegmenter(stream: PoseFrameStream, catchWindows?: Array<[number, number]>): Stroke[] {
   if (stream.frames.length < 3) return [];
 
   const projectedStream = toProjectedStream(stream);
@@ -24,9 +24,8 @@ export function StrokePhaseSegmenter(stream: PoseFrameStream): Stroke[] {
   const catches = findCatchCandidates(signal, projectedStream.fps);
   const strokes: Stroke[] = [];
 
-  for (let i = 0; i < catches.length - 1; i++) {
-    const catchFrameIndex = catches[i];
-    const nextCatchFrameIndex = catches[i + 1];
+  const windows = catchWindows ?? catches.slice(0, -1).map((start, i): [number, number] => [start, catches[i + 1]]);
+  for (const [catchFrameIndex, nextCatchFrameIndex] of windows) {
     if (nextCatchFrameIndex - catchFrameIndex < 3) continue;
 
     const finishFrameIndex = maxSignalFrame(
@@ -34,7 +33,7 @@ export function StrokePhaseSegmenter(stream: PoseFrameStream): Stroke[] {
       catchFrameIndex,
       nextCatchFrameIndex,
     );
-    if (finishFrameIndex <= catchFrameIndex) continue;
+    if (finishFrameIndex <= catchFrameIndex || finishFrameIndex >= nextCatchFrameIndex || !signal[finishFrameIndex].tracked) continue;
 
     const recoveryStartFrameIndex = Math.min(
       finishFrameIndex + 1,
@@ -46,7 +45,7 @@ export function StrokePhaseSegmenter(stream: PoseFrameStream): Stroke[] {
 
     strokes.push({
       strokeIndex: strokes.length,
-      segmentationSource: "pose-segmented",
+      segmentationSource: catchWindows ? "csv-aligned" : "pose-segmented",
       catchFrameIndex,
       driveStartFrameIndex: catchFrameIndex,
       finishFrameIndex,

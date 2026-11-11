@@ -50,6 +50,7 @@ test("post-session metrics and faults equal independent per-stroke analysis with
     assert.equal(row.metricsJson.sidecar3D?.lateralShoulderSymmetryMm, 200);
     assert.equal(row.metricsJson.sidecar3D?.lateralHipSymmetryMm, 200);
     assert.equal(row.metricsJson.sidecar3D?.rightKneeTrackDeviationMm, 20);
+    assert.ok(row.metricsJson.backAngleAtCatchDeg !== null);
     assert.ok(Math.abs(row.metricsJson.backAngleAtCatchDeg - 45) < 1e-9);
   }
 });

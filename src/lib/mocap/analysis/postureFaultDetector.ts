@@ -8,7 +8,7 @@ export function PostureFaultDetector(
   const faults: PostureFault[] = [];
 
   if (
-    metrics.backAngleAtCatchDeg <
+    metrics.backAngleAtCatchDeg !== null && metrics.backAngleAtCatchDeg <
     thresholds.rounded_back_at_catch.criticalBelowDeg
   ) {
     faults.push({
@@ -23,7 +23,7 @@ export function PostureFaultDetector(
       },
     });
   } else if (
-    metrics.backAngleAtCatchDeg <
+    metrics.backAngleAtCatchDeg !== null && metrics.backAngleAtCatchDeg <
     thresholds.rounded_back_at_catch.warningBelowDeg
   ) {
     faults.push({
@@ -96,7 +96,7 @@ export function PostureFaultDetector(
     });
   }
 
-  if (metrics.laybackAngleDeg > thresholds.excessive_layback.warningAboveDeg) {
+  if (metrics.laybackAngleDeg !== null && metrics.laybackAngleDeg > thresholds.excessive_layback.warningAboveDeg) {
     faults.push({
       strokeIndex: metrics.strokeIndex,
       faultType: "excessive_layback",
@@ -109,7 +109,7 @@ export function PostureFaultDetector(
       },
     });
   } else if (
-    metrics.laybackAngleDeg > thresholds.excessive_layback.infoAboveDeg
+    metrics.laybackAngleDeg !== null && metrics.laybackAngleDeg > thresholds.excessive_layback.infoAboveDeg
   ) {
     faults.push({
       strokeIndex: metrics.strokeIndex,

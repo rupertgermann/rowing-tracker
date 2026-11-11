@@ -108,9 +108,9 @@ export interface Sidecar3DMetrics {
 export interface PostureMetrics {
   strokeIndex: number;
   segmentationSource: StrokeSegmentationSource;
-  backAngleAtCatchDeg: number;
-  backAngleAtFinishDeg: number;
-  laybackAngleDeg: number;
+  backAngleAtCatchDeg: number | null;
+  backAngleAtFinishDeg: number | null;
+  laybackAngleDeg: number | null;
   catchReferenceDeltaDeg: MaybeMetric<number>;
   finishReferenceDeltaDeg: MaybeMetric<number>;
   hipKneeOpeningOffsetFrames: number | null;
