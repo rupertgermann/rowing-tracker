@@ -47,7 +47,7 @@ test('record-only finalize excludes concurrent uploads and keeps a replayable po
     const imports = { ...boundaries, '@/lib/server/userSettings': settings };
     const analysis = loadModule<typeof import('../../src/lib/mocap/sessionAnalysis')>('src/lib/mocap/sessionAnalysis.ts', imports);
     const lifecycleModule = loadModule<typeof import('../../src/lib/mocap/lifecyclePrisma')>('src/lib/mocap/lifecyclePrisma.ts', { ...imports, '@/lib/mocap/sessionAnalysis': analysis });
-    const lifecycle = lifecycleModule.createPrismaMocapSessionLifecycle({ storage });
+    let lifecycle = lifecycleModule.createPrismaMocapSessionLifecycle({ storage });
     const upload = loadModule<typeof import('../../src/lib/mocap/captureUpload')>('src/lib/mocap/captureUpload.ts', { ...imports, './storage': { getMocapStorage: () => storage } });
     const pose = loadModule<typeof import('../../src/app/api/mocap/sessions/[id]/pose-stream/route')>('src/app/api/mocap/sessions/[id]/pose-stream/route.ts', { ...imports, '@/lib/mocap/captureUpload': upload, '@/lib/mocap/storage': { getMocapStorage: () => storage } });
     const finalize = loadModule<typeof import('../../src/app/api/mocap/sessions/[id]/finalize/route')>('src/app/api/mocap/sessions/[id]/finalize/route.ts', { ...imports, '@/lib/mocap/lifecyclePrisma': { getPrismaMocapSessionLifecycle: () => lifecycle } });
@@ -103,6 +103,45 @@ test('record-only finalize excludes concurrent uploads and keeps a replayable po
     assert.equal((await retried.json()).frameCount, 2);
     const retryReplay = await pose.GET(new Request('http://test/pose-stream'), params);
     assert.equal(adaptPoseFrameStreamBlob(new Uint8Array(await retryReplay.arrayBuffer()), 'side-right').frames.length, 2);
+
+    const publicationRetry = await createCapture();
+    params.params = Promise.resolve({ id: publicationRetry.id });
+    await pool.query(`CREATE FUNCTION fail_ready() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.status = 'ready' THEN RAISE EXCEPTION 'ready write failed'; END IF; RETURN NEW; END $$`);
+    await pool.query('CREATE TRIGGER fail_ready BEFORE UPDATE ON "MocapSession" FOR EACH ROW EXECUTE FUNCTION fail_ready()');
+    try {
+      assert.equal((await finish()).status, 500);
+    } finally {
+      await pool.query('DROP TRIGGER fail_ready ON "MocapSession"');
+      await pool.query('DROP FUNCTION fail_ready()');
+    }
+    const publicationRetried = await finish();
+    assert.equal(publicationRetried.status, 200, 'failed ready write permits finalization retry');
+    assert.equal((await publicationRetried.json()).status, 'ready');
+
+    const lostResponse = await createCapture();
+    params.params = Promise.resolve({ id: lostResponse.id });
+    let failResponse = true;
+    const responseFailingPrisma = prisma.$extends({ query: { mocapSession: {
+      async findUniqueOrThrow({ args, query }) {
+        const row = await query(args);
+        if (row.status === 'ready' && failResponse) {
+          failResponse = false;
+          throw new Error('ready committed but response lost');
+        }
+        return row;
+      },
+    } } });
+    const responseFailingLifecycle = loadModule<typeof import('../../src/lib/mocap/lifecyclePrisma')>('src/lib/mocap/lifecyclePrisma.ts', {
+      ...imports,
+      '@/lib/db/prisma': { prisma: responseFailingPrisma },
+      '@/lib/mocap/sessionAnalysis': analysis,
+    });
+    lifecycle = responseFailingLifecycle.createPrismaMocapSessionLifecycle({ storage });
+    assert.equal((await finish()).status, 500);
+    const captures = loadModule<typeof import('../../src/app/api/mocap/sessions/[id]/route')>('src/app/api/mocap/sessions/[id]/route.ts', imports);
+    const published = await captures.GET(new Request('http://test/session'), params);
+    assert.equal((await published.json()).session.status, 'ready', 'lost response must not undo committed ready');
+    assert.equal((await append()).status, 409);
 
     const recordOnly = await createCapture();
     params.params = Promise.resolve({ id: recordOnly.id });

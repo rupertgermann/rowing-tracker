@@ -283,14 +283,20 @@ export async function finalizeMocapSessionLifecycle(
   }
 
   if (input.skipAnalysis) {
-    const updated = await deps.setCaptureFinalizationState(session.id, {
-      status: "ready",
-      ...captureState,
-      qualityFlags: uniqueFlags([
-        ...captureState.qualityFlags,
-        MOCAP_RECORD_ONLY_FLAG,
-      ]),
-    }, { from: "analyzing" });
+    let updated: { status: string; durationSec: number } | null;
+    try {
+      updated = await deps.setCaptureFinalizationState(session.id, {
+        status: "ready",
+        ...captureState,
+        qualityFlags: uniqueFlags([
+          ...captureState.qualityFlags,
+          MOCAP_RECORD_ONLY_FLAG,
+        ]),
+      }, { from: "analyzing" });
+    } catch (err) {
+      await deps.setStatus(session.id, "capturing", { from: "analyzing" });
+      return finalizeFailure(err);
+    }
     if (!updated) {
       return transitionConflict("Session status changed during finalization");
     }
