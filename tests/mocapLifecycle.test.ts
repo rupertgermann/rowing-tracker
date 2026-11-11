@@ -349,6 +349,7 @@ test("finalizeMocapSessionLifecycle completes record-only captures without analy
     faultCount: 0,
   });
   assert.deepEqual(calls, [
+    "capture:analyzing:30:record-only",
     "capture:ready:30:record-only",
   ]);
 });
