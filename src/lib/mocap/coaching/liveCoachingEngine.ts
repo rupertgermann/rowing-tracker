@@ -23,6 +23,7 @@ import type {
   PoseFrameStream,
   PostureFault,
   PostureFaultType,
+  PostureMetrics,
   Stroke,
 } from "../analysis/types";
 import { getCoachingCues, type CoachingCue } from "./coachingAdvisor";
@@ -50,6 +51,7 @@ export interface LiveCoachingEngineOptions {
    * the very end of the buffer where the segmenter is least confident.
    */
   trailingFrameMargin?: number;
+  onMetrics?: (metrics: PostureMetrics) => void;
   onCue: (cue: CoachingCue, stroke: Stroke, faults: PostureFault[]) => void;
   /** Wall clock (ms). Injectable for tests. Defaults to Date.now. */
   now?: () => number;
@@ -71,6 +73,7 @@ export class LiveCoachingEngine {
   private readonly segmenterIntervalMs: number;
   private readonly perFaultThrottleMs: number;
   private readonly trailingFrameMargin: number;
+  private readonly onMetrics: LiveCoachingEngineOptions["onMetrics"];
   private readonly onCue: LiveCoachingEngineOptions["onCue"];
   private readonly now: () => number;
 
@@ -90,6 +93,7 @@ export class LiveCoachingEngine {
     this.perFaultThrottleMs = opts.perFaultThrottleMs ?? 8000;
     this.trailingFrameMargin = opts.trailingFrameMargin ?? 3;
     this.onCue = opts.onCue;
+    this.onMetrics = opts.onMetrics;
     this.now = opts.now ?? (() => Date.now());
   }
 
@@ -135,6 +139,7 @@ export class LiveCoachingEngine {
       this.completedStrokeCount += 1;
 
       const metrics = PostureMetricsCalculator(stream, stroke, this.calibration);
+      this.onMetrics?.(metrics);
       const faults = PostureFaultDetector(metrics, this.thresholds);
       if (faults.length === 0) continue;
 

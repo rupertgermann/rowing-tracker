@@ -2,6 +2,7 @@ import {
   getPosePoint,
   landmarkSide,
   type Calibration,
+  type MaybeMetric,
   type PoseAnalysisFrame,
   type PoseFrameStream,
   type PoseLandmarkName,
@@ -21,7 +22,6 @@ export function PostureMetricsCalculator(
   calibration?: Calibration,
   projectedStream: PoseFrameStream = toProjectedStream(stream),
 ): PostureMetrics {
-  void calibration;
   const catchFrame = frameAt(projectedStream, stroke.catchFrameIndex);
   const finishFrame = frameAt(projectedStream, stroke.finishFrameIndex);
   const backAngleAtCatchDeg = torsoBackAngleDeg(projectedStream, catchFrame);
@@ -55,6 +55,8 @@ export function PostureMetricsCalculator(
     backAngleAtCatchDeg,
     backAngleAtFinishDeg,
     laybackAngleDeg,
+    catchReferenceDeltaDeg: referenceDelta(stream, catchFrame, calibration, "catchFrame"),
+    finishReferenceDeltaDeg: referenceDelta(stream, finishFrame, calibration, "finishFrame"),
     hipKneeOpeningOffsetFrames:
       legExtensionStartFrameIndex === null || torsoOpenFrameIndex === null
         ? null
@@ -82,6 +84,36 @@ export function PostureMetricsCalculator(
       stream.capturePerspective === "sidecar-3d"
         ? computeSidecar3DMetrics(stream, stroke)
         : undefined,
+  };
+}
+
+function referenceDelta(
+  stream: PoseFrameStream,
+  measuredFrame: PoseAnalysisFrame,
+  calibration: Calibration | undefined,
+  phase: "catchFrame" | "finishFrame",
+): MaybeMetric<number> {
+  if (stream.capturePerspective === "sidecar-3d") {
+    return { available: false, reason: "browser-calibration-only" };
+  }
+  const reference = calibration?.[phase];
+  if (!reference) return { available: false, reason: "missing-calibration" };
+  const { hip, shoulder } = sideNames(stream);
+  const usable = (frame: PoseAnalysisFrame) => {
+    const h = getPosePoint(frame, hip);
+    const s = getPosePoint(frame, shoulder);
+    return h && s && [h, s].every(p =>
+      Number.isFinite(p.x) && Number.isFinite(p.y) &&
+      Number.isFinite(p.confidence) && p.confidence >= MIN_CONFIDENCE,
+    ) && (h.x !== s.x || h.y !== s.y);
+  };
+  if (calibration.capturePerspective !== stream.capturePerspective || !usable(reference)) {
+    return { available: false, reason: "unusable-calibration" };
+  }
+  if (!usable(measuredFrame)) return { available: false, reason: "insufficient-tracking" };
+  return {
+    available: true,
+    value: torsoBackAngleDeg(stream, measuredFrame) - torsoBackAngleDeg(stream, reference),
   };
 }
 

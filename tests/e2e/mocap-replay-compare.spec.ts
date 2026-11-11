@@ -53,6 +53,7 @@ test("replay comparison controls render and select strokes", async ({ page }) =>
   );
 
   await expect(page.getByTestId("mocap-stroke-compare")).toBeVisible();
+  await expect(page.getByTestId("mocap-calibration-comparison").first()).toContainText("Catch: +5.0° · Finish: -10.0°");
 
   const faultSelect = page.getByTestId("mocap-compare-fault-stroke");
   const cleanSelect = page.getByTestId("mocap-compare-clean-stroke");
@@ -81,6 +82,8 @@ function metric(strokeIndex: number, startFrame: number) {
       confidence: 0.9,
     },
     metricsJson: {
+      catchReferenceDeltaDeg: { available: true, value: 5 },
+      finishReferenceDeltaDeg: { available: true, value: -10 },
       backAngleAtCatchDeg: 24 + strokeIndex,
       backAngleAtFinishDeg: 55 + strokeIndex,
       laybackAngleDeg: 28 + strokeIndex,
