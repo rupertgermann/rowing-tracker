@@ -578,11 +578,6 @@ Copyright (c) 2025–2026 Rupert Germann.
 The current Rowing Tracker code is licensed under the GNU General Public License
 version 3 only (`GPL-3.0-only`). See [LICENSE](LICENSE) for the full text.
 
-Revisions through the
-[`mit-public-cutoff-2026-08-02`](https://github.com/rupertgermann/rowing-tracker/tree/mit-public-cutoff-2026-08-02)
-tag remain available under their original MIT terms. Third-party components
-retain their own licenses, including AGPLv3 for the optional FreeMoCap dependency.
-
 ## Support
 
 If you encounter any issues:
