@@ -11,6 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { SettingsService } from '@/lib/settings';
+import { useSettings } from '@/hooks/useSettings';
 import { SplitTimeChart } from '@/components/SplitTimeChart';
 import { ConsistencyScoreChart } from '@/components/ConsistencyScoreChart';
 import { calculateAdvancedStats } from '@/lib/analysisUtils';
@@ -269,6 +270,10 @@ const ScatterTooltip = ({ active, payload }: { active?: boolean; payload?: (Scat
 
 const Analytics = () => {
   const router = useRouter();
+  const { settings } = useSettings();
+  // The shared formatter reads preferences from SettingsService; refresh memoized labels after settings load.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const formatAnalyticsDate = useCallback((date: Date | string) => formatChartDate(date), [settings?.userPreferences]);
   const storeSessions = useRowingStore((state) => state.sessions);
   const chartSettings = useRowingStore((state) => state.chartSettings);
   const { updateChartSettings, dashboardSettings, updateDashboardSettings, chartExplanations, setPendingChartExplanation, removeChartExplanationsBySessionId } = useRowingStore();
@@ -429,7 +434,6 @@ const Analytics = () => {
         ...session,
         _timestamp: timestamp,
         _timestampMs: timestamp.getTime(),
-        _formattedDate: formatChartDate(timestamp)
       };
     });
   }, [sessions]);
@@ -635,7 +639,6 @@ ${explainChartPrompt}`;
             timestamp: timestamp,
             _timestamp: timestamp,
             _timestampMs: timestamp.getTime(),
-            _formattedDate: point.date,
             distance: point.value,
             duration: durationMap.get(point.sessionId) || 0,
             avgPower: powerMap.get(point.sessionId) || 0,
@@ -799,7 +802,6 @@ ${explainChartPrompt}`;
     timestamp: Date | string;
     _timestamp?: Date;
     _timestampMs?: number;
-    _formattedDate?: string;
   }
   // Prepare chart data for different metrics (with smoothing)
   const prepareChartDataWithSmoothing = useCallback((sessions: SessionForChart[], metric: ChartMetric, smoothing: SmoothingOption) => {
@@ -807,7 +809,7 @@ ${explainChartPrompt}`;
       .slice()
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map(session => ({
-        date: session._formattedDate ?? formatChartDate(new Date(session.timestamp)),
+        date: formatAnalyticsDate(session.timestamp),
         [metric]: getMetricValue(session, metric),
         fullDate: session.timestamp,
         sessionId: session.id
@@ -826,7 +828,7 @@ ${explainChartPrompt}`;
     }
 
     return baseData;
-  }, [getMetricValue]);
+  }, [getMetricValue, formatAnalyticsDate]);
 
   // Toggle chart visibility
   const toggleChart = (metric: ChartMetric) => {
@@ -863,7 +865,7 @@ ${explainChartPrompt}`;
         const withSmoothing = applySmoothingToData(filteredApiData as ChartDataPoint[], smoothingValue);
         // Convert to chart format
         acc[metric] = withSmoothing.map((d: ChartDataPoint) => ({
-          date: d.date,
+          date: formatAnalyticsDate(d.fullDate),
           [metric]: d.value,
           fullDate: d.fullDate,
           sessionId: d.sessionId,
@@ -878,7 +880,7 @@ ${explainChartPrompt}`;
       acc[metric] = hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions as SessionForChart[], metric, smoothingValue) : [];
       return acc;
     }, {} as Record<ChartMetric, Record<string, unknown>[]>);
-  }, [analyticsData, orderedEnabledCharts, smoothingValue, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, filteredSessionIds]);
+  }, [analyticsData, orderedEnabledCharts, smoothingValue, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, filteredSessionIds, formatAnalyticsDate]);
 
   // Compute dynamic Y-axis domains for each metric (with 10% padding)
   const chartDomains = useMemo(() => {
@@ -919,7 +921,7 @@ ${explainChartPrompt}`;
       const filteredApiData = apiData.filter((point) => filteredSessionIds.has(point.sessionId));
       const withSmoothing = applySmoothingToData(filteredApiData as ChartDataPoint[], smoothingValue);
       return withSmoothing.map((d: ChartDataPoint) => ({
-        date: d.date,
+        date: formatAnalyticsDate(d.fullDate),
         splitTime: d.value,
         fullDate: d.fullDate,
         sessionId: d.sessionId,
@@ -928,7 +930,7 @@ ${explainChartPrompt}`;
     }
     // Fallback to computed data
     return hasFilteredData ? prepareChartDataWithSmoothing(filteredSessions, 'splitTime', smoothingValue) : [];
-  }, [analyticsData, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue, filteredSessionIds]);
+  }, [analyticsData, filteredSessions, hasFilteredData, prepareChartDataWithSmoothing, smoothingValue, filteredSessionIds, formatAnalyticsDate]);
 
   // Handle chart data point click
   const handleChartClick = (data: { activeIndex?: number } | null, chartData: Record<string, unknown>[]) => {
@@ -944,7 +946,11 @@ ${explainChartPrompt}`;
   const scatterPlotData = useMemo(() => {
     // Use analytics API data for scatter plot
     if (analyticsData && analyticsData.scatterData.length > 0) {
-      return analyticsData.scatterData.filter((point) => filteredSessionIds.has(point.sessionId));
+      const timestamps = new Map(filteredSessions.map(session => [session.id, session.timestamp]));
+      return analyticsData.scatterData.flatMap(point => {
+        const timestamp = timestamps.get(point.sessionId);
+        return timestamp ? [{ ...point, date: formatAnalyticsDate(timestamp) }] : [];
+      });
     }
     // Fallback to sessions
     return filteredSessions
@@ -952,7 +958,7 @@ ${explainChartPrompt}`;
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map(session => ({
         sessionId: session.id,
-        date: formatChartDate(new Date(session.timestamp)),
+        date: formatAnalyticsDate(session.timestamp),
         distance: session.distance,
         duration: session.duration,
         durationMinutes: Math.round(session.duration / 60),
@@ -962,7 +968,7 @@ ${explainChartPrompt}`;
         energy: session.energy,
         strokeLength: session.avgStrokeLength,
       }));
-  }, [filteredSessions, analyticsData, filteredSessionIds]);
+  }, [filteredSessions, analyticsData, formatAnalyticsDate]);
 
   // Render chart based on selected type
   const renderChart = (metric: ChartMetric, chartData: Record<string, unknown>[], config: ChartConfig) => {
