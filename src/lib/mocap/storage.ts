@@ -147,15 +147,13 @@ class VercelBlobStorage implements MocapStorage {
     const count = index?.count ?? 0;
     const partPath = `${storagePath}.parts/${String(count).padStart(12, "0")}`;
     await this.putBytes(partPath, bytes);
+    const proposed = { count: count + 1, size: (index?.size ?? baseSize) + bytes.byteLength, baseSize };
     try {
-      await put(`${storagePath}.parts/index.json`, JSON.stringify({
-        count: count + 1,
-        size: (index?.size ?? baseSize) + bytes.byteLength,
-        baseSize,
-      }), { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" });
+      await put(`${storagePath}.parts/index.json`, JSON.stringify(proposed), { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" });
     } catch (error) {
       // A failed response may still have published the index: never delete a referenced part.
       const published = await this.readIndex(storagePath);
+      if (published?.count === proposed.count && published.size === proposed.size && published.baseSize === proposed.baseSize) return;
       if (!published || published.count <= count) await del(partPath);
       throw error;
     }

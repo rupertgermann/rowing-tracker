@@ -46,7 +46,8 @@ async function refreshAfterFailedImport(
   try {
     // Even a lost response can follow a commit; only the server knows what was saved.
     const fresh = await fetchRowingSessionList({ cache: 'no-store' });
-    store.replaceSessionsInStore(fresh.sessions);
+    // Invalidate omitted detail so the session page fetches any committed stroke replacement.
+    store.replaceSessionsInStore(fresh.sessions.map(session => ({ ...session, strokeData: session.strokeData ?? [] })));
     recoveryMessage = 'Some workouts may have been saved. Your workout list has been refreshed from the server. You can retry the import safely.';
   } catch {
     recoveryMessage = 'Some workouts may have been saved, but the server refresh failed. Your displayed workouts may be out of date. Retry when the connection is restored; already saved workouts will not be duplicated.';

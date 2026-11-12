@@ -1,4 +1,4 @@
-import { INGESTION_LIMITS } from '@/lib/ingestionLimits';
+import { createSessionUploadBatches } from '@/lib/sessionUploadBatches';
 import type { Session } from '@/types/session';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 import {
@@ -286,34 +286,13 @@ export async function saveRowingSessions(
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
-  const chunkSize = Math.min(INGESTION_LIMITS.sessions, Math.max(1, Math.floor(options.chunkSize || 25)));
   const persistDerivedData = options.persistDerivedData ?? true;
-  const chunks: { sessions: Session[]; json: string[] }[] = [];
-  const encoder = new TextEncoder();
-  const envelopeBytes = encoder.encode('{"sessions":[]}').length;
-  let chunk = { sessions: [] as Session[], json: [] as string[] };
-  let bytes = envelopeBytes;
-  let strokes = 0;
-  for (const session of sessions) {
-    const json = JSON.stringify(session);
-    const sessionBytes = encoder.encode(json).length;
-    const sessionStrokes = session.strokeData?.length ?? 0;
-    if (sessionBytes + envelopeBytes > INGESTION_LIMITS.sessionBodyBytes || sessionStrokes > INGESTION_LIMITS.strokes) {
-      return { success: false, error: `Workout ${session.id} exceeds the upload limit; split its stroke data into smaller workouts before importing.` };
-    }
-    if (chunk.sessions.length && (chunk.sessions.length >= chunkSize ||
-      bytes + 1 + sessionBytes > INGESTION_LIMITS.sessionBodyBytes || strokes + sessionStrokes > INGESTION_LIMITS.strokes)) {
-      chunks.push(chunk);
-      chunk = { sessions: [], json: [] };
-      bytes = envelopeBytes;
-      strokes = 0;
-    }
-    bytes += sessionBytes + (chunk.sessions.length ? 1 : 0);
-    strokes += sessionStrokes;
-    chunk.sessions.push(session);
-    chunk.json.push(json);
+  let chunks: { sessions: Session[]; json: string[] }[];
+  try {
+    chunks = createSessionUploadBatches(sessions, options.chunkSize);
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Invalid session upload' };
   }
-  if (chunk.sessions.length) chunks.push(chunk);
   const totalChunks = chunks.length;
   let sessionsProcessed = 0;
   const savedSessions: Session[] = [];

@@ -258,3 +258,22 @@ test('ZIP and SmartRow imports split ordinary workouts to fit the real request s
     assert.equal(store.sessions.filter(row => row.strokeData?.length === 2100).length, 25);
   }
 });
+
+
+test('uncertain ZIP replacement invalidates cached strokes in the real store', async (t) => {
+  const { useRowingStore } = await import('../src/lib/store');
+  const initial = useRowingStore.getState();
+  t.after(() => useRowingStore.setState(initial, true));
+  const prior = session({ id: 'cached', strokeData: [stroke({ power: 100 })], strokeDataCount: 1 });
+  useRowingStore.setState({ sessions: [prior] });
+  const metadata = { ...prior, strokeData: undefined };
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ sessions: [metadata] }));
+  const result = await persistZipImportSessions([session({ ...prior, strokeData: [stroke({ power: 200 })] })], useRowingStore.getState(), {
+    saveSessions: async () => ({ success: false, error: 'Response lost' }),
+  });
+  assert.equal(result.success, false);
+  const [refreshed] = useRowingStore.getState().sessions;
+  assert.deepEqual(refreshed.strokeData, []);
+  assert.equal(refreshed.strokeDataCount, 1);
+  assert.match(result.error!, /refreshed from the server/);
+});

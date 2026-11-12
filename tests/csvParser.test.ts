@@ -153,3 +153,23 @@ test('CSV parser rejects invalid numeric fields and oversized files before impor
   assert.equal(huge.sessions.length, 0);
   assert.match(huge.result.errors.join(' '), /8 MiB/);
 });
+
+
+test('detailed CSV accepts absent or blank timestamps and retains bounded numeric validation', async () => {
+  const { parseStrokeCsv } = await import('../src/lib/strokeParser');
+  const { sessionsInput } = await import('../src/lib/sessionInput');
+  for (const suffix of ['', ';Timestamp (UTC)']) {
+    const parsed = await parseStrokeCsv(new File([
+      `Stroke (#);Second (#);Actual power (W)${suffix}\n1;3;150${suffix ? ';' : ''}`,
+    ], 'strokes.csv', { type: 'text/csv' }));
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.data.length, 1);
+    assert.equal(parsed.data[0].timestamp, '');
+    assert.equal(parsed.data[0].time, 3);
+    assert.equal(parsed.data[0].power, 150);
+    assert.equal(sessionsInput.parse({ sessions: [{ timestamp: '2026-01-01', distance: 1000, duration: 300, strokeData: parsed.data }] }).sessions[0].strokeData?.[0].timestamp, '');
+  }
+  const invalid = await parseStrokeCsv(new File(['Stroke (#);Second (#);Actual power (W)\n1;3;-150'], 'invalid.csv'));
+  assert.equal(invalid.data.length, 0);
+  assert.ok(invalid.error);
+});

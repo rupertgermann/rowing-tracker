@@ -67,7 +67,7 @@ export function analyzePoseFrameStream(
     const alignment = alignStrokesToCsv(strokes.map(s => stream.frames[s.catchFrameIndex].timestampMs), csv);
     const windows: Array<[number, number]> = [];
     const matches = new Map<number, { strokeIndex: number; id: string; offsetMs: number; deltaMs: number }>();
-    for (const [poseIndex, match] of alignment.matches) {
+    for (const match of alignment.matches.values()) {
       const index = csv.findIndex(c => c.id === match.csvStrokeDataId);
       const next = csv[index + 1];
       if (!next || next.strokeIndex !== csv[index].strokeIndex + 1) continue;
@@ -77,7 +77,7 @@ export function analyzePoseFrameStream(
       const nearest = (time: number) => stream.frames.reduce((best, f, i) => Math.abs(f.timestampMs - time) < Math.abs(stream.frames[best].timestampMs - time) ? i : best, 0);
       const startFrame = nearest(startMs);
       windows.push([startFrame, nearest(endMs)]);
-      matches.set(startFrame, { strokeIndex: strokes[poseIndex].strokeIndex, id: match.csvStrokeDataId, offsetMs: match.offsetMs, deltaMs: alignment.deltaMs });
+      matches.set(startFrame, { strokeIndex: match.csvStrokeIndex, id: match.csvStrokeDataId, offsetMs: match.offsetMs, deltaMs: alignment.deltaMs });
     }
     strokes = StrokePhaseSegmenter(projectedStream, windows).map(stroke => {
       const match = matches.get(stroke.catchFrameIndex)!;

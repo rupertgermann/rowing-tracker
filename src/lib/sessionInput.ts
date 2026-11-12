@@ -6,8 +6,8 @@ const date = z.string().min(1).max(64).refine(value => Number.isFinite(Date.pars
 export const strokeInput = z.object({
   strokeIndex: number(INGESTION_LIMITS.strokes).int(),
   time: number(7 * 86400),
-  // SmartRow timestamps are retained as exported text, including time-only values.
-  timestamp: z.string().min(1).max(64),
+  // Retain exported text (including time-only values); absent timestamps stay empty.
+  timestamp: z.string().max(64).default(''),
   distance: number(1_000_000),
   work: number(100_000),
   power: number(10_000),

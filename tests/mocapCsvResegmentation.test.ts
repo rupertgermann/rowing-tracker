@@ -100,3 +100,17 @@ test('unmatched CSV gaps and untracked windows never receive CSV-derived metric 
   const frames = structuredClone(stream.frames).map(frame => ({ ...frame, keypoints: {} }));
   assert.equal(analyzePoseFrameStream({ ...stream, frames }, { csvStrokes }).metrics.length, 0);
 });
+
+
+test('CSV windows retain CSV stroke numbers on both metrics and faults when pose indexes differ', () => {
+  const csv = csvStrokes.map(row => ({ ...row, strokeIndex: row.strokeIndex + 11 }));
+  const result = analyzePoseFrameStream(stream, { csvStrokes: csv });
+  assert.deepEqual(result.metrics.map(row => row.strokeIndex), [11, 12, 13]);
+  for (const metric of result.metrics) {
+    assert.equal(metric.strokeDataId, csv.find(row => row.strokeIndex === metric.strokeIndex)?.id);
+  }
+  assert.ok(result.faults.length > 0);
+  assert.ok(result.faults.every(fault => [11, 12, 13].includes(fault.strokeIndex)));
+  const baseline = analyzePoseFrameStream(stream, { csvStrokes });
+  assert.deepEqual(result.faults, baseline.faults.map(fault => ({ ...fault, strokeIndex: fault.strokeIndex + 11 })));
+});

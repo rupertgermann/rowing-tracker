@@ -73,7 +73,7 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
                 return {
                   strokeIndex: Number(row['Stroke (#)'] || '0'),
                   time: Number(row['Second (#)'] || '0'),
-                  timestamp: row['Timestamp (UTC)'],
+                  timestamp: row['Timestamp (UTC)'] ?? '',
                   distance: distance,
                   work: parseEuropeanNumber(row['Work (J)']),
                   power: parseEuropeanNumber(row['Actual power (W)']),

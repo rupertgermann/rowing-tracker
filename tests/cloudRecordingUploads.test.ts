@@ -13,6 +13,7 @@ function cloud() {
   const reads: string[] = [];
   let failIndex = false;
   let failHead = false;
+  let loseIndexResponse = false;
   const sdk = {
     BlobNotFoundError,
     put: async (file: string, bytes: Uint8Array | string, options: { contentType: string }) => {
@@ -20,6 +21,7 @@ function cloud() {
       const payload = typeof bytes === "string" ? new TextEncoder().encode(bytes) : new Uint8Array(bytes);
       objects.set(file, payload);
       writes.push({ path: file, bytes: payload.length, json: options.contentType === "application/json" });
+      if (loseIndexResponse && options.contentType === "application/json") throw new Error("index response lost");
     },
     get: async (file: string, options: { headers?: Record<string, string> }) => {
       reads.push(file);
@@ -49,7 +51,7 @@ function cloud() {
   const storage = () => loadModule<{ getMocapStorage(): MocapStorage }>("src/lib/mocap/storage.ts", {
     "@vercel/blob": sdk,
   }, { process: { env: { MOCAP_STORAGE_BACKEND: "vercel-blob" } } }).getMocapStorage();
-  return { storage, objects, writes, reads, failIndex: (fail: boolean) => { failIndex = fail; }, failHead: (fail: boolean) => { failHead = fail; } };
+  return { storage, objects, writes, reads, loseIndexResponse: () => { loseIndexResponse = true; }, failIndex: (fail: boolean) => { failIndex = fail; }, failHead: (fail: boolean) => { failHead = fail; } };
 }
 
 test("cloud video uploads send each chunk once without downloading previous recording bytes", async (t) => {
@@ -149,4 +151,29 @@ test("unpublished cloud chunks are ignored, replaceable and cleaned up", async (
   await assert.rejects(fixture.storage().appendBytes(file, Uint8Array.of(4)), /index unavailable/);
   await fixture.storage().delete(file);
   assert.equal(fixture.objects.size, 0);
+});
+
+
+test('published cloud pose chunks survive lost index responses and finalize normally', async () => {
+  const fixture = cloud();
+  const storage = fixture.storage();
+  const file = storage.poseStreamPath('owner', 'lost-response');
+  await initializePoseStreamBlob(storage, file, 30);
+  const row = { id: 'lost-response', status: 'capturing', poseStreamPath: file };
+  const db = { mocapSession: { findFirst: async () => row }, $queryRaw: async () => [row] };
+  const upload = loadModule<typeof import('../src/lib/mocap/captureUpload')>('src/lib/mocap/captureUpload.ts', {
+    '@/lib/db/prisma': { prisma: { ...db, $transaction: async (fn: (tx: typeof db) => unknown) => fn(db) } },
+    '@/lib/rateLimit': { applyRateLimit: async () => null },
+    './storage': { getMocapStorage: () => storage },
+  });
+  fixture.loseIndexResponse();
+  for (let i = 0; i < 2; i++) {
+    const response = await upload.uploadCaptureChunk(new Request('http://local/api/pose', {
+      method: 'POST', body: new Uint8Array(BYTES_PER_FRAME_V1),
+    }), 'owner', row.id, 'pose');
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).appended, 1);
+  }
+  assert.equal((await finalizePoseStreamBlob(storage, file)).frameCount, 2);
+  assert.equal((await storage.read(file)).length, HEADER_SIZE + 2 * BYTES_PER_FRAME_V1);
 });
