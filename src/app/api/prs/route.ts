@@ -61,6 +61,21 @@ export async function POST(req: Request) {
       );
     }
 
+    if (newPRs.some((pr) => !pr || typeof pr !== 'object' ||
+      (pr.sessionId != null && typeof pr.sessionId !== 'string'))) {
+      return NextResponse.json({ error: "Invalid PR session ID" }, { status: 400 });
+    }
+
+    const sessionIds = [...new Set<string>(newPRs.flatMap((pr) =>
+      typeof pr?.sessionId === 'string' ? [pr.sessionId] : []
+    ))];
+    const ownedSessionCount = await prisma.rowingSession.count({
+      where: { userId: session.user.id, id: { in: sessionIds } },
+    });
+    if (ownedSessionCount !== sessionIds.length) {
+      return NextResponse.json({ error: "Session not found" }, { status: 400 });
+    }
+
     const updated = [];
 
     for (const prData of newPRs) {

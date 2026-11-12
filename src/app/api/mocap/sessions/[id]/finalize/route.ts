@@ -1,3 +1,6 @@
+import { INGESTION_LIMITS } from "@/lib/ingestionLimits";
+import { InputError, readBoundedJson } from "@/lib/server/requestBody";
+import { applyRateLimit } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -8,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const Body = z.object({
-  durationSec: z.number().nonnegative().max(60 * 60 * 8),
+  durationSec: z.number().nonnegative().max(INGESTION_LIMITS.recordingSeconds),
   qualityScore: z.number().min(0).max(1).optional(),
   qualityFlags: z.array(z.string().min(1).max(80)).max(20).optional(),
   skipAnalysis: z.boolean().optional(),
@@ -24,16 +27,19 @@ export async function POST(
   }
 
   const { id } = await params;
+  const limited = await applyRateLimit(req, session.user.id, "upload");
+  if (limited) return limited;
+
   let body: z.infer<typeof Body>;
   try {
-    body = Body.parse(await req.json());
+    body = Body.parse(await readBoundedJson(req, INGESTION_LIMITS.captureBodyBytes));
   } catch (err) {
     return NextResponse.json(
       {
         error: "Invalid request body",
         details: err instanceof Error ? err.message : String(err),
       },
-      { status: 400 },
+      { status: err instanceof InputError ? err.status : 400 },
     );
   }
 

@@ -20,6 +20,7 @@ declare module "next-auth" {
   }
   
   interface User {
+    sessionVersion?: number;
     role?: string;
   }
 }
@@ -27,6 +28,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
+    sessionVersion?: number;
     role?: string;
   }
 }
@@ -77,7 +79,8 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.image,
-          role: user.role
+          role: user.role,
+          sessionVersion: user.sessionVersion
         };
       }
     }),
@@ -102,27 +105,35 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+        token.sessionVersion = user.sessionVersion;
         token.role = user.role;
         token.picture = avatarImageUrl(user.image);
       }
 
-      if (trigger === "update" && token.id) {
-        const currentUser = await prisma.user.findUnique({
-          where: { id: token.id },
-          select: {
-            name: true,
-            email: true,
-            image: true,
-            role: true,
-          },
-        });
+      const currentUser = await prisma.user.findUnique({
+        where: { id: token.id },
+        select: {
+          sessionVersion: true,
+          name: true,
+          email: true,
+          image: true,
+          role: true,
+        },
+      });
 
-        if (currentUser) {
-          token.name = currentUser.name;
-          token.email = currentUser.email;
-          token.picture = avatarImageUrl(currentUser.image);
-          token.role = currentUser.role;
-        }
+      // Adapter-backed OAuth/email users may omit custom fields on initial sign-in.
+      if (user && token.sessionVersion === undefined) {
+        token.sessionVersion = currentUser?.sessionVersion;
+      }
+      if (!currentUser || !Number.isInteger(token.sessionVersion) || token.sessionVersion !== currentUser.sessionVersion) {
+        throw new Error("Session revoked");
+      }
+
+      if (trigger === "update") {
+        token.name = currentUser.name;
+        token.email = currentUser.email;
+        token.picture = avatarImageUrl(currentUser.image);
+        token.role = currentUser.role;
       }
       return token;
     },

@@ -8,6 +8,7 @@ import {
   type RowingImportStoreActions,
   type SaveRowingSessionsForImport,
 } from "../src/lib/smartrowImportPersistence";
+import { saveRowingSessions } from "../src/lib/services/rowingSessionPersistence";
 import type { Session, StrokeData } from "../src/types/session";
 
 function session(overrides: Partial<Session> & { id: string }): Session {
@@ -53,6 +54,9 @@ function memoryStore(initialSessions: Session[] = []): RowingImportStoreActions 
 } {
   return {
     sessions: [...initialSessions],
+    replaceSessionsInStore(sessions) {
+      this.sessions = sessions;
+    },
     addSessions(sessions) {
       const existingKeys = new Set(
         this.sessions.map((row) => `${row.timestamp.getTime()}-${row.distance}`),
@@ -178,4 +182,98 @@ test("persistSmartRowSyncImport saves CSV before ZIP so ZIP matching sees databa
   assert.deepEqual(callOrder, ["save-csv", "load-zip", "save-zip"]);
   assert.deepEqual(overlapIds, ["db-csv-id", "db-csv-id"]);
   assert.deepEqual(store.sessions[0].strokeData, [stroke()]);
+});
+
+for (const failure of ['http', 'connection-after-commit'] as const) {
+  test(`failed later import chunk refreshes committed workouts and retries safely: ${failure}`, async (t) => {
+    const prior = session({ id: 'prior', distance: 99 });
+    const store = memoryStore([prior]);
+    const submitted = Array.from({ length: 26 }, (_, index) => session({
+      id: `client-${index}`, distance: 100 + index,
+    }));
+    const committed = new Map([[prior.distance, prior]]);
+    let posts = 0;
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      if (init?.method !== 'POST') {
+        return Response.json({ sessions: [...committed.values()] });
+      }
+      posts++;
+      if (posts === 2 && failure === 'http') {
+        return Response.json({ error: 'Unavailable' }, { status: 503 });
+      }
+      const rows: Session[] = JSON.parse(String(init.body)).sessions;
+      const saved = rows.map(row => ({ ...row, id: `db-${row.distance}` }));
+      for (const row of saved) committed.set(row.distance, row);
+      if (posts === 2) throw new Error('Connection lost after commit');
+      return Response.json({ sessions: saved });
+    };
+    t.mock.method(globalThis, 'fetch', fetchImpl);
+    const options = { saveSessions: (rows: Session[]) => saveRowingSessions(rows, { fetchImpl, persistDerivedData: false }) };
+    const failed = await persistCsvImportSessions(submitted, store, options);
+    assert.equal(failed.success, false);
+    assert.equal(store.sessions.length, failure === 'http' ? 26 : 27);
+    assert.match(failed.error!, /may have been saved.*refreshed.*retry/i);
+    assert.ok(store.sessions.every(row => row.id === 'prior' || row.id.startsWith('db-')));
+    const retried = await persistCsvImportSessions(submitted, store, options);
+    assert.equal(retried.success, true);
+    assert.equal(store.sessions.length, 27);
+    assert.equal(new Set(store.sessions.map(row => row.id)).size, 27);
+  });
+}
+
+test('failed ZIP import and failed refresh preserve visible workouts and report uncertainty', async (t) => {
+  const prior = session({ id: 'prior' });
+  const store = memoryStore([prior]);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('Offline'); });
+  const result = await persistZipImportSessions([session({ id: 'prior', strokeData: [stroke()] })], store, {
+    saveSessions: rows => saveRowingSessions(rows, { persistDerivedData: false }),
+  });
+  assert.equal(result.success, false);
+  assert.deepEqual(store.sessions, [prior]);
+  assert.match(result.error!, /may have been saved.*refresh failed.*out of date/i);
+  assert.doesNotMatch(result.error!, /has been refreshed|complete/i);
+});
+
+test('ZIP and SmartRow imports split ordinary workouts to fit the real request schema', async () => {
+  const { sessionsInput } = await import('../src/lib/sessionInput');
+  const rows = Array.from({ length: 25 }, (_, i) => session({ id: `zip-${i}`, strokeData: Array.from({ length: 2100 }, () => stroke()) }));
+  for (const mode of ['zip', 'sync']) {
+    const store = memoryStore(rows.map(row => ({ ...row, strokeData: undefined })));
+    const sizes: number[] = [];
+    const saveSessions: SaveRowingSessionsForImport = (sessions, options) => saveRowingSessions(sessions, {
+      ...options, persistDerivedData: false,
+      fetchImpl: async (_url, init) => {
+        const body = sessionsInput.parse(JSON.parse(String(init?.body)));
+        sizes.push(body.sessions.length);
+        return Response.json({ sessions: body.sessions });
+      },
+    });
+    if (mode === 'zip') {
+      assert.equal((await persistZipImportSessions(rows, store, { saveSessions })).success, true);
+    } else {
+      const result = await persistSmartRowSyncImport({ csvSessions: [], loadZipSessions: async () => rows, store }, { saveSessions });
+      assert.equal(result.zipResult?.success, true);
+    }
+    assert.deepEqual(sizes, [23, 2]);
+    assert.equal(store.sessions.filter(row => row.strokeData?.length === 2100).length, 25);
+  }
+});
+
+
+test('uncertain ZIP replacement invalidates cached strokes in the real store', async (t) => {
+  const { useRowingStore } = await import('../src/lib/store');
+  const initial = useRowingStore.getState();
+  t.after(() => useRowingStore.setState(initial, true));
+  const prior = session({ id: 'cached', strokeData: [stroke({ power: 100 })], strokeDataCount: 1 });
+  useRowingStore.setState({ sessions: [prior] });
+  const metadata = { ...prior, strokeData: undefined };
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ sessions: [metadata] }));
+  const result = await persistZipImportSessions([session({ ...prior, strokeData: [stroke({ power: 200 })] })], useRowingStore.getState(), {
+    saveSessions: async () => ({ success: false, error: 'Response lost' }),
+  });
+  assert.equal(result.success, false);
+  const [refreshed] = useRowingStore.getState().sessions;
+  assert.deepEqual(refreshed.strokeData, []);
+  assert.equal(refreshed.strokeDataCount, 1);
+  assert.match(result.error!, /refreshed from the server/);
 });

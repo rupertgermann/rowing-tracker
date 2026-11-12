@@ -1,3 +1,5 @@
+import { INGESTION_LIMITS } from "./ingestionLimits";
+import { strokeInput } from "./sessionInput";
 import Papa from 'papaparse';
 import { StrokeData } from '@/types/session';
 
@@ -18,14 +20,16 @@ function detectDelimiter(firstLine: string): string {
 function parseEuropeanNumber(value: string | undefined): number {
   if (!value || value.trim() === '') return 0;
   const cleaned = value.trim().replace(',', '.');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
+  const parsed = Number(cleaned);
+  if (!Number.isFinite(parsed)) throw new Error(`Invalid number: ${value}`);
+  return parsed;
 }
 
 /**
  * Parse SmartRow Detailed Stroke CSV
  */
 export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?: string }> {
+  if (file.size > INGESTION_LIMITS.csvBytes) return Promise.resolve({ data: [], error: 'CSV size limit is 8 MiB' });
   return new Promise((resolve) => {
     // Auto-detect delimiter
     const reader = new FileReader();
@@ -37,9 +41,11 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
       Papa.parse(file, {
         delimiter: delimiter,
         header: true,
+        preview: INGESTION_LIMITS.strokes + 1,
         skipEmptyLines: true,
         complete: (results) => {
           try {
+            if (results.data.length > INGESTION_LIMITS.strokes) throw new Error('CSV stroke limit is 50000');
             const headers = results.meta.fields || [];
             // Validate headers for Detailed CSV
             // Expected: Stroke (#);Second (#);Timestamp (UTC);Distance (m);Work (J);Actual power (W)...
@@ -65,9 +71,9 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
                 // For first stroke, it's just the distance
 
                 return {
-                  strokeIndex: parseInt(row['Stroke (#)'] || '0'),
-                  time: parseInt(row['Second (#)'] || '0'),
-                  timestamp: row['Timestamp (UTC)'],
+                  strokeIndex: Number(row['Stroke (#)'] || '0'),
+                  time: Number(row['Second (#)'] || '0'),
+                  timestamp: row['Timestamp (UTC)'] ?? '',
                   distance: distance,
                   work: parseEuropeanNumber(row['Work (J)']),
                   power: parseEuropeanNumber(row['Actual power (W)']),
@@ -94,9 +100,10 @@ export function parseStrokeCsv(file: File): Promise<{ data: StrokeData[]; error?
               };
             });
 
+            enrichedData.forEach(stroke => strokeInput.parse(stroke));
             resolve({ data: enrichedData });
-          } catch {
-            resolve({ data: [], error: 'Failed to parse stroke data.' });
+          } catch (error) {
+            resolve({ data: [], error: error instanceof Error ? error.message : 'Failed to parse stroke data.' });
           }
         },
         error: (err) => {

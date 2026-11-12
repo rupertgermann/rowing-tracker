@@ -87,7 +87,7 @@ export interface Calibration {
 
 export interface UnavailableMetric {
   available: false;
-  reason: "requires-sidecar-3d" | "insufficient-tracking";
+  reason: "requires-sidecar-3d" | "insufficient-tracking" | "missing-calibration" | "unusable-calibration" | "browser-calibration-only";
 }
 
 export interface AvailableMetric<T> {
@@ -108,9 +108,11 @@ export interface Sidecar3DMetrics {
 export interface PostureMetrics {
   strokeIndex: number;
   segmentationSource: StrokeSegmentationSource;
-  backAngleAtCatchDeg: number;
-  backAngleAtFinishDeg: number;
-  laybackAngleDeg: number;
+  backAngleAtCatchDeg: number | null;
+  backAngleAtFinishDeg: number | null;
+  laybackAngleDeg: number | null;
+  catchReferenceDeltaDeg: MaybeMetric<number>;
+  finishReferenceDeltaDeg: MaybeMetric<number>;
   hipKneeOpeningOffsetFrames: number | null;
   armBendOnsetFrameIndex: number | null;
   legExtensionCompleteFrameIndex: number | null;

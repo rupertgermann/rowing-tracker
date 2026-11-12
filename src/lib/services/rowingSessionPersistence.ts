@@ -1,3 +1,4 @@
+import { createSessionUploadBatches } from '@/lib/sessionUploadBatches';
 import type { Session } from '@/types/session';
 import { clearAnalyticsCache } from '@/lib/services/analyticsCache';
 import {
@@ -285,17 +286,22 @@ export async function saveRowingSessions(
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
-  const chunkSize = options.chunkSize ?? 25;
   const persistDerivedData = options.persistDerivedData ?? true;
-  const totalChunks = Math.ceil(sessions.length / chunkSize);
+  let chunks: { sessions: Session[]; json: string[] }[];
+  try {
+    chunks = createSessionUploadBatches(sessions, options.chunkSize);
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Invalid session upload' };
+  }
+  const totalChunks = chunks.length;
   let sessionsProcessed = 0;
   const savedSessions: Session[] = [];
   let derivedDataError: string | undefined;
 
   for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, sessions.length);
-    const chunk = sessions.slice(start, end);
+    const chunk = chunks[i].sessions;
+    const start = sessionsProcessed;
+    const end = start + chunk.length;
 
     options.onProgress?.({
       current: i + 1,
@@ -309,10 +315,11 @@ export async function saveRowingSessions(
       const response = await fetchImpl('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: chunk }),
+        body: `{"sessions":[${chunks[i].json.join(',')}]}`,
       });
 
       if (!response.ok) {
+        invalidateRowingSessionCaches();
         const error = await response.json().catch(() => ({}));
         console.error(`[RowingSessionPersistence] Save chunk ${i + 1}/${totalChunks} failed:`, error);
         return {
@@ -326,6 +333,8 @@ export async function saveRowingSessions(
 
       sessionsProcessed += chunk.length;
     } catch (error) {
+      // The server may have committed this or earlier chunks before the request failed.
+      invalidateRowingSessionCaches();
       console.error(`[RowingSessionPersistence] Error saving chunk ${i + 1}/${totalChunks}:`, error);
       return {
         success: false,
@@ -384,9 +393,8 @@ export async function saveRowingSession(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[RowingSessionPersistence] Failed to save session:', errorText);
-    throw new Error('Failed to save rowing session');
+    const error = await response.json().catch(() => null);
+    throw new Error(typeof error?.error === 'string' && error.error ? error.error : 'Failed to save rowing session');
   }
 
   const data: RowingSessionMutationApiResponse = await response.json();
@@ -447,9 +455,8 @@ export async function deleteRowingSession(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[RowingSessionPersistence] Failed to delete session:', errorText);
-    throw new Error('Failed to delete rowing session');
+    const error = await response.json().catch(() => null);
+    throw new Error(typeof error?.error === 'string' && error.error ? error.error : 'Failed to delete rowing session');
   }
 
   const data: RowingSessionMutationApiResponse = await response.json();

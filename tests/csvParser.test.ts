@@ -41,9 +41,9 @@ const headers = [
   "Maximum stroke rate (SPM)",
 ];
 
-function summaryFile(averageSplit: string): File {
+function summaryFile(averageSplit: string, timestamp = "2026-03-09 17:58:44.627"): File {
   const values = [
-    "2026-03-09 17:58:44.627",
+    timestamp,
     "1000",
     "317",
     "0",
@@ -73,6 +73,17 @@ test("parseSmartRowCsv derives average pace when the summary split is missing", 
   assert.equal(parsed.sessions[0].avgSplit, 158.5);
   assert.equal(parsed.result.importedSessions, 1);
   assert.deepEqual(parsed.result.errors, []);
+});
+
+test("parseSmartRowCsv rejects invalid dates instead of inventing a workout today", async () => {
+  for (const timestamp of ['', 'not a date', '2026-13-09 17:58:44.627', '2026-03-09 25:58:44', '2026-02-30 17:58:44']) {
+    const parsed = await parseSmartRowCsv(summaryFile('158.5', timestamp));
+    assert.equal(parsed.sessions.length, 0);
+    assert.equal(parsed.result.importedSessions, 0);
+    assert.match(parsed.result.errors[0], /Invalid timestamp/);
+  }
+  const parsed = await parseSmartRowCsv(summaryFile('158.5', '2026-03-09 17:58:44'));
+  assert.equal(parsed.sessions[0].timestamp.toISOString(), '2026-03-09T17:58:44.000Z');
 });
 
 test("parseSmartRowCsv returns an update when derived pace repairs an existing session", async () => {
@@ -131,4 +142,34 @@ test("parseSmartRowCsv keeps an existing valid pace and skips the duplicate", as
   assert.equal(parsed.result.importedSessions, 0);
   assert.equal(parsed.result.updatedSessions, 0);
   assert.equal(parsed.result.duplicatesSkipped, 1);
+});
+
+test('CSV parser rejects invalid numeric fields and oversized files before import', async () => {
+  const bad = new File([(await summaryFile('').text()).replace(';1000;', ';1000oops;')], 'bad.csv');
+  const parsed = await parseSmartRowCsv(bad);
+  assert.equal(parsed.sessions.length, 0);
+  assert.match(parsed.result.errors.join(' '), /Invalid number/);
+  const huge = await parseSmartRowCsv(new File([new Uint8Array(8 * 1024 * 1024 + 1)], 'huge.csv'));
+  assert.equal(huge.sessions.length, 0);
+  assert.match(huge.result.errors.join(' '), /8 MiB/);
+});
+
+
+test('detailed CSV accepts absent or blank timestamps and retains bounded numeric validation', async () => {
+  const { parseStrokeCsv } = await import('../src/lib/strokeParser');
+  const { sessionsInput } = await import('../src/lib/sessionInput');
+  for (const suffix of ['', ';Timestamp (UTC)']) {
+    const parsed = await parseStrokeCsv(new File([
+      `Stroke (#);Second (#);Actual power (W)${suffix}\n1;3;150${suffix ? ';' : ''}`,
+    ], 'strokes.csv', { type: 'text/csv' }));
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.data.length, 1);
+    assert.equal(parsed.data[0].timestamp, '');
+    assert.equal(parsed.data[0].time, 3);
+    assert.equal(parsed.data[0].power, 150);
+    assert.equal(sessionsInput.parse({ sessions: [{ timestamp: '2026-01-01', distance: 1000, duration: 300, strokeData: parsed.data }] }).sessions[0].strokeData?.[0].timestamp, '');
+  }
+  const invalid = await parseStrokeCsv(new File(['Stroke (#);Second (#);Actual power (W)\n1;3;-150'], 'invalid.csv'));
+  assert.equal(invalid.data.length, 0);
+  assert.ok(invalid.error);
 });

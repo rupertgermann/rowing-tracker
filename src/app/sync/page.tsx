@@ -33,7 +33,7 @@ interface MocapOverlap {
 type UploadState = 'idle' | 'dragging' | 'validating' | 'processing' | 'saving' | 'syncing' | 'success' | 'error';
 
 export default function UploadPage() {
-  const { addSessions, getSessions, updateSessionsInStore } = useRowingStore();
+  const { addSessions, getSessions, updateSessionsInStore, replaceSessionsInStore } = useRowingStore();
   const { settings, isLoading: isSettingsLoading, updateSmartRowSettings } = useSettings();
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -179,7 +179,7 @@ export default function UploadPage() {
 
           const saveResult = await persistZipImportSessions(
             result.sessionsToSave,
-            { addSessions, updateSessionsInStore },
+            { addSessions, updateSessionsInStore, replaceSessionsInStore },
             {
               onProgress: (progress) => setUploadProgress(progress),
               checkMocapOverlap,
@@ -232,7 +232,7 @@ export default function UploadPage() {
 
         const saveResult = await persistCsvImportSessions(
           sessions,
-          { addSessions, updateSessionsInStore },
+          { addSessions, updateSessionsInStore, replaceSessionsInStore },
           {
             onProgress: (progress) => setUploadProgress(progress),
             checkMocapOverlap,
@@ -255,7 +255,7 @@ export default function UploadPage() {
       setError(errorMessage);
       setUploadState('error');
     }
-  }, [addSessions, checkMocapOverlap, getSessions, updateSessionsInStore]);
+  }, [addSessions, checkMocapOverlap, getSessions, updateSessionsInStore, replaceSessionsInStore]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -456,7 +456,7 @@ export default function UploadPage() {
         {
           csvSessions: csvSessionsToSave,
           loadZipSessions,
-          store: { addSessions, updateSessionsInStore },
+          store: { addSessions, updateSessionsInStore, replaceSessionsInStore },
         },
         {
           onProgress: (progress) => setUploadProgress(progress),

@@ -1,3 +1,5 @@
+import { INGESTION_LIMITS } from "@/lib/ingestionLimits";
+import { uploadCaptureChunk } from "@/lib/mocap/captureUpload";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -57,29 +59,35 @@ export async function GET(
   const totalSize = await storage.size(row.videoStoragePath);
   const range = parseRange(req.headers.get("range"), totalSize);
 
-  if (!range) {
-    const bytes = await storage.read(row.videoStoragePath);
-    return new Response(new Uint8Array(bytes) as BodyInit, {
-      status: 200,
-      headers: {
-        "Content-Type": "video/webm",
-        "Content-Length": String(totalSize),
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "private, no-store",
-      },
-    });
-  }
-
-  const slice = await storage.read(row.videoStoragePath, {
-    start: range.start,
-    end: range.end + 1,
-  });
-  return new Response(new Uint8Array(slice) as BodyInit, {
-    status: 206,
+  let position = range?.start ?? 0;
+  const end = range ? range.end + 1 : totalSize;
+  const length = end - position;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (cancelled) return;
+      if (req.signal.aborted) { controller.error(new Error("Playback aborted")); return; }
+      if (position >= end) { controller.close(); return; }
+      try {
+        const next = Math.min(end, position + INGESTION_LIMITS.videoChunkBytes);
+        const bytes = await storage.read(row.videoStoragePath, { start: position, end: next });
+        if (cancelled) return;
+        if (req.signal.aborted) { controller.error(new Error("Playback aborted")); return; }
+        if (bytes.byteLength !== next - position) throw new Error("Truncated recording");
+        position = next;
+        controller.enqueue(bytes);
+      } catch (error) {
+        if (!cancelled) controller.error(error);
+      }
+    },
+    cancel() { cancelled = true; },
+  }, { highWaterMark: 0 });
+  return new Response(stream, {
+    status: range ? 206 : 200,
     headers: {
       "Content-Type": "video/webm",
-      "Content-Length": String(slice.byteLength),
-      "Content-Range": `bytes ${range.start}-${range.end}/${totalSize}`,
+      "Content-Length": String(length),
+      ...(range ? { "Content-Range": `bytes ${range.start}-${range.end}/${totalSize}` } : {}),
       "Accept-Ranges": "bytes",
       "Cache-Control": "private, no-store",
     },
@@ -96,27 +104,5 @@ export async function POST(
   }
 
   const { id } = await params;
-  const row = await prisma.mocapSession.findFirst({
-    where: { id, userId: session.user.id },
-    select: { id: true, status: true, videoStoragePath: true },
-  });
-  if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  if (row.status !== "capturing") {
-    return NextResponse.json(
-      { error: `Session not capturing (status=${row.status})` },
-      { status: 409 },
-    );
-  }
-
-  const buf = new Uint8Array(await req.arrayBuffer());
-  if (buf.byteLength === 0) {
-    return NextResponse.json({ appended: 0 });
-  }
-
-  const storage = getMocapStorage();
-  await storage.appendBytes(row.videoStoragePath, buf);
-
-  return NextResponse.json({ appended: buf.byteLength });
+  return uploadCaptureChunk(req, session.user.id, id, "video");
 }

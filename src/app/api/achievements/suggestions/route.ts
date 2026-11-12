@@ -1,6 +1,10 @@
+import { isPersonalAIEnabled } from '@/lib/aiMode';
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { applyRateLimit } from '@/lib/rateLimit';
 import { AWARDS } from '@/lib/awards';
-import { normalizeAITextModel, SettingsService } from '@/lib/settings';
+import { getUserAchievementAISettings } from '@/lib/server/userSettings';
 
 
 interface SuggestionCriteria {
@@ -69,6 +73,15 @@ function extractResponseTextOrJson(data: OpenAIResponseData): { kind: 'text' | '
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const limited = await applyRateLimit(request, session.user.id, 'ai');
+    if (limited) return limited;
+
+    if (!isPersonalAIEnabled()) {
+      return NextResponse.json({ error: 'Hosted AI is unavailable in this deployment.' }, { status: 503 });
+    }
+
     const body = await request.json();
 
     const {
@@ -98,11 +111,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing sessions' }, { status: 400 });
     }
 
-    // Load AI settings from database
-    const settings = SettingsService.getInstance();
-    const aiSettings = settings.getAISettings();
-    const useCaseConfig = aiSettings.awardSuggestions;
-
     const earnedAwardsList = Array.isArray(earnedAwardsInput) ? earnedAwardsInput : [];
 
     const earnedAwardsForPrompt = earnedAwardsList
@@ -118,13 +126,15 @@ export async function POST(request: NextRequest) {
     // Build list of all existing awards to prevent duplicates
     const existingAwardsList = AWARDS.map(a => `- "${a.title}": ${a.description}`).join('\n');
 
-    const openaiApiKey = apiKey || process.env.OPENAI_API_KEY;
+    const openaiApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
     if (!openaiApiKey) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 401 }
       );
     }
+
+    const { config: useCaseConfig, maxTokens } = await getUserAchievementAISettings(session.user.id, 'awardSuggestions');
 
     const sortedSessions = [...sessions].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -188,7 +198,7 @@ Keep output short:
 
     const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
     const initialMaxOutputTokens = clamp(
-      aiSettings.maxTokens || 2500,
+      maxTokens,
       800,
       6000
     );
@@ -201,7 +211,7 @@ Keep output short:
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: normalizeAITextModel(useCaseConfig.model, 'gpt-5.4-mini'),
+          model: useCaseConfig.model,
           input: prompt,
           instructions,
           max_output_tokens: requestedMaxOutputTokens,

@@ -243,12 +243,21 @@ function makeFactory(state: FactoryState) {
   return createPrismaMocapSessionLifecycle({
     prisma: makeFakePrisma(state),
     storage: makeFakeStorage(),
-    analyzePoseSegmented: async () => {
+    analyzePoseSegmented: async (_storage, _session, unlinkRowingSessionId) => {
       if (state.failPoseAnalysis) throw new Error("pose analysis failed");
+      if (unlinkRowingSessionId) {
+        assert.equal(state.mocapSession.rowingSessionId, unlinkRowingSessionId);
+        state.mocapSession.rowingSessionId = null;
+        state.mocapSession.status = "ready";
+        return { status: "ready", strokeMetricCount: 3, faultCount: 1 };
+      }
       return { strokeMetricCount: 3, faultCount: 1 };
     },
-    analyzeCsvAligned: async () => {
+    analyzeCsvAligned: async (_storage, _session, rowingSessionId) => {
+      assert.equal(state.mocapSession.rowingSessionId, null);
+      if (state.uniqueConflictOnAssign) throw Object.assign(new Error("unique constraint"), { code: "P2002" });
       if (state.failCsvAnalysis) throw new Error("csv analysis failed");
+      state.mocapSession.rowingSessionId = rowingSessionId;
       return { strokeMetricCount: 4, faultCount: 2 };
     },
     finalizePoseStream: async () => ({
@@ -284,7 +293,7 @@ function makeFakePrisma(state: FactoryState) {
         if (
           state.lostAssignmentRace &&
           args.where.rowingSessionId === null &&
-          args.data.rowingSessionId
+          args.data.status === "analyzing"
         ) {
           return { count: 0 };
         }

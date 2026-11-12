@@ -156,7 +156,14 @@ export const settingsUpdateSchema = z.object({
   dateFormat: dateFormatSchema,
   timeFormat: timeFormatSchema,
   language: languageSchema,
-  timeZone: z.string().max(100),
+  timeZone: z.string().max(100).refine((value) => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value });
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'Invalid time zone'),
   defaultChartType: chartTypeSchema,
   animationsEnabled: z.boolean(),
   showPromptSuggestions: z.boolean(),
@@ -176,9 +183,6 @@ export const settingsUpdateSchema = z.object({
   achievementAlerts: z.boolean(),
   planReminders: z.boolean(),
   adherenceAlerts: z.boolean(),
-  exportFormat: z.enum(['json', 'csv']).optional(),
-  backupEnabled: z.boolean().optional(),
-  lastBackup: z.string().optional().nullable(),
 
   // AI settings
   cloudAIEnabled: z.boolean(),

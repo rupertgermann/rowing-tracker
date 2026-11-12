@@ -1,12 +1,23 @@
+import { isPersonalAIEnabled } from '@/lib/aiMode';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { applyRateLimit } from '@/lib/rateLimit';
 import { existsSync } from 'fs';
 import path from 'path';
 import { getColorPalettePrompt } from '@/lib/achievementColors';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const limited = await applyRateLimit(request, session.user.id, 'ai');
+    if (limited) return limited;
+
+    if (!isPersonalAIEnabled()) {
+      return NextResponse.json({ error: 'Hosted AI is unavailable in this deployment.' }, { status: 503 });
+    }
+
     const body = await request.json();
     const {
       title,
@@ -27,8 +38,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use provided API key or fall back to environment variable
-    const openaiApiKey = apiKey || process.env.OPENAI_API_KEY;
+    // Personal mode accepts only the caller’s key.
+    const openaiApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
     
     if (!openaiApiKey) {
       return NextResponse.json(

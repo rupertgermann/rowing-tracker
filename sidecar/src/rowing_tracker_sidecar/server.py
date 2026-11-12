@@ -31,6 +31,8 @@ class SidecarState:
 
     def start(self) -> tuple[int, dict[str, object]]:
         with self.lock:
+            if self.active:
+                return HTTPStatus.CONFLICT, {"error": "A session is already active"}
             health = self.health()
             if health.status != "ready":
                 return (

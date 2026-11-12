@@ -1,3 +1,7 @@
+import { createSessionUploadBatches } from './sessionUploadBatches';
+import { sessionInput } from './sessionInput';
+import { INGESTION_LIMITS } from './ingestionLimits';
+import { isLegacyDataQuarantined } from './accountBoundary';
 interface LocalStorageData {
   sessions?: Record<string, unknown>[];
   personalRecords?: Record<string, unknown>[];
@@ -72,6 +76,7 @@ export async function migrateLocalStorageToDatabase(): Promise<MigrationResult> 
 
 function getLocalStorageData(): LocalStorageData {
   const data: LocalStorageData = {};
+  if (isLegacyDataQuarantined(localStorage)) return data;
 
   try {
     const sessionsStr = localStorage.getItem('rowingSessions');
@@ -113,22 +118,27 @@ function getLocalStorageData(): LocalStorageData {
 }
 
 async function migrateSessions(sessions: Record<string, unknown>[]): Promise<{ count: number; error?: string }> {
+  let count = 0;
   try {
-    const response = await fetch('/api/migrate/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions }),
-    });
+    const chunks = createSessionUploadBatches(sessions.map(session => sessionInput.parse(session)), INGESTION_LIMITS.sessions);
+    for (const chunk of chunks) {
+      const response = await fetch('/api/migrate/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: `{"sessions":[${chunk.json.join(',')}]}`,
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      return { count: 0, error: error.error || 'Failed to migrate sessions' };
+      if (!response.ok) {
+        const error = await response.json();
+        return { count, error: error.error || 'Failed to migrate sessions' };
+      }
+
+      const data = await response.json();
+      count += data.count || 0;
     }
-
-    const data = await response.json();
-    return { count: data.count || 0 };
+    return { count };
   } catch (error) {
-    return { count: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+    return { count, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -207,6 +217,7 @@ function markMigrationComplete(): void {
 }
 
 export function clearLocalStorageData(): void {
+  if (isLegacyDataQuarantined(localStorage)) return;
   localStorage.removeItem('rowingSessions');
   localStorage.removeItem('personalRecords');
   localStorage.removeItem('trainingPlans');

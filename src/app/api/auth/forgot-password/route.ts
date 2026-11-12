@@ -62,7 +62,6 @@ export async function POST(req: Request) {
     // Check if email is configured
     if (!process.env.EMAIL_SERVER || !process.env.EMAIL_FROM) {
       console.error("Email not configured. Set EMAIL_SERVER and EMAIL_FROM in .env");
-      console.log(`Reset link for ${email}: ${resetUrl}`);
       return NextResponse.json({
         message: "If an account exists with that email, a password reset link has been sent.",
         resetUrl: process.env.NODE_ENV === "development" ? resetUrl : undefined
@@ -115,11 +114,10 @@ If you didn't request this, you can safely ignore this email.
       });
     } catch (emailError) {
       console.error("Email sending error:", emailError);
-      console.log(`Reset link for ${email}: ${resetUrl}`);
       return NextResponse.json({
         message: "If an account exists with that email, a password reset link has been sent.",
         resetUrl: process.env.NODE_ENV === "development" ? resetUrl : undefined,
-        warning: "Email failed to send. Check console for reset link."
+        warning: process.env.NODE_ENV === "development" ? "Email failed to send. Use the development reset link." : undefined
       });
     }
   } catch (error) {

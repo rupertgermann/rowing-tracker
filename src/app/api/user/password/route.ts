@@ -63,7 +63,7 @@ export async function PATCH(req: Request) {
     // Update password
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { passwordHash: newPasswordHash },
+      data: { passwordHash: newPasswordHash, sessionVersion: { increment: 1 } },
     });
 
     return NextResponse.json({ message: "Password updated successfully" });

@@ -1,3 +1,4 @@
+import { isLegacyDataQuarantined } from './accountBoundary';
 import { DEFAULT_AWARD_SUGGESTIONS_PROMPT, DEFAULT_CHAT_SYSTEM_PROMPT } from '@/lib/aiPromptDefaults';
 import {
   defaultPostureThresholdSettings,
@@ -48,9 +49,6 @@ export interface UserPreferences {
 }
 
 export interface DataManagement {
-  exportFormat: 'json' | 'csv';
-  backupEnabled: boolean;
-  lastBackup: Date | null;
   storageUsage: {
     sessions: number;
     chatHistory: number;
@@ -122,6 +120,11 @@ export interface UseCaseConfig {
   verbosity: 'low' | 'medium' | 'high';
   model: AITextModel;
 }
+
+export const ACHIEVEMENT_AI_DEFAULTS = {
+  achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5.4-mini' },
+  awardSuggestions: { reasoning: 'medium', verbosity: 'low', model: 'gpt-5.4-mini' },
+} as const satisfies Record<string, UseCaseConfig>;
 
 export interface AISettings {
   cloudAIEnabled: boolean;
@@ -195,9 +198,6 @@ export class SettingsService {
       customPrompts: []
     },
     dataManagement: {
-      exportFormat: 'json',
-      backupEnabled: false,
-      lastBackup: null,
       storageUsage: {
         sessions: 0,
         chatHistory: 0,
@@ -278,11 +278,7 @@ export class SettingsService {
         verbosity: 'high',        // Detailed explanations
         model: 'gpt-5.5'          // Best quality for complex plans
       },
-      awardSuggestions: {
-        reasoning: 'medium',
-        verbosity: 'low',
-        model: 'gpt-5.4-mini'
-      },
+      awardSuggestions: { ...ACHIEVEMENT_AI_DEFAULTS.awardSuggestions },
       systemPrompt: 'You are an expert rowing coach and sports scientist...',
       chatSystemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT,
       planGenerationPrompt: 'You are an expert rowing coach specializing in training plan design...',
@@ -330,7 +326,7 @@ Be brief and direct. No fluff.`,
       awardSuggestionsPrompt: DEFAULT_AWARD_SUGGESTIONS_PROMPT,
 
       // Achievement generator (defaults)
-      achievementText: { reasoning: 'low', verbosity: 'medium', model: 'gpt-5.4-mini' },
+      achievementText: { ...ACHIEVEMENT_AI_DEFAULTS.achievementText },
       achievementImageModel: 'gpt-image-2',
       achievementImageQuality: 'auto',
       achievementImageSize: '1024x1024',
@@ -551,9 +547,6 @@ Be specific and actionable. Only include information relevant to rowing training
       },
       dataManagement: {
         ...this.defaultSettings.dataManagement,
-        exportFormat: (dbSettings.exportFormat as 'json' | 'csv') || 'json',
-        backupEnabled: (dbSettings.backupEnabled as boolean) || false,
-        lastBackup: dbSettings.lastBackup ? new Date(dbSettings.lastBackup as string) : null,
       },
       trainingSettings: {
         ...this.defaultSettings.trainingSettings,
@@ -650,9 +643,6 @@ Be specific and actionable. Only include information relevant to rowing training
       animationsEnabled: settings.userPreferences.animationsEnabled,
       showPromptSuggestions: settings.userPreferences.showPromptSuggestions,
       customPrompts: settings.userPreferences.customPrompts,
-      exportFormat: settings.dataManagement.exportFormat,
-      backupEnabled: settings.dataManagement.backupEnabled,
-      lastBackup: settings.dataManagement.lastBackup,
       trainingZones: settings.trainingSettings.defaultTrainingZones,
       preferredMetrics: settings.trainingSettings.preferredMetrics,
       weeklyGoalType: settings.trainingSettings.weeklyGoal.type,
@@ -908,7 +898,7 @@ Be specific and actionable. Only include information relevant to rowing training
       }
 
       // Fallback to local calculation for remaining localStorage items
-      const rowingStore = localStorage.getItem('rowing-tracker-storage');
+      const rowingStore = isLegacyDataQuarantined(localStorage) ? null : localStorage.getItem('rowing-tracker-storage');
       const settings = localStorage.getItem(this.STORAGE_KEY);
 
       let sessionsSize = 0;
@@ -986,7 +976,9 @@ Be specific and actionable. Only include information relevant to rowing training
       this.STORAGE_KEY
     ];
 
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+    keysToRemove.forEach(key => {
+      if (key !== 'rowing-tracker-storage' || !isLegacyDataQuarantined(localStorage)) localStorage.removeItem(key);
+    });
   }
 
   /**
@@ -1034,6 +1026,10 @@ Be specific and actionable. Only include information relevant to rowing training
 
   private migrateSettings(settings: Partial<Settings>): Settings {
     const migratedSettings = { ...settings } as Settings;
+
+    migratedSettings.dataManagement = {
+      storageUsage: settings.dataManagement?.storageUsage ?? this.defaultSettings.dataManagement.storageUsage,
+    };
 
     // Ensure UserPreferences has all required fields
     migratedSettings.userPreferences = {

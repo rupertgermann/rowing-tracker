@@ -4,13 +4,14 @@ import {
   adaptPoseFrameStreamBlob,
   analyzePoseFrameStream,
   resolvePostureThresholdSettings,
-  alignStrokesToCsv,
   type CapturePerspective,
   type CsvStrokeTarget,
 } from "@/lib/mocap/analysis";
+import { decodeBrowserCalibration } from "./browserCalibration";
 import type { MocapStorage } from "@/lib/mocap/storage";
 
 export interface PersistedMocapAnalysisSummary {
+  status?: "ready";
   strokeMetricCount: number;
   faultCount: number;
 }
@@ -27,6 +28,7 @@ type AnalyzeSessionInput = {
 export async function analyzeAndPersistMocapSession(
   storage: MocapStorage,
   session: AnalyzeSessionInput,
+  unlinkRowingSessionId?: string,
 ): Promise<PersistedMocapAnalysisSummary> {
   const [poseBlob, userSettings] = await Promise.all([
     storage.read(session.poseStreamPath),
@@ -43,9 +45,24 @@ export async function analyzeAndPersistMocapSession(
     poseBlob,
     session.capturePerspective as CapturePerspective,
   );
-  const result = analyzePoseFrameStream(stream, { thresholds });
+  const result = analyzePoseFrameStream(stream, {
+    thresholds,
+    calibration: decodeBrowserCalibration(
+      stream.capturePerspective,
+      session.calibrationCatchFrame,
+      session.calibrationFinishFrame,
+    ),
+  });
 
   await prisma.$transaction(async (tx) => {
+    if (unlinkRowingSessionId) {
+      await tx.$queryRaw`SELECT id FROM "RowingSession" WHERE id = ${unlinkRowingSessionId} FOR UPDATE`;
+      const unlinked = await tx.mocapSession.updateMany({
+        where: { id: session.id, userId: session.userId, status: "analyzing", rowingSessionId: unlinkRowingSessionId },
+        data: { rowingSessionId: null, status: "ready" },
+      });
+      if (unlinked.count !== 1) throw new Error("Session changed during unlink analysis");
+    }
     await tx.postureFault.deleteMany({
       where: { mocapSessionId: session.id },
     });
@@ -79,6 +96,7 @@ export async function analyzeAndPersistMocapSession(
   });
 
   return {
+    ...(unlinkRowingSessionId ? { status: "ready" as const } : {}),
     strokeMetricCount: result.metrics.length,
     faultCount: result.faults.length,
   };
@@ -86,26 +104,19 @@ export async function analyzeAndPersistMocapSession(
 
 /**
  * Run analysis for a MocapSession that is linked to a RowingSession.
- * Aligns pose-derived strokes to StrokeData rows by timestamp cross-correlation
- * rather than array position. Sets segmentationSource = "csv-aligned" and
- * strokeDataId on each metric row. Unmatched pose strokes get strokeDataId=null
- * and csvMatchOffsetMs=null in phaseBoundariesJson.
+ * Recomputes metrics over aligned CSV catch windows; the finish remains pose-derived.
+ * Incomplete/unmatched windows are omitted, never relabeled pose metrics.
  */
 export async function analyzeAndPersistMocapSessionLinked(
   storage: MocapStorage,
   session: AnalyzeSessionInput,
   rowingSessionId: string,
 ): Promise<PersistedMocapAnalysisSummary> {
-  const [poseBlob, userSettings, strokeDataRows] = await Promise.all([
+  const [poseBlob, userSettings] = await Promise.all([
     storage.read(session.poseStreamPath),
     prisma.userSettings.findUnique({
       where: { userId: session.userId },
       select: { postureThresholds: true },
-    }),
-    prisma.strokeData.findMany({
-      where: { sessionId: rowingSessionId },
-      orderBy: { strokeIndex: "asc" },
-      select: { id: true, strokeIndex: true, time: true },
     }),
   ]);
 
@@ -116,23 +127,29 @@ export async function analyzeAndPersistMocapSessionLinked(
     poseBlob,
     session.capturePerspective as CapturePerspective,
   );
-  const result = analyzePoseFrameStream(stream, { thresholds });
+  return prisma.$transaction(async (tx) => {
+    // Rowing first, then capture: mutation guards and unlink publication use this order too.
+    const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "RowingSession" WHERE id = ${rowingSessionId} AND "userId" = ${session.userId} FOR UPDATE`;
+    if (rows.length !== 1) throw new Error("Rowing session no longer exists");
+    const strokeDataRows = await tx.strokeData.findMany({
+      where: { sessionId: rowingSessionId },
+      orderBy: { strokeIndex: "asc" },
+      select: { id: true, strokeIndex: true, time: true },
+    });
+    const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map(sd => ({ id: sd.id, strokeIndex: sd.strokeIndex, timeMs: sd.time * 1000 }));
+    const result = analyzePoseFrameStream(stream, {
+      csvStrokes,
+      thresholds,
+      calibration: decodeBrowserCalibration(stream.capturePerspective, session.calibrationCatchFrame, session.calibrationFinishFrame),
+    });
+    if (result.metrics.length === 0) throw new Error("No complete CSV-aligned stroke windows with usable pose tracking");
 
-  // Build CSV stroke targets with elapsed ms for alignment
-  const csvStrokes: CsvStrokeTarget[] = strokeDataRows.map((sd) => ({
-    id: sd.id,
-    strokeIndex: sd.strokeIndex,
-    timeMs: sd.time * 1000, // StrokeData.time is elapsed seconds from session start
-  }));
-
-  // Extract pose catch timestamps (elapsed ms from pose session start)
-  const poseCatchTimesMs = result.metrics.map(
-    (m) => stream.frames[m.phaseBoundariesJson.catchFrameIndex]?.timestampMs ?? 0,
-  );
-
-  const alignment = alignStrokesToCsv(poseCatchTimesMs, csvStrokes);
-
-  await prisma.$transaction(async (tx) => {
+    // Publish the link only with its recomputed rows; the lifecycle already claimed analyzing.
+    const linked = await tx.mocapSession.updateMany({
+      where: { id: session.id, userId: session.userId, status: "analyzing", OR: [{ rowingSessionId: null }, { rowingSessionId }] },
+      data: { rowingSessionId, status: "ready" },
+    });
+    if (linked.count !== 1) throw new Error("Session changed during CSV analysis");
     await tx.postureFault.deleteMany({
       where: { mocapSessionId: session.id },
     });
@@ -141,21 +158,14 @@ export async function analyzeAndPersistMocapSessionLinked(
     });
     if (result.metrics.length > 0) {
       await tx.strokePostureMetric.createMany({
-        data: result.metrics.map((metric) => {
-          const match = alignment.matches.get(metric.strokeIndex);
-          const phaseBoundariesJson = {
-            ...metric.phaseBoundariesJson,
-            csvMatchOffsetMs: match ? match.offsetMs : null,
-          };
-          return {
-            mocapSessionId: session.id,
-            strokeIndex: metric.strokeIndex,
-            phaseBoundariesJson: phaseBoundariesJson as unknown as Prisma.InputJsonValue,
-            metricsJson: metric.metricsJson as unknown as Prisma.InputJsonValue,
-            segmentationSource: "csv-aligned",
-            strokeDataId: match?.csvStrokeDataId ?? null,
-          };
-        }),
+        data: result.metrics.map((metric) => ({
+          mocapSessionId: session.id,
+          strokeIndex: metric.strokeIndex,
+          phaseBoundariesJson: metric.phaseBoundariesJson as unknown as Prisma.InputJsonValue,
+          metricsJson: metric.metricsJson as unknown as Prisma.InputJsonValue,
+          segmentationSource: metric.segmentationSource,
+          strokeDataId: metric.strokeDataId,
+        })),
       });
     }
     if (result.faults.length > 0) {
@@ -170,10 +180,10 @@ export async function analyzeAndPersistMocapSessionLinked(
         })),
       });
     }
-  });
-
-  return {
-    strokeMetricCount: result.metrics.length,
-    faultCount: result.faults.length,
-  };
+    return {
+      status: "ready" as const,
+      strokeMetricCount: result.metrics.length,
+      faultCount: result.faults.length,
+    };
+  }, { timeout: 30000 });
 }

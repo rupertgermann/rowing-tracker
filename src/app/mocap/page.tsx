@@ -1,5 +1,9 @@
 "use client";
 
+import { CalibrationComparison } from "@/components/mocap/CalibrationComparison";
+import { decodeBrowserCalibration } from "@/lib/mocap/browserCalibration";
+import type { PostureMetrics } from "@/lib/mocap/analysis/types";
+
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -54,7 +58,6 @@ import {
   keypointTripletsToPosePoints,
 } from "@/lib/mocap/analysis/poseFrameStreamAdapter";
 import type {
-  Calibration,
   PoseAnalysisFrame,
   PostureFault,
 } from "@/lib/mocap/analysis/types";
@@ -190,6 +193,7 @@ export default function MocapCapturePage() {
     useState<RecordOnlyReason | null>(null);
   const [captureSupport, setCaptureSupport] =
     useState<MocapCaptureSupport | null>(null);
+  const [latestMetrics, setLatestMetrics] = useState<PostureMetrics | null>(null);
   const [activeCue, setActiveCue] = useState<CoachingCue | null>(null);
   const [sessionFaults, setSessionFaults] = useState<PostureFault[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -539,6 +543,7 @@ export default function MocapCapturePage() {
   );
 
   const start = useCallback(async () => {
+    setLatestMetrics(null);
     // Sidecar path: skip browser camera/calibration, use sidecar-3d perspective
     if (useSidecar) {
       activeCaptureSessionIdRef.current = null;
@@ -649,7 +654,7 @@ export default function MocapCapturePage() {
       calibrationSourceRef.current = null;
 
       // Spin up the live coaching engine (skipped when in record-only mode).
-      const calibrationFramesForEngine = buildEngineCalibration(
+      const calibrationFramesForEngine = decodeBrowserCalibration(
         perspective,
         calibrationFrames?.catchFrame,
         calibrationFrames?.finishFrame,
@@ -660,6 +665,7 @@ export default function MocapCapturePage() {
           fps: CAPTURE_FPS,
           capturePerspective: perspective,
           calibration: calibrationFramesForEngine,
+          onMetrics: setLatestMetrics,
           thresholds: mocapPrefs.postureThresholds.thresholds,
           minSeverity:
             mocapPrefs.mocapPreferences.verbosity === "verbose"
@@ -1304,6 +1310,7 @@ export default function MocapCapturePage() {
             </div>
           ) : null}
 
+          {latestMetrics ? <CalibrationComparison metrics={latestMetrics} /> : null}
           {activeCue ? (
             <div
               className={`rounded border p-3 text-sm space-y-1 ${
@@ -1473,25 +1480,6 @@ function decodeBase64PoseFrame(
   } catch {
     return null;
   }
-}
-
-function buildEngineCalibration(
-  capturePerspective: "side-left" | "side-right",
-  catchFrameBase64: { poseFrameBase64: string } | undefined,
-  finishFrameBase64: { poseFrameBase64: string } | undefined,
-): Calibration | undefined {
-  const catchFrame = catchFrameBase64?.poseFrameBase64
-    ? decodeBase64PoseFrame(catchFrameBase64.poseFrameBase64) ?? undefined
-    : undefined;
-  const finishFrame = finishFrameBase64?.poseFrameBase64
-    ? decodeBase64PoseFrame(finishFrameBase64.poseFrameBase64) ?? undefined
-    : undefined;
-  if (!catchFrame && !finishFrame) return undefined;
-  return {
-    capturePerspective,
-    catchFrame,
-    finishFrame,
-  };
 }
 
 function pickRecorderMime(): string {

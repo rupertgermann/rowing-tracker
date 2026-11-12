@@ -1,5 +1,8 @@
 "use client";
 
+import { CalibrationComparison } from "@/components/mocap/CalibrationComparison";
+import type { PostureMetrics } from "@/lib/mocap/analysis/types";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -68,7 +71,7 @@ interface SessionStrokeMetric {
   segmentationSource: string;
 }
 
-interface SessionPostureMetrics {
+interface SessionPostureMetrics extends Partial<Pick<PostureMetrics, "catchReferenceDeltaDeg" | "finishReferenceDeltaDeg">> {
   backAngleAtCatchDeg?: number;
   backAngleAtFinishDeg?: number;
   laybackAngleDeg?: number;
@@ -892,10 +895,15 @@ export default function MocapReplayPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center justify-between gap-3 text-sm font-medium">
               <span>Linked rowing session</span>
-              <Badge variant="secondary">CSV-aligned</Badge>
+              <Badge variant="secondary">{segmentationSource === "csv-aligned" ? "CSV-aligned" : "Re-analysis needed"}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground" data-testid="mocap-csv-provenance">
+              {segmentationSource === "csv-aligned"
+                ? "Catch windows follow aligned CSV timestamps; finish timing is inferred from pose. Incomplete or unmatched windows are omitted."
+                : "This recording has legacy pose-derived analysis. Re-analyze to derive catch windows from CSV timestamps."}
+            </p>
             <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <span>
                 {fmtDate(session.rowingSession.timestamp)} ·{" "}
@@ -1405,6 +1413,7 @@ function CompareStrokePanel({
       </div>
 
       <div className="grid gap-1 text-xs">
+        <CalibrationComparison metrics={metric.metricsJson} />
         {metricRows(metric.metricsJson).map((row) => (
           <div key={row.label} className="flex justify-between gap-3">
             <span className="text-muted-foreground">{row.label}</span>

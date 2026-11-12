@@ -1,5 +1,8 @@
 'use client';
 
+import { accountSummaryScope } from '@/lib/accountSummaryScope';
+import { isPersonalAIEnabled } from '@/lib/aiMode';
+
 import { useCallback, useState, useEffect, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -767,8 +770,36 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle className="text-lg">Account summary</CardTitle>
+            <CardDescription>A limited JSON summary of your server-saved account data</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert><AlertDescription>{accountSummaryScope.warning}</AlertDescription></Alert>
+            <div>
+              <h3 className="font-medium">Included</h3>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                {Object.entries(accountSummaryScope.included).map(([key, description]) => <li key={key}>{description}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-medium">Not included</h3>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                {accountSummaryScope.excluded.map(description => <li key={description}>{description}</li>)}
+              </ul>
+            </div>
+            <Button variant="outline" asChild>
+              <a href="/api/user/export">
+                <Download className="h-4 w-4 mr-2" />
+                Download account summary (JSON)
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle className="text-lg">Export & Import</CardTitle>
-            <CardDescription>Backup your settings and data</CardDescription>
+            <CardDescription>Export or import your settings as a JSON file</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
@@ -1428,6 +1459,7 @@ export default function SettingsPage() {
   };
 
   const renderAISettings = () => {
+    if (!isPersonalAIEnabled()) return <Card><CardHeader><CardTitle>Hosted AI unavailable</CardTitle><CardDescription>AI features and personal API keys are disabled in this deployment. Basic workout tracking and analysis remain available.</CardDescription></CardHeader></Card>;
     // ✅ No hooks here - moved to component level
     // Conditional logic is safe now
     if (!settingsData?.aiSettings) {
@@ -3077,7 +3109,7 @@ export default function SettingsPage() {
         open={showClearDataConfirm}
         onOpenChange={setShowClearDataConfirm}
         title={`Clear ${dataCategoryToClear}?`}
-        description={`Are you sure you want to clear all ${dataCategoryToClear}? This action cannot be undone and will permanently remove all stored data.`}
+        description={`Are you sure you want to clear all ${dataCategoryToClear}? This action cannot be undone and will permanently remove all stored data. ${accountSummaryScope.warning}`}
         confirmLabel="Clear"
         cancelLabel="Cancel"
         onConfirm={executeClearDataCategory}

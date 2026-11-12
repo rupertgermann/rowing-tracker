@@ -1,3 +1,5 @@
+import { INGESTION_LIMITS } from "./ingestionLimits";
+import { sessionInput } from "./sessionInput";
 import Papa from 'papaparse';
 import { Session, RawCsvRow, ImportResult } from '@/types/session';
 
@@ -8,32 +10,25 @@ import { Session, RawCsvRow, ImportResult } from '@/types/session';
 function parseEuropeanNumber(value: string): number {
   if (!value || value.trim() === '') return 0;
   const cleaned = value.trim().replace(',', '.');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
+  const parsed = Number(cleaned);
+  if (!Number.isFinite(parsed)) throw new Error(`Invalid number: ${value}`);
+  return parsed;
 }
 
 /**
  * Parse timestamp from SmartRow format: "YYYY-MM-DD HH:MM:SS.mmm"
  */
 function parseTimestamp(timestamp: string): Date {
-  // Handle both with and without milliseconds
   const cleanTimestamp = timestamp.trim();
-
-  // Try parsing with milliseconds first
-  const withMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})$/.exec(cleanTimestamp);
-  if (withMs) {
-    return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
+  const isSmartRowTimestamp = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{3})?$/.test(cleanTimestamp);
+  const date = new Date(isSmartRowTimestamp
+    ? cleanTimestamp.replace(' ', 'T') + 'Z'
+    : cleanTimestamp);
+  if (Number.isNaN(date.getTime())) throw new Error('Invalid timestamp');
+  if (isSmartRowTimestamp && date.toISOString().slice(0, 19) !== cleanTimestamp.replace(' ', 'T').slice(0, 19)) {
+    throw new Error('Invalid timestamp');
   }
-
-  // Try parsing without milliseconds
-  const withoutMs = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$/.exec(cleanTimestamp);
-  if (withoutMs) {
-    return new Date(cleanTimestamp + 'Z'); // Add Z for UTC
-  }
-
-  // Fallback - try direct parsing
-  const date = new Date(cleanTimestamp);
-  return isNaN(date.getTime()) ? new Date() : date;
+  return date;
 }
 
 /**
@@ -108,6 +103,9 @@ export async function parseSmartRowCsv(
   file: File,
   existingSessions: Session[] = []
 ): Promise<{ sessions: Session[], result: ImportResult }> {
+  if (file.size > INGESTION_LIMITS.csvBytes) return {
+    sessions: [], result: { totalRows: 0, importedSessions: 0, updatedSessions: 0, duplicatesSkipped: 0, errors: ['CSV size limit is 8 MiB'], totalDistance: 0, totalTime: 0 },
+  };
   return new Promise((resolve) => {
     const errors: string[] = [];
     const sessionsToSave: Session[] = [];
@@ -127,11 +125,13 @@ export async function parseSmartRowCsv(
       Papa.parse<RawCsvRow>(file, {
         delimiter: delimiter,
         header: true,
+        preview: INGESTION_LIMITS.sessions + 1,
         skipEmptyLines: true,
         transformHeader: (header) => header.replace(/\r/g, '').trim(),
         transform: (value) => value.replace(/\r/g, '').trim(),
         complete: (results) => {
           try {
+            if (results.data.length > INGESTION_LIMITS.sessions) throw new Error('CSV session limit is 1000; split the file');
             // Validate required columns
             const requiredColumns = [
               'Time stamp (UTC)',
@@ -171,6 +171,7 @@ export async function parseSmartRowCsv(
             results.data.forEach((row, index) => {
               try {
                 const session = transformRowToSession(row);
+                sessionInput.parse({ ...session, timestamp: session.timestamp.toISOString() });
 
                 // Validate session data
                 if (session.distance <= 0 || session.duration <= 0) {
@@ -277,6 +278,7 @@ export async function parseSmartRowCsv(
  */
 export function validateSmartRowCsv(file: File): Promise<{ isValid: boolean; error?: string }> {
   return new Promise((resolve) => {
+    if (file.size > INGESTION_LIMITS.csvBytes) { resolve({ isValid: false, error: 'CSV size limit is 8 MiB' }); return; }
     // Check file extension
     if (!file.name.toLowerCase().endsWith('.csv')) {
       resolve({ isValid: false, error: 'File must be a CSV file' });

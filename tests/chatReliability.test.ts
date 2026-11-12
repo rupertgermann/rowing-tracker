@@ -34,6 +34,12 @@ test("reopening a chat loads messages after the first 200", async () => {
 });
 
 test("an interrupted coaching stream is rejected instead of saved as complete", async (t) => {
+  const mode = process.env.NEXT_PUBLIC_AI_MODE;
+  process.env.NEXT_PUBLIC_AI_MODE = "personal";
+  t.after(() => {
+    if (mode === undefined) delete process.env.NEXT_PUBLIC_AI_MODE;
+    else process.env.NEXT_PUBLIC_AI_MODE = mode;
+  });
   cloudAI.initialize("synthetic-test-key");
   const partial = { type: "message", content: [{ type: "output_text", text: "Partial answer" }] };
   const stream = `data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item: partial })}\n\n`;
@@ -46,6 +52,12 @@ test("an interrupted coaching stream is rejected instead of saved as complete", 
 });
 
 test("a completed coaching stream returns the final answer", async (t) => {
+  const mode = process.env.NEXT_PUBLIC_AI_MODE;
+  process.env.NEXT_PUBLIC_AI_MODE = "personal";
+  t.after(() => {
+    if (mode === undefined) delete process.env.NEXT_PUBLIC_AI_MODE;
+    else process.env.NEXT_PUBLIC_AI_MODE = mode;
+  });
   cloudAI.initialize("synthetic-test-key");
   const answer = { id: "response-1", output: [{ type: "message", content: [{ type: "output_text", text: "Complete answer" }] }] };
   const stream = `data: ${JSON.stringify({ type: "response.completed", response: answer })}\n\n`;

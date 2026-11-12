@@ -349,6 +349,7 @@ test("finalizeMocapSessionLifecycle completes record-only captures without analy
     faultCount: 0,
   });
   assert.deepEqual(calls, [
+    "capture:analyzing:30:record-only",
     "capture:ready:30:record-only",
   ]);
 });
@@ -818,3 +819,13 @@ function makeFinalizeDeps(
     ...overrides,
   };
 }
+
+
+test("link returns ready without a second transition after analysis atomically publishes ready", async () => {
+  const result = await linkMocapSessionLifecycle(makeDeps({
+    analyzeCsvAligned: async () => ({ status: "ready", strokeMetricCount: 2, faultCount: 0 }),
+    setStatus: async () => { throw new Error("already committed ready"); },
+  }), { userId: "user-1", mocapSessionId: "mocap-1", rowingSessionId: "rowing-1" });
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.status, "ready");
+});

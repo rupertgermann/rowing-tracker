@@ -39,6 +39,11 @@ test("rowing-tracker-sidecar serves the ADR-0005 contract with synthetic frames"
     assert.ok(started.sessionId);
     assert.ok(started.calibrationId);
 
+    const duplicateStart = await fetch(`http://localhost:${port}/session/start`, {
+      method: "POST",
+    });
+    assert.equal(duplicateStart.status, 409);
+
     const frame = await readOneSidecarFrame(port);
     assert.equal(frame.schema_version, 2);
     assert.equal(frame.source, "sidecar-3d");
@@ -50,6 +55,7 @@ test("rowing-tracker-sidecar serves the ADR-0005 contract with synthetic frames"
       method: "POST",
     });
     assert.equal(stopRes.status, 200);
+    assert.equal((await stopRes.json()).sessionId, started.sessionId);
   } finally {
     await stopProcess(sidecar);
   }

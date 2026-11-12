@@ -121,7 +121,7 @@ export default function SessionDetailPage() {
       }
     } catch (error) {
       console.error(error);
-      alert('Failed to process file');
+      alert(error instanceof Error ? error.message : 'Failed to process file');
     } finally {
       setAnalyzing(false);
     }
@@ -139,7 +139,7 @@ export default function SessionDetailPage() {
       setShowClearAnalysisConfirm(false);
     } catch (error) {
       console.error(error);
-      alert('Failed to clear stroke analysis');
+      alert(error instanceof Error ? error.message : 'Failed to clear stroke analysis');
     } finally {
       setAnalyzing(false);
     }
@@ -574,7 +574,7 @@ export default function SessionDetailPage() {
             router.push(targetSession ? `/sessions/${targetSession.id}` : '/sessions');
           } catch (error) {
             console.error(error);
-            alert('Failed to delete session');
+            alert(error instanceof Error ? error.message : 'Failed to delete session');
           }
         }}
         variant="destructive"

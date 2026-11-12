@@ -19,8 +19,8 @@ export interface PostureFaultSummary {
 export interface PostureMetricSummary {
   strokeIndex: number;
   segmentationSource: string;
-  backAngleAtCatchDeg: number;
-  laybackAngleDeg: number;
+  backAngleAtCatchDeg: number | null;
+  laybackAngleDeg: number | null;
   recoveryDriveRatio: number;
 }
 
@@ -123,9 +123,9 @@ export function buildPostureAIPayload(
       strokeIndex: m.strokeIndex,
       segmentationSource: m.segmentationSource,
       backAngleAtCatchDeg:
-        typeof mj.backAngleAtCatchDeg === "number" ? mj.backAngleAtCatchDeg : 0,
+        typeof mj.backAngleAtCatchDeg === "number" ? mj.backAngleAtCatchDeg : null,
       laybackAngleDeg:
-        typeof mj.laybackAngleDeg === "number" ? mj.laybackAngleDeg : 0,
+        typeof mj.laybackAngleDeg === "number" ? mj.laybackAngleDeg : null,
       recoveryDriveRatio:
         typeof mj.recoveryDriveRatio === "number" ? mj.recoveryDriveRatio : 0,
     };

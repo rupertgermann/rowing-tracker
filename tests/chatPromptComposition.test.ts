@@ -33,6 +33,12 @@ async function captureChatRequest(
       output: [{ type: "message", content: [{ type: "output_text", text: "reply" }] }],
     });
   });
+  const mode = process.env.NEXT_PUBLIC_AI_MODE;
+  process.env.NEXT_PUBLIC_AI_MODE = "personal";
+  t.after(() => {
+    if (mode === undefined) delete process.env.NEXT_PUBLIC_AI_MODE;
+    else process.env.NEXT_PUBLIC_AI_MODE = mode;
+  });
   cloudAI.initialize("synthetic-test-key");
   const result = await cloudAI.sendChatMessage("hello", [], [], undefined, undefined, undefined, posturePayload);
   assert.equal(result.content, "reply");

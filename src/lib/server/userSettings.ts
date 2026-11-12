@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { ACHIEVEMENT_AI_DEFAULTS, normalizeAITextModel } from "@/lib/settings";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 
@@ -53,4 +55,25 @@ export async function bumpUserSessionsRevision(
       sessionsRevision: 1,
     }),
   });
+}
+
+export async function getUserAchievementAISettings(
+  userId: string,
+  useCase: keyof typeof ACHIEVEMENT_AI_DEFAULTS,
+) {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { aiConfig: true, maxTokens: true },
+  });
+  const defaults = ACHIEVEMENT_AI_DEFAULTS[useCase];
+  const aiConfig = settings?.aiConfig;
+  const saved = aiConfig && typeof aiConfig === "object" && !Array.isArray(aiConfig)
+    ? aiConfig[useCase] : undefined;
+  // Legacy or partial records retain valid fields and default each missing/invalid field.
+  const config = z.object({
+    model: z.string().nullish().catch(undefined).transform(model => normalizeAITextModel(model, defaults.model)),
+    reasoning: z.enum(["none", "low", "medium", "high"]).catch(defaults.reasoning),
+    verbosity: z.enum(["low", "medium", "high"]).catch(defaults.verbosity),
+  }).catch(defaults).parse(saved);
+  return { config, maxTokens: settings?.maxTokens ?? USER_SETTINGS_DEFAULT_VALUES.maxTokens };
 }

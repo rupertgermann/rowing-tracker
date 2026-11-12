@@ -150,22 +150,7 @@ export async function POST(req: Request) {
         userId: session.user.id,
       },
       update: updateData,
-      create: buildUserSettingsCreateData(session.user.id, {
-        theme: settingsData.theme || USER_SETTINGS_DEFAULT_VALUES.theme,
-        units: settingsData.units || USER_SETTINGS_DEFAULT_VALUES.units,
-        dateFormat: settingsData.dateFormat || USER_SETTINGS_DEFAULT_VALUES.dateFormat,
-        timeFormat: settingsData.timeFormat || USER_SETTINGS_DEFAULT_VALUES.timeFormat,
-        language: settingsData.language || USER_SETTINGS_DEFAULT_VALUES.language,
-        defaultChartType:
-          settingsData.defaultChartType || USER_SETTINGS_DEFAULT_VALUES.defaultChartType,
-        animationsEnabled: settingsData.animationsEnabled !== false,
-        cloudAIEnabled:
-          settingsData.cloudAIEnabled || USER_SETTINGS_DEFAULT_VALUES.cloudAIEnabled,
-        maxTokens: settingsData.maxTokens || USER_SETTINGS_DEFAULT_VALUES.maxTokens,
-        userProfileContext: settingsData.userProfileContext,
-        userProfileRawInput: settingsData.userProfileRawInput,
-        sidecarPort: settingsData.sidecarPort,
-      }),
+      create: buildUserSettingsCreateData(session.user.id, updateData),
     });
 
     return NextResponse.json({ settings });

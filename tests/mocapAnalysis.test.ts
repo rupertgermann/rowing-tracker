@@ -81,6 +81,9 @@ test("posture metrics match fixture ground truth angles", () => {
       strokes[expected.strokeIndex],
     );
 
+    assert.ok(metrics.backAngleAtCatchDeg !== null);
+    assert.ok(metrics.backAngleAtFinishDeg !== null);
+    assert.ok(metrics.laybackAngleDeg !== null);
     assertWithin(
       metrics.backAngleAtCatchDeg,
       expected.backAngleAtCatchDeg,

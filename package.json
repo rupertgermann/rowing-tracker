@@ -41,11 +41,11 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.2",
+    "@auth/prisma-adapter": "^2.11.3",
     "@mediapipe/tasks-vision": "^0.10.35",
     "@playwright/test": "^1.56.1",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -60,7 +60,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@upstash/ratelimit": "^2.0.7",
     "@upstash/redis": "^1.36.0",
-    "@vercel/blob": "^2.3.3",
+    "@vercel/blob": "2.4.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -69,13 +69,13 @@
     "idb": "^8.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.553.0",
-    "next": "^16.2.4",
-    "next-auth": "^4.24.14",
+    "next": "^16.4.6",
+    "next-auth": "^4.24.15",
     "next-themes": "^0.4.6",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.5.0",
     "papaparse": "^5.5.3",
     "pg": "^8.16.3",
-    "prisma": "^7.8.0",
+    "prisma": "^7.10.1",
     "react": "19.2.0",
     "react-day-picker": "^9.11.3",
     "react-dom": "19.2.0",
@@ -87,7 +87,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "unpdf": "^1.4.0",
-    "zod": "^4.2.1",
+    "zod": "^4.6.7",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
@@ -108,23 +108,20 @@
     "typescript": "^5"
   },
   "overrides": {
-    "@prisma/dev": {
-      "@hono/node-server": "1.19.13",
-      "hono": "4.12.26"
-    },
     "cookie": "1.1.1",
     "esbuild": "0.28.1",
     "nodemailer": "$nodemailer",
-    "postcss": "8.5.13",
-    "uuid": "14.0.0"
+    "postcss": "8.5.32",
+    "uuid": "14.0.0",
+    "eslint-plugin-react-hooks": "7.0.1"
   },
   "allowScripts": {
-    "@prisma/engines@7.8.0": true,
     "esbuild@0.28.1": true,
     "fsevents@2.3.2": true,
     "fsevents@2.3.3": true,
-    "prisma@7.8.0": true,
     "sharp@0.34.5": true,
-    "unrs-resolver@1.11.1": true
+    "unrs-resolver@1.11.1": true,
+    "@prisma/engines@7.10.1": true,
+    "prisma@7.10.1": true
   }
 }

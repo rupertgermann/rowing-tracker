@@ -4,6 +4,8 @@
 **Date:** 2026-05-08
 **Context owner:** mocap posture analysis (see `docs/prd-mocap-posture.md`)
 
+**Deployment scope (2026-11-11):** This ADR describes explicit personal BYOK mode (`NEXT_PUBLIC_AI_MODE=personal`). Hosted deployments currently disable all cloud AI; CommercialBeta must follow the stricter [hosted privacy boundary](../research/hosted-ai-privacy-boundary.md), which excludes mocap entirely.
+
 ## Context
 
 When `UserSettings.cloudAIEnabled` is on, the existing `aiAnalysis.ts` flow sends a context payload to a third-party LLM (Anthropic/OpenAI). The mocap PRD asks for posture data to be included in that context so the AI can correlate posture with performance.

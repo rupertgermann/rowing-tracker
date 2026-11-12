@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getMocapStorage } from "@/lib/mocap/storage";
+import { bumpUserSessionsRevision } from "@/lib/server/userSettings";
 
 const PatchBody = z.object({
   calibrationId: z.string().min(1).max(160).optional(),
@@ -71,7 +72,10 @@ export async function DELETE(
     console.error("Failed to delete motion-capture files:", error);
     return NextResponse.json({ error: "Failed to delete session files" }, { status: 500 });
   }
-  await prisma.mocapSession.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.mocapSession.delete({ where: { id } });
+    await bumpUserSessionsRevision(session.user.id, tx);
+  });
 
   return NextResponse.json({ success: true, id });
 }

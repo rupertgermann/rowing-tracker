@@ -1,26 +1,12 @@
 import { settings } from './settings';
 import { cloudAI } from './cloudAI';
-
-/**
- * AI Configuration Helper
- * 
- * This helper centralizes AI coach initialization logic and ensures
- * consistent behavior across all AI features (chat, insights, training plans).
- * 
- * Features:
- * - Reads AI settings from SettingsService (single source of truth)
- * - Initializes cloudAI with user's API key when enabled
- * - Falls back to environment variable if user hasn't configured AI
- * - Safe for client-side only usage with SSR guards
- * - Idempotent: can be called multiple times safely
- */
+import { isPersonalAIEnabled } from './aiMode';
 
 export interface AIConfigurationStatus {
   isConfigured: boolean;
   isUserEnabled: boolean;
   hasUserApiKey: boolean;
-  hasEnvApiKey: boolean;
-  source: 'user-settings' | 'environment' | 'none';
+  source: 'user-settings' | 'none';
 }
 
 /**
@@ -33,7 +19,7 @@ export interface AIConfigurationStatus {
  */
 export function initializeCloudAIFromSettings(): boolean {
   // Guard against SSR/non-browser environments
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+  if (!isPersonalAIEnabled() || typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return false;
   }
 
@@ -42,7 +28,6 @@ export function initializeCloudAIFromSettings(): boolean {
     
     // Check if user has explicitly enabled cloud AI
     if (!aiSettings.cloudAIEnabled) {
-      // User has disabled AI, don't initialize even if env key exists
       return false;
     }
 
@@ -50,14 +35,6 @@ export function initializeCloudAIFromSettings(): boolean {
     if (aiSettings.openaiApiKey && aiSettings.openaiApiKey.trim()) {
       const success = cloudAI.initialize(aiSettings.openaiApiKey);
       return success;
-    }
-
-    // Fallback: try environment variable if user hasn't provided key.
-    // Avoid calling cloudAI.initialize() with no key; this path is a normal
-    // configuration state, not a warning-worthy runtime failure.
-    const envApiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-    if (envApiKey && envApiKey.trim()) {
-      return cloudAI.initialize(envApiKey);
     }
 
     return false;
@@ -74,19 +51,17 @@ export function initializeCloudAIFromSettings(): boolean {
  * Useful for UI components to determine what state to show:
  * - Not configured (needs setup)
  * - Configured with user key (full functionality)
- * - Configured with env key (limited functionality)
  * - Disabled by user
  * 
  * @returns AIConfigurationStatus - detailed status information
  */
 export function getAIConfigurationStatus(): AIConfigurationStatus {
   // Guard against SSR/non-browser environments
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+  if (!isPersonalAIEnabled() || typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return {
       isConfigured: false,
       isUserEnabled: false,
       hasUserApiKey: false,
-      hasEnvApiKey: false,
       source: 'none'
     };
   }
@@ -96,18 +71,13 @@ export function getAIConfigurationStatus(): AIConfigurationStatus {
     const isUserEnabled = aiSettings.cloudAIEnabled;
     const hasUserApiKey = Boolean(aiSettings.openaiApiKey && aiSettings.openaiApiKey.trim());
     
-    // Check if environment key exists (without exposing it)
-    const hasEnvApiKey = Boolean(process.env.NEXT_PUBLIC_OPENAI_API_KEY);
-    
     // Determine if cloudAI is currently configured
     const isConfigured = cloudAI.isConfigured();
     
     // Determine the source of configuration
-    let source: 'user-settings' | 'environment' | 'none';
+    let source: 'user-settings' | 'none';
     if (isConfigured && hasUserApiKey && isUserEnabled) {
       source = 'user-settings';
-    } else if (isConfigured && hasEnvApiKey && isUserEnabled) {
-      source = 'environment';
     } else {
       source = 'none';
     }
@@ -116,7 +86,6 @@ export function getAIConfigurationStatus(): AIConfigurationStatus {
       isConfigured,
       isUserEnabled,
       hasUserApiKey,
-      hasEnvApiKey,
       source
     };
 
@@ -126,7 +95,6 @@ export function getAIConfigurationStatus(): AIConfigurationStatus {
       isConfigured: false,
       isUserEnabled: false,
       hasUserApiKey: false,
-      hasEnvApiKey: false,
       source: 'none'
     };
   }
@@ -151,13 +119,14 @@ export function isAIAvailable(): boolean {
  * @returns string - appropriate error message or null if no issues
  */
 export function getAIConfigurationErrorMessage(): string | null {
+  if (!isPersonalAIEnabled()) return 'Hosted AI is unavailable. Personal API keys are disabled in this deployment.';
   const status = getAIConfigurationStatus();
   
   if (!status.isUserEnabled) {
     return 'Cloud AI is disabled in settings. Enable it to use AI features.';
   }
   
-  if (!status.hasUserApiKey && !status.hasEnvApiKey) {
+  if (!status.hasUserApiKey) {
     return 'No OpenAI API key configured. Add your API key in Settings to use AI features.';
   }
   

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { applyRateLimit } from "@/lib/rateLimit";
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1, "Token is required"),
@@ -10,6 +11,9 @@ const resetPasswordSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const limited = await applyRateLimit(req, null, "auth");
+    if (limited) return limited;
+
     const body = await req.json();
     const result = resetPasswordSchema.safeParse(body);
 
@@ -60,21 +64,27 @@ export async function POST(req: Request) {
     // Hash new password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Update user password
-    await prisma.user.update({
-      where: { email: resetToken.email },
-      data: { passwordHash },
+    const reset = await prisma.$transaction(async (tx) => {
+      // Claim the still-valid token before changing the password; concurrent reuse loses.
+      const consumed = await tx.passwordResetToken.deleteMany({
+        where: { token, expires: { gt: new Date() } },
+      });
+      if (consumed.count !== 1) return false;
+
+      await tx.user.update({
+        where: { email: resetToken.email },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+      });
+      await tx.passwordResetToken.deleteMany({ where: { email: resetToken.email } });
+      return true;
     });
 
-    // Delete used reset token
-    await prisma.passwordResetToken.delete({
-      where: { token },
-    });
-
-    // Delete all other reset tokens for this email
-    await prisma.passwordResetToken.deleteMany({
-      where: { email: resetToken.email },
-    });
+    if (!reset) {
+      return NextResponse.json(
+        { error: "Invalid or expired reset token" },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({
       message: "Password reset successfully. You can now log in with your new password.",

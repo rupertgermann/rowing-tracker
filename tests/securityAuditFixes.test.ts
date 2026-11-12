@@ -157,13 +157,17 @@ test('memory allows its supported image and PDF signatures without the avatar 2 
 });
 test('memory metadata cannot lower stored file sizes or insert negative quota usage', async () => {
   const updates: object[] = [];
-  const handler = loadModule<Route>('src/app/api/memory/route.ts', {
-    ...sharedImports('alice'),
-    '@/lib/db/prisma': { prisma: { memoryDocument: {
+  const tx = {
+    $queryRaw: async () => [],
+    memoryDocument: {
       findFirst: async () => ({ id: 'doc', size: 100, filePath: 'memory/alice/doc.png' }),
       update: async ({ data }: { data: object }) => { updates.push(data); return data; },
       create: async () => { throw new Error('Negative size must not be saved'); },
-    } } },
+    },
+  };
+  const handler = loadModule<Route>('src/app/api/memory/route.ts', {
+    ...sharedImports('alice'),
+    '@/lib/db/prisma': { prisma: { $transaction: (run: (db: typeof tx) => unknown) => run(tx) } },
   });
   assert.equal((await handler.POST(request({ documents: [{ id: 'doc', size: 0, description: 'updated' }] }))).status, 200);
   assert.equal('size' in updates[0], false);
