@@ -1,5 +1,7 @@
 # Vorab-Screening für den kommerziellen Produktnamen
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Ticket:** [Choose a distinctive commercial brand](https://github.com/rupertgermann/rowing-tracker/issues/94)
 
 **Wayfinder-Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)

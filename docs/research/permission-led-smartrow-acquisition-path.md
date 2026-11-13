@@ -1,5 +1,7 @@
 # Erster erlaubnisbasierter Akquisitionspfad für die CommercialBeta
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Ticket:** [Choose the first permission-led acquisition path](https://github.com/rupertgermann/rowing-tracker/issues/93)
 
 **Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)

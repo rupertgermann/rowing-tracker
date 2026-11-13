@@ -1,5 +1,7 @@
 # Memorow brand pre-clearance
 
+> **Historical research.** Rowing Tracker dropped its monetization plans and has no paid plan. The current code is licensed under [GPLv3 only](../../LICENSE).
+
 **Issue:** [#94 — Choose a distinctive commercial brand](https://github.com/rupertgermann/rowing-tracker/issues/94)
 
 **Research window:** 2026-08-10, approximately 08:12–08:23 CEST

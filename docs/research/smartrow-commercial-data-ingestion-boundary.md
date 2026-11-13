@@ -1,5 +1,7 @@
 # Kommerziell sichere SmartRow-Datenübernahme
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Ticket:** [Determine the commercially safe SmartRow data-ingestion boundary](https://github.com/rupertgermann/rowing-tracker/issues/89)
 
 **Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)

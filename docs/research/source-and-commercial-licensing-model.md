@@ -1,11 +1,11 @@
 # Source- und kommerzielles Lizenzmodell
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE). Die frühere MIT-Veröffentlichung bleibt unter ihren ursprünglichen Bedingungen verfügbar.
+
 **Ticket:** [Choose the future source and commercial licensing model](https://github.com/rupertgermann/rowing-tracker/issues/90)
 
 **Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)
 **Stand:** 2026-08-02 · Recherchebericht, keine Rechtsberatung
-
-**Nachtrag vom 2026-11-11:** Die GPLv3-Lizenzierung des aktuellen Rowing-Tracker-Codes ersetzt die unten dokumentierte Lizenzentscheidung. Die frühere MIT-Veröffentlichung bleibt unter ihren ursprünglichen Bedingungen verfügbar. Maßgeblich für den aktuellen Stand ist der [Lizenzabschnitt der README](../../README.md#license).
 
 ## Entscheidung
 
