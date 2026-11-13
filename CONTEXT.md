@@ -4,42 +4,6 @@ Domain glossary for rowing-tracker. Terms here are canonical — use them in cod
 
 ## Glossary
 
-### CoreCustomer
-
-An individual SmartRow owner who imports and reviews their own workout data. Coaches, clubs, and rowers without SmartRow are outside the first monetization effort.
-
-_Avoid_: general rower, club customer, coach customer
-
-### PaidOutcome
-
-The CoreCustomer's measurable training improvement through personalized guidance and AI coaching based on imported workout data. Movement analysis is a possible later extension, not part of the CommercialBeta; data import, training history, and basic analytics are the free foundation.
-
-_Avoid_: premium features, paid tracking
-
-### PaidPlan
-
-A monthly or annual, cancellable subscription that gives a CoreCustomer ongoing access to the PaidOutcome. It is not a one-time purchase or lifetime entitlement.
-
-_Avoid_: lifetime deal, paid license, one-time upgrade
-
-### CommercialBeta
-
-An invitation-only hosted validation phase in which CoreCustomers import SmartRow CSV/ZIP exports without sharing SmartRow credentials. It excludes Mocap and FreeMoCap, and tests activation, repeated value, and real payment before a public commercial launch.
-
-_Avoid_: public launch, free preview
-
-### ActivatedRower
-
-A CoreCustomer who has completed a first manual workout import and viewed at least one useful result. Registration or a landing-page visit alone is not activation.
-
-_Avoid_: signup, visitor, lead
-
-### PayingRower
-
-An ActivatedRower who has made a non-zero payment for continued access to the PaidOutcome. Stated willingness to pay, waitlist registration, and free-trial use do not make someone a PayingRower.
-
-_Avoid_: interested user, likely buyer
-
 ### CapturePerspective
 
 Which physical viewpoint a mocap session was recorded from. Determines which posture metrics are computable.

@@ -1,5 +1,7 @@
 # Primärquellen-Vorprüfung für `RowingSage`
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Recherchezeitpunkt:** 2026-08-09, 21:58 CEST\
 **Namenspfad:** **REJECT als dritter privater Prototyp-Challenger**\
 **Bestehende Sage-Familie:** **`TempoSage` Agent DEMOTE / REVIEW**\

@@ -1,5 +1,7 @@
 # Unit Economics und belastbarer Preiskorridor für den Paid Plan
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Ticket:** [Establish unit economics and a defensible price corridor](https://github.com/rupertgermann/rowing-tracker/issues/92)
 
 **Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)

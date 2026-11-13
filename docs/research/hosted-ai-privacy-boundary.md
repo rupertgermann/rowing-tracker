@@ -1,5 +1,7 @@
 # Hosted-AI-Privacy-Grenze für CommercialBeta
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 Stand der Recherche: 2026-08-02
 Geltungsbereich: invite-only CommercialBeta von Rowing Tracker, manuell importierte eigene SmartRow-CSV/ZIP-Dateien, gehostetes KI-Coaching. Mocap/FreeMoCap, Live-FTMS, SmartRow-Login-Automation und andere Quellen sind nicht Teil dieser Freigabe.
 

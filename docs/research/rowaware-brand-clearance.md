@@ -1,5 +1,7 @@
 # RowAware: vorläufiges Markenregister- und Kollisionsscreening
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Recherchefenster:** 2026-08-09, 19:30–19:39 CEST (+02:00)
 
 **Geprüfte Registeroberflächen:** EUIPO eSearch plus, DPMAregister; WIPO Global Brand Database nur hinsichtlich Umfang und Nutzungsbedingungen, nicht mit automatisierten Markenabfragen

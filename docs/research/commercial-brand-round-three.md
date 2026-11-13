@@ -1,5 +1,7 @@
 # Kommerzielles Namensscreening – Runde 3
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Bezug:** [Issue #94 – Choose a distinctive commercial brand](https://github.com/rupertgermann/rowing-tracker/issues/94)
 
 **Recherchefenster:** 2026-08-09, ca. 19:55–20:20 CEST

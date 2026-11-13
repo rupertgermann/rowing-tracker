@@ -1,5 +1,7 @@
 # Erreichbares SmartRow-Kundensegment und Alternativen
 
+> **Historische Recherche.** Die Monetarisierungspläne für Rowing Tracker wurden eingestellt. Es gibt kein kostenpflichtiges Abo. Der aktuelle Code steht unter [GPLv3-only](../../LICENSE).
+
 **Ticket:** [Size the reachable SmartRow customer segment and alternatives](https://github.com/rupertgermann/rowing-tracker/issues/88)
 
 **Map:** [Wayfind the Rowing Tracker monetization model](https://github.com/rupertgermann/rowing-tracker/issues/87)  
